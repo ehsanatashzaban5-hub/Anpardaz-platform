@@ -194,6 +194,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      if(!w)throw new Error('withdrawal_not_found');
      if(!w.provider_code)throw new Error('withdrawal_provider_missing');
      if(w.status==='completed'||w.status==='cancelled')throw new Error('withdrawal_already_final');
+     if(w.approval_status!=='APPROVED')throw new Error('withdrawal_not_approved_for_reconcile');
      const providerWithdrawalId=supplied??w.provider_withdrawal_id;
      if(!providerWithdrawalId)throw new Error('provider_withdrawal_id_required_for_manual_reconcile');
      await client.query(
