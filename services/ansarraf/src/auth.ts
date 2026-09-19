@@ -73,8 +73,10 @@ export async function ensureCustomer(pool: Pool, auth: Claims) {
     'SELECT id,status FROM customers WHERE identity_id=$1 LIMIT 1',
     [auth.sub],
   );
-  if (existing.rows[0]?.status !== 'active') throw new Error('customer_inactive');
-  if (existing.rows[0]) return existing.rows[0].id;
+  if (existing.rows[0]) {
+    if (existing.rows[0].status !== 'active') throw new Error('customer_inactive');
+    return existing.rows[0].id;
+  }
 
   const result = await pool.query<{ id: string }>(
     'INSERT INTO customers(identity_id,external_user_id,email) VALUES($1,$1,$2) ON CONFLICT(identity_id) DO UPDATE SET email=EXCLUDED.email RETURNING id',
