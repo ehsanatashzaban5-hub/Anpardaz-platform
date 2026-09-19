@@ -86,6 +86,14 @@ export class ProviderExecutionWorker {
   }
 
   private async execute(row:any){
+    const payload=row.payload??{};
+    if(payload.quoteLockId){
+      await this.pool.query(
+        `UPDATE quote_locks SET status='CONSUMED',consumed_at=NOW(),consumed_by_operation_id=$1
+         WHERE id=$2 AND status='ACTIVE' AND expires_at>NOW()`,
+        [String(payload.operationId??'provider-execution:'+row.id),Number(payload.quoteLockId)]
+      );
+    }
     const q=await this.pool.query(
       `SELECT po.*,lp.code AS provider_code,lp.status AS provider_status
        FROM provider_orders po
