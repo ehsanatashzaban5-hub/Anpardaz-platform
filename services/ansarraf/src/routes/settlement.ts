@@ -1,6 +1,6 @@
 import type {FastifyInstance,FastifyRequest} from 'fastify';
 import type {Pool} from 'pg';
-import {createHash} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 
 const validId=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;
 const amount=(v:unknown)=>typeof v==='string'&&/^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/.test(v)&&v!=='0'&&!/^0\.0+$/.test(v);
@@ -146,9 +146,20 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
         await client.query('INSERT INTO wallets(customer_id,asset_id,available_balance) VALUES($1,$2,$3)',[seller.customer_id,seller.quote_asset_id,quoteAmount]);
       }
 
+      const operationId='ANSARRAF-TR-'+randomUUID();
       const trade=await client.query(
-        'INSERT INTO trades(order_id,counterparty_order_id,quantity,price,fee_amount,fee_asset_id,settlement_status,settlement_idempotency_key,settled_at) VALUES($1,$2,$3,$4,$5,$6,\'settled\',$7,NOW()) RETURNING *',
-        [order.id,other.id,q,String(b.price),feeAmount,feeAssetId,b.idempotencyKey]
+        'INSERT INTO trades(order_id,counterparty_order_id,quantity,price,fee_amount,fee_asset_id,settlement_status,settlement_idempotency_key,settled_at,operation_id,settlement_source,customer_fee_amount,provider_fee_amount,company_revenue_amount) VALUES($1,$2,$3,$4,$5,$6,\'settled\',$7,NOW(),$8,\'internal_match\',$9,0,0) RETURNING *',
+        [order.id,other.id,q,String(b.price),feeAmount,feeAssetId,b.idempotencyKey,operationId,feeAmount]
+      );
+      const tradeId=String(trade.rows[0].id);
+      await client.query(
+        `INSERT INTO asset_provenance(customer_id,asset_id,direction,amount,source_type,source_id,operation_id,ledger_entry_reference)
+         VALUES
+         ($1,$2,'CREDIT',$3,'TRADE', $5,$6,$5),
+         ($7,$2,'DEBIT',$3,'TRADE', $5,$6,$5),
+         ($8,$9,'CREDIT',$10,'TRADE', $5,$6,$5),
+         ($11,$9,'DEBIT',$10,'TRADE', $5,$6,$5)`,
+        [buyer.customer_id,buyer.base_asset_id,baseCredit.rows[0].amount,tradeId,operationId,seller.customer_id,buyer.customer_id,buyer.quote_asset_id,quoteAmount,seller.customer_id]
       );
 
       // Consume reservation portions. Fully consumed reservations are captured;
@@ -175,7 +186,8 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
           price:String(b.price),
           quoteAmount,
           feeAmount,
-          feeAssetId
+          feeAssetId,
+          operationId
         }]
       );
 
