@@ -145,10 +145,10 @@ export class ProviderReconciliationWorker{
           criticalCount++;
         }
         await this.pool.query(
-          `INSERT INTO provider_balance_reconciliations
-           (run_id,provider_code,asset_symbol,provider_available,provider_locked,provider_total,accounting_balance,difference,status)
-           VALUES($1,$2,$3,0,0,$4,$5,$6,$7)`,
-          [run.id,providerCode,symbol,walletTotal,accountingTotal,diff,status]
+          `INSERT INTO customer_balance_reconciliations
+           (run_id,asset_symbol,wallet_total,accounting_liability,difference,status)
+           VALUES($1,$2,$3,$4,$5,$6)`,
+          [run.id,symbol,walletTotal,accountingTotal,diff,status]
         );
       }
 
