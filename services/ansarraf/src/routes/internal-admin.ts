@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 
-const guard = (request: FastifyRequest, reply: { code: (n: number) => { send: (v: unknown) => unknown } }) => {
+const guard = async (request: FastifyRequest, reply: { code: (n: number) => { send: (v: unknown) => void } }): Promise<void> => {
   const expected = process.env.ANSARRAF_INTERNAL_TOKEN;
   if (!expected || request.headers.authorization !== `Bearer ${expected}`) return reply.code(401).send({ error: 'unauthorized' });
 };
