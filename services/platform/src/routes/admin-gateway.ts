@@ -20,28 +20,7 @@ async function fetchJson(url: string, init: RequestInit = {}, timeoutMs = 5000) 
   } finally {
     clearTimeout(timer);
   }
-  app.get<{ Params: { operationId: string } }>(
-    '/api/v1/admin/ecosystem/operations/:operationId/trace',
-    { preHandler: requireAuth },
-    async (request, reply) => {
-      const req = reqAuth(request);
-      if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
-      const operationId = request.params.operationId?.trim();
-      if (!operationId || operationId.length > 200) return reply.code(400).send({ error: 'invalid_operation_id' });
-      const ansarrafUrl = process.env.ANSARRAF_SERVICE_URL ?? 'http://localhost:4002';
-      const ansarrafToken = process.env.ANSARRAF_INTERNAL_TOKEN;
-      if (!ansarrafToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
-      const trace = await fetchJson(
-        `${ansarrafUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`,
-        { headers: { authorization: `Bearer ${ansarrafToken}` } },
-        Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS ?? 5000) + 2000,
-      );
-      if (!trace.ok) return reply.code(trace.status).send({ error: 'ansarraf_trace_unavailable', upstream: trace.body });
-      return trace.body;
-    },
-  );
 
-}
 
 export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   app.get('/api/v1/admin/ecosystem/health', { preHandler: requireAuth }, async (request, reply) => {
@@ -97,6 +76,27 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
           accounting: accounting.ok ? accounting.body : { unavailable: true, status: accounting.status, error: accounting.body },
         },
       };
+    },
+  );
+
+  app.get<{ Params: { operationId: string } }>(
+    '/api/v1/admin/ecosystem/operations/:operationId/trace',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const req = reqAuth(request);
+      if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
+      const operationId = request.params.operationId?.trim();
+      if (!operationId || operationId.length > 200) return reply.code(400).send({ error: 'invalid_operation_id' });
+      const ansarrafUrl = process.env.ANSARRAF_SERVICE_URL ?? 'http://localhost:4002';
+      const ansarrafToken = process.env.ANSARRAF_INTERNAL_TOKEN;
+      if (!ansarrafToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
+      const trace = await fetchJson(
+        `${ansarrafUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`,
+        { headers: { authorization: `Bearer ${ansarrafToken}` } },
+        Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS ?? 5000) + 2000,
+      );
+      if (!trace.ok) return reply.code(trace.status).send({ error: 'ansarraf_trace_unavailable', upstream: trace.body });
+      return trace.body;
     },
   );
 }
