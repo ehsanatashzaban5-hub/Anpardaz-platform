@@ -103,43 +103,50 @@ export class ProviderExecutionWorker {
     const order=q.rows[0];
     if(order.status==='FILLED'||order.status==='CANCELLED'||order.status==='REJECTED')return;
 
-    if(payload.quoteLockId && order.status==='REQUESTED'){
-      const lock=await this.pool.query(
-        `UPDATE quote_locks SET status='CONSUMED',consumed_at=NOW(),consumed_by_operation_id=$1
-         WHERE id=$2 AND status='ACTIVE' AND expires_at>NOW() RETURNING id`,
-        [String(payload.operationId??'provider-execution:'+row.id),Number(payload.quoteLockId)]
-      );
-      if(!lock.rows[0]){
-        const rejected:ProviderOrderResult={
-          providerOrderId:order.provider_order_id?String(order.provider_order_id):null,
-          clientOrderId:String(order.client_order_id),
-          status:'REJECTED',
-          executedQuantity:String(order.executed_quantity),
-          executedQuoteAmount:String(order.executed_quote_amount),
-          providerFeeAmount:String(order.provider_fee_amount),
-          providerFeeAssetSymbol:null,
-          raw:{reason:'quote_lock_unavailable_or_expired'}
-        };
-        await this.persistResult(Number(order.id),rejected);
-        await settleProviderExecution(this.pool,Number(order.id),rejected);
-        return;
-      }
-    }
-
     const adapter=this.registry.get(String(order.provider_code));
     if(!adapter||!this.registry.executionEnabled)throw new Error('provider_execution_not_enabled');
     if(order.provider_status!=='ACTIVE')throw new Error('provider_not_active');
 
-    // An UNKNOWN/timeout state is reconciled by clientOrderId/providerOrderId before any
-    // new submission. This prevents duplicate real orders after ambiguous network failures.
+    // Reconcile an ambiguous REQUESTED order before touching the quote lock. A worker can
+    // crash after the provider accepted an order but before provider_order_id/status was
+    // persisted; rejecting on an expired quote lock in that state could create a duplicate
+    // order on retry. Only submit after the provider explicitly reports the client order
+    // as absent.
     let result:ProviderOrderResult;
     if(order.status==='REQUESTED'){
+      let providerOrderFound=false;
       try{
         result=await adapter.getOrder(String(order.client_order_id),order.provider_order_id);
-        if(result.status==='UNKNOWN')throw new Error('provider_order_not_found_for_reconciliation');
+        if(result.status!=='UNKNOWN'){
+          providerOrderFound=true;
+        }else{
+          throw new Error('provider_order_not_found_for_reconciliation');
+        }
       }catch(error){
         const message=error instanceof Error?error.message:'provider_lookup_failed';
         if(!message.includes('404')&&!message.includes('not_found')&&!message.includes('NOT_FOUND'))throw error;
+        if(payload.quoteLockId){
+          const lock=await this.pool.query(
+            `UPDATE quote_locks SET status='CONSUMED',consumed_at=NOW(),consumed_by_operation_id=$1
+             WHERE id=$2 AND status='ACTIVE' AND expires_at>NOW() RETURNING id`,
+            [String(payload.operationId??'provider-execution:'+row.id),Number(payload.quoteLockId)]
+          );
+          if(!lock.rows[0]){
+            const rejected:ProviderOrderResult={
+              providerOrderId:order.provider_order_id?String(order.provider_order_id):null,
+              clientOrderId:String(order.client_order_id),
+              status:'REJECTED',
+              executedQuantity:String(order.executed_quantity),
+              executedQuoteAmount:String(order.executed_quote_amount),
+              providerFeeAmount:String(order.provider_fee_amount),
+              providerFeeAssetSymbol:null,
+              raw:{reason:'quote_lock_unavailable_or_expired_after_provider_absence_confirmed'}
+            };
+            await this.persistResult(Number(order.id),rejected);
+            await settleProviderExecution(this.pool,Number(order.id),rejected);
+            return;
+          }
+        }
         result=await adapter.submitOrder({
           clientOrderId:String(order.client_order_id),
           symbol:String(order.symbol),
@@ -148,6 +155,12 @@ export class ProviderExecutionWorker {
           quantity:String(order.quantity),
           ...(order.price!==null?{price:String(order.price)}:{})
         });
+      }
+      if(providerOrderFound){
+        await this.persistResult(Number(order.id),result);
+        if(result.executedQuantity!=='0'&&result.executedQuoteAmount!=='0')
+          await settleProviderExecution(this.pool,Number(order.id),result);
+        return;
       }
     }else{
       result=await adapter.getOrder(String(order.client_order_id),order.provider_order_id);
