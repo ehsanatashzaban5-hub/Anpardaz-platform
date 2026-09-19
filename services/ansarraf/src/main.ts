@@ -12,8 +12,10 @@ import { AccountingOutboxWorker } from './accounting-outbox.js';
 import { ProviderExecutionWorker } from './provider-execution-worker.js';
 import { ProviderWithdrawalWorker } from './provider-withdrawal-worker.js';
 import { ProviderReconciliationWorker } from './provider-reconciliation.js';
+import { validateAnSarrafProductionConfig } from './production-config.js';
 
 const isProduction=process.env.NODE_ENV==='production';
+validateAnSarrafProductionConfig(process.env);
 const requiredProduction=['DATABASE_URL','CORS_ORIGIN','IDENTITY_SERVICE_URL','IDENTITY_ISSUER','IDENTITY_PUBLIC_KEY_B64','ANSARRAF_INTERNAL_TOKEN','ACCOUNTING_SERVICE_URL','ACCOUNTING_INTERNAL_TOKEN'];
 if(isProduction){for(const name of requiredProduction){const value=process.env[name];if(!value||value.includes('CHANGE_ME')||value.includes('your-web-domain.example')||value.includes('your-domain.example')||value.includes('BASE64-DER-ED25519-PUBLIC-KEY'))throw new Error(`Production environment variable ${name} must be configured with a real value`);}}
 
