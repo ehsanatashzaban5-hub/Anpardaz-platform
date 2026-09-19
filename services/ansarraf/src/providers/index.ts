@@ -7,7 +7,7 @@ export function createProviderRegistry(){
   const registry=new Map<string,LiquidityProviderAdapter>();
   const code=(process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX').toUpperCase();
   const executionEnabled=bool(process.env.LIQUIDITY_PROVIDER_EXECUTION_ENABLED);
-  if(code==='WALLEX' && executionEnabled){
+  if(code==='WALLEX'){
     const key=process.env.WALLEX_API_KEY;
     const baseUrl=process.env.WALLEX_API_BASE_URL??'https://api.wallex.ir';
     if(key && !key.includes('CHANGE_ME') && !key.includes('local-secret-not-for-git')){
