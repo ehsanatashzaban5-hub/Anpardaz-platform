@@ -104,7 +104,7 @@ export class ProviderWithdrawalWorker{
         `INSERT INTO provider_withdrawal_outbox(withdrawal_id,event_type,idempotency_key,payload)
          VALUES($1,'provider.withdrawal.poll',$2,$3)
          ON CONFLICT(idempotency_key) DO NOTHING`,
-        [w.id,'ansarraf:withdrawal-poll:'+w.id+':'+Date.now(),{withdrawalId:w.id,providerCode}]);
+        [w.id,'ansarraf:withdrawal-poll:'+w.id+':'+String(result.providerWithdrawalId),{withdrawalId:w.id,providerCode,providerWithdrawalId:result.providerWithdrawalId}]);
     }
   }
   private async persistAndSettle(withdrawalId:number,result:ProviderWithdrawalResult){
