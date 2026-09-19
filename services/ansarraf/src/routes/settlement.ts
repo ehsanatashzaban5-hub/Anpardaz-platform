@@ -115,19 +115,31 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
       if(!reservationCheck.rows[0].valid)throw new Error('reservation_insufficient');
 
       // Consume locked quote from buyer and locked base from seller.
+      // For a sell-side base-asset fee, first top up the locked fee from the seller's available balance.
+      if(Number(feeAssetId)===Number(seller.base_asset_id) && feeAmount!=='0'){
+        const topped=await client.query(
+          'UPDATE wallets SET available_balance=available_balance-$1::numeric,locked_balance=locked_balance+$1::numeric WHERE id=$2 AND available_balance >= $1::numeric RETURNING id',
+          [feeAmount,sellerWallet.id]
+        );
+        if(!topped.rows[0])throw new Error('seller_fee_balance_insufficient');
+      }
       const bw=await client.query(
         'UPDATE wallets SET locked_balance=locked_balance-$1 WHERE id=$2 AND locked_balance >= $1 RETURNING id',
         [quoteAmount,buyerWallet.id]
       );
       if(!bw.rows[0])throw new Error('buyer_locked_balance_invariant_failed');
+      const sellerLockedDebit=feeAssetId!==null&&Number(feeAssetId)===Number(seller.base_asset_id)
+        ? (await client.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[q,feeAmount])).rows[0].amount
+        : q;
       const sw=await client.query(
         'UPDATE wallets SET locked_balance=locked_balance-$1 WHERE id=$2 AND locked_balance >= $1 RETURNING id',
-        [q,sellerWallet.id]
+        [sellerLockedDebit,sellerWallet.id]
       );
       if(!sw.rows[0])throw new Error('seller_locked_balance_invariant_failed');
 
       // Deliver assets. Buy-side base fee is taken from the received base asset.
-      const baseCredit=await client.query('SELECT ($1::numeric-$2::numeric)::text AS amount',[q,feeAssetId!==null?feeAmount:'0']);
+      const buyerBaseFee=order.side==='buy'&&feeAssetId!==null&&Number(feeAssetId)===Number(buyer.base_asset_id)?feeAmount:'0';
+      const baseCredit=await client.query('SELECT ($1::numeric-$2::numeric)::text AS amount',[q,buyerBaseFee]);
       const baseCreditCheck=await client.query('SELECT ($1::numeric >= 0) AS valid',[baseCredit.rows[0].amount]);
       if(!baseCreditCheck.rows[0].valid)throw new Error('fee_exceeds_base_fill');
 
