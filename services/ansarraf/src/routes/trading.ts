@@ -133,16 +133,16 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
  app.get('/api/v1/withdrawals',{preHandler:requireAuth},async(req)=>{const customer=await ensureCustomer(pool,r(req).auth);return{withdrawals:(await pool.query('SELECT w.*,a.symbol,a.name FROM withdrawals w JOIN assets a ON a.id=w.asset_id WHERE w.customer_id=$1 ORDER BY w.created_at DESC LIMIT 200',[customer])).rows};});
  app.post('/api/v1/withdrawals',{preHandler:requireAuth},async(req,reply)=>{
    const customer=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;
-   if(!id(b.assetId)||!amount(b.amount)||typeof b.network!=='string'||!b.network.trim()||b.network.length>50||typeof b.destination!=='string'||b.destination.length<10||b.destination.length>500||!idem(b.idempotencyKey))
+   if(!id(b.assetId)||!amount(b.amount)||typeof b.network!=='string'||!b.network.trim()||b.network.length>50||typeof b.destination!=='string'||b.destination.length<10||b.destination.length>500||(b.memo!=null&&(typeof b.memo!=='string'||b.memo.length>200))||!idem(b.idempotencyKey))
      return reply.code(400).send({error:'invalid_withdrawal'});
-   const requestFingerprint=fp({assetId:b.assetId,amount:b.amount,network:b.network.trim(),destination:b.destination.trim()});
+   const requestFingerprint=fp({assetId:b.assetId,amount:b.amount,network:b.network.trim(),destination:b.destination.trim(),memo:b.memo??null});
    const client=await pool.connect();
    try{
      await client.query('BEGIN');
      const existing=await client.query('SELECT * FROM withdrawals WHERE customer_id=$1 AND idempotency_key=$2 FOR UPDATE',[customer,b.idempotencyKey]);
      if(existing.rows[0]){
        const e=existing.rows[0];
-       const existingFingerprint=fp({assetId:e.asset_id,amount:e.amount,network:e.network,destination:e.destination});
+       const existingFingerprint=fp({assetId:e.asset_id,amount:e.amount,network:e.network,destination:e.destination,memo:e.destination_memo??null});
        if(existingFingerprint!==requestFingerprint){await client.query('ROLLBACK');return reply.code(409).send({error:'idempotency_key_reused'});}
        await client.query('ROLLBACK');return{withdrawal:e,idempotent:true};
      }
@@ -154,7 +154,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      const moved=await client.query('UPDATE wallets SET available_balance=available_balance-$1,locked_balance=locked_balance+$1 WHERE id=$2 AND available_balance >= $1 RETURNING id',[b.amount,wallet.rows[0].id]);
      if(!moved.rows[0])throw new Error('insufficient_available_balance');
      const operationId='ANSARRAF-WD-'+randomUUID();
-     const w=await client.query("INSERT INTO withdrawals(customer_id,asset_id,amount,network,destination,idempotency_key,operation_id,approval_status) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING') RETURNING *",[customer,b.assetId,b.amount,b.network.trim(),b.destination.trim(),b.idempotencyKey,operationId]);
+     const w=await client.query("INSERT INTO withdrawals(customer_id,asset_id,amount,network,destination,destination_memo,idempotency_key,operation_id,approval_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING') RETURNING *",[customer,b.assetId,b.amount,b.network.trim(),b.destination.trim(),b.memo??null,b.idempotencyKey,operationId]);
      await client.query('INSERT INTO withdrawal_reservations(withdrawal_id,wallet_id,asset_id,amount) VALUES($1,$2,$3,$4)',[w.rows[0].id,wallet.rows[0].id,b.assetId,b.amount]);
      await client.query('COMMIT');
      return reply.code(201).send({withdrawal:w.rows[0]});
@@ -163,6 +163,94 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      if(e instanceof Error&&e.message==='insufficient_available_balance')return reply.code(409).send({error:'insufficient_available_balance'});
      if(e instanceof Error&&e.message==='asset_not_available')return reply.code(400).send({error:'asset_not_available'});
      req.log.error(e);return reply.code(400).send({error:e instanceof Error?e.message:'withdrawal_creation_failed'});
+   }finally{client.release();}
+ });
+ app.post('/api/v1/withdrawals/:id/approve',{preHandler:requireAuth},async(req,reply)=>{
+   const auth=r(req).auth;
+   if(!['admin','super_admin','operator'].includes(auth.role))return reply.code(403).send({error:'forbidden'});
+   const wid=Number((req.params as any).id);
+   if(!Number.isSafeInteger(wid)||wid<=0)return reply.code(400).send({error:'invalid_withdrawal_id'});
+   const client=await pool.connect();
+   try{
+     await client.query('BEGIN');
+     const wq=await client.query(
+       `SELECT w.*,c.identity_id
+        FROM withdrawals w JOIN customers c ON c.id=w.customer_id
+        WHERE w.id=$1 FOR UPDATE`,[wid]);
+     const w=wq.rows[0];
+     if(!w)return reply.code(404).send({error:'withdrawal_not_found'});
+     if(w.identity_id===auth.sub)return reply.code(409).send({error:'self_approval_forbidden'});
+     if(w.approval_status!=='PENDING'||w.status!=='pending')return reply.code(409).send({error:'withdrawal_not_pending_approval'});
+     const asset=await client.query('SELECT symbol FROM assets WHERE id=$1',[w.asset_id]);
+     const threshold=process.env.WITHDRAWAL_DUAL_APPROVAL_THRESHOLD;
+     const requiresDual=threshold===undefined||threshold===''||threshold==='0'
+       ? true
+       : Number(w.amount)>=Number(threshold);
+     const requiredCount=requiresDual?2:1;
+     if(Number(w.approval_required_count)!==requiredCount){
+       await client.query('UPDATE withdrawals SET approval_required_count=$2 WHERE id=$1',[wid,requiredCount]);
+     }
+     const ins=await client.query(
+       `INSERT INTO withdrawal_approvals(withdrawal_id,approver_identity_id,decision)
+        VALUES($1,$2,'APPROVED')
+        ON CONFLICT(withdrawal_id,approver_identity_id) DO NOTHING
+        RETURNING id`,[wid,auth.sub]);
+     if(!ins.rows[0])return reply.code(409).send({error:'approval_already_recorded'});
+     const count=Number((await client.query(
+       "SELECT COUNT(*)::int AS count FROM withdrawal_approvals WHERE withdrawal_id=$1 AND decision='APPROVED'",[wid])).rows[0].count);
+     if(count>=requiredCount){
+       const provider=await client.query("SELECT id FROM liquidity_providers WHERE code=$1 AND status='ACTIVE' FOR UPDATE",[process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX']);
+       if(!provider.rows[0])throw new Error('provider_not_active');
+       await client.query(
+         `UPDATE withdrawals
+          SET approval_status='APPROVED',approved_count=$2,approved_by=$3,approved_at=NOW(),
+              liquidity_provider_id=$4,status='processing'
+          WHERE id=$1`,
+         [wid,count,auth.sub,provider.rows[0].id]);
+       await client.query(
+         `INSERT INTO provider_withdrawal_outbox(withdrawal_id,event_type,idempotency_key,payload)
+          VALUES($1,'provider.withdrawal.submit',$2,$3)
+          ON CONFLICT(idempotency_key) DO NOTHING`,
+         [wid,'ansarraf:withdrawal-submit:'+wid,{withdrawalId:wid,operationId:w.operation_id,providerCode:process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX'}]);
+     }else{
+       await client.query("UPDATE withdrawals SET approved_count=$2,approval_required_count=$3 WHERE id=$1",[wid,count,requiredCount]);
+     }
+     const result=await client.query('SELECT * FROM withdrawals WHERE id=$1',[wid]);
+     await client.query('COMMIT');
+     return{withdrawal:result.rows[0],requiredApprovals:requiredCount,approvedCount:count};
+   }catch(e){
+     await client.query('ROLLBACK');
+     req.log.error(e);
+     return reply.code(400).send({error:e instanceof Error?e.message:'withdrawal_approval_failed'});
+   }finally{client.release();}
+ });
+ app.post('/api/v1/withdrawals/:id/reject',{preHandler:requireAuth},async(req,reply)=>{
+   const auth=r(req).auth;
+   if(!['admin','super_admin','operator'].includes(auth.role))return reply.code(403).send({error:'forbidden'});
+   const wid=Number((req.params as any).id);
+   const reason=typeof (req.body as any)?.reason==='string'?String((req.body as any).reason).trim().slice(0,1000):'rejected_by_admin';
+   if(!Number.isSafeInteger(wid)||wid<=0)return reply.code(400).send({error:'invalid_withdrawal_id'});
+   const client=await pool.connect();
+   try{
+     await client.query('BEGIN');
+     const w=await client.query("SELECT w.*,c.identity_id FROM withdrawals w JOIN customers c ON c.id=w.customer_id WHERE w.id=$1 FOR UPDATE",[wid]);
+     if(!w.rows[0])throw new Error('withdrawal_not_found');
+     if(w.rows[0].identity_id===auth.sub)throw new Error('self_approval_forbidden');
+     if(w.rows[0].approval_status!=='PENDING'||w.rows[0].status!=='pending')throw new Error('withdrawal_not_pending_approval');
+     const rr=await client.query("SELECT * FROM withdrawal_reservations WHERE withdrawal_id=$1 AND status='active' FOR UPDATE",[wid]);
+     if(!rr.rows[0])throw new Error('withdrawal_reservation_missing');
+     const released=await client.query(
+       `UPDATE wallets SET locked_balance=locked_balance-$1::numeric,available_balance=available_balance+$1::numeric
+        WHERE id=$2 AND locked_balance >= $1::numeric RETURNING id`,[rr.rows[0].amount,rr.rows[0].wallet_id]);
+     if(!released.rows[0])throw new Error('withdrawal_reservation_release_failed');
+     await client.query("UPDATE withdrawal_reservations SET status='released',resolved_at=NOW() WHERE id=$1",[rr.rows[0].id]);
+     await client.query("INSERT INTO withdrawal_approvals(withdrawal_id,approver_identity_id,decision,reason) VALUES($1,$2,'REJECTED',$3) ON CONFLICT(withdrawal_id,approver_identity_id) DO UPDATE SET decision='REJECTED',reason=EXCLUDED.reason",[wid,auth.sub,reason]);
+     const x=await client.query("UPDATE withdrawals SET approval_status='REJECTED',rejection_reason=$2,status='cancelled',completed_at=NOW() WHERE id=$1 RETURNING *",[wid,reason]);
+     await client.query('COMMIT');
+     return{withdrawal:x.rows[0]};
+   }catch(e){
+     await client.query('ROLLBACK');
+     return reply.code(400).send({error:e instanceof Error?e.message:'withdrawal_rejection_failed'});
    }finally{client.release();}
  });
  app.post('/api/v1/withdrawals/:id/cancel',{preHandler:requireAuth},async(req,reply)=>{
