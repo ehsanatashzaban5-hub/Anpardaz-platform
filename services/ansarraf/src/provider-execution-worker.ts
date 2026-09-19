@@ -87,14 +87,6 @@ export class ProviderExecutionWorker {
 
   private async execute(row:any){
     const payload=row.payload??{};
-    if(payload.quoteLockId){
-      const lock=await this.pool.query(
-        `UPDATE quote_locks SET status='CONSUMED',consumed_at=NOW(),consumed_by_operation_id=$1
-         WHERE id=$2 AND status='ACTIVE' AND expires_at>NOW() RETURNING id`,
-        [String(payload.operationId??'provider-execution:'+row.id),Number(payload.quoteLockId)]
-      );
-      if(!lock.rows[0] && String(row.event_type)==='provider.order.execute')throw new Error('quote_lock_unavailable_or_expired');
-    }
     const q=await this.pool.query(
       `SELECT po.*,lp.code AS provider_code,lp.status AS provider_status
        FROM provider_orders po
@@ -106,6 +98,15 @@ export class ProviderExecutionWorker {
     if(!q.rows[0])throw new Error('provider_order_not_found');
     const order=q.rows[0];
     if(order.status==='FILLED'||order.status==='CANCELLED'||order.status==='REJECTED')return;
+
+    if(payload.quoteLockId && order.status==='REQUESTED'){
+      const lock=await this.pool.query(
+        `UPDATE quote_locks SET status='CONSUMED',consumed_at=NOW(),consumed_by_operation_id=$1
+         WHERE id=$2 AND status='ACTIVE' AND expires_at>NOW() RETURNING id`,
+        [String(payload.operationId??'provider-execution:'+row.id),Number(payload.quoteLockId)]
+      );
+      if(!lock.rows[0])throw new Error('quote_lock_unavailable_or_expired');
+    }
 
     const adapter=this.registry.get(String(order.provider_code));
     if(!adapter||!this.registry.executionEnabled)throw new Error('provider_execution_not_enabled');
