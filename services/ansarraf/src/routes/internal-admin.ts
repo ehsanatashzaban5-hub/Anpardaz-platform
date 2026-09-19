@@ -201,6 +201,4 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
       };
     },
   );
-
-  );
 }
