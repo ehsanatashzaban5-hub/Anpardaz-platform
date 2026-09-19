@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS withdrawal_approvals (
 
 ALTER TABLE withdrawals
   ADD COLUMN IF NOT EXISTS liquidity_provider_id BIGINT REFERENCES liquidity_providers(id),
+  ADD COLUMN IF NOT EXISTS destination_memo TEXT,
   ADD COLUMN IF NOT EXISTS approval_required_count INTEGER NOT NULL DEFAULT 1
     CHECK (approval_required_count BETWEEN 1 AND 2),
   ADD COLUMN IF NOT EXISTS approved_count INTEGER NOT NULL DEFAULT 0
