@@ -44,7 +44,7 @@ export class ProviderWithdrawalWorker{
          SET status=$2,available_at=CASE WHEN $2='failed' THEN NOW()+($3::text)::interval ELSE available_at END,
              processing_started_at=NULL,last_error=$4
          WHERE id=$1 AND status='processing'`,
-        [row.id,terminal?'failed':'failed',seconds+' seconds',message.slice(0,2000)]);
+        [row.id,terminal?'manual_review':'failed',seconds+' seconds',message.slice(0,2000)]);
       this.log.error({outboxId:row.id,attempts:row.attempts,error},'provider withdrawal event failed');
     }
     return true;
@@ -81,8 +81,13 @@ export class ProviderWithdrawalWorker{
           });
         }catch(error){
           const message=error instanceof Error?error.message:'provider_withdrawal_submission_failed';
-          if(message.includes('wallex_http_4')||message.includes('wallex_http_422'))
-            throw new Error(message);
+          if(/^wallex_http_(400|401|403|422):/.test(message)){
+            await this.persistAndSettle(Number(w.id),{
+              providerWithdrawalId:null,status:'FAILED',amount:String(w.amount),feeAmount:'0',txHash:null,
+              raw:{error:message}
+            });
+            return;
+          }
           throw new Error('withdrawal_unknown_after_submission:'+message);
         }
       }
@@ -99,7 +104,7 @@ export class ProviderWithdrawalWorker{
         `INSERT INTO provider_withdrawal_outbox(withdrawal_id,event_type,idempotency_key,payload)
          VALUES($1,'provider.withdrawal.poll',$2,$3)
          ON CONFLICT(idempotency_key) DO NOTHING`,
-        [w.id,'ansarraf:withdrawal-poll:'+w.id,{withdrawalId:w.id,providerCode}]);
+        [w.id,'ansarraf:withdrawal-poll:'+w.id+':'+Date.now(),{withdrawalId:w.id,providerCode}]);
     }
   }
   private async persistAndSettle(withdrawalId:number,result:ProviderWithdrawalResult){
@@ -142,15 +147,17 @@ export class ProviderWithdrawalWorker{
         }
         await client.query("UPDATE withdrawals SET completed_at=NOW() WHERE id=$1",[withdrawalId]);
       }
-      await client.query(
-        `INSERT INTO accounting_outbox(event_type,aggregate_type,aggregate_id,idempotency_key,payload)
-         VALUES('exchange.withdrawal.settled','withdrawal',$1,$2,$3)
-         ON CONFLICT(idempotency_key) DO NOTHING`,
-        [withdrawalId,'ansarraf:withdrawal-settlement:'+withdrawalId,{
-          withdrawalId,customerId:w.customer_id,assetId:w.asset_id,assetSymbol:w.symbol,
-          amount:w.amount,providerCode:w.provider_code??null,providerWithdrawalId:result.providerWithdrawalId,
-          providerFeeAmount:result.feeAmount,txHash:result.txHash,status:result.status,operationId:w.operation_id
-        }]);
+      if(result.status==='COMPLETED'){
+        await client.query(
+          `INSERT INTO accounting_outbox(event_type,aggregate_type,aggregate_id,idempotency_key,payload)
+           VALUES('exchange.withdrawal.settled','withdrawal',$1,$2,$3)
+           ON CONFLICT(idempotency_key) DO NOTHING`,
+          [withdrawalId,'ansarraf:withdrawal-settlement:'+withdrawalId,{
+            withdrawalId,customerId:w.customer_id,assetId:w.asset_id,assetSymbol:w.symbol,
+            amount:w.amount,providerCode:w.provider_code??null,providerWithdrawalId:result.providerWithdrawalId,
+            providerFeeAmount:result.feeAmount,txHash:result.txHash,status:result.status,operationId:w.operation_id
+          }]);
+      }
       await client.query('COMMIT');
     }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
   }
