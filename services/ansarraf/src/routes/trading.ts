@@ -165,6 +165,54 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      req.log.error(e);return reply.code(400).send({error:e instanceof Error?e.message:'withdrawal_creation_failed'});
    }finally{client.release();}
  });
+ app.get('/api/v1/admin/withdrawals',{preHandler:requireAuth},async(req,reply)=>{
+   if(!['admin','super_admin','operator','support'].includes(r(req).auth.role))return reply.code(403).send({error:'forbidden'});
+   const q=req.query as any;
+   const status=typeof q.status==='string'?q.status:null;
+   const rows=await pool.query(
+     `SELECT w.*,a.symbol,c.identity_id,lp.code AS provider_code
+      FROM withdrawals w
+      JOIN assets a ON a.id=w.asset_id
+      JOIN customers c ON c.id=w.customer_id
+      LEFT JOIN liquidity_providers lp ON lp.id=w.liquidity_provider_id
+      WHERE ($1::text IS NULL OR w.status=$1)
+      ORDER BY w.created_at DESC LIMIT 500`,[status]);
+   return{withdrawals:rows.rows};
+ });
+ app.post('/api/v1/admin/withdrawals/:id/reconcile',{preHandler:requireAuth},async(req,reply)=>{
+   if(!['admin','super_admin','operator'].includes(r(req).auth.role))return reply.code(403).send({error:'forbidden'});
+   const wid=Number((req.params as any).id);
+   const supplied=typeof (req.body as any)?.providerWithdrawalId==='string'?String((req.body as any).providerWithdrawalId).trim():null;
+   if(!Number.isSafeInteger(wid)||wid<=0)return reply.code(400).send({error:'invalid_withdrawal_id'});
+   const client=await pool.connect();
+   try{
+     await client.query('BEGIN');
+     const w=(await client.query(
+       `SELECT w.*,lp.code AS provider_code
+        FROM withdrawals w LEFT JOIN liquidity_providers lp ON lp.id=w.liquidity_provider_id
+        WHERE w.id=$1 FOR UPDATE`,[wid])).rows[0];
+     if(!w)throw new Error('withdrawal_not_found');
+     if(!w.provider_code)throw new Error('withdrawal_provider_missing');
+     if(w.status==='completed'||w.status==='cancelled')throw new Error('withdrawal_already_final');
+     const providerWithdrawalId=supplied??w.provider_withdrawal_id;
+     if(!providerWithdrawalId)throw new Error('provider_withdrawal_id_required_for_manual_reconcile');
+     await client.query(
+       `UPDATE withdrawals
+        SET provider_withdrawal_id=$2,status='processing'
+        WHERE id=$1`,[wid,providerWithdrawalId]);
+     await client.query(
+       `INSERT INTO provider_withdrawal_outbox(withdrawal_id,event_type,idempotency_key,payload)
+        VALUES($1,'provider.withdrawal.poll',$2,$3)
+        ON CONFLICT(idempotency_key) DO NOTHING`,
+       [wid,'ansarraf:manual-withdrawal-poll:'+wid+':'+Date.now(),{withdrawalId:wid,providerCode:w.provider_code,manual:true}]);
+     const result=await client.query('SELECT * FROM withdrawals WHERE id=$1',[wid]);
+     await client.query('COMMIT');
+     return{withdrawal:result.rows[0],queued:true};
+   }catch(e){
+     await client.query('ROLLBACK');
+     return reply.code(400).send({error:e instanceof Error?e.message:'withdrawal_reconcile_failed'});
+   }finally{client.release();}
+ });
  app.post('/api/v1/withdrawals/:id/approve',{preHandler:requireAuth},async(req,reply)=>{
    const auth=r(req).auth;
    if(!['admin','super_admin','operator'].includes(auth.role))return reply.code(403).send({error:'forbidden'});
