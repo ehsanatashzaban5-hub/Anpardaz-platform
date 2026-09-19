@@ -204,7 +204,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
        `INSERT INTO provider_withdrawal_outbox(withdrawal_id,event_type,idempotency_key,payload)
         VALUES($1,'provider.withdrawal.poll',$2,$3)
         ON CONFLICT(idempotency_key) DO NOTHING`,
-       [wid,'ansarraf:manual-withdrawal-poll:'+wid+':'+Date.now(),{withdrawalId:wid,providerCode:w.provider_code,manual:true}]);
+       [wid,'ansarraf:manual-withdrawal-poll:'+wid+':'+providerWithdrawalId,{withdrawalId:wid,providerCode:w.provider_code,providerWithdrawalId,manual:true}]);
      const result=await client.query('SELECT * FROM withdrawals WHERE id=$1',[wid]);
      await client.query('COMMIT');
      return{withdrawal:result.rows[0],queued:true};
