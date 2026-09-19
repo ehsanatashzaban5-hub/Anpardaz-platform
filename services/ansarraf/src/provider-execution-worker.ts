@@ -143,6 +143,15 @@ export class ProviderExecutionWorker {
   private async persistResult(providerOrderId:number,result:ProviderOrderResult){
     const status=result.status;
     const terminal=status==='FILLED'||status==='CANCELLED'||status==='REJECTED';
+    let feeAssetId:null|number=null;
+    if(result.providerFeeAssetSymbol){
+      const asset=await this.pool.query(
+        "SELECT id FROM assets WHERE symbol=$1 AND status='active'",
+        [String(result.providerFeeAssetSymbol).toUpperCase()]
+      );
+      if(!asset.rows[0])throw new Error('provider_fee_asset_not_found');
+      feeAssetId=Number(asset.rows[0].id);
+    }
     await this.pool.query(
       `UPDATE provider_orders
        SET provider_order_id=COALESCE($2,provider_order_id),
@@ -150,7 +159,8 @@ export class ProviderExecutionWorker {
            executed_quantity=$4,
            executed_quote_amount=$5,
            provider_fee_amount=$6,
-           raw_response=$7,
+           provider_fee_asset_id=COALESCE($7,provider_fee_asset_id),
+           raw_response=$8,
            submitted_at=CASE WHEN $3<>'REQUESTED' THEN COALESCE(submitted_at,NOW()) ELSE submitted_at END,
            executed_at=CASE WHEN $3='FILLED' THEN NOW() ELSE executed_at END,
            last_checked_at=NOW(),
@@ -163,6 +173,7 @@ export class ProviderExecutionWorker {
         result.executedQuantity,
         result.executedQuoteAmount,
         result.providerFeeAmount,
+        feeAssetId,
         JSON.stringify(result.raw??{})
       ]
     );
