@@ -87,9 +87,6 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      const reservation=await client.query("SELECT * FROM wallet_reservations WHERE order_id=$1 AND status='active' FOR UPDATE",[orderId]);
      if(!reservation.rows[0])throw new Error('wallet_reservation_missing');
      const rr=reservation.rows[0];
-     const released=await client.query('UPDATE wallets SET locked_balance=locked_balance-$1,available_balance=available_balance+$1 WHERE id=$2 AND locked_balance >= $1 RETURNING id',[rr.amount,rr.wallet_id]);
-     if(!released.rows[0])throw new Error('wallet_reservation_invariant_failed');
-     await client.query("UPDATE wallet_reservations SET status='released',resolved_at=NOW() WHERE id=$1",[rr.id]);
      const providerOrder=await client.query(
        `SELECT id,status,client_order_id
         FROM provider_orders
@@ -119,6 +116,10 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
            {providerOrderId:po.id,orderId,clientOrderId:String(po.client_order_id),operationId:'ANSARRAF-CANCEL-'+orderId}
          ]
        );
+     }else{
+       const released=await client.query('UPDATE wallets SET locked_balance=locked_balance-$1,available_balance=available_balance+$1 WHERE id=$2 AND locked_balance >= $1 RETURNING id',[rr.amount,rr.wallet_id]);
+       if(!released.rows[0])throw new Error('wallet_reservation_invariant_failed');
+       await client.query("UPDATE wallet_reservations SET status='released',resolved_at=NOW() WHERE id=$1",[rr.id]);
      }
      const x=await client.query("UPDATE orders SET status='cancelled',reserved_asset_id=NULL,reserved_amount=0 WHERE id=$1 RETURNING *",[orderId]);
      await client.query('COMMIT');return{order:x.rows[0]};
