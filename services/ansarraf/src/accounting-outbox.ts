@@ -28,6 +28,7 @@ export class AccountingOutboxWorker{
   private async postTrade(row:any){
     const p=row.payload??{};
     if(row.event_type==='exchange.provider_trade.settled')return this.postProviderTrade(row,p);
+    if(row.event_type==='exchange.withdrawal.settled')return this.postWithdrawal(row,p);
     if(row.event_type!=='exchange.trade.settled')throw new Error('unsupported_accounting_event');const required=['tradeId','buyerCustomerId','sellerCustomerId','baseAssetId','quoteAssetId','quantity','quoteAmount'];
     for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_outbox_field:'+key);
     const base=await this.asset(Number(p.baseAssetId));const quote=await this.asset(Number(p.quoteAssetId));
@@ -100,6 +101,28 @@ export class AccountingOutboxWorker{
           {accountId:providerQuote,currency:quote.symbol,direction:'debit',amount:quoteAmount,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_quote_received'}},
           {accountId:customerQuote,currency:quote.symbol,direction:'credit',amount:quoteAmount,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'customer_quote'}}
         ]
+    });
+  }
+  private async postWithdrawal(row:any,p:any){
+    const required=['withdrawalId','customerId','assetId','assetSymbol','amount','providerCode','providerFeeAmount'];
+    for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_withdrawal_outbox_field:'+key);
+    const customer=await this.ensureAccount(Number(p.customerId),String(p.assetSymbol));
+    const provider=await this.ensureProviderAssetAccount(String(p.providerCode),String(p.assetSymbol));
+    const expense=await this.ensureProviderExpenseAccount(String(p.providerCode),String(p.assetSymbol));
+    const amount=String(p.amount);
+    const fee=String(p.providerFeeAmount??'0');
+    const providerCredit=(await this.pool.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[amount,fee])).rows[0].amount;
+    const entries:any[]=[
+      {accountId:customer,currency:String(p.assetSymbol),direction:'debit',amount,metadata:{withdrawalId:p.withdrawalId,providerWithdrawalId:p.providerWithdrawalId,type:'customer_withdrawal'}},
+      {accountId:provider,currency:String(p.assetSymbol),direction:'credit',amount:providerCredit,metadata:{withdrawalId:p.withdrawalId,providerWithdrawalId:p.providerWithdrawalId,type:'provider_asset_sent'}}
+    ];
+    if(fee!=='0')entries.splice(1,0,{accountId:expense,currency:String(p.assetSymbol),direction:'debit',amount:fee,metadata:{withdrawalId:p.withdrawalId,providerWithdrawalId:p.providerWithdrawalId,type:'provider_withdrawal_fee'}});
+    await this.postLedger({
+      referenceType:'exchange_withdrawal',
+      referenceId:String(p.withdrawalId),
+      idempotencyKey:row.idempotency_key,
+      description:'Crypto withdrawal '+p.withdrawalId,
+      entries
     });
   }
   private async ensureProviderAssetAccount(providerCode:string,symbol:string){
