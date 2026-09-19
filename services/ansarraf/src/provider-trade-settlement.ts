@@ -197,6 +197,19 @@ export async function settleProviderExecution(pool:Pool,providerOrderId:number,r
       return {settled:false,quarantined:false,reason:'settlement_already_exists'};
     }
 
+    const baseProvenanceAmount=po.customer_side==='buy'
+      ? (await client.query('SELECT ($1::numeric-$2::numeric)::text AS amount',[d.quantity,fee.customerFeeAmount])).rows[0].amount
+      : (await client.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[d.quantity,fee.customerFeeAmount])).rows[0].amount;
+    const quoteDirection=po.customer_side==='buy'?'DEBIT':'CREDIT';
+    const baseDirection=po.customer_side==='buy'?'CREDIT':'DEBIT';
+    await client.query(
+      `INSERT INTO asset_provenance(customer_id,asset_id,direction,amount,source_type,source_id,operation_id,ledger_entry_reference)
+       VALUES
+       ($1,$2,$3,$4,'PROVIDER_TRADE_SETTLEMENT',$5,$6,$5),
+       ($1,$7,$8,$9,'PROVIDER_TRADE_SETTLEMENT',$5,$6,$5)`,
+      [po.customer_id,po.base_asset_id,baseDirection,baseProvenanceAmount,String(inserted.rows[0].id),operationId,po.quote_asset_id,quoteDirection,d.quote_amount]
+    );
+
     const targetQty=await client.query(
       `SELECT ($1::numeric+$2::numeric)::text AS value`,
       [po.settled_quantity,d.quantity]
