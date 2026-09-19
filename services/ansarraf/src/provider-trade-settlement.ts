@@ -263,13 +263,44 @@ export async function settleProviderExecution(pool:Pool,providerOrderId:number,r
       [providerOrderId,targetQty.rows[0].value,targetQuote.rows[0].value,targetFee.rows[0].value,full.rows[0].valid]
     );
 
+    const consumedReservationAmount=po.customer_side==='buy'
+      ? d.quote_amount
+      : (await client.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[d.quantity,fee.customerFeeAmount])).rows[0].amount;
     await client.query(
       `UPDATE orders
        SET status=CASE WHEN $2 THEN 'filled' ELSE 'partially_filled' END,
            reserved_amount=GREATEST(reserved_amount-$3::numeric,0)
        WHERE id=$1`,
-      [po.customer_order_id,full.rows[0].valid,po.customer_side==='buy'?d.quote_amount:(await client.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[d.quantity,fee.customerFeeAmount])).rows[0].amount]
+      [po.customer_order_id,full.rows[0].valid,consumedReservationAmount]
     );
+
+    if(full.rows[0].valid){
+      const reservation=await client.query(
+        "SELECT * FROM wallet_reservations WHERE order_id=$1 AND status='active' FOR UPDATE",
+        [po.customer_order_id]
+      );
+      if(reservation.rows[0]){
+        const rr=reservation.rows[0];
+        const unused=(await client.query(
+          'SELECT (amount-consumed_amount)::text AS amount FROM wallet_reservations WHERE id=$1',
+          [rr.id]
+        )).rows[0].amount;
+        const positive=(await client.query('SELECT ($1::numeric>0) AS valid',[unused])).rows[0].valid;
+        if(positive){
+          const released=await client.query(
+            `UPDATE wallets
+             SET locked_balance=locked_balance-$1::numeric,
+                 available_balance=available_balance+$1::numeric
+             WHERE id=$2 AND locked_balance >= $1::numeric
+             RETURNING id`,
+            [unused,rr.wallet_id]
+          );
+          if(!released.rows[0])throw new Error('provider_unused_reservation_release_failed');
+        }
+        await client.query("UPDATE wallet_reservations SET status='released',resolved_at=NOW() WHERE id=$1",[rr.id]);
+      }
+      await client.query("UPDATE orders SET reserved_asset_id=NULL,reserved_amount=0 WHERE id=$1",[po.customer_order_id]);
+    }
 
     await client.query(
       `INSERT INTO accounting_outbox(event_type,aggregate_type,aggregate_id,idempotency_key,payload)
