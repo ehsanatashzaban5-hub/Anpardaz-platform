@@ -65,6 +65,32 @@ export async function settleProviderExecution(pool:Pool,providerOrderId:number,r
            WHERE id=$1`,
           [providerOrderId]
         );
+      }else if(result.status==='CANCELLED'||result.status==='REJECTED'){
+        const reservation=await client.query(
+          "SELECT * FROM wallet_reservations WHERE order_id=$1 AND status='active' FOR UPDATE",
+          [po.customer_order_id]
+        );
+        if(reservation.rows[0]){
+          const rr=reservation.rows[0];
+          const released=await client.query(
+            `UPDATE wallets
+             SET locked_balance=locked_balance-$1::numeric,
+                 available_balance=available_balance+$1::numeric
+             WHERE id=$2 AND locked_balance >= $1::numeric
+             RETURNING id`,
+            [await client.query('SELECT (amount-consumed_amount)::text AS amount FROM wallet_reservations WHERE id=$1',[rr.id]).then(x=>x.rows[0].amount),rr.wallet_id]
+          );
+          if(!released.rows[0])throw new Error('provider_cancel_reservation_release_failed');
+          await client.query("UPDATE wallet_reservations SET status='released',resolved_at=NOW() WHERE id=$1",[rr.id]);
+        }
+        await client.query(
+          "UPDATE orders SET status='cancelled',reserved_asset_id=NULL,reserved_amount=0 WHERE id=$1",
+          [po.customer_order_id]
+        );
+        await client.query(
+          `UPDATE provider_orders SET settlement_status='SETTLED',updated_at=NOW() WHERE id=$1`,
+          [providerOrderId]
+        );
       }
       await client.query('COMMIT');
       return {settled:false,quarantined:false,reason:'no_new_execution'};
