@@ -36,7 +36,16 @@ export class AccountingOutboxWorker{
     const buyerQuote=await this.ensureAccount(Number(p.buyerCustomerId),quote.symbol);const sellerQuote=await this.ensureAccount(Number(p.sellerCustomerId),quote.symbol);
     const customerFee=String(p.customerFeeAmount??p.feeAmount??'0');
     const netBase=await this.pool.query('SELECT ($1::numeric-$2::numeric)::text AS amount',[String(p.quantity),customerFee]);
-    const baseEntries:any[]=[{accountId:buyerBase,currency:base.symbol,direction:'credit',amount:netBase.rows[0].amount,metadata:{tradeId:p.tradeId,asset:'base'}},{accountId:sellerBase,currency:base.symbol,direction:'debit',amount:String(p.quantity),metadata:{tradeId:p.tradeId,asset:'base'}}];
+    const sellerDebit=await this.pool.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[String(p.quantity),customerFee]);
+    const baseEntries:any[]=String(p.side)==='sell'
+      ? [
+        {accountId:buyerBase,currency:base.symbol,direction:'credit',amount:String(p.quantity),metadata:{tradeId:p.tradeId,asset:'base'}},
+        {accountId:sellerBase,currency:base.symbol,direction:'debit',amount:sellerDebit.rows[0].amount,metadata:{tradeId:p.tradeId,asset:'base'}}
+      ]
+      : [
+        {accountId:buyerBase,currency:base.symbol,direction:'credit',amount:netBase.rows[0].amount,metadata:{tradeId:p.tradeId,asset:'base'}},
+        {accountId:sellerBase,currency:base.symbol,direction:'debit',amount:String(p.quantity),metadata:{tradeId:p.tradeId,asset:'base'}}
+      ];
     if(customerFee!=='0')baseEntries.push({accountId:revenueBase,currency:base.symbol,direction:'credit',amount:customerFee,metadata:{tradeId:p.tradeId,asset:'base',type:'customer_fee'}});
     await this.postLedger({referenceType:'exchange_trade_base',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':base',description:'Exchange trade '+p.tradeId+' base settlement',entries:baseEntries});
     await this.postLedger({referenceType:'exchange_trade_quote',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':quote',description:'Exchange trade '+p.tradeId+' quote settlement',entries:[{accountId:sellerQuote,currency:quote.symbol,direction:'credit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}},{accountId:buyerQuote,currency:quote.symbol,direction:'debit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}}]});
