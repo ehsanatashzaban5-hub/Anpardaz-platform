@@ -85,7 +85,6 @@ export class ProviderExecutionWorker {
   }
 
   private async execute(row:any){
-    const p=row.payload??{};
     const q=await this.pool.query(
       `SELECT po.*,lp.code AS provider_code,lp.status AS provider_status
        FROM provider_orders po
