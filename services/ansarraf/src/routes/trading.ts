@@ -1,6 +1,6 @@
 import type {FastifyInstance,FastifyRequest} from 'fastify';
 import type {Pool} from 'pg';
-import {createHash} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
 type R=FastifyRequest&{auth:AuthClaims};const r=(x:FastifyRequest)=>x as R;
 const dec=/^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/;const amount=(v:unknown)=>typeof v==='string'&&dec.test(v)&&v!=='0'&&!/^0\.0+$/.test(v);const id=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;const idem=(v:unknown)=>typeof v==='string'&&v.length>=8&&v.length<=200;const fp=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
@@ -93,6 +93,60 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
  app.get('/api/v1/deposits',{preHandler:requireAuth},async(req)=>{const customer=await ensureCustomer(pool,r(req).auth);return{deposits:(await pool.query('SELECT d.*,a.symbol,a.name FROM deposits d JOIN assets a ON a.id=d.asset_id WHERE d.customer_id=$1 ORDER BY d.created_at DESC LIMIT 200',[customer])).rows};});
  app.post('/api/v1/deposits',{preHandler:requireAuth},async(req,reply)=>{const customer=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;if(!id(b.assetId)||!amount(b.amount)||typeof b.network!=='string'||!b.network.trim()||b.network.length>50||!idem(b.idempotencyKey))return reply.code(400).send({error:'invalid_deposit'});const requestFingerprint=fp({assetId:b.assetId,amount:b.amount,network:b.network.trim(),externalReference:b.externalReference??null});try{const x=await pool.query('INSERT INTO deposits(customer_id,asset_id,amount,network,external_reference,idempotency_key) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',[customer,b.assetId,b.amount,b.network.trim(),b.externalReference??null,b.idempotencyKey]);return reply.code(201).send({deposit:x.rows[0]});}catch(e:any){if(e?.code==='23505'){const x=await pool.query('SELECT * FROM deposits WHERE customer_id=$1 AND idempotency_key=$2',[customer,b.idempotencyKey]);const existing=x.rows[0];if(existing){const existingFingerprint=fp({assetId:existing.asset_id,amount:existing.amount,network:existing.network,externalReference:existing.external_reference??null});if(existingFingerprint!==requestFingerprint)return reply.code(409).send({error:'idempotency_key_reused'});return{deposit:existing,idempotent:true};}}throw e;}});
  app.get('/api/v1/withdrawals',{preHandler:requireAuth},async(req)=>{const customer=await ensureCustomer(pool,r(req).auth);return{withdrawals:(await pool.query('SELECT w.*,a.symbol,a.name FROM withdrawals w JOIN assets a ON a.id=w.asset_id WHERE w.customer_id=$1 ORDER BY w.created_at DESC LIMIT 200',[customer])).rows};});
- app.post('/api/v1/withdrawals',{preHandler:requireAuth},async(req,reply)=>{const customer=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;if(!id(b.assetId)||!amount(b.amount)||typeof b.network!=='string'||!b.network.trim()||typeof b.destination!=='string'||b.destination.length<10||b.destination.length>500||!idem(b.idempotencyKey))return reply.code(400).send({error:'invalid_withdrawal'});const requestFingerprint=fp({assetId:b.assetId,amount:b.amount,network:b.network.trim(),destination:b.destination.trim()});try{const x=await pool.query('INSERT INTO withdrawals(customer_id,asset_id,amount,network,destination,idempotency_key) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',[customer,b.assetId,b.amount,b.network.trim(),b.destination.trim(),b.idempotencyKey]);return reply.code(201).send({withdrawal:x.rows[0]});}catch(e:any){if(e?.code==='23505'){const x=await pool.query('SELECT * FROM withdrawals WHERE customer_id=$1 AND idempotency_key=$2',[customer,b.idempotencyKey]);const existing=x.rows[0];if(existing){const existingFingerprint=fp({assetId:existing.asset_id,amount:existing.amount,network:existing.network,destination:existing.destination});if(existingFingerprint!==requestFingerprint)return reply.code(409).send({error:'idempotency_key_reused'});return{withdrawal:existing,idempotent:true};}}throw e;}});
- app.post('/api/v1/withdrawals/:id/cancel',{preHandler:requireAuth},async(req,reply)=>{const customer=await ensureCustomer(pool,r(req).auth),wid=Number((req.params as any).id);const x=await pool.query("UPDATE withdrawals SET status='cancelled' WHERE id=$1 AND customer_id=$2 AND status='pending' RETURNING *",[wid,customer]);if(!x.rows[0])return reply.code(404).send({error:'cancellable_withdrawal_not_found'});return{withdrawal:x.rows[0]};});
+ app.post('/api/v1/withdrawals',{preHandler:requireAuth},async(req,reply)=>{
+   const customer=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;
+   if(!id(b.assetId)||!amount(b.amount)||typeof b.network!=='string'||!b.network.trim()||b.network.length>50||typeof b.destination!=='string'||b.destination.length<10||b.destination.length>500||!idem(b.idempotencyKey))
+     return reply.code(400).send({error:'invalid_withdrawal'});
+   const requestFingerprint=fp({assetId:b.assetId,amount:b.amount,network:b.network.trim(),destination:b.destination.trim()});
+   const client=await pool.connect();
+   try{
+     await client.query('BEGIN');
+     const existing=await client.query('SELECT * FROM withdrawals WHERE customer_id=$1 AND idempotency_key=$2 FOR UPDATE',[customer,b.idempotencyKey]);
+     if(existing.rows[0]){
+       const e=existing.rows[0];
+       const existingFingerprint=fp({assetId:e.asset_id,amount:e.amount,network:e.network,destination:e.destination});
+       if(existingFingerprint!==requestFingerprint){await client.query('ROLLBACK');return reply.code(409).send({error:'idempotency_key_reused'});}
+       await client.query('ROLLBACK');return{withdrawal:e,idempotent:true};
+     }
+     const asset=await client.query("SELECT id FROM assets WHERE id=$1 AND status='active'",[b.assetId]);
+     if(!asset.rows[0])throw new Error('asset_not_available');
+     await client.query('INSERT INTO wallets(customer_id,asset_id) VALUES($1,$2) ON CONFLICT(customer_id,asset_id) DO NOTHING',[customer,b.assetId]);
+     const wallet=await client.query('SELECT * FROM wallets WHERE customer_id=$1 AND asset_id=$2 FOR UPDATE',[customer,b.assetId]);
+     if(!wallet.rows[0])throw new Error('wallet_not_found');
+     const moved=await client.query('UPDATE wallets SET available_balance=available_balance-$1,locked_balance=locked_balance+$1 WHERE id=$2 AND available_balance >= $1 RETURNING id',[b.amount,wallet.rows[0].id]);
+     if(!moved.rows[0])throw new Error('insufficient_available_balance');
+     const operationId='ANSARRAF-WD-'+randomUUID();
+     const w=await client.query("INSERT INTO withdrawals(customer_id,asset_id,amount,network,destination,idempotency_key,operation_id,approval_status) VALUES($1,$2,$3,$4,$5,$6,$7,'PENDING') RETURNING *",[customer,b.assetId,b.amount,b.network.trim(),b.destination.trim(),b.idempotencyKey,operationId]);
+     await client.query('INSERT INTO withdrawal_reservations(withdrawal_id,wallet_id,asset_id,amount) VALUES($1,$2,$3,$4)',[w.rows[0].id,wallet.rows[0].id,b.assetId,b.amount]);
+     await client.query('COMMIT');
+     return reply.code(201).send({withdrawal:w.rows[0]});
+   }catch(e:any){
+     await client.query('ROLLBACK');
+     if(e instanceof Error&&e.message==='insufficient_available_balance')return reply.code(409).send({error:'insufficient_available_balance'});
+     if(e instanceof Error&&e.message==='asset_not_available')return reply.code(400).send({error:'asset_not_available'});
+     req.log.error(e);return reply.code(400).send({error:e instanceof Error?e.message:'withdrawal_creation_failed'});
+   }finally{client.release();}
+ });
+ app.post('/api/v1/withdrawals/:id/cancel',{preHandler:requireAuth},async(req,reply)=>{
+   const customer=await ensureCustomer(pool,r(req).auth),wid=Number((req.params as any).id);
+   if(!Number.isSafeInteger(wid)||wid<=0)return reply.code(400).send({error:'invalid_withdrawal_id'});
+   const client=await pool.connect();
+   try{
+     await client.query('BEGIN');
+     const w=await client.query("SELECT * FROM withdrawals WHERE id=$1 AND customer_id=$2 AND status='pending' FOR UPDATE",[wid,customer]);
+     if(!w.rows[0]){await client.query('ROLLBACK');return reply.code(404).send({error:'cancellable_withdrawal_not_found'});}
+     const reservation=await client.query("SELECT * FROM withdrawal_reservations WHERE withdrawal_id=$1 AND status='active' FOR UPDATE",[wid]);
+     if(!reservation.rows[0])throw new Error('withdrawal_reservation_missing');
+     const rr=reservation.rows[0];
+     const released=await client.query('UPDATE wallets SET locked_balance=locked_balance-$1,available_balance=available_balance+$1 WHERE id=$2 AND locked_balance >= $1 RETURNING id',[rr.amount,rr.wallet_id]);
+     if(!released.rows[0])throw new Error('withdrawal_reservation_invariant_failed');
+     await client.query("UPDATE withdrawal_reservations SET status='released',resolved_at=NOW() WHERE id=$1",[rr.id]);
+     const x=await client.query("UPDATE withdrawals SET status='cancelled' WHERE id=$1 RETURNING *",[wid]);
+     await client.query('COMMIT');
+     return{withdrawal:x.rows[0]};
+   }catch(e){
+     await client.query('ROLLBACK');req.log.error(e);return reply.code(400).send({error:e instanceof Error?e.message:'withdrawal_cancellation_failed'});
+   }finally{client.release();}
+ });
+
 }
