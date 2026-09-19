@@ -90,6 +90,36 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      const released=await client.query('UPDATE wallets SET locked_balance=locked_balance-$1,available_balance=available_balance+$1 WHERE id=$2 AND locked_balance >= $1 RETURNING id',[rr.amount,rr.wallet_id]);
      if(!released.rows[0])throw new Error('wallet_reservation_invariant_failed');
      await client.query("UPDATE wallet_reservations SET status='released',resolved_at=NOW() WHERE id=$1",[rr.id]);
+     const providerOrder=await client.query(
+       `SELECT id,status,client_order_id
+        FROM provider_orders
+        WHERE customer_order_id=$1
+          AND status NOT IN ('FILLED','CANCELLED','REJECTED')
+        ORDER BY id DESC
+        LIMIT 1
+        FOR UPDATE`,
+       [orderId]
+     );
+     if(providerOrder.rows[0]){
+       const po=providerOrder.rows[0];
+       await client.query(
+         `UPDATE provider_orders
+          SET status='CANCEL_PENDING',updated_at=NOW()
+          WHERE id=$1 AND status NOT IN ('FILLED','CANCELLED','REJECTED')`,
+         [po.id]
+       );
+       await client.query(
+         `INSERT INTO provider_execution_outbox
+          (provider_order_id,event_type,idempotency_key,payload)
+          VALUES($1,'provider.order.cancel',$2,$3)
+          ON CONFLICT(idempotency_key) DO NOTHING`,
+         [
+           po.id,
+           'provider.order.cancel:'+po.id,
+           {providerOrderId:po.id,orderId,clientOrderId:String(po.client_order_id),operationId:'ANSARRAF-CANCEL-'+orderId}
+         ]
+       );
+     }
      const x=await client.query("UPDATE orders SET status='cancelled',reserved_asset_id=NULL,reserved_amount=0 WHERE id=$1 RETURNING *",[orderId]);
      await client.query('COMMIT');return{order:x.rows[0]};
    }catch(e){await client.query('ROLLBACK');req.log.error(e);return reply.code(400).send({error:e instanceof Error?e.message:'order_cancellation_failed'});}
