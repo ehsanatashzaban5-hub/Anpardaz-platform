@@ -39,8 +39,8 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
           [customerId],
         ),
         pool.query(
-          `SELECT id,provider_code,status,started_at,completed_at,checked_assets,
-                  mismatch_count,critical_count
+          `SELECT id,provider_code,status,started_at,completed_at,
+                  error_message,metadata
            FROM reconciliation_runs ORDER BY id DESC LIMIT 10`,
         ),
       ]);
