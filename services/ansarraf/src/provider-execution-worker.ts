@@ -105,7 +105,21 @@ export class ProviderExecutionWorker {
          WHERE id=$2 AND status='ACTIVE' AND expires_at>NOW() RETURNING id`,
         [String(payload.operationId??'provider-execution:'+row.id),Number(payload.quoteLockId)]
       );
-      if(!lock.rows[0])throw new Error('quote_lock_unavailable_or_expired');
+      if(!lock.rows[0]){
+        const rejected:ProviderOrderResult={
+          providerOrderId:order.provider_order_id?String(order.provider_order_id):null,
+          clientOrderId:String(order.client_order_id),
+          status:'REJECTED',
+          executedQuantity:String(order.executed_quantity),
+          executedQuoteAmount:String(order.executed_quote_amount),
+          providerFeeAmount:String(order.provider_fee_amount),
+          providerFeeAssetSymbol:null,
+          raw:{reason:'quote_lock_unavailable_or_expired'}
+        };
+        await this.persistResult(Number(order.id),rejected);
+        await settleProviderExecution(this.pool,Number(order.id),rejected);
+        return;
+      }
     }
 
     const adapter=this.registry.get(String(order.provider_code));
