@@ -178,10 +178,9 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
         FROM withdrawals w JOIN customers c ON c.id=w.customer_id
         WHERE w.id=$1 FOR UPDATE`,[wid]);
      const w=wq.rows[0];
-     if(!w)return reply.code(404).send({error:'withdrawal_not_found'});
-     if(w.identity_id===auth.sub)return reply.code(409).send({error:'self_approval_forbidden'});
-     if(w.approval_status!=='PENDING'||w.status!=='pending')return reply.code(409).send({error:'withdrawal_not_pending_approval'});
-     const asset=await client.query('SELECT symbol FROM assets WHERE id=$1',[w.asset_id]);
+     if(!w)throw new Error('withdrawal_not_found');
+     if(w.identity_id===auth.sub)throw new Error('self_approval_forbidden');
+     if(w.approval_status!=='PENDING'||w.status!=='pending')throw new Error('withdrawal_not_pending_approval');
      const threshold=process.env.WITHDRAWAL_DUAL_APPROVAL_THRESHOLD;
      const requiresDual=threshold===undefined||threshold===''||threshold==='0'
        ? true
@@ -195,7 +194,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
         VALUES($1,$2,'APPROVED')
         ON CONFLICT(withdrawal_id,approver_identity_id) DO NOTHING
         RETURNING id`,[wid,auth.sub]);
-     if(!ins.rows[0])return reply.code(409).send({error:'approval_already_recorded'});
+     if(!ins.rows[0])throw new Error('approval_already_recorded');
      const count=Number((await client.query(
        "SELECT COUNT(*)::int AS count FROM withdrawal_approvals WHERE withdrawal_id=$1 AND decision='APPROVED'",[wid])).rows[0].count);
      if(count>=requiredCount){
