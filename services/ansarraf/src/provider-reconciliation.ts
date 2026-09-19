@@ -21,16 +21,22 @@ export class ProviderReconciliationWorker{
     const run=(await this.pool.query(
       "INSERT INTO reconciliation_runs(scope,provider_code,status) VALUES('PROVIDER_BALANCE',$1,'RUNNING') RETURNING id",[providerCode])).rows[0];
     let overall:'OK'|'WARNING'|'CRITICAL'='OK';
+    let checkedAssets=0;
+    let mismatchCount=0;
+    let criticalCount=0;
     try{
       const balances=await adapter.getBalances();
       const tolerance=process.env.PROVIDER_RECONCILIATION_TOLERANCE??'0.00000001';
       for(const b of balances){
+        checkedAssets++;
         const symbol=String(b.asset).toUpperCase();
         const providerTotal=(await this.pool.query('SELECT ($1::numeric+$2::numeric)::text AS value',[b.available,b.locked])).rows[0].value;
         const accountCode='ansarraf.provider.'+providerCode+'.asset.'+symbol;
         const response=await this.accountingRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(accountCode));
         if(response.status===404){
           overall='CRITICAL';
+          mismatchCount++;
+          criticalCount++;
           await this.pool.query(
             `INSERT INTO provider_balance_reconciliations
              (run_id,provider_code,asset_symbol,provider_available,provider_locked,provider_total,status)
@@ -46,14 +52,21 @@ export class ProviderReconciliationWorker{
         const diff=(await this.pool.query('SELECT ($1::numeric-$2::numeric)::text AS value',[providerTotal,accountingBalance])).rows[0].value;
         const magnitude=String((await this.pool.query('SELECT ABS($1::numeric)::text AS value',[diff])).rows[0].value);
         const status=magnitude==='0'||(await this.pool.query('SELECT $1::numeric <= $2::numeric AS ok',[magnitude,tolerance])).rows[0].ok?'OK':'CRITICAL';
-        if(status==='CRITICAL')overall='CRITICAL';
+        if(status==='CRITICAL'){
+          overall='CRITICAL';
+          mismatchCount++;
+          criticalCount++;
+        }
         await this.pool.query(
           `INSERT INTO provider_balance_reconciliations
            (run_id,provider_code,asset_symbol,provider_available,provider_locked,provider_total,accounting_balance,difference,status)
            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [run.id,providerCode,symbol,b.available,b.locked,providerTotal,accountingBalance,diff,status]);
       }
-      await this.pool.query("UPDATE reconciliation_runs SET status=$2,completed_at=NOW() WHERE id=$1",[run.id,overall]);
+      await this.pool.query(
+        "UPDATE reconciliation_runs SET status=$2,completed_at=NOW(),metadata=$3 WHERE id=$1",
+        [run.id,overall,{checkedAssets,mismatchCount,criticalCount}]
+      );
       return {status:overall,runId:run.id};
     }catch(error){
       await this.pool.query("UPDATE reconciliation_runs SET status='FAILED',completed_at=NOW(),error_message=$2 WHERE id=$1",[run.id,String(error instanceof Error?error.message:error).slice(0,2000)]);
