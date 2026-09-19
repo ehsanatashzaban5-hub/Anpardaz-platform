@@ -2,6 +2,7 @@ import type {FastifyBaseLogger} from 'fastify';
 import type {Pool} from 'pg';
 import {createProviderRegistry} from './providers/index.js';
 import type {LiquidityProviderAdapter,ProviderOrderResult} from './providers/types.js';
+import {settleProviderExecution} from './provider-trade-settlement.js';
 
 export class ProviderExecutionWorker {
   private stopped=false;
@@ -125,6 +126,8 @@ export class ProviderExecutionWorker {
     }
 
     await this.persistResult(order.id,result);
+    if(result.executedQuantity!=='0'&&result.executedQuoteAmount!=='0')
+      await settleProviderExecution(this.pool,Number(order.id),result);
   }
 
   private async persistResult(providerOrderId:number,result:ProviderOrderResult){
