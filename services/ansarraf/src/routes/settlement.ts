@@ -164,6 +164,13 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
         [order.id,other.id,q,String(b.price),feeAmount,feeAssetId,b.idempotencyKey,operationId,feeAmount]
       );
       const tradeId=String(trade.rows[0].id);
+      const buyerProvenanceAmount=baseCredit.rows[0].amount;
+      const sellerProvenanceAmount=feeAssetId!==null&&Number(feeAssetId)===Number(seller.base_asset_id)
+        ? (await client.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[q,feeAmount])).rows[0].amount
+        : q;
+      if(sellerProvenanceAmount!==q){
+        await client.query('UPDATE wallet_reservations SET amount=amount+$1::numeric WHERE id=$2',[feeAmount,sellerRes.rows[0].id]);
+      }
       await client.query(
         `INSERT INTO asset_provenance(customer_id,asset_id,direction,amount,source_type,source_id,operation_id,ledger_entry_reference)
          VALUES
@@ -171,7 +178,7 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
          ($7,$2,'DEBIT',$3,'TRADE', $5,$6,$5),
          ($8,$9,'CREDIT',$10,'TRADE', $5,$6,$5),
          ($11,$9,'DEBIT',$10,'TRADE', $5,$6,$5)`,
-        [buyer.customer_id,buyer.base_asset_id,baseCredit.rows[0].amount,tradeId,operationId,seller.customer_id,buyer.customer_id,buyer.quote_asset_id,quoteAmount,seller.customer_id]
+        [buyer.customer_id,buyer.base_asset_id,buyerProvenanceAmount,tradeId,operationId,seller.customer_id,seller.customer_id,seller.base_asset_id,sellerProvenanceAmount,tradeId]
       );
 
       // Consume reservation portions. Fully consumed reservations are captured;
