@@ -183,7 +183,10 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
 
       // Consume reservation portions. Fully consumed reservations are captured;
       // partially consumed reservations remain active.
-      for(const x of [{r:buyerRes.rows[0],used:quoteAmount},{r:sellerRes.rows[0],used:q}]){
+      const sellerReservationUse=feeAssetId!==null&&Number(feeAssetId)===Number(seller.base_asset_id)
+        ? (await client.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[q,feeAmount])).rows[0].amount
+        : q;
+      for(const x of [{r:buyerRes.rows[0],used:quoteAmount},{r:sellerRes.rows[0],used:sellerReservationUse}]){
         const upd=await client.query(
           'UPDATE wallet_reservations SET consumed_amount=consumed_amount+$1,status=CASE WHEN consumed_amount+$1>=amount THEN \'captured\' ELSE \'active\' END,resolved_at=CASE WHEN consumed_amount+$1>=amount THEN NOW() ELSE NULL END WHERE id=$2 RETURNING *',
           [x.used,x.r.id]
