@@ -2,6 +2,7 @@ import type {FastifyInstance,FastifyRequest} from 'fastify';
 import type {Pool} from 'pg';
 import {createHash,randomUUID} from 'node:crypto';
 import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
+import {provisionProviderExecution} from '../provider-execution.js';
 type R=FastifyRequest&{auth:AuthClaims};const r=(x:FastifyRequest)=>x as R;
 const dec=/^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/;const amount=(v:unknown)=>typeof v==='string'&&dec.test(v)&&v!=='0'&&!/^0\.0+$/.test(v);const id=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;const idem=(v:unknown)=>typeof v==='string'&&v.length>=8&&v.length<=200;const fp=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 
@@ -53,7 +54,13 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
        if(match.statusCode>=400)req.log.warn({orderId:o.id,status:match.statusCode},'post-order matching pass failed');
      }
      const refreshed=await pool.query('SELECT * FROM orders WHERE id=$1',[o.id]);
-     return reply.code(201).send({order:refreshed.rows[0]});
+     let providerExecution:any={enabled:false,created:false};
+     if(refreshed.rows[0]&&['open','partially_filled'].includes(refreshed.rows[0].status)){
+       try{providerExecution=await provisionProviderExecution(pool,Number(o.id));}
+       catch(error){req.log.error({orderId:o.id,error},'provider execution provisioning failed');providerExecution={enabled:true,created:false,reason:'provisioning_failed'};}
+     }
+     const finalOrder=await pool.query('SELECT * FROM orders WHERE id=$1',[o.id]);
+     return reply.code(201).send({order:finalOrder.rows[0],providerExecution});
    }catch(e:any){
      await client.query('ROLLBACK');
      if(e?.code==='23505'){
