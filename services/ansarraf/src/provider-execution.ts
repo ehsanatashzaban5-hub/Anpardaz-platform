@@ -103,7 +103,7 @@ export async function provisionProviderExecution(pool:Pool,orderId:number){
     const providerFixed=String(providerRule.rows[0]?.fixed_fee??'0');
     const gross=await client.query(
       'SELECT ($1::numeric*$2::numeric)::text AS amount',
-      [String(order.quantity),String(order.price??liquidity.executablePrice)]
+      [executionQuantity,String(order.price??liquidity.executablePrice)]
     );
     const providerFeeEstimate=await client.query(
       'SELECT (($1::numeric*$2::numeric)+$3::numeric)::text AS amount',
@@ -138,7 +138,7 @@ export async function provisionProviderExecution(pool:Pool,orderId:number){
       providerId:Number(provider.rows[0].id),
       symbol,
       side:order.side,
-      quantity:String(order.quantity),
+      quantity:executionQuantity,
       executablePrice:liquidity.executablePrice,
       customerFee:fee.customerFeeAmount,
       providerFeeEstimate:providerFeeEstimate.rows[0].amount,
