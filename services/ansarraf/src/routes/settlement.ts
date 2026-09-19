@@ -174,11 +174,11 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
       await client.query(
         `INSERT INTO asset_provenance(customer_id,asset_id,direction,amount,source_type,source_id,operation_id,ledger_entry_reference)
          VALUES
-         ($1,$2,'CREDIT',$3,'TRADE', $5,$6,$5),
-         ($7,$2,'DEBIT',$3,'TRADE', $5,$6,$5),
-         ($8,$9,'CREDIT',$10,'TRADE', $5,$6,$5),
-         ($11,$9,'DEBIT',$10,'TRADE', $5,$6,$5)`,
-        [buyer.customer_id,buyer.base_asset_id,buyerProvenanceAmount,tradeId,operationId,seller.customer_id,seller.customer_id,buyer.quote_asset_id,quoteAmount,buyer.customer_id]
+         ($1,$2,'CREDIT',$3,'TRADE',$4,$5,$4),
+         ($6,$2,'DEBIT',$7,'TRADE',$4,$5,$4),
+         ($8,$9,'CREDIT',$10,'TRADE',$4,$5,$4),
+         ($11,$9,'DEBIT',$10,'TRADE',$4,$5,$4)`,
+        [buyer.customer_id,buyer.base_asset_id,buyerProvenanceAmount,tradeId,operationId,seller.customer_id,sellerProvenanceAmount,seller.customer_id,buyer.quote_asset_id,quoteAmount,buyer.customer_id]
       );
 
       // Consume reservation portions. Fully consumed reservations are captured;
