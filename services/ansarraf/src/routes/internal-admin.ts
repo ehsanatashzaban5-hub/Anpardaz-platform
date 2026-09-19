@@ -102,7 +102,7 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
         pool.query(
           `SELECT po.*,lp.code AS provider_code
            FROM provider_orders po JOIN liquidity_providers lp ON lp.id=po.provider_id
-           WHERE po.operation_id=$1 OR po.customer_order_id IN
+           WHERE po.customer_order_id IN
              (SELECT id FROM orders WHERE operation_id=$1)
            ORDER BY po.id`,
           [operationId],
