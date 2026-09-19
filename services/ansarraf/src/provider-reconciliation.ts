@@ -15,7 +15,6 @@ export class ProviderReconciliationWorker{
     this.timer=setTimeout(()=>void this.loop(),Number(process.env.PROVIDER_RECONCILIATION_INTERVAL_MS??60000));
   }
   async run(){
-    if(!this.registry.executionEnabled)return {status:'SKIPPED',reason:'provider_execution_disabled'};
     const providerCode=(process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX').toUpperCase();
     const adapter=this.registry.get(providerCode);
     if(!adapter)return {status:'SKIPPED',reason:'provider_not_configured'};
