@@ -92,8 +92,7 @@ export class WallexAdapter implements LiquidityProviderAdapter{
         network:request.network,
         value:request.amount,
         wallet_address:request.destination,
-        ...(request.memo?{memo:request.memo}:{}),
-        client_id:request.clientWithdrawalId
+        ...(request.memo?{memo:request.memo}:{} )
       })
     });
     return this.mapWithdrawal(body);
