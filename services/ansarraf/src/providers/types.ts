@@ -22,6 +22,24 @@ export type ProviderOrderResult={
 
 export type ProviderBalance={asset:string;available:string;locked:string;raw:any};
 
+export type ProviderWithdrawalRequest={
+  asset:string;
+  network:string;
+  amount:string;
+  destination:string;
+  memo?:string|null;
+  clientWithdrawalId:string;
+};
+
+export type ProviderWithdrawalResult={
+  providerWithdrawalId:string|null;
+  status:'PROCESSING'|'COMPLETED'|'FAILED'|'UNKNOWN';
+  amount:string;
+  feeAmount:string;
+  txHash:string|null;
+  raw:any;
+};
+
 export interface LiquidityProviderAdapter{
   readonly code:string;
   getOrderBook(symbol:string):Promise<{bids:Array<[string,string]>;asks:Array<[string,string]>;raw:any}>;
@@ -29,4 +47,6 @@ export interface LiquidityProviderAdapter{
   submitOrder(request:ProviderOrderRequest):Promise<ProviderOrderResult>;
   getOrder(clientOrderId:string,providerOrderId?:string|null):Promise<ProviderOrderResult>;
   cancelOrder(clientOrderId:string,providerOrderId?:string|null):Promise<ProviderOrderResult>;
+  submitWithdrawal(request:ProviderWithdrawalRequest):Promise<ProviderWithdrawalResult>;
+  getWithdrawal(providerWithdrawalId:string):Promise<ProviderWithdrawalResult>;
 }
