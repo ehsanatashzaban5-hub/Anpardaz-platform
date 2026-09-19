@@ -87,6 +87,10 @@ export class ProviderExecutionWorker {
 
   private async execute(row:any){
     const payload=row.payload??{};
+    if(row.event_type==='provider.order.cancel'){
+      await this.executeCancel(row);
+      return;
+    }
     const q=await this.pool.query(
       `SELECT po.*,lp.code AS provider_code,lp.status AS provider_status
        FROM provider_orders po
@@ -152,6 +156,62 @@ export class ProviderExecutionWorker {
     await this.persistResult(order.id,result);
     if(result.executedQuantity!=='0'&&result.executedQuoteAmount!=='0')
       await settleProviderExecution(this.pool,Number(order.id),result);
+  }
+
+  private async executeCancel(row:any){
+    const q=await this.pool.query(
+      `SELECT po.*,lp.code AS provider_code,lp.status AS provider_status
+       FROM provider_orders po
+       JOIN liquidity_providers lp ON lp.id=po.provider_id
+       WHERE po.id=$1
+       FOR UPDATE`,
+      [row.provider_order_id]
+    );
+    if(!q.rows[0])throw new Error('provider_order_not_found');
+    const order=q.rows[0];
+    const adapter=this.registry.get(String(order.provider_code));
+    if(!adapter||!this.registry.executionEnabled)throw new Error('provider_execution_not_enabled');
+
+    let result:ProviderOrderResult;
+    if(order.status==='REQUESTED'){
+      result={
+        providerOrderId:order.provider_order_id?String(order.provider_order_id):null,
+        clientOrderId:String(order.client_order_id),
+        status:'CANCELLED',
+        executedQuantity:String(order.executed_quantity),
+        executedQuoteAmount:String(order.executed_quote_amount),
+        providerFeeAmount:String(order.provider_fee_amount),
+        providerFeeAssetSymbol:null,
+        raw:{reason:'cancelled_before_provider_submission'}
+      };
+    }else{
+      try{
+        const current=await adapter.getOrder(String(order.client_order_id),order.provider_order_id);
+        if(current.status==='FILLED'||current.status==='CANCELLED'||current.status==='REJECTED'){
+          result=current;
+        }else{
+          result=await adapter.cancelOrder(String(order.client_order_id),order.provider_order_id);
+        }
+      }catch(error){
+        const message=error instanceof Error?error.message:'provider_cancel_failed';
+        if(message.includes('404')||message.includes('not_found')||message.includes('NOT_FOUND')){
+          result={
+            providerOrderId:order.provider_order_id?String(order.provider_order_id):null,
+            clientOrderId:String(order.client_order_id),
+            status:'UNKNOWN',
+            executedQuantity:String(order.executed_quantity),
+            executedQuoteAmount:String(order.executed_quote_amount),
+            providerFeeAmount:String(order.provider_fee_amount),
+            providerFeeAssetSymbol:null,
+            raw:{reason:'provider_order_not_found_during_cancel',error:message}
+          };
+        }else throw error;
+      }
+    }
+
+    await this.persistResult(Number(order.id),result);
+    if(result.status==='UNKNOWN')throw new Error('provider_cancel_status_unknown');
+    await settleProviderExecution(this.pool,Number(order.id),result);
   }
 
   private async persistResult(providerOrderId:number,result:ProviderOrderResult){
