@@ -27,9 +27,11 @@ export class ProviderReconciliationWorker{
     try{
       const balances=await adapter.getBalances();
       const tolerance=process.env.PROVIDER_RECONCILIATION_TOLERANCE??'0.00000001';
+      const providerSymbols=new Set<string>();
       for(const b of balances){
         checkedAssets++;
         const symbol=String(b.asset).toUpperCase();
+        providerSymbols.add(symbol);
         const providerTotal=(await this.pool.query('SELECT ($1::numeric+$2::numeric)::text AS value',[b.available,b.locked])).rows[0].value;
         const accountCode='ansarraf.provider.'+providerCode+'.asset.'+symbol;
         const response=await this.accountingRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(accountCode));
@@ -63,6 +65,42 @@ export class ProviderReconciliationWorker{
            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [run.id,providerCode,symbol,b.available,b.locked,providerTotal,accountingBalance,diff,status]);
       }
+      const prefix='ansarraf.provider.'+providerCode+'.asset.';
+      const accountResponse=await this.accountingRequest(
+        'GET',
+        '/internal/v1/ledger/accounts?status=active&accountCodePrefix='+encodeURIComponent(prefix)+'&limit=500'
+      );
+      if(!accountResponse.ok)throw new Error('accounting_provider_accounts_lookup_failed:'+accountResponse.status);
+      for(const account of accountResponse.body.accounts??[]){
+        const accountCode=String(account.account_code);
+        const symbol=accountCode.slice(prefix.length).toUpperCase();
+        if(!symbol||providerSymbols.has(symbol))continue;
+        checkedAssets++;
+        const balanceResponse=await this.accountingRequest('GET','/internal/v1/ledger/accounts/'+Number(account.id)+'/balance');
+        if(!balanceResponse.ok)throw new Error('accounting_balance_lookup_failed:'+balanceResponse.status);
+        const accountingBalance=String(balanceResponse.body.balance.balance);
+        const diff=(await this.pool.query(
+          'SELECT (0::numeric-$1::numeric)::text AS value',
+          [accountingBalance]
+        )).rows[0].value;
+        const magnitude=String((await this.pool.query('SELECT ABS($1::numeric)::text AS value',[diff])).rows[0].value);
+        const status=(await this.pool.query(
+          'SELECT $1::numeric <= $2::numeric AS ok',
+          [magnitude,tolerance]
+        )).rows[0].ok?'OK':'CRITICAL';
+        if(status==='CRITICAL'){
+          overall='CRITICAL';
+          mismatchCount++;
+          criticalCount++;
+        }
+        await this.pool.query(
+          `INSERT INTO provider_balance_reconciliations
+           (run_id,provider_code,asset_symbol,provider_available,provider_locked,provider_total,accounting_balance,difference,status)
+           VALUES($1,$2,$3,0,0,0,$4,$5,$6)`,
+          [run.id,providerCode,symbol,accountingBalance,diff,status]
+        );
+      }
+
       await this.pool.query(
         "UPDATE reconciliation_runs SET status=$2,completed_at=NOW(),metadata=$3 WHERE id=$1",
         [run.id,overall,{checkedAssets,mismatchCount,criticalCount}]
