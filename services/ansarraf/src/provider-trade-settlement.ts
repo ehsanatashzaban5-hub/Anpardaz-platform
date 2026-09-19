@@ -131,6 +131,24 @@ export async function settleProviderExecution(pool:Pool,providerOrderId:number,r
     );
     const companyRevenue=revenue.rows[0].amount;
 
+    const consumedReservationAmount=po.customer_side==='buy'
+      ? d.quote_amount
+      : (await client.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[d.quantity,fee.customerFeeAmount])).rows[0].amount;
+    const reservation=await client.query(
+      `SELECT * FROM wallet_reservations WHERE order_id=$1 AND status='active' FOR UPDATE`,
+      [po.customer_order_id]
+    );
+    if(!reservation.rows[0])throw new Error('provider_settlement_reservation_missing');
+    const reservationRemaining=(await client.query(
+      'SELECT (amount-consumed_amount)::text AS amount FROM wallet_reservations WHERE id=$1',
+      [reservation.rows[0].id]
+    )).rows[0].amount;
+    const reservationEnough=(await client.query(
+      'SELECT ($1::numeric >= $2::numeric) AS valid',
+      [reservationRemaining,consumedReservationAmount]
+    )).rows[0].valid;
+    if(!reservationEnough)throw new Error('provider_settlement_reservation_insufficient');
+
     const wallet=await client.query(
       `SELECT w.*
        FROM wallets w
@@ -263,9 +281,12 @@ export async function settleProviderExecution(pool:Pool,providerOrderId:number,r
       [providerOrderId,targetQty.rows[0].value,targetQuote.rows[0].value,targetFee.rows[0].value,full.rows[0].valid]
     );
 
-    const consumedReservationAmount=po.customer_side==='buy'
-      ? d.quote_amount
-      : (await client.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[d.quantity,fee.customerFeeAmount])).rows[0].amount;
+    await client.query(
+      `UPDATE wallet_reservations
+       SET consumed_amount=consumed_amount+$2::numeric
+       WHERE id=$1 AND status='active' AND amount-consumed_amount >= $2::numeric`,
+      [reservation.rows[0].id,consumedReservationAmount]
+    );
     await client.query(
       `UPDATE orders
        SET status=CASE WHEN $2 THEN 'filled' ELSE 'partially_filled' END,
