@@ -38,11 +38,15 @@ export async function provisionProviderExecution(pool:Pool,orderId:number){
   );
   if(existing.rows[0])return {enabled:true,created:false,reason:'provider_order_already_exists',providerOrder:existing.rows[0]};
 
+  const filled=await pool.query('SELECT COALESCE(SUM(quantity),0)::text AS amount FROM trades WHERE order_id=$1',[orderId]);
+  const remaining=await pool.query('SELECT ($1::numeric-$2::numeric)::text AS amount',[String(order.quantity),filled.rows[0].amount]);
+  if(remaining.rows[0].amount==='0')return {enabled:true,created:false,reason:'order_fully_filled'};
+  const executionQuantity=remaining.rows[0].amount;
   const symbol=String(order.base_symbol)+'/'+String(order.quote_symbol);
   const liquidity=await checkProviderLiquidity(adapter,{
     symbol,
     side:order.side,
-    quantity:String(order.quantity),
+    quantity:executionQuantity,
     maxSlippageBps
   });
 
@@ -76,7 +80,7 @@ export async function provisionProviderExecution(pool:Pool,orderId:number){
       Number(order.base_asset_id),
       Number(order.quote_asset_id),
       order.side,
-      String(order.quantity),
+      executionQuantity,
       String(order.price??liquidity.executablePrice)
     );
 
@@ -114,6 +118,20 @@ export async function provisionProviderExecution(pool:Pool,orderId:number){
     }).slice(0,32);
     const clientOrderId='AP-'+String(orderId)+'-'+operationId.slice(-16);
 
+    if(order.side==='sell'){
+      const reservation=await client.query("SELECT * FROM wallet_reservations WHERE order_id=$1 AND status='active' FOR UPDATE",[orderId]);
+      if(!reservation.rows[0])throw new Error('wallet_reservation_missing');
+      const requiredBase=await client.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[executionQuantity,fee.customerFeeAmount]);
+      const currentRemaining=await client.query('SELECT (amount-consumed_amount)::text AS amount FROM wallet_reservations WHERE id=$1',[reservation.rows[0].id]);
+      const extra=await client.query('SELECT GREATEST($1::numeric-$2::numeric,0)::text AS amount',[requiredBase.rows[0].amount,currentRemaining.rows[0].amount]);
+      if(extra.rows[0].amount!=='0'){
+        const moved=await client.query('UPDATE wallets SET available_balance=available_balance-$1::numeric,locked_balance=locked_balance+$1::numeric WHERE id=$2 AND available_balance >= $1::numeric RETURNING id',[extra.rows[0].amount,reservation.rows[0].wallet_id]);
+        if(!moved.rows[0])throw new Error('insufficient_fee_reserve_for_provider_sell');
+        await client.query('UPDATE wallet_reservations SET amount=amount+$1::numeric WHERE id=$2',[extra.rows[0].amount,reservation.rows[0].id]);
+        await client.query('UPDATE orders SET reserved_amount=reserved_amount+$1::numeric WHERE id=$2',[extra.rows[0].amount,orderId]);
+      }
+    }
+
     const quoteLock=await createQuoteLock(client,{
       customerId:Number(order.customer_id),
       orderId,
@@ -139,7 +157,7 @@ export async function provisionProviderExecution(pool:Pool,orderId:number){
         symbol,
         order.side,
         order.order_type,
-        order.quantity,
+        executionQuantity,
         order.order_type==='limit'?order.price:liquidity.executablePrice,
         operationId,
         'provider-execution:'+code+':'+clientOrderId
