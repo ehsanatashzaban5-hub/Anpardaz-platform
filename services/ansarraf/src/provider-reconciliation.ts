@@ -101,6 +101,57 @@ export class ProviderReconciliationWorker{
         );
       }
 
+      // Cross-check customer wallet liabilities against the Accounting liability ledger.
+      // Provider reconciliation alone cannot prove that customer balances and the ledger agree.
+      const customerWallets=await this.pool.query(
+        `SELECT a.symbol,
+                COALESCE(SUM(w.available_balance+w.locked_balance),0)::text AS wallet_total
+         FROM wallets w
+         JOIN assets a ON a.id=w.asset_id
+         GROUP BY a.symbol`
+      );
+      const customerPrefix='ansarraf.customer.';
+      const liabilityResponse=await this.accountingRequest(
+        'GET',
+        '/internal/v1/ledger/accounts/balances?status=active&accountCodePrefix='+encodeURIComponent(customerPrefix)+'&limit=5000'
+      );
+      if(!liabilityResponse.ok)throw new Error('accounting_customer_balances_lookup_failed:'+liabilityResponse.status);
+      const accountingBySymbol=new Map<string,string>();
+      for(const account of liabilityResponse.body.accounts??[]){
+        const symbol=String(account.currency).toUpperCase();
+        const current=accountingBySymbol.get(symbol)??'0';
+        accountingBySymbol.set(symbol,String((await this.pool.query(
+          'SELECT ($1::numeric+$2::numeric)::text AS value',[current,String(account.balance)]
+        )).rows[0].value));
+      }
+      const symbols=new Set<string>([
+        ...customerWallets.rows.map(x=>String(x.symbol).toUpperCase()),
+        ...accountingBySymbol.keys()
+      ]);
+      for(const symbol of symbols){
+        checkedAssets++;
+        const walletTotal=String(customerWallets.rows.find(x=>String(x.symbol).toUpperCase()===symbol)?.wallet_total??'0');
+        const accountingTotal=String(accountingBySymbol.get(symbol)??'0');
+        const diff=String((await this.pool.query(
+          'SELECT ($1::numeric-$2::numeric)::text AS value',[walletTotal,accountingTotal]
+        )).rows[0].value);
+        const magnitude=String((await this.pool.query('SELECT ABS($1::numeric)::text AS value',[diff])).rows[0].value);
+        const status=(await this.pool.query(
+          'SELECT $1::numeric <= $2::numeric AS ok',[magnitude,tolerance]
+        )).rows[0].ok?'OK':'CRITICAL';
+        if(status==='CRITICAL'){
+          overall='CRITICAL';
+          mismatchCount++;
+          criticalCount++;
+        }
+        await this.pool.query(
+          `INSERT INTO provider_balance_reconciliations
+           (run_id,provider_code,asset_symbol,provider_available,provider_locked,provider_total,accounting_balance,difference,status)
+           VALUES($1,$2,$3,0,0,$4,$5,$6,$7)`,
+          [run.id,providerCode,symbol,walletTotal,accountingTotal,diff,status]
+        );
+      }
+
       await this.pool.query(
         "UPDATE reconciliation_runs SET status=$2,completed_at=NOW(),metadata=$3 WHERE id=$1",
         [run.id,overall,{checkedAssets,mismatchCount,criticalCount}]
