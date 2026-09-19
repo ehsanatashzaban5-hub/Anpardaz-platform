@@ -1,4 +1,4 @@
-import type {LiquidityProviderAdapter,ProviderBalance,ProviderOrderRequest,ProviderOrderResult,ProviderOrderStatus} from './types.js';
+import type {LiquidityProviderAdapter,ProviderBalance,ProviderOrderRequest,ProviderOrderResult,ProviderOrderStatus,ProviderWithdrawalRequest,ProviderWithdrawalResult} from './types.js';
 
 type WallexConfig={baseUrl:string;apiKey:string;timeoutMs:number};
 const text=(v:any)=>v===undefined||v===null?'0':String(v);
@@ -82,6 +82,46 @@ export class WallexAdapter implements LiquidityProviderAdapter{
   async cancelOrder(clientOrderId:string,_providerOrderId?:string|null):Promise<ProviderOrderResult>{
     const body=await this.request('/v1/account/orders?clientOrderId='+encodeURIComponent(clientOrderId),{method:'DELETE'});
     return this.mapOrder(body,clientOrderId);
+  }
+
+  async submitWithdrawal(request:ProviderWithdrawalRequest):Promise<ProviderWithdrawalResult>{
+    const body=await this.request('/v1/account/crypto-withdrawal',{
+      method:'POST',
+      body:JSON.stringify({
+        coin:request.asset,
+        network:request.network,
+        value:request.amount,
+        wallet_address:request.destination,
+        ...(request.memo?{memo:request.memo}:{}),
+        client_id:request.clientWithdrawalId
+      })
+    });
+    return this.mapWithdrawal(body);
+  }
+
+  async getWithdrawal(providerWithdrawalId:string):Promise<ProviderWithdrawalResult>{
+    const body=await this.request('/v1/account/crypto-withdrawal?page=1&per_page=100');
+    const rows=Array.isArray(body?.result)?body.result:(body?.result?.withdrawals??body?.data??[]);
+    const found=rows.find((x:any)=>String(x?.id??'')===String(providerWithdrawalId));
+    if(!found)return {providerWithdrawalId,status:'UNKNOWN',amount:'0',feeAmount:'0',txHash:null,raw:body};
+    return this.mapWithdrawal({success:true,result:found});
+  }
+
+  private mapWithdrawal(body:any):ProviderWithdrawalResult{
+    const x=body?.result??body?.data??body;
+    const rawStatus=String(x?.status??'').toUpperCase();
+    const status:ProviderWithdrawalResult['status']=
+      ['ACCOMPLISHED','COMPLETED','CONFIRMED','SUCCESS'].includes(rawStatus)?'COMPLETED':
+      ['PENDING','PROCESSING','IN_PROGRESS'].includes(rawStatus)?'PROCESSING':
+      ['FAILED','REJECTED','CANCELLED','CANCELED'].includes(rawStatus)?'FAILED':'UNKNOWN';
+    return {
+      providerWithdrawalId:x?.id!==undefined?String(x.id):null,
+      status,
+      amount:text(x?.amount??x?.value),
+      feeAmount:text(x?.fee),
+      txHash:x?.txHash?String(x.txHash):null,
+      raw:body
+    };
   }
 
   private mapOrder(body:any,clientOrderId:string):ProviderOrderResult{
