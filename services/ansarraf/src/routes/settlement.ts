@@ -1,6 +1,7 @@
 import type {FastifyInstance,FastifyRequest} from 'fastify';
 import type {Pool} from 'pg';
 import {createHash,randomUUID} from 'node:crypto';
+import {calculateInternalTradeFee} from '../fee-engine.js';
 
 const validId=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;
 const amount=(v:unknown)=>typeof v==='string'&&/^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/.test(v)&&v!=='0'&&!/^0\.0+$/.test(v);
@@ -70,15 +71,14 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
 
       const buyer=order.side==='buy'?order:other;
       const seller=order.side==='sell'?order:other;
-      const feeAmount=b.feeAmount??'0';
-      const feeAssetId=b.feeAssetId??null;
-      const feeCheck=await client.query(
-        `SELECT ($1::numeric >= 0 AND (($1::numeric=0 AND $2::bigint IS NULL) OR ($1::numeric>0 AND $2::bigint=$3::bigint))) AS valid`,
-        [feeAmount,feeAssetId,buyer.base_asset_id]
-      );
-      if(!feeCheck.rows[0].valid)throw new Error('invalid_fee');
-      // Do not destroy value: fee transfer/accounting is not enabled yet.
-      if(feeAmount !== '0')throw new Error('fee_processing_not_configured');
+      const calculatedFee=await calculateInternalTradeFee(client,Number(buyer.base_asset_id),Number(buyer.quote_asset_id),buyer.side,q,String(b.price));
+      const feeAmount=calculatedFee.customerFeeAmount;
+      const feeAssetId=calculatedFee.feeAssetId;
+      if(b.feeAmount!==undefined){
+        const requestedFee=await client.query('SELECT ($1::numeric=$2::numeric) AS valid',[String(b.feeAmount),feeAmount]);
+        if(!requestedFee.rows[0].valid)throw new Error('fee_mismatch');
+      }
+      if(b.feeAssetId!==undefined && Number(b.feeAssetId)!==Number(feeAssetId??0))throw new Error('fee_asset_mismatch');
 
       const quote=await client.query('SELECT ($1::numeric*$2::numeric)::text AS amount',[q,String(b.price)]);
       const quoteAmount=quote.rows[0].amount;
@@ -187,7 +187,11 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
           quoteAmount,
           feeAmount,
           feeAssetId,
-          operationId
+          operationId,
+          customerFeeAmount:feeAmount,
+          providerFeeAmount:calculatedFee.providerFeeAmount,
+          providerFeeAssetId:calculatedFee.providerFeeAssetId,
+          companyRevenueAmount:calculatedFee.companyRevenueAmount
         }]
       );
 
