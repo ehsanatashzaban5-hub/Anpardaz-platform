@@ -202,6 +202,7 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
           counterpartyOrderId:other.id,
           buyerCustomerId:buyer.customer_id,
           sellerCustomerId:seller.customer_id,
+          side:order.side,
           baseAssetId:buyer.base_asset_id,
           quoteAssetId:buyer.quote_asset_id,
           quantity:q,
