@@ -26,8 +26,9 @@ export class AccountingOutboxWorker{
     return true;
   }
   private async postTrade(row:any){
-    if(row.event_type!=='exchange.trade.settled')throw new Error('unsupported_accounting_event');
-    const p=row.payload??{};const required=['tradeId','buyerCustomerId','sellerCustomerId','baseAssetId','quoteAssetId','quantity','quoteAmount'];
+    const p=row.payload??{};
+    if(row.event_type==='exchange.provider_trade.settled')return this.postProviderTrade(row,p);
+    if(row.event_type!=='exchange.trade.settled')throw new Error('unsupported_accounting_event');const required=['tradeId','buyerCustomerId','sellerCustomerId','baseAssetId','quoteAssetId','quantity','quoteAmount'];
     for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_outbox_field:'+key);
     const base=await this.asset(Number(p.baseAssetId));const quote=await this.asset(Number(p.quoteAssetId));
     if(base.symbol===quote.symbol)throw new Error('accounting_asset_currency_collision');
@@ -39,6 +40,78 @@ export class AccountingOutboxWorker{
     if(customerFee!=='0')baseEntries.push({accountId:revenueBase,currency:base.symbol,direction:'credit',amount:customerFee,metadata:{tradeId:p.tradeId,asset:'base',type:'customer_fee'}});
     await this.postLedger({referenceType:'exchange_trade_base',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':base',description:'Exchange trade '+p.tradeId+' base settlement',entries:baseEntries});
     await this.postLedger({referenceType:'exchange_trade_quote',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':quote',description:'Exchange trade '+p.tradeId+' quote settlement',entries:[{accountId:sellerQuote,currency:quote.symbol,direction:'credit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}},{accountId:buyerQuote,currency:quote.symbol,direction:'debit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}}]});
+  }
+  private async postProviderTrade(row:any,p:any){
+    const required=['settlementId','providerOrderId','customerId','providerCode','side','baseAssetId','quoteAssetId','quantity','quoteAmount','customerFeeAmount','providerFeeAmount'];
+    for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_provider_outbox_field:'+key);
+    const base=await this.asset(Number(p.baseAssetId));
+    const quote=await this.asset(Number(p.quoteAssetId));
+    const customerBase=await this.ensureAccount(Number(p.customerId),base.symbol);
+    const customerQuote=await this.ensureAccount(Number(p.customerId),quote.symbol);
+    const providerBase=await this.ensureProviderAssetAccount(String(p.providerCode),base.symbol);
+    const providerQuote=await this.ensureProviderAssetAccount(String(p.providerCode),quote.symbol);
+    const revenueBase=await this.ensureRevenueAccount(base.symbol);
+    const expenseBase=await this.ensureProviderExpenseAccount(String(p.providerCode),base.symbol);
+    const customerFee=String(p.customerFeeAmount);
+    const providerFee=String(p.providerFeeAmount);
+    const quantity=String(p.quantity);
+    const quoteAmount=String(p.quoteAmount);
+    const netBase=(await this.pool.query('SELECT ($1::numeric-$2::numeric)::text AS amount',[quantity,customerFee])).rows[0].amount;
+    const baseEntries:any[]=[];
+    if(String(p.side)==='buy'){
+      baseEntries.push(
+        {accountId:providerBase,currency:base.symbol,direction:'debit',amount:netBase,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_asset_received'}},
+        {accountId:expenseBase,currency:base.symbol,direction:'debit',amount:providerFee,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_fee'}},
+        {accountId:customerBase,currency:base.symbol,direction:'credit',amount:netBase,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'customer_asset'}},
+        {accountId:revenueBase,currency:base.symbol,direction:'credit',amount:customerFee,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'customer_fee'}},
+        {accountId:providerBase,currency:base.symbol,direction:'credit',amount:providerFee,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_fee_paid'}}
+      );
+    }else{
+      const customerDebit=(await this.pool.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[quantity,customerFee])).rows[0].amount;
+      baseEntries.push(
+        {accountId:customerBase,currency:base.symbol,direction:'debit',amount:customerDebit,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'customer_asset_sold'}},
+        {accountId:expenseBase,currency:base.symbol,direction:'debit',amount:providerFee,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_fee'}},
+        {accountId:providerBase,currency:base.symbol,direction:'credit',amount:quantity,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_asset_sold'}},
+        {accountId:revenueBase,currency:base.symbol,direction:'credit',amount:customerFee,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'customer_fee'}},
+        {accountId:providerBase,currency:base.symbol,direction:'credit',amount:providerFee,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_fee_paid'}}
+      );
+    }
+    await this.postLedger({referenceType:'exchange_provider_trade_base',referenceId:String(p.settlementId),idempotencyKey:row.idempotency_key+':base',description:'Provider trade '+p.providerOrderId+' base settlement',entries:baseEntries});
+    await this.postLedger({
+      referenceType:'exchange_provider_trade_quote',
+      referenceId:String(p.settlementId),
+      idempotencyKey:row.idempotency_key+':quote',
+      description:'Provider trade '+p.providerOrderId+' quote settlement',
+      entries:String(p.side)==='buy'
+        ? [
+          {accountId:customerQuote,currency:quote.symbol,direction:'debit',amount:quoteAmount,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'customer_quote'}},
+          {accountId:providerQuote,currency:quote.symbol,direction:'credit',amount:quoteAmount,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_quote_spent'}}
+        ]
+        : [
+          {accountId:providerQuote,currency:quote.symbol,direction:'debit',amount:quoteAmount,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_quote_received'}},
+          {accountId:customerQuote,currency:quote.symbol,direction:'credit',amount:quoteAmount,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'customer_quote'}}
+        ]
+    });
+  }
+  private async ensureProviderAssetAccount(providerCode:string,symbol:string){
+    const code='ansarraf.provider.'+providerCode+'.asset.'+symbol;
+    let r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));
+    if(r.ok)return Number(r.body.account.id);
+    if(r.status!==404)throw new Error('provider_asset_account_lookup_failed:'+r.status);
+    r=await this.accountRequest('POST','/internal/v1/ledger/accounts',{accountCode:code,accountName:'An Sarraf provider '+providerCode+' '+symbol,accountType:'asset',currency:symbol});
+    if(r.ok)return Number(r.body.account.id);
+    if(r.status===409){r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));if(r.ok)return Number(r.body.account.id);}
+    throw new Error('provider_asset_account_create_failed:'+r.status);
+  }
+  private async ensureProviderExpenseAccount(providerCode:string,symbol:string){
+    const code='ansarraf.expense.provider_fee.'+providerCode+'.'+symbol;
+    let r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));
+    if(r.ok)return Number(r.body.account.id);
+    if(r.status!==404)throw new Error('provider_expense_account_lookup_failed:'+r.status);
+    r=await this.accountRequest('POST','/internal/v1/ledger/accounts',{accountCode:code,accountName:'An Sarraf provider fee expense '+providerCode+' '+symbol,accountType:'expense',currency:symbol});
+    if(r.ok)return Number(r.body.account.id);
+    if(r.status===409){r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));if(r.ok)return Number(r.body.account.id);}
+    throw new Error('provider_expense_account_create_failed:'+r.status);
   }
   private async asset(id:number){const r=await this.pool.query('SELECT id,symbol,status FROM assets WHERE id=$1',[id]);if(!r.rows[0]||r.rows[0].status!=='active')throw new Error('accounting_asset_not_active');return r.rows[0];}
   private async ensureRevenueAccount(symbol:string){
