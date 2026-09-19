@@ -18,7 +18,7 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
       );
       if (!customer.rows[0]) return reply.code(404).send({ error: 'customer_not_found' });
       const customerId = customer.rows[0].id;
-      const [wallets, orders, withdrawals, reconciliation, reconciliationDetails] = await Promise.all([
+      const [wallets, orders, withdrawals, reconciliation, reconciliationDetails, customerReconciliation] = await Promise.all([
         pool.query(
           `SELECT w.id,a.symbol,a.asset_type,w.available_balance::text,w.locked_balance::text,
                   (w.available_balance+w.locked_balance)::text AS total_balance
@@ -50,6 +50,12 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
            FROM provider_balance_reconciliations
            ORDER BY id DESC LIMIT 100`,
         ),
+        pool.query(
+          `SELECT id,run_id,asset_symbol,wallet_total::text,accounting_liability::text,
+                  difference::text,status,created_at
+           FROM customer_balance_reconciliations
+           ORDER BY id DESC LIMIT 100`,
+        ),
       ]);
       return {
         customer: customer.rows[0],
@@ -58,6 +64,7 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
         withdrawals: withdrawals.rows,
         reconciliation: reconciliation.rows,
         reconciliationDetails: reconciliationDetails.rows,
+        customerReconciliation: customerReconciliation.rows,
       };
     },
   );
