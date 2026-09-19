@@ -29,7 +29,7 @@ export class AccountingOutboxWorker{
     const p=row.payload??{};
     if(row.event_type==='exchange.provider_trade.settled')return this.postProviderTrade(row,p);
     if(row.event_type==='exchange.withdrawal.settled')return this.postWithdrawal(row,p);
-    if(row.event_type!=='exchange.trade.settled')throw new Error('unsupported_accounting_event');const required=['tradeId','buyerCustomerId','sellerCustomerId','baseAssetId','quoteAssetId','quantity','quoteAmount'];
+    if(row.event_type!=='exchange.trade.settled')throw new Error('unsupported_accounting_event');const required=['tradeId','operationId','buyerCustomerId','sellerCustomerId','baseAssetId','quoteAssetId','quantity','quoteAmount'];
     for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_outbox_field:'+key);
     const base=await this.asset(Number(p.baseAssetId));const quote=await this.asset(Number(p.quoteAssetId));
     if(base.symbol===quote.symbol)throw new Error('accounting_asset_currency_collision');
@@ -52,7 +52,7 @@ export class AccountingOutboxWorker{
     await this.postLedger({operationId:p.operationId,referenceType:'exchange_trade_quote',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':quote',description:'Exchange trade '+p.tradeId+' quote settlement',entries:[{accountId:sellerQuote,currency:quote.symbol,direction:'credit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}},{accountId:buyerQuote,currency:quote.symbol,direction:'debit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}}]});
   }
   private async postProviderTrade(row:any,p:any){
-    const required=['settlementId','providerOrderId','customerId','providerCode','side','baseAssetId','quoteAssetId','quantity','quoteAmount','customerFeeAmount','providerFeeAmount'];
+    const required=['settlementId','operationId','providerOrderId','customerId','providerCode','side','baseAssetId','quoteAssetId','quantity','quoteAmount','customerFeeAmount','providerFeeAmount'];
     for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_provider_outbox_field:'+key);
     const base=await this.asset(Number(p.baseAssetId));
     const quote=await this.asset(Number(p.quoteAssetId));
@@ -105,7 +105,7 @@ export class AccountingOutboxWorker{
     });
   }
   private async postWithdrawal(row:any,p:any){
-    const required=['withdrawalId','customerId','assetId','assetSymbol','amount','providerCode','providerFeeAmount'];
+    const required=['withdrawalId','operationId','customerId','assetId','assetSymbol','amount','providerCode','providerFeeAmount'];
     for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_withdrawal_outbox_field:'+key);
     const customer=await this.ensureAccount(Number(p.customerId),String(p.assetSymbol));
     const provider=await this.ensureProviderAssetAccount(String(p.providerCode),String(p.assetSymbol));
