@@ -48,9 +48,10 @@ export async function provisionProviderExecution(pool:Pool,orderId:number){
 
   if(order.order_type==='limit'){
     const limit=String(order.price);
-    const acceptable=order.side==='buy'
-      ? Number(liquidity.executablePrice)<=Number(limit)
-      : Number(liquidity.executablePrice)>=Number(limit);
+    const scale=1000000000000000000n;
+    const parse=(v:string)=>{const [w,f='']=v.split('.');return BigInt(w)*scale+BigInt((f+'0'.repeat(18)).slice(0,18));};
+    const executable=parse(liquidity.executablePrice),limitValue=parse(limit);
+    const acceptable=order.side==='buy'?executable<=limitValue:executable>=limitValue;
     if(!acceptable)throw new Error('provider_price_outside_customer_limit');
   }
 
