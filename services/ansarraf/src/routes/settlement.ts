@@ -178,7 +178,7 @@ export function registerSettlementRoutes(app:FastifyInstance,pool:Pool){
          ($7,$2,'DEBIT',$3,'TRADE', $5,$6,$5),
          ($8,$9,'CREDIT',$10,'TRADE', $5,$6,$5),
          ($11,$9,'DEBIT',$10,'TRADE', $5,$6,$5)`,
-        [buyer.customer_id,buyer.base_asset_id,buyerProvenanceAmount,tradeId,operationId,seller.customer_id,seller.customer_id,seller.base_asset_id,sellerProvenanceAmount,tradeId]
+        [buyer.customer_id,buyer.base_asset_id,buyerProvenanceAmount,tradeId,operationId,seller.customer_id,seller.customer_id,buyer.quote_asset_id,quoteAmount,buyer.customer_id]
       );
 
       // Consume reservation portions. Fully consumed reservations are captured;
