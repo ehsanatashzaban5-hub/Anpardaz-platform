@@ -9,7 +9,7 @@ const status=(value:any):ProviderOrderStatus=>{
   if(['PARTIALLY_FILLED','PARTIAL'].includes(s))return 'PARTIALLY_FILLED';
   if(['CANCELED','CANCELLED'].includes(s))return 'CANCELLED';
   if(['REJECTED','FAILED'].includes(s))return 'REJECTED';
-  if(['NEW','OPEN','ACTIVE'].includes(s))return 'SUBMITTED';
+  if(['NEW','OPEN','ACTIVE','PENDING','PARTIALLY_FILLED_PENDING'].includes(s))return 'SUBMITTED';
   return 'UNKNOWN';
 };
 
