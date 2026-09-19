@@ -60,7 +60,7 @@ export class AccountingOutboxWorker{
     const baseEntries:any[]=[];
     if(String(p.side)==='buy'){
       baseEntries.push(
-        {accountId:providerBase,currency:base.symbol,direction:'debit',amount:netBase,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_asset_received'}},
+        {accountId:providerBase,currency:base.symbol,direction:'debit',amount:quantity,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_asset_received'}},
         {accountId:expenseBase,currency:base.symbol,direction:'debit',amount:providerFee,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_fee'}},
         {accountId:customerBase,currency:base.symbol,direction:'credit',amount:netBase,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'customer_asset'}},
         {accountId:revenueBase,currency:base.symbol,direction:'credit',amount:customerFee,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'customer_fee'}},
