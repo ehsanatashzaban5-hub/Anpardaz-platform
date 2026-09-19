@@ -48,9 +48,9 @@ export class WallexAdapter implements LiquidityProviderAdapter{
   }
 
   async getBalances():Promise<ProviderBalance[]>{
-    const body=await this.request('/v1/account/assets');
-    const data=body?.result??body?.data??body;
-    const rows=Array.isArray(data)?data:(data?.assets??[]);
+    const body=await this.request('/v1/account/balances');
+    const data=body?.result?.balances??body?.result??body?.data??body;
+    const rows=Array.isArray(data)?data:Object.values(data??{});
     return rows.map((x:any)=>({
       asset:String(x.asset??x.symbol??''),
       available:text(x.available??x.free),
