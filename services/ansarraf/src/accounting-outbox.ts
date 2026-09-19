@@ -48,8 +48,8 @@ export class AccountingOutboxWorker{
         {accountId:sellerBase,currency:base.symbol,direction:'debit',amount:String(p.quantity),metadata:{tradeId:p.tradeId,asset:'base'}}
       ];
     if(customerFee!=='0')baseEntries.push({accountId:revenueBase,currency:base.symbol,direction:'credit',amount:customerFee,metadata:{tradeId:p.tradeId,asset:'base',type:'customer_fee'}});
-    await this.postLedger({referenceType:'exchange_trade_base',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':base',description:'Exchange trade '+p.tradeId+' base settlement',entries:baseEntries});
-    await this.postLedger({referenceType:'exchange_trade_quote',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':quote',description:'Exchange trade '+p.tradeId+' quote settlement',entries:[{accountId:sellerQuote,currency:quote.symbol,direction:'credit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}},{accountId:buyerQuote,currency:quote.symbol,direction:'debit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}}]});
+    await this.postLedger({operationId:p.operationId,referenceType:'exchange_trade_base',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':base',description:'Exchange trade '+p.tradeId+' base settlement',entries:baseEntries});
+    await this.postLedger({operationId:p.operationId,referenceType:'exchange_trade_quote',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':quote',description:'Exchange trade '+p.tradeId+' quote settlement',entries:[{accountId:sellerQuote,currency:quote.symbol,direction:'credit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}},{accountId:buyerQuote,currency:quote.symbol,direction:'debit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}}]});
   }
   private async postProviderTrade(row:any,p:any){
     const required=['settlementId','providerOrderId','customerId','providerCode','side','baseAssetId','quoteAssetId','quantity','quoteAmount','customerFeeAmount','providerFeeAmount'];
@@ -86,8 +86,9 @@ export class AccountingOutboxWorker{
         {accountId:providerBase,currency:base.symbol,direction:'credit',amount:providerFee,metadata:{settlementId:p.settlementId,providerOrderId:p.providerOrderId,type:'provider_fee_paid'}}
       );
     }
-    await this.postLedger({referenceType:'exchange_provider_trade_base',referenceId:String(p.settlementId),idempotencyKey:row.idempotency_key+':base',description:'Provider trade '+p.providerOrderId+' base settlement',entries:baseEntries});
+    await this.postLedger({operationId:p.operationId,referenceType:'exchange_provider_trade_base',referenceId:String(p.settlementId),idempotencyKey:row.idempotency_key+':base',description:'Provider trade '+p.providerOrderId+' base settlement',entries:baseEntries});
     await this.postLedger({
+      operationId:p.operationId,
       referenceType:'exchange_provider_trade_quote',
       referenceId:String(p.settlementId),
       idempotencyKey:row.idempotency_key+':quote',
@@ -118,6 +119,7 @@ export class AccountingOutboxWorker{
     ];
     if(fee!=='0')entries.splice(1,0,{accountId:expense,currency:String(p.assetSymbol),direction:'debit',amount:fee,metadata:{withdrawalId:p.withdrawalId,providerWithdrawalId:p.providerWithdrawalId,type:'provider_withdrawal_fee'}});
     await this.postLedger({
+      operationId:p.operationId,
       referenceType:'exchange_withdrawal',
       referenceId:String(p.withdrawalId),
       idempotencyKey:row.idempotency_key,
