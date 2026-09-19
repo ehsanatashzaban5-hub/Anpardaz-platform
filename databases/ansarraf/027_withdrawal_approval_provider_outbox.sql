@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS provider_withdrawal_outbox (
   idempotency_key TEXT NOT NULL UNIQUE,
   payload JSONB NOT NULL DEFAULT '{}'::jsonb,
   status TEXT NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending','processing','posted','failed')),
+    CHECK (status IN ('pending','processing','posted','failed','manual_review')),
   attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   processing_started_at TIMESTAMPTZ,
