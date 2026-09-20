@@ -51,6 +51,10 @@ jobs:
       - name: Build
         working-directory: ${{ matrix.path }}
         run: pnpm run build 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
+      - name: Regression tests
+        if: matrix.name == 'ansarraf-service'
+        working-directory: ${{ matrix.path }}
+        run: pnpm test
       - name: Upload build diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
