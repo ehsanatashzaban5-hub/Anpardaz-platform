@@ -45,6 +45,11 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
            FROM reconciliation_runs ORDER BY id DESC LIMIT 10`,
         ),
         pool.query(
+          `SELECT id,status,provider_code,provider_reference,provider_identity_match,provider_mobile_match,provider_status,provider_checked_at,submitted_at,approved_at,rejected_at,admin_id,admin_decision_reason,created_at,updated_at
+           FROM kyc_profiles WHERE customer_id=$1 LIMIT 1`,
+          [customerId],
+        ),
+        pool.query(
           `SELECT id,run_id,provider_code,asset_symbol,provider_available::text,
                   provider_locked::text,provider_total::text,accounting_balance::text,
                   difference::text,status,created_at
@@ -56,11 +61,6 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
                   difference::text,status,created_at
            FROM customer_balance_reconciliations
            ORDER BY id DESC LIMIT 100`,
-        ),
-        pool.query(
-          `SELECT id,status,provider_code,provider_reference,provider_identity_match,provider_mobile_match,provider_status,provider_checked_at,submitted_at,approved_at,rejected_at,admin_id,admin_decision_reason,created_at,updated_at
-           FROM kyc_profiles WHERE customer_id=$1 LIMIT 1`,
-          [customerId],
         ),
       ]);
       return {
