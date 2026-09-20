@@ -21,7 +21,7 @@ export async function reconcileSolvency(pool:Pool,provider:LiquidityProviderAdap
 
   const liabilityResponse=await fetch(
     (process.env.ACCOUNTING_SERVICE_URL??'http://localhost:4004').replace(/\/$/,'')+
-    '/internal/v1/ledger/accounts/balances?status=active&accountCodePrefix='+encodeURIComponent('ansarraf.customer.')+'&limit=5000',
+    '/internal/v1/ledger/accounts/balances?status=active&accountCodePrefix='+encodeURIComponent('ansarraf.customer.')+'&limit=500',
     {headers:{authorization:'Bearer '+String(process.env.ACCOUNTING_INTERNAL_TOKEN??'')},signal:AbortSignal.timeout(Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS??5000))}
   );
   const liabilityBody:any=await liabilityResponse.json().catch(()=>({}));
@@ -55,7 +55,7 @@ export async function reconcileSolvency(pool:Pool,provider:LiquidityProviderAdap
        RETURNING *`,
       [runId,symbol,controlled,liability,difference,status,'LIQUIDITY_PROVIDER_ONLY',{
         providerCode:process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX',
-        independentlyUnverifiedSources:['BLOCKCHAIN','BANK']
+        scopeNote:'Compares Wallex/provider-controlled balances against An Sarraf customer liabilities in Accounting. No local blockchain or bank custody is part of An Sarraf solvency scope.'
       }]
     )).rows[0];
     rows.push(row);
