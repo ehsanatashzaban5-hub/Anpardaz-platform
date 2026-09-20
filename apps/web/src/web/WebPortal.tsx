@@ -239,7 +239,7 @@ export default function WebPortal() {
         ::-webkit-scrollbar-thumb { background: var(--w-border2); border-radius: 4px; }
       `}</style>
 
-      {<WebHeader
+      <WebHeader
         currentPage={page}
         onNavigate={handleNavigate}
         userRole={userRole}
