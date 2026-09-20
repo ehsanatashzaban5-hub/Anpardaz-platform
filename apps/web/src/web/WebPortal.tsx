@@ -11,6 +11,7 @@ import WebBanner     from "./WebBanner";
 import WebHoosh      from "./WebHoosh";
 import WebFinancial  from "./WebFinancial";
 import WebContent, { type ContentSection } from "./WebContent";
+import AdminPanel from "./AdminPanel";
 import WebAuthModal, { WebKycModal } from "./WebAuth";
 import type { WebPage, UserRole } from "./types";
 
@@ -156,7 +157,7 @@ function SupportPage() {
 
 // ── Main Portal Component ─────────────────────────
 export default function WebPortal() {
-  const [page,     setPage]     = useState<WebPage>("home");
+  const [page,     setPage]     = useState<WebPage>(() => window.location.pathname === "/admin" ? "admin" : "home");
   const [showAuth, setShowAuth] = useState(false);
   const [showKyc,  setShowKyc]  = useState(false);
   const [userRole, setUserRole] = useState<UserRole>("guest");
@@ -249,6 +250,7 @@ export default function WebPortal() {
       />
 
       <main style={{ paddingTop:"var(--w-header)" }}>
+        {page === "admin" && <AdminPanel/>}
         {page === "home" && (
           <WebHome onNavigate={handleNavigate}/>
         )}
