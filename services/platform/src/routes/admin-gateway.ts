@@ -218,6 +218,3 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   });
 
 }
-
-
-}
