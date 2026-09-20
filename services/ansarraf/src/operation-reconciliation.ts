@@ -50,7 +50,9 @@ export async function reconcileOperation(pool:Pool,operationId:string){
   }
 
   if(provenance.rows.length){
-    const invalidOperation=provenance.rows.some((p:any)=>String(p.operation_id)!==id);\n    const invalidAmount=(await pool.query('SELECT EXISTS(SELECT 1 FROM asset_provenance WHERE operation_id=$1 AND amount<=0) AS invalid',[id])).rows[0].invalid;\n    const invalid=invalidOperation||invalidAmount;
+    const invalidOperation=provenance.rows.some((p:any)=>String(p.operation_id)!==id);
+    const invalidAmount=(await pool.query('SELECT EXISTS(SELECT 1 FROM asset_provenance WHERE operation_id=$1 AND amount<=0) AS invalid',[id])).rows[0].invalid;
+    const invalid=invalidOperation||invalidAmount;
     check('asset_provenance',invalid?'CRITICAL':'OK',{entries:provenance.rows.length});
   }else if(orders.rows.length||withdrawals.rows.length)check('asset_provenance','WARNING','Financial operation has no asset provenance evidence yet');
 
