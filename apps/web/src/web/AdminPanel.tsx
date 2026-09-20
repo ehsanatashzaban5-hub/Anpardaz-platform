@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import WI from "./WebIcons";
 
 type AdminUser={email:string;role:string};
@@ -15,7 +15,7 @@ async function api(path:string,token:string,init:RequestInit={}){
   return body;
 }
 
-function Card({children,style}:{children:React.ReactNode;style?:React.CSSProperties}){return <div className="w-card" style={{padding:18,...style}}>{children}</div>}
+function Card({children,style}:{children:ReactNode;style?:CSSProperties}){return <div className="w-card" style={{padding:18,...style}}>{children}</div>}
 function Badge({children,tone="muted"}:{children:React.ReactNode;tone?:string}){const colors:any={ok:"#059669",bad:"#dc2626",warn:"#d97706",muted:"var(--w-muted)",blue:"#0891b2"};return <span style={{display:"inline-flex",padding:"4px 9px",borderRadius:20,fontSize:11,fontWeight:800,background:"var(--w-card2)",color:colors[tone]??colors.muted}}>{children}</span>}
 
 export default function AdminPanel(){
