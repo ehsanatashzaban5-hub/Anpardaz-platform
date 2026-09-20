@@ -76,7 +76,7 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
       const operationId = request.params.operationId?.trim();
       if (!operationId || operationId.length > 200) return reply.code(400).send({ error: 'invalid_operation_id' });
 
-      const [orders, withdrawals, trades, providerOrders, settlements, provenance, reconciliationRuns] = await Promise.all([
+      const [orders, withdrawals, trades, providerOrders, settlements, provenance, reconciliationRuns, auditEvents] = await Promise.all([
         pool.query(
           `SELECT o.*,ba.symbol AS base_symbol,qa.symbol AS quote_symbol
            FROM orders o
@@ -124,6 +124,14 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
         pool.query(
           `SELECT id,provider_code,status,started_at,completed_at,error_message,metadata
            FROM reconciliation_runs ORDER BY id DESC LIMIT 20`,
+        ),
+        pool.query(
+          `SELECT id,operation_id,event_type,actor_type,actor_id,aggregate_type,aggregate_id,
+                  event_payload,previous_hash,event_hash,created_at
+           FROM operation_audit_events
+           WHERE operation_id=$1
+           ORDER BY id`,
+          [operationId],
         ),
       ]);
 
@@ -194,6 +202,14 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
         withdrawals: withdrawals.rows,
         provenance: provenance.rows,
         accounting,
+        audit: {
+          events: auditEvents.rows,
+          tamperEvidence: auditEvents.rows.map((row: any) => ({
+            id: row.id,
+            previousHash: row.previous_hash,
+            eventHash: row.event_hash,
+          })),
+        },
         reconciliation: {
           latestRuns: reconciliationRuns.rows,
           note: 'Reconciliation runs are periodic evidence; they are not treated as a direct financial link to this operation unless an explicit operation reference exists.',
