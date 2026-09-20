@@ -296,7 +296,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 <div key={a.id} style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, cursor:"pointer", flexShrink:0 }} onClick={()=>{setAsset(a);setTab("trade-select");}}>
                   <span style={{ fontWeight:700, color:"var(--w-muted)" }}>{a.symbol}</span>
                   <span style={{ fontWeight:900 }}>${fmtP(a.price)}</span>
-                  <span style={{ color:clr(a.change24h), fontWeight:700, fontSize:10 }}>{a.change24h>0?"+":""}{a.change24h.toFixed(1)}%</span>
+                  <span style={{ color:Number.isFinite(a.change24h)?clr(a.change24h):"var(--w-muted)", fontWeight:700, fontSize:10 }}>{fmtChange(a.change24h)}</span>
                 </div>
               ))}
             </div>
@@ -524,7 +524,7 @@ function MarketsTab({ assets, search, onSearch, sortBy, onSort, filterFav, onFil
                 <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{FA(Math.round(a.priceIrt/1000).toLocaleString())} ه</div>
                 <div style={{ textAlign:"center" }}>
                   <span style={{ fontSize:12, fontWeight:700, color:clr(a.change24h), background:a.change24h>=0?"rgba(16,185,129,0.08)":"rgba(244,63,94,0.08)", padding:"2px 7px", borderRadius:5 }}>
-                    {a.change24h>0?"+":""}{a.change24h.toFixed(2)}%
+                    {fmtChange(a.change24h)}
                   </span>
                 </div>
                 <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{fmtMaybe(a.volume24h, fmtVol)}</div>
@@ -690,7 +690,7 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
                 <div style={{ fontSize:11, fontWeight:700, color:asset.id===a.id?"#0891b2":"var(--w-text)" }}>{a.symbol}/USDT</div>
                 <div style={{ fontSize:10, color:"var(--w-muted)" }}>${fmtP(a.price)}</div>
               </div>
-              <span style={{ fontSize:10, color:clr(a.change24h), fontWeight:700 }}>{a.change24h>0?"+":""}{a.change24h.toFixed(1)}%</span>
+              <span style={{ fontSize:10, color:clr(a.change24h), fontWeight:700 }}>{fmtChange(a.change24h)}</span>
             </div>
           ))}
         </div>
@@ -711,26 +711,17 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
             <div style={{ fontSize:10, color:"var(--w-muted)" }}>{asset.nameFa}</div>
           </div>
           <div style={{ fontSize:isMob?18:22, fontWeight:900 }}>${fmtP(asset.price)}</div>
-          <span style={{ fontSize:13, fontWeight:700, color:clr(asset.change24h) }}>{asset.change24h>0?"+":""}{asset.change24h.toFixed(2)}%</span>
+          <span style={{ fontSize:13, fontWeight:700, color:Number.isFinite(asset.change24h)?clr(asset.change24h):"var(--w-muted)" }}>{asset.change24h>0?"+":""}{asset.change24h.toFixed(2)}%</span>
           {!isMob && [["بالا","high24h"],["پایین","low24h"],["حجم","volume24h"]].map(([l,k]) => (
             <div key={k} style={{ marginRight:8 }}>
               <div style={{ fontSize:10, color:"var(--w-muted)" }}>{l} ۲۴ه</div>
-              <div style={{ fontSize:11, fontWeight:700 }}>{k==="volume24h"?fmtVol((asset as any)[k]):`$${fmtP((asset as any)[k])}`}</div>
+              <div style={{ fontSize:11, fontWeight:700 }}>{k==="volume24h"?fmtVol((asset as any)[k]):Number.isFinite(Number((asset as any)[k])) ? `${fmtP(Number((asset as any)[k]))}` : "—"}</div>
             </div>
           ))}
         </div>
         {/* Chart */}
         <div style={{ height:260, background:"var(--w-card)", borderBottom:"1px solid var(--w-border)", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden" }}>
-          <svg viewBox="0 0 600 180" style={{ position:"absolute", bottom:0, left:0, width:"100%", height:"100%" }}>
-            <defs>
-              <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0891b2" stopOpacity="0.2"/>
-                <stop offset="100%" stopColor="#0891b2" stopOpacity="0"/>
-              </linearGradient>
-            </defs>
-            <path d="M0,140 L40,130 L80,135 L120,100 L160,90 L200,70 L240,75 L280,55 L320,50 L360,35 L400,30 L440,20 L480,25 L520,15 L560,10 L600,5 L600,180 L0,180Z" fill="url(#chartFill)"/>
-            <path d="M0,140 L40,130 L80,135 L120,100 L160,90 L200,70 L240,75 L280,55 L320,50 L360,35 L400,30 L440,20 L480,25 L520,15 L560,10 L600,5" fill="none" stroke="#0891b2" strokeWidth="1.5"/>
-          </svg>
+<div style={{ height:"100%", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", color:"var(--w-muted)", fontSize:12 }}>نمودار تاریخی هنوز از API آن صراف ارائه نمی‌شود.</div>
           <div style={{ position:"absolute", bottom:4, left:8, display:"flex", gap:4 }}>
             {["۱ه","۴ه","۱ر","۱ه","۱هف","۱م"].map(tf=>(
               <button key={tf} style={{ padding:"2px 8px", borderRadius:4, border:"none", background:"rgba(8,145,178,0.1)", color:"#0891b2", fontSize:10, fontWeight:700, cursor:"pointer" }}>{tf}</button>
