@@ -2,11 +2,13 @@
 // An Pardaz Web Portal — An Sarraf (Desktop Exchange)
 // Full professional exchange: 293 assets, all tabs
 // ─────────────────────────────────────────────────
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import WI from "./WebIcons";
 import { CRYPTO_ASSETS } from "./mockData";
-import type { WebPage, CryptoAsset, KycStatus } from "./types";
+import type { WebPage, CryptoAsset, KycStatus, OrderBookEntry } from "./types";
 import { useIsMobile } from "./useResponsive";
+
+const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 const fmtP = (n: number) => n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits:2 }) : n.toPrecision(4);
@@ -59,7 +61,8 @@ const TAB_GROUPS = [
 
 export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLoggedIn }: SarrafProps) {
   const [tab, setTab]               = useState<SarrafTab>("markets");
-  const [selectedAsset, setAsset]   = useState<CryptoAsset>(CRYPTO_ASSETS[0]);
+  const [liveAssets, setLiveAssets] = useState<CryptoAsset[]>(() => CRYPTO_ASSETS.map(a => ({ ...a, price: 0, priceIrt: 0 })));
+  const [selectedAsset, setAsset]   = useState<CryptoAsset>(() => ({ ...CRYPTO_ASSETS[0], price: 0, priceIrt: 0 }));
   const [search, setSearch]         = useState("");
   const [sortBy, setSortBy]         = useState<"rank"|"price"|"change"|"volume">("rank");
   const [filterFav, setFilterFav]   = useState(false);
@@ -73,8 +76,46 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
   const [selectedTx, setSelectedTx] = useState<null|{type:string;amount:string;date:string;status:string;txid:string}>(null);
   const isMobile = useIsMobile(900);
 
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const r = await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes`, { signal: AbortSignal.timeout(7000), cache: "no-store" });
+        if (!r.ok) throw new Error("market_data_unavailable");
+        const d = await r.json();
+        const quotes = Array.isArray(d?.quotes) ? d.quotes : [];
+        const live = quotes.filter((q: any) => !q.stale && Number(q.lastPrice) > 0);
+        const bySymbol = new Map<string, any>();
+        for (const q of live) {
+          const current = bySymbol.get(q.symbol);
+          if (!current || q.provider === "wallex") bySymbol.set(q.symbol, q);
+        }
+        const tomanRate = Number(bySymbol.get("USDT/TOMAN")?.lastPrice || 0);
+        if (!active) return;
+        setLiveAssets(previous => previous.map(a => {
+          if (a.symbol === "USDT") return { ...a, price: tomanRate, priceIrt: tomanRate };
+          const usdt = bySymbol.get(`${a.symbol}/USDT`);
+          const toman = bySymbol.get(`${a.symbol}/TOMAN`);
+          const price = usdt ? Number(usdt.lastPrice) : 0;
+          const priceIrt = toman ? Number(toman.lastPrice) : (price > 0 && tomanRate > 0 ? price * tomanRate : 0);
+          return { ...a, price, priceIrt };
+        }));
+      } catch {
+        // Keep verified backend data already rendered; never synthesize a mock quote.
+      }
+    };
+    void load();
+    const id = window.setInterval(() => void load(), 5000);
+    return () => { active = false; window.clearInterval(id); };
+  }, []);
+
+  useEffect(() => {
+    const next = liveAssets.find(a => a.id === selectedAsset.id);
+    if (next) setAsset(next);
+  }, [liveAssets, selectedAsset.id]);
+
   const filtered = useMemo(() => {
-    let list = CRYPTO_ASSETS.filter(a =>
+    let list = liveAssets.filter(a =>
       (!filterFav || favorites.has(a.id)) &&
       (search === "" ||
         a.symbol.toLowerCase().includes(search.toLowerCase()) ||
@@ -96,16 +137,28 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
   const needsLogin = !isLoggedIn;
   const needsKyc   = isLoggedIn && kycStatus !== "verified";
 
-  const asks = useMemo(() => Array.from({length:12}, (_,i) => ({
-    price: selectedAsset.price * (1 + (i+1)*0.0005 + Math.random()*0.0003),
-    amount: +(Math.random()*3+0.05).toFixed(4),
-    total:  0,
-  })), [selectedAsset.id]);
-  const bids = useMemo(() => Array.from({length:12}, (_,i) => ({
-    price: selectedAsset.price * (1 - (i+1)*0.0005 - Math.random()*0.0003),
-    amount: +(Math.random()*3+0.05).toFixed(4),
-    total:  0,
-  })), [selectedAsset.id]);
+  const [asks, setAsks] = useState<OrderBookEntry[]>([]);
+  const [bids, setBids] = useState<OrderBookEntry[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      if (!selectedAsset.symbol) return;
+      try {
+        const r = await fetch(`${ANSARRAF_API_BASE}/api/v1/orderbook?symbol=${encodeURIComponent(`${selectedAsset.symbol}/USDT`)}&limit=20`, { signal: AbortSignal.timeout(5000), cache: "no-store" });
+        if (!r.ok) throw new Error("orderbook_unavailable");
+        const d = await r.json();
+        if (!active) return;
+        setBids(Array.isArray(d?.bids) ? d.bids.map((x: any) => ({ price: Number(x.price), amount: Number(x.amount), total: Number(x.total) })) : []);
+        setAsks(Array.isArray(d?.asks) ? d.asks.map((x: any) => ({ price: Number(x.price), amount: Number(x.amount), total: Number(x.total) })) : []);
+      } catch {
+        if (active) { setBids([]); setAsks([]); }
+      }
+    };
+    void load();
+    const id = window.setInterval(() => void load(), 3000);
+    return () => { active = false; window.clearInterval(id); };
+  }, [selectedAsset.symbol]);
 
   const PROTECTED_TABS: SarrafTab[] = ["assets","deposit","deposit-coin","withdraw","withdraw-coin","orders","transactions","security","forexbot"];
   const PROTECTED = PROTECTED_TABS.includes(tab);
@@ -171,7 +224,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
           {/* Live tickers — hidden on very small mobile */}
           {!isMobile && (
             <div style={{ display:"flex", gap:20, overflow:"hidden" }}>
-              {CRYPTO_ASSETS.slice(0,5).map(a => (
+              {liveAssets.slice(0,5).map(a => (
                 <div key={a.id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, cursor:"pointer" }} onClick={()=>{setAsset(a);setTab("trade-select");}}>
                   <span style={{ fontWeight:700, color:"var(--w-muted)" }}>{a.symbol}/USDT</span>
                   <span style={{ fontWeight:900 }}>${fmtP(a.price)}</span>
@@ -182,7 +235,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
           )}
           {isMobile && (
             <div style={{ flex:1, display:"flex", gap:12, overflow:"hidden" }}>
-              {CRYPTO_ASSETS.slice(0,2).map(a => (
+              {liveAssets.slice(0,2).map(a => (
                 <div key={a.id} style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, cursor:"pointer", flexShrink:0 }} onClick={()=>{setAsset(a);setTab("trade-select");}}>
                   <span style={{ fontWeight:700, color:"var(--w-muted)" }}>{a.symbol}</span>
                   <span style={{ fontWeight:900 }}>${fmtP(a.price)}</span>
@@ -227,7 +280,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                   favorites={favorites} onToggleFav={toggleFav}
                   onSelectTrade={selectAndTrade}
                   onSelectDetail={setCoinDetail}
-                  totalCount={CRYPTO_ASSETS.length}
+                  totalCount={liveAssets.length}
                 />
               )}
             </div>
@@ -259,7 +312,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 isLoggedIn={isLoggedIn} needsKyc={needsKyc}
                 onAuth={onAuthRequired}
                 onSelectAsset={()=>setTab("markets")}
-                assets={CRYPTO_ASSETS.slice(0,20)} onAssetChange={setAsset}
+                assets={liveAssets.slice(0,20)} onAssetChange={setAsset}
                 favorites={favorites} onToggleFav={toggleFav}
                 tradeKind="spot"
                 onBack={()=>setTab("trade-select")}
@@ -290,13 +343,13 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
             <AuthGate onAuth={onAuthRequired}/>
           )}
           {tab === "assets" && isLoggedIn && (
-            <AssetsTab assets={CRYPTO_ASSETS.slice(0,12)} kycStatus={kycStatus} onDeposit={()=>setTab("deposit")} onWithdraw={()=>setTab("withdraw")} onDepositCoin={()=>setTab("deposit-coin")} onWithdrawCoin={()=>setTab("withdraw-coin")}/>
+            <AssetsTab assets={liveAssets.slice(0,12)} kycStatus={kycStatus} onDeposit={()=>setTab("deposit")} onWithdraw={()=>setTab("withdraw")} onDepositCoin={()=>setTab("deposit-coin")} onWithdrawCoin={()=>setTab("withdraw-coin")}/>
           )}
           {tab === "deposit" && isLoggedIn && (
             <DepositTomanTab kycStatus={kycStatus}/>
           )}
           {tab === "deposit-coin" && isLoggedIn && (
-            <DepositCoinTab assets={CRYPTO_ASSETS} kycStatus={kycStatus}/>
+            <DepositCoinTab assets={liveAssets} kycStatus={kycStatus}/>
           )}
           {tab === "withdraw" && isLoggedIn && (
             <WithdrawTomanTab kycStatus={kycStatus}/>
