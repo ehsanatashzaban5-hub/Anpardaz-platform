@@ -1,5 +1,4 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import WI from "./WebIcons";
 
 type AdminUser={email:string;role:string};
 type Json=Record<string,any>;

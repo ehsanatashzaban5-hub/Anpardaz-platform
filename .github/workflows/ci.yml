@@ -29,6 +29,8 @@ jobs:
             path: apps/mobile
           - name: web
             path: apps/web
+          - name: admin
+            path: apps/admin
     steps:
       - name: Checkout
         uses: actions/checkout@v4
