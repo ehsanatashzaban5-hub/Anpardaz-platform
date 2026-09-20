@@ -81,7 +81,7 @@ test('withdrawal approval path preserves separation of duties and dual approval 
   assert.ok(i >= 0);
   const block = source.slice(i, i + 12000);
   assert.match(block, /approval_status/);
-  assert.match(block, /admin_id/);
+  assert.match(block, /approved_by|approver_identity_id/);
   assert.match(block, /dual|DUAL|approval/i);
 });
 
