@@ -65,4 +65,4 @@ jobs:
         if: always()
         run: |
           echo "### ${{ matrix.name }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Build target: \\`${{ matrix.path }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Build target: ${{ matrix.path }}" >> "$GITHUB_STEP_SUMMARY"
