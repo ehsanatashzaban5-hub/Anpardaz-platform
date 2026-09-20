@@ -1,3 +1,4 @@
+import {reconcileSolvency} from './solvency-reconciliation.js';
 import type {FastifyBaseLogger} from 'fastify';
 import type {Pool} from 'pg';
 import {createProviderRegistry} from './providers/index.js';
@@ -99,6 +100,13 @@ export class ProviderReconciliationWorker{
            VALUES($1,$2,$3,0,0,0,$4,$5,$6)`,
           [run.id,providerCode,symbol,accountingBalance,diff,status]
         );
+      }
+
+      const solvency=await reconcileSolvency(this.pool,adapter,Number(run.id));
+      if(solvency.status==='CRITICAL'){
+        overall='CRITICAL';
+        criticalCount++;
+        mismatchCount++;
       }
 
       // Cross-check customer wallet liabilities against the Accounting liability ledger.
