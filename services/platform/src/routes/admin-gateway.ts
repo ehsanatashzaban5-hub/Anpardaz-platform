@@ -20,7 +20,7 @@ async function fetchJson(url: string, init: RequestInit = {}, timeoutMs = 5000) 
   } finally {
     clearTimeout(timer);
   }
-
+}
 
 export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   app.get('/api/v1/admin/ecosystem/health', { preHandler: requireAuth }, async (request, reply) => {
