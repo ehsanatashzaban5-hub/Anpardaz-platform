@@ -660,9 +660,50 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
   onBack?: ()=>void;
 }) {
   const [leverage, setLeverage] = useState(1);
+  const [orderBusy, setOrderBusy] = useState(false);
+  const [orderMessage, setOrderMessage] = useState("");
   const maxAsk = Math.max(...asks.map(a=>a.price));
   const minBid = Math.min(...bids.map(b=>b.price));
   const estimatedTotal = tradeMode==="market" ? asset.price*(parseFloat(amount)||0) : (parseFloat(price)||0)*(parseFloat(amount)||0);
+  const submitOrder = async () => {
+    if (!isLoggedIn) { onAuth(); return; }
+    if (needsKyc) { setOrderMessage("برای معامله، وضعیت احراز هویت حساب را تکمیل کنید."); return; }
+    if (tradeMode === "stop-limit") { setOrderMessage("این نوع سفارش هنوز در API معاملاتی An Sarraf فعال نشده است."); return; }
+    const quantity = Number.parseFloat(amount);
+    const limitPrice = Number.parseFloat(price);
+    if (!Number.isFinite(quantity) || quantity <= 0) { setOrderMessage("مقدار سفارش را وارد کنید."); return; }
+    if (tradeMode === "limit" && (!Number.isFinite(limitPrice) || limitPrice <= 0)) { setOrderMessage("قیمت سفارش لیمیت را وارد کنید."); return; }
+    setOrderBusy(true); setOrderMessage("");
+    try {
+      const token = getWebToken();
+      const assetsResponse = await fetch(`${ANSARRAF_API_BASE}/api/v1/assets`, { cache: "no-store" });
+      if (!assetsResponse.ok) throw new Error("لیست دارایی‌های صرافی در دسترس نیست.");
+      const assetRows = (await assetsResponse.json()).assets ?? [];
+      const base = assetRows.find((x:any) => String(x.symbol).toUpperCase() === asset.symbol.toUpperCase());
+      const quote = assetRows.find((x:any) => String(x.symbol).toUpperCase() === "USDT");
+      if (!base || !quote) throw new Error("بازار انتخاب‌شده در زیرساخت صرافی فعال نیست.");
+      const quoteAmount = tradeMode === "market" && tradeType === "buy" ? String(estimatedTotal) : undefined;
+      const response = await fetch(`${ANSARRAF_API_BASE}/api/v1/orders`, {
+        method: "POST",
+        headers: { "content-type":"application/json", authorization:`Bearer ${token}` },
+        body: JSON.stringify({
+          baseAssetId: Number(base.id), quoteAssetId: Number(quote.id), side: tradeType,
+          orderType: tradeMode === "market" ? "market" : "limit", quantity:String(quantity),
+          price: tradeMode === "limit" ? String(limitPrice) : undefined, quoteAmount,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.error === "insufficient_balance" ? "موجودی کافی نیست." : body?.error ?? "ثبت سفارش ناموفق بود.");
+      setOrderMessage("سفارش با موفقیت در صرافی ثبت شد.");
+      onAmount(""); onPrice("");
+    } catch (e) {
+      setOrderMessage(e instanceof Error ? e.message : "ثبت سفارش ناموفق بود.");
+    } finally {
+      setOrderBusy(false);
+    }
+  };
+
   const isMob = useIsMobile(900);
 
   return (
@@ -849,9 +890,10 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
               <WI n="shield" s={15}/> تأیید هویت برای معامله
             </button>
           ) : (
-            <button className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, background:tradeType==="buy"?"#10b981":"#f43f5e" }}>
-              {tradeType==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
+            <button onClick={submitOrder} disabled={orderBusy} className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, background:tradeType==="buy"?"#10b981":"#f43f5e", opacity:orderBusy?0.65:1 }}>
+              {orderBusy ? "در حال ثبت..." : tradeType==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
             </button>
+            {orderMessage && <div style={{ marginTop:8, padding:"8px 10px", borderRadius:8, background:"var(--w-card2)", color:"var(--w-muted)", fontSize:11, lineHeight:1.7 }}>{orderMessage}</div>}
           )}
         </div>
         {/* Recent trades */}
