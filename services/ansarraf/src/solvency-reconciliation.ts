@@ -1,7 +1,7 @@
 import type {Pool} from 'pg';
-import type {ProviderBalance,ProviderAdapter} from './providers/types.js';
+import type {ProviderBalance,LiquidityProviderAdapter} from './providers/types.js';
 
-export async function reconcileSolvency(pool:Pool,provider:ProviderAdapter,runId:number){
+export async function reconcileSolvency(pool:Pool,provider:LiquidityProviderAdapter,runId:number){
   const balances:ProviderBalance[]=await provider.getBalances();
   const providerByAsset=new Map<string,{available:string;locked:string;total:string}>();
   for(const balance of balances){
