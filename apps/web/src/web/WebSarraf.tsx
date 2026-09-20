@@ -346,7 +346,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
           )}
           {/* ── Instant Trade ── */}
           {tab === "instant" && (
-            <InstantTradeTab asset={selectedAsset} onBack={()=>setTab("trade-select")} isLoggedIn={isLoggedIn} onAuth={onAuthRequired}/>
+            <InstantTradeTab asset={selectedAsset} onBack={()=>setTab("trade-select")} isLoggedIn={isLoggedIn} onAuth={onAuthRequired} kycStatus={effectiveKycStatus}/>
           )}
           {/* ── Spot Trade ── */}
           {tab === "spot" && (
@@ -380,7 +380,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
                 isLoggedIn={isLoggedIn} needsKyc={needsKyc}
                 onAuth={onAuthRequired}
                 onSelectAsset={()=>setTab("markets")}
-                assets={CRYPTO_ASSETS.slice(0,20)} onAssetChange={setAsset}
+                assets={liveAssets.slice(0,20)} onAssetChange={setAsset}
                 favorites={favorites} onToggleFav={toggleFav}
                 tradeKind="margin"
                 onBack={()=>setTab("trade-select")}
@@ -1153,82 +1153,42 @@ function TradeSelectTab({ asset, onInstant, onSpot, onMargin, isLoggedIn, onAuth
 }
 
 // ── Instant Trade Tab ──────────────────────────────
-function InstantTradeTab({ asset, onBack, isLoggedIn, onAuth }: { asset:CryptoAsset; onBack:()=>void; isLoggedIn:boolean; onAuth:()=>void }) {
-  const [side, setSide] = useState<"buy"|"sell">("buy");
-  const [amount, setAmount] = useState("");
-  const [done, setDone] = useState(false);
-  const estimated = side === "buy" ? (parseFloat(amount)||0)/asset.price : (parseFloat(amount)||0)*asset.price;
-  if (done) return (
-    <div style={{ padding:"60px 24px", textAlign:"center", maxWidth:400, margin:"0 auto" }}>
-      <div style={{ width:72, height:72, borderRadius:"50%", background:"rgba(16,185,129,0.12)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", color:"#10b981", fontSize:40 }}>✓</div>
-      <div style={{ fontSize:22, fontWeight:900, marginBottom:8 }}>{side==="buy"?"خرید موفق":"فروش موفق"}</div>
-      <div style={{ fontSize:14, color:"var(--w-muted)", marginBottom:6 }}>{amount} {side==="buy"?"USDT":asset.symbol}</div>
-      <div style={{ fontSize:14, fontWeight:800, marginBottom:24 }}>{estimated.toFixed(side==="buy"?6:2)} {side==="buy"?asset.symbol:"USDT"} دریافت شد</div>
-      <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
-        <button onClick={()=>{setDone(false);setAmount("");}} className="w-btn w-btn-ghost">معامله جدید</button>
-        <button onClick={onBack} className="w-btn w-btn-primary">بازگشت</button>
-      </div>
+function InstantTradeTab({ asset, onBack, isLoggedIn, onAuth, kycStatus }: { asset:CryptoAsset; onBack:()=>void; isLoggedIn:boolean; onAuth:()=>void; kycStatus:KycStatus }) {
+  const [side,setSide]=useState<"buy"|"sell">("buy"),[amount,setAmount]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
+  const estimated=side==="buy"?(parseFloat(amount)||0)/(asset.price||1):(parseFloat(amount)||0)*(asset.price||0);
+  const submit=async()=>{
+    if(!isLoggedIn){onAuth();return;}
+    if(kycStatus!=="verified"){setMessage("برای معامله، ابتدا احراز هویت آن صراف را تکمیل کنید.");return;}
+    const entered=Number(amount);
+    if(!Number.isFinite(entered)||entered<=0){setMessage("مقدار معتبر وارد کنید.");return;}
+    if(!asset.price||asset.price<=0){setMessage("قیمت لحظه‌ای در دسترس نیست.");return;}
+    setBusy(true);setMessage("");
+    try{
+      const token=getWebToken(), ar=await fetch(ANSARRAF_API_BASE+"/api/v1/assets",{cache:"no-store"});
+      if(!ar.ok)throw new Error("لیست دارایی‌های صراف در دسترس نیست.");
+      const rows=(await ar.json()).assets??[],base=rows.find((x:any)=>String(x.symbol).toUpperCase()===asset.symbol.toUpperCase()),quote=rows.find((x:any)=>String(x.symbol).toUpperCase()==="USDT");
+      if(!base||!quote)throw new Error("بازار انتخاب‌شده در زیرساخت صراف فعال نیست.");
+      const quantity=side==="buy"?entered/asset.price:entered;
+      const response=await fetch(ANSARRAF_API_BASE+"/api/v1/orders",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({baseAssetId:Number(base.id),quoteAssetId:Number(quote.id),side,orderType:"market",quantity:String(quantity),quoteAmount:side==="buy"?String(entered):undefined,idempotencyKey:crypto.randomUUID()})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data?.error==="insufficient_available_balance"?"موجودی کافی نیست.":data?.error??"ثبت سفارش ناموفق بود.");
+      setMessage("سفارش واقعی در صراف ثبت شد. نتیجه نهایی را از بخش سفارشات/تراکنش‌ها پیگیری کنید.");setAmount("");
+    }catch(e){setMessage(e instanceof Error?e.message:"ثبت سفارش ناموفق بود.");}finally{setBusy(false);}
+  };
+  return <div style={{padding:"32px 0",maxWidth:460}}>
+    <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:"var(--w-muted)",fontSize:13,marginBottom:20}}><WI n="arrow-right" s={13}/> انتخاب نوع معامله</button>
+    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}><div style={{width:44,height:44,borderRadius:"50%",background:asset.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:13}}>{asset.symbol.slice(0,3)}</div><div><div style={{fontSize:16,fontWeight:900}}>{asset.nameFa} ({asset.symbol})</div><div style={{fontSize:13,fontWeight:800,color:clr(asset.change24h)}}>{"$"}{fmtP(asset.price)} <span style={{fontSize:11}}>{asset.change24h>0?"+":""}{asset.change24h.toFixed(2)}%</span></div></div></div>
+    <div className="w-card" style={{padding:"24px"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",background:"var(--w-card2)",borderRadius:10,padding:3,marginBottom:20}}><button onClick={()=>setSide("buy")} style={{padding:10,borderRadius:8,border:"none",background:side==="buy"?"#10b981":"transparent",color:side==="buy"?"#fff":"var(--w-muted)",fontWeight:800,cursor:"pointer"}}>خرید {asset.symbol}</button><button onClick={()=>setSide("sell")} style={{padding:10,borderRadius:8,border:"none",background:side==="sell"?"#f43f5e":"transparent",color:side==="sell"?"#fff":"var(--w-muted)",fontWeight:800,cursor:"pointer"}}>فروش {asset.symbol}</button></div>
+      <div style={{marginBottom:14}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--w-muted)",marginBottom:6}}><span>{side==="buy"?"پرداخت می‌کنید":"می‌فروشید"}</span><span>{side==="buy"?"USDT":asset.symbol}</span></div><input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" className="w-input" inputMode="decimal" dir="ltr"/></div>
+      {amount&&<div style={{padding:"12px 14px",background:"var(--w-card2)",borderRadius:9,marginBottom:16}}><div style={{display:"flex",justifyContent:"space-between",fontSize:13}}><span style={{color:"var(--w-muted"}}>برآورد</span><span style={{fontWeight:800}}>{estimated.toFixed(6)} {side==="buy"?asset.symbol:"USDT"}</span></div></div>}
+      {message&&<div style={{padding:"9px 11px",borderRadius:9,background:"var(--w-card2)",fontSize:11,lineHeight:1.8,marginBottom:12}}>{message}</div>}
+      {!isLoggedIn?<button onClick={onAuth} className="w-btn w-btn-primary" style={{width:"100%",padding:13}}>ورود برای معامله</button>:<button onClick={submit} disabled={busy||!amount} className="w-btn w-btn-primary" style={{width:"100%",padding:13,background:side==="buy"?"#10b981":"#f43f5e",opacity:busy||!amount?0.65:1}}>{busy?"در حال ثبت...":side==="buy"?"خرید "+asset.symbol:"فروش "+asset.symbol}</button>}
     </div>
-  );
-  return (
-    <div style={{ padding:"32px 0", maxWidth:440 }}>
-      <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:20 }}>
-        <WI n="arrow-right" s={13}/> انتخاب نوع معامله
-      </button>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-        <div style={{ width:44, height:44, borderRadius:"50%", background:asset.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:900, fontSize:13 }}>{asset.symbol.slice(0,3)}</div>
-        <div>
-          <div style={{ fontSize:16, fontWeight:900 }}>{asset.nameFa} ({asset.symbol})</div>
-          <div style={{ fontSize:13, fontWeight:800, color:clr(asset.change24h) }}>${fmtP(asset.price)} <span style={{ fontSize:11 }}>{asset.change24h>0?"+":""}{asset.change24h.toFixed(2)}%</span></div>
-        </div>
-      </div>
-      <div className="w-card" style={{ padding:"24px" }}>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", background:"var(--w-card2)", borderRadius:10, padding:3, marginBottom:20 }}>
-          <button onClick={()=>setSide("buy")} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="buy"?"#10b981":"transparent", color:side==="buy"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>خرید {asset.symbol}</button>
-          <button onClick={()=>setSide("sell")} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="sell"?"#f43f5e":"transparent", color:side==="sell"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>فروش {asset.symbol}</button>
-        </div>
-        <div style={{ marginBottom:14 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)", marginBottom:6 }}>
-            <span>{side==="buy"?"پرداخت می‌کنید":"می‌فروشید"}</span>
-            <span>موجودی: {side==="buy"?"0.00 USDT":`0.00 ${asset.symbol}`}</span>
-          </div>
-          <div style={{ position:"relative" }}>
-            <input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" className="w-input" style={{ paddingLeft:56, fontSize:16 }} inputMode="decimal"/>
-            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, fontWeight:700, color:"var(--w-muted)" }}>{side==="buy"?"USDT":asset.symbol}</span>
-          </div>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:6, marginBottom:16 }}>
-          {["25%","50%","75%","همه"].map(p=>(
-            <button key={p} style={{ padding:"6px", borderRadius:7, border:"1px solid var(--w-border)", background:"transparent", color:"var(--w-muted)", fontSize:12, cursor:"pointer", fontFamily:"Vazirmatn" }}>{p}</button>
-          ))}
-        </div>
-        {amount && (
-          <div style={{ padding:"12px 14px", background:"var(--w-card2)", borderRadius:9, marginBottom:16 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, marginBottom:4 }}>
-              <span style={{ color:"var(--w-muted)" }}>{side==="buy"?"دریافت می‌کنید":"معادل USDT"}</span>
-              <span style={{ fontWeight:800 }}>{estimated.toFixed(side==="buy"?6:2)} {side==="buy"?asset.symbol:"USDT"}</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)" }}>
-              <span>قیمت</span><span>${fmtP(asset.price)}</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)" }}>
-              <span>کارمزد (۰.۱٪)</span><span>{side==="buy"?`$${(parseFloat(amount)*0.001).toFixed(4)}`:`${(parseFloat(amount)*0.001).toFixed(6)} ${asset.symbol}`}</span>
-            </div>
-          </div>
-        )}
-        {!isLoggedIn ? (
-          <button onClick={onAuth} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e" }}>
-            <WI n="lock" s={15}/> ورود برای معامله
-          </button>
-        ) : (
-          <button disabled={!amount} onClick={()=>setDone(true)} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e", opacity:amount?1:0.5, fontSize:15 }}>
-            {side==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
-          </button>
-        )}
-      </div>
-    </div>
-  );
+  </div>;
 }
+
+// ── Support Tab ────────────────────────────────────
 
 // ── Support Tab ────────────────────────────────────
 function SupportTab({ isLoggedIn, onAuth }: { isLoggedIn:boolean; onAuth:()=>void }) {
