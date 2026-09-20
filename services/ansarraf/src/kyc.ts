@@ -3,19 +3,115 @@ import type { Pool } from 'pg';
 
 export type KycStatus = 'NOT_REQUIRED'|'KYC_REQUIRED'|'DRAFT'|'SUBMITTED'|'PROVIDER_CHECKING'|'PROVIDER_VERIFIED'|'PROVIDER_REJECTED'|'REQUIRES_ACTION'|'ADMIN_REVIEW'|'APPROVED'|'REJECTED'|'VERIFIED';
 export type KycSubmission = { fullName:string; nationalId:string; mobile:string; birthDate?:string };
+export type KycCustomerId = string | number;
 
-function key(){const raw=process.env.KYC_ENCRYPTION_KEY_B64;if(!raw)throw new Error('kyc_encryption_key_not_configured');const b=Buffer.from(raw,'base64');if(b.length!==32)throw new Error('kyc_encryption_key_invalid');return b;}
-function encrypt(v:unknown){const iv=randomBytes(12),c=createCipheriv('aes-256-gcm',key(),iv);const body=Buffer.concat([c.update(JSON.stringify(v),'utf8'),c.final()]);return Buffer.concat([iv,c.getAuthTag(),body]).toString('base64');}
-function decrypt(v:string){const b=Buffer.from(v,'base64'),d=createDecipheriv('aes-256-gcm',key(),b.subarray(0,12));d.setAuthTag(b.subarray(12,28));return JSON.parse(Buffer.concat([d.update(b.subarray(28)),d.final()]).toString()) as KycSubmission;}
-function validate(v:unknown):KycSubmission{const b=(v??{}) as Record<string,unknown>;if(typeof b.fullName!=='string'||b.fullName.trim().length<3||b.fullName.trim().length>150)throw new Error('invalid_full_name');if(typeof b.nationalId!=='string'||!/^[0-9]{10}$/.test(b.nationalId.trim()))throw new Error('invalid_national_id');if(typeof b.mobile!=='string'||!/^(?:09)[0-9]{9}$/.test(b.mobile.trim()))throw new Error('invalid_mobile');if(b.birthDate!=null&&(typeof b.birthDate!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(b.birthDate)))throw new Error('invalid_birth_date');return{fullName:b.fullName.trim(),nationalId:b.nationalId.trim(),mobile:b.mobile.trim(),birthDate:b.birthDate as string|undefined};}
+function key(){
+  const raw=process.env.KYC_ENCRYPTION_KEY_B64;
+  if(!raw)throw new Error('kyc_encryption_key_not_configured');
+  const b=Buffer.from(raw,'base64');
+  if(b.length!==32)throw new Error('kyc_encryption_key_invalid');
+  return b;
+}
+function encrypt(v:unknown){
+  const iv=randomBytes(12),c=createCipheriv('aes-256-gcm',key(),iv);
+  const body=Buffer.concat([c.update(JSON.stringify(v),'utf8'),c.final()]);
+  return Buffer.concat([iv,c.getAuthTag(),body]).toString('base64');
+}
+function decrypt(v:string){
+  const b=Buffer.from(v,'base64');
+  if(b.length<29)throw new Error('kyc_encrypted_data_invalid');
+  const d=createDecipheriv('aes-256-gcm',key(),b.subarray(0,12));
+  d.setAuthTag(b.subarray(12,28));
+  return JSON.parse(Buffer.concat([d.update(b.subarray(28)),d.final()]).toString()) as KycSubmission;
+}
+export function validateKycSubmission(v:unknown):KycSubmission{
+  const b=(v??{}) as Record<string,unknown>;
+  if(typeof b.fullName!=='string'||b.fullName.trim().length<3||b.fullName.trim().length>150)throw new Error('invalid_full_name');
+  if(typeof b.nationalId!=='string'||!/^[0-9]{10}$/.test(b.nationalId.trim()))throw new Error('invalid_national_id');
+  if(typeof b.mobile!=='string'||!/^(?:09)[0-9]{9}$/.test(b.mobile.trim()))throw new Error('invalid_mobile');
+  if(b.birthDate!=null&&(typeof b.birthDate!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(b.birthDate)))throw new Error('invalid_birth_date');
+  return{fullName:b.fullName.trim(),nationalId:b.nationalId.trim(),mobile:b.mobile.trim(),birthDate:b.birthDate as string|undefined};
+}
 function digest(v:unknown){return createHash('sha256').update(JSON.stringify(v)).digest('hex');}
 
-export async function ensureKycRequired(pool:Pool,customerId:number,operationId?:string){const q=await pool.query('SELECT id,status FROM kyc_profiles WHERE customer_id=$1',[customerId]);if(!q.rows[0]){const x=await pool.query("INSERT INTO kyc_profiles(customer_id,status) VALUES($1,'KYC_REQUIRED') RETURNING id",[customerId]);await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,new_status,operation_id) VALUES($1,'system','KYC_REQUIRED','KYC_REQUIRED',$2)",[x.rows[0].id,operationId??null]);return{allowed:false,status:'KYC_REQUIRED' as KycStatus};}return{allowed:q.rows[0].status==='VERIFIED',status:q.rows[0].status as KycStatus};}
+export async function ensureKycRequired(pool:Pool,customerId:KycCustomerId,operationId?:string){
+  const q=await pool.query('SELECT id,status FROM kyc_profiles WHERE customer_id=$1',[customerId]);
+  if(!q.rows[0]){
+    const x=await pool.query("INSERT INTO kyc_profiles(customer_id,status) VALUES($1,'KYC_REQUIRED') RETURNING id",[customerId]);
+    await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,new_status,operation_id) VALUES($1,'system','KYC_REQUIRED','KYC_REQUIRED',$2)",[x.rows[0].id,operationId??null]);
+    return{allowed:false,status:'KYC_REQUIRED' as KycStatus};
+  }
+  return{allowed:q.rows[0].status==='VERIFIED',status:q.rows[0].status as KycStatus};
+}
 
-async function providerCheck(data:KycSubmission){const url=process.env.KYC_PROVIDER_URL,code=process.env.KYC_PROVIDER_CODE,apiKey=process.env.KYC_PROVIDER_API_KEY;if(!url||!code||!apiKey)throw new Error('kyc_provider_not_configured');const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),Number(process.env.KYC_PROVIDER_TIMEOUT_MS??10000));try{const res=await fetch(url.replace(/\/$/,'')+'/v1/identity/match',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+apiKey,'x-provider-code':code},body:JSON.stringify(data),signal:ctl.signal});const body=await res.json().catch(()=>({})) as Record<string,unknown>;if(!res.ok)throw new Error(typeof body.error==='string'?body.error:'kyc_provider_http_error');return{reference:typeof body.reference==='string'?body.reference:null,status:body.status==='verified'?'verified':body.status==='rejected'?'rejected':'review',identityMatch:body.identityMatch===true,mobileMatch:body.mobileMatch===true,statusCode:typeof body.statusCode==='string'?body.statusCode:null};}finally{clearTimeout(timer);}}
+async function providerCheck(data:KycSubmission){
+  const url=process.env.KYC_PROVIDER_URL,code=process.env.KYC_PROVIDER_CODE,apiKey=process.env.KYC_PROVIDER_API_KEY;
+  if(!url||!code||!apiKey)throw new Error('kyc_provider_not_configured');
+  const timeout=Number(process.env.KYC_PROVIDER_TIMEOUT_MS??10000);
+  if(!Number.isSafeInteger(timeout)||timeout<1000||timeout>60000)throw new Error('kyc_provider_timeout_invalid');
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),timeout);
+  try{
+    const res=await fetch(url.replace(/\/$/,'')+'/v1/identity/match',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+apiKey,'x-provider-code':code},body:JSON.stringify(data),signal:ctl.signal});
+    const body=await res.json().catch(()=>({})) as Record<string,unknown>;
+    if(!res.ok)throw new Error(typeof body.error==='string'?body.error:'kyc_provider_http_error');
+    return{
+      reference:typeof body.reference==='string'?body.reference:null,
+      status:body.status==='verified'?'verified':body.status==='rejected'?'rejected':'review',
+      identityMatch:body.identityMatch===true,
+      mobileMatch:body.mobileMatch===true,
+      statusCode:typeof body.statusCode==='string'?body.statusCode:null
+    };
+  }finally{clearTimeout(timer);}
+}
 
-export async function submitKyc(pool:Pool,customerId:number,input:unknown,actorId:string,operationId?:string){const data=validate(input);let q=await pool.query('SELECT id,status FROM kyc_profiles WHERE customer_id=$1 FOR UPDATE',[customerId]);let id:number;if(!q.rows[0]){q=await pool.query("INSERT INTO kyc_profiles(customer_id,status) VALUES($1,'DRAFT') RETURNING id,status",[customerId]);}else if(!['KYC_REQUIRED','DRAFT','REQUIRES_ACTION','REJECTED'].includes(q.rows[0].status))throw new Error('kyc_submission_not_allowed');id=Number(q.rows[0].id);await pool.query("UPDATE kyc_profiles SET status='PROVIDER_CHECKING',submitted_data_encrypted=$2,submitted_data_hash=$3,submitted_at=NOW(),updated_at=NOW(),admin_id=NULL,admin_decision_reason=NULL,rejected_at=NULL WHERE id=$1",[id,encrypt(data),digest(data)]);await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,actor_id,action,previous_status,new_status,operation_id) VALUES($1,'customer',$2,'SUBMITTED',$3,'PROVIDER_CHECKING',$4)",[id,actorId,q.rows[0]?.status??'DRAFT',operationId??null]);try{const p=await providerCheck(data);const next=p.status==='verified'&&p.identityMatch&&p.mobileMatch?'ADMIN_REVIEW':p.status==='rejected'?'PROVIDER_REJECTED':'REQUIRES_ACTION';await pool.query('UPDATE kyc_profiles SET status=$2,provider_code=$3,provider_reference=$4,provider_identity_match=$5,provider_mobile_match=$6,provider_status=$7,provider_checked_at=NOW(),updated_at=NOW() WHERE id=$1',[id,next,process.env.KYC_PROVIDER_CODE,p.reference,p.identityMatch,p.mobileMatch,p.status]);await pool.query("INSERT INTO kyc_provider_events(kyc_profile_id,provider_code,provider_reference,event_type,identity_match,mobile_match,provider_status,error_code) VALUES($1,$2,$3,'IDENTITY_MATCH_RESULT',$4,$5,$6,$7)",[id,process.env.KYC_PROVIDER_CODE,p.reference,p.identityMatch,p.mobileMatch,p.status,p.statusCode]);await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,previous_status,new_status,provider_reference) VALUES($1,'provider','PROVIDER_RESULT','PROVIDER_CHECKING',$2,$3)",[id,next,p.reference]);}catch(e){await pool.query("UPDATE kyc_profiles SET status='REQUIRES_ACTION',provider_status='error',updated_at=NOW() WHERE id=$1",[id]);await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,previous_status,new_status,reason) VALUES($1,'system','PROVIDER_ERROR','PROVIDER_CHECKING','REQUIRES_ACTION',$2)",[id,e instanceof Error?e.message:'provider_error']);}return getKycById(pool,id,false);}
+export async function submitKyc(pool:Pool,customerId:KycCustomerId,input:unknown,actorId:string,operationId?:string){
+  const data=validateKycSubmission(input);
+  let q=await pool.query('SELECT id,status FROM kyc_profiles WHERE customer_id=$1 FOR UPDATE',[customerId]);
+  let id:string;
+  if(!q.rows[0]){
+    q=await pool.query("INSERT INTO kyc_profiles(customer_id,status) VALUES($1,'DRAFT') RETURNING id,status",[customerId]);
+  }else if(!['KYC_REQUIRED','DRAFT','REQUIRES_ACTION','REJECTED'].includes(q.rows[0].status)){
+    throw new Error('kyc_submission_not_allowed');
+  }
+  id=String(q.rows[0]?.id);
+  await pool.query("UPDATE kyc_profiles SET status='PROVIDER_CHECKING',submitted_data_encrypted=$2,submitted_data_hash=$3,submitted_at=NOW(),updated_at=NOW(),admin_id=NULL,admin_decision_reason=NULL,rejected_at=NULL WHERE id=$1",[id,encrypt(data),digest(data)]);
+  await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,actor_id,action,previous_status,new_status,operation_id) VALUES($1,'customer',$2,'SUBMITTED',$3,'PROVIDER_CHECKING',$4)",[id,actorId,q.rows[0]?.status??'DRAFT',operationId??null]);
+  try{
+    const p=await providerCheck(data);
+    const next=p.status==='verified'&&p.identityMatch&&p.mobileMatch?'ADMIN_REVIEW':p.status==='rejected'?'PROVIDER_REJECTED':'REQUIRES_ACTION';
+    await pool.query('UPDATE kyc_profiles SET status=$2,provider_code=$3,provider_reference=$4,provider_identity_match=$5,provider_mobile_match=$6,provider_status=$7,provider_checked_at=NOW(),updated_at=NOW() WHERE id=$1',[id,next,process.env.KYC_PROVIDER_CODE,p.reference,p.identityMatch,p.mobileMatch,p.status]);
+    await pool.query("INSERT INTO kyc_provider_events(kyc_profile_id,provider_code,provider_reference,event_type,identity_match,mobile_match,provider_status,error_code) VALUES($1,$2,$3,'IDENTITY_MATCH_RESULT',$4,$5,$6,$7)",[id,process.env.KYC_PROVIDER_CODE,p.reference,p.identityMatch,p.mobileMatch,p.status,p.statusCode]);
+    await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,previous_status,new_status,provider_reference) VALUES($1,'provider','PROVIDER_RESULT','PROVIDER_CHECKING',$2,$3)",[id,next,p.reference]);
+  }catch(e){
+    await pool.query("UPDATE kyc_profiles SET status='REQUIRES_ACTION',provider_status='error',updated_at=NOW() WHERE id=$1",[id]);
+    await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,previous_status,new_status,reason) VALUES($1,'system','PROVIDER_ERROR','PROVIDER_CHECKING','REQUIRES_ACTION',$2)",[id,e instanceof Error?e.message:'provider_error']);
+  }
+  return getKycById(pool,id,false);
+}
 
-export async function getKyc(pool:Pool,customerId:number,includeSensitive=false){const q=await pool.query('SELECT * FROM kyc_profiles WHERE customer_id=$1',[customerId]);if(!q.rows[0])return null;const r={...q.rows[0]} as Record<string,unknown>,enc=r.submitted_data_encrypted;delete r.submitted_data_encrypted;if(includeSensitive&&typeof enc==='string')r.submittedData=decrypt(enc);return r;}
-export async function getKycById(pool:Pool,id:number,includeSensitive=false){const q=await pool.query('SELECT k.*,c.identity_id,c.email FROM kyc_profiles k JOIN customers c ON c.id=k.customer_id WHERE k.id=$1',[id]);if(!q.rows[0])return null;const r={...q.rows[0]} as Record<string,unknown>,enc=r.submitted_data_encrypted;delete r.submitted_data_encrypted;if(includeSensitive&&typeof enc==='string')r.submittedData=decrypt(enc);return r;}
-export async function adminDecideKyc(pool:Pool,id:number,adminId:string,approve:boolean,reason:string){if(!reason.trim()||reason.length>1000)throw new Error('admin_decision_reason_required');const q=await pool.query('SELECT status FROM kyc_profiles WHERE id=$1',[id]);if(!q.rows[0])throw new Error('kyc_not_found');if(!['ADMIN_REVIEW','PROVIDER_VERIFIED','REQUIRES_ACTION'].includes(q.rows[0].status))throw new Error('kyc_not_ready_for_admin_decision');const next=approve?'VERIFIED':'REJECTED';await pool.query('UPDATE kyc_profiles SET status=$2,admin_id=$3,admin_decision_reason=$4,updated_at=NOW(),approved_at=CASE WHEN $2=\'VERIFIED\' THEN NOW() ELSE approved_at END,rejected_at=CASE WHEN $2=\'REJECTED\' THEN NOW() ELSE rejected_at END WHERE id=$1',[id,next,adminId,reason.trim()]);await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,actor_id,action,previous_status,new_status,reason) VALUES($1,'admin',$2,$3,$4,$5,$6)",[id,adminId,approve?'APPROVE':'REJECT',q.rows[0].status,next,reason.trim()]);return getKycById(pool,id,true);}
+export async function getKyc(pool:Pool,customerId:KycCustomerId,includeSensitive=false){
+  const q=await pool.query('SELECT * FROM kyc_profiles WHERE customer_id=$1',[customerId]);
+  if(!q.rows[0])return null;
+  const r={...q.rows[0]} as Record<string,unknown>,enc=r.submitted_data_encrypted;
+  delete r.submitted_data_encrypted;
+  if(includeSensitive&&typeof enc==='string')r.submittedData=decrypt(enc);
+  return r;
+}
+export async function getKycById(pool:Pool,id:KycCustomerId,includeSensitive=false){
+  const q=await pool.query('SELECT k.*,c.identity_id,c.email FROM kyc_profiles k JOIN customers c ON c.id=k.customer_id WHERE k.id=$1',[id]);
+  if(!q.rows[0])return null;
+  const r={...q.rows[0]} as Record<string,unknown>,enc=r.submitted_data_encrypted;
+  delete r.submitted_data_encrypted;
+  if(includeSensitive&&typeof enc==='string')r.submittedData=decrypt(enc);
+  return r;
+}
+export async function adminDecideKyc(pool:Pool,id:KycCustomerId,adminId:string,approve:boolean,reason:string){
+  if(!reason.trim()||reason.trim().length>1000)throw new Error('admin_decision_reason_required');
+  const q=await pool.query('SELECT status FROM kyc_profiles WHERE id=$1',[id]);
+  if(!q.rows[0])throw new Error('kyc_not_found');
+  if(q.rows[0].status!=='ADMIN_REVIEW')throw new Error('kyc_not_ready_for_admin_decision');
+  const next=approve?'VERIFIED':'REJECTED';
+  await pool.query('UPDATE kyc_profiles SET status=$2,admin_id=$3,admin_decision_reason=$4,updated_at=NOW(),approved_at=CASE WHEN $2=\'VERIFIED\' THEN NOW() ELSE approved_at END,rejected_at=CASE WHEN $2=\'REJECTED\' THEN NOW() ELSE rejected_at END WHERE id=$1',[id,next,adminId,reason.trim()]);
+  await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,actor_id,action,previous_status,new_status,reason) VALUES($1,'admin',$2,$3,$4,$5,$6)",[id,adminId,approve?'APPROVE':'REJECT',q.rows[0].status,next,reason.trim()]);
+  return getKycById(pool,id,true);
+}
