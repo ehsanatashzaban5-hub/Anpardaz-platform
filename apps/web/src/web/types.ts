@@ -33,7 +33,6 @@ export type WebPage =
   | "auth" | "kyc"
   | "download"
   | "support"
-  | "admin"
   | "about";
 
 // ── Content / SEO ─────────────────────────────────
