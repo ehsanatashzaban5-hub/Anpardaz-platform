@@ -9,6 +9,7 @@ import type { WebPage, CryptoAsset, KycStatus, OrderBookEntry } from "./types";
 import { useIsMobile } from "./useResponsive";
 
 const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+const getWebToken = () => typeof window !== "undefined" ? window.localStorage.getItem("anpardaz:accessToken") ?? "" : "";
 
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 const fmtP = (n: number) => n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits:2 }) : n.toPrecision(4);
@@ -59,7 +60,7 @@ const TAB_GROUPS = [
   ]},
 ];
 
-export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLoggedIn }: SarrafProps) {
+export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onAuthRequired, isLoggedIn }: SarrafProps) {
   const [tab, setTab]               = useState<SarrafTab>("markets");
   const [liveAssets, setLiveAssets] = useState<CryptoAsset[]>(() => CRYPTO_ASSETS.map(a => ({ ...a, price: 0, priceIrt: 0 })));
   const [selectedAsset, setAsset]   = useState<CryptoAsset>(() => ({ ...CRYPTO_ASSETS[0], price: 0, priceIrt: 0 }));
@@ -73,8 +74,50 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
   const [amount, setAmount]         = useState("");
   const [coinDetail, setCoinDetail] = useState<CryptoAsset|null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedTx, setSelectedTx] = useState<null|{type:string;amount:string;date:string;status:string;txid:string}>(null);
+  const [selectedTx, setSelectedTx] = useState<any>(null);
+  const [wallets, setWallets] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [deposits, setDeposits] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [backendKycStatus, setBackendKycStatus] = useState<KycStatus | null>(null);
   const isMobile = useIsMobile(900);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const token = getWebToken();
+    if (!token) return;
+    let active = true;
+    const headers = { authorization: `Bearer ${token}` };
+    const loadAccount = async () => {
+      try {
+        const [walletR, orderR, depositR, withdrawalR, kycR] = await Promise.all([
+          fetch(`${ANSARRAF_API_BASE}/api/v1/wallets`, { headers, cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/orders`, { headers, cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/deposits`, { headers, cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/withdrawals`, { headers, cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/kyc`, { headers, cache: "no-store" }),
+        ]);
+        if (!active) return;
+        if (walletR.ok) setWallets((await walletR.json()).wallets ?? []);
+        if (orderR.ok) setOrders((await orderR.json()).orders ?? []);
+        if (depositR.ok) setDeposits((await depositR.json()).deposits ?? []);
+        if (withdrawalR.ok) setWithdrawals((await withdrawalR.json()).withdrawals ?? []);
+        if (kycR.ok) {
+          const status = (await kycR.json()).kyc?.status;
+          if (status === "VERIFIED" || status === "verified") setBackendKycStatus("verified");
+          else if (status === "PENDING" || status === "pending" || status === "SUBMITTED" || status === "submitted") setBackendKycStatus("pending");
+          else if (status) setBackendKycStatus("not_verified");
+        }
+      } catch {
+        // Protected account data remains empty rather than being replaced with demo data.
+      }
+    };
+    void loadAccount();
+    const id = window.setInterval(() => void loadAccount(), 5000);
+    return () => { active = false; window.clearInterval(id); };
+  }, [isLoggedIn]);
+
+  const effectiveKycStatus = backendKycStatus ?? initialKycStatus;
 
   useEffect(() => {
     let active = true;
@@ -349,27 +392,27 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
             <AuthGate onAuth={onAuthRequired}/>
           )}
           {tab === "assets" && isLoggedIn && (
-            <AssetsTab assets={liveAssets.slice(0,12)} kycStatus={kycStatus} onDeposit={()=>setTab("deposit")} onWithdraw={()=>setTab("withdraw")} onDepositCoin={()=>setTab("deposit-coin")} onWithdrawCoin={()=>setTab("withdraw-coin")}/>
+            <AssetsTab assets={liveAssets.slice(0,12)} wallets={wallets} kycStatus={effectiveKycStatus} onDeposit={()=>setTab("deposit")} onWithdraw={()=>setTab("withdraw")} onDepositCoin={()=>setTab("deposit-coin")} onWithdrawCoin={()=>setTab("withdraw-coin")}/>
           )}
           {tab === "deposit" && isLoggedIn && (
-            <DepositTomanTab kycStatus={kycStatus}/>
+            <DepositTomanTab kycStatus={effectiveKycStatus}/>
           )}
           {tab === "deposit-coin" && isLoggedIn && (
-            <DepositCoinTab assets={liveAssets} kycStatus={kycStatus}/>
+            <DepositCoinTab assets={liveAssets} kycStatus={effectiveKycStatus}/>
           )}
           {tab === "withdraw" && isLoggedIn && (
-            <WithdrawTomanTab kycStatus={kycStatus}/>
+            <WithdrawTomanTab kycStatus={effectiveKycStatus}/>
           )}
           {tab === "withdraw-coin" && isLoggedIn && (
             <WithdrawCoinTab assets={CRYPTO_ASSETS} kycStatus={kycStatus}/>
           )}
           {tab === "orders" && isLoggedIn && (
-            <OrdersTab/>
+            <OrdersTab orders={orders}/>
           )}
           {tab === "transactions" && isLoggedIn && (
             selectedTx
               ? <TxDetailView tx={selectedTx} onBack={()=>setSelectedTx(null)}/>
-              : <TransactionsTab onSelectTx={setSelectedTx}/>
+              : <TransactionsTab orders={orders} deposits={deposits} withdrawals={withdrawals} onSelectTx={setSelectedTx}/>
           )}
           {tab === "fees" && (
             <FeesTab/>
@@ -847,15 +890,16 @@ function AuthGate({ onAuth }: { onAuth:()=>void }) {
 }
 
 // ── Assets Tab ─────────────────────────────────────
-function AssetsTab({ assets, kycStatus, onDeposit, onWithdraw, onDepositCoin, onWithdrawCoin }: { assets:CryptoAsset[]; kycStatus:KycStatus; onDeposit:()=>void; onWithdraw:()=>void; onDepositCoin:()=>void; onWithdrawCoin:()=>void; }) {
-  const portfolioValue = assets.reduce((sum,a) => sum + a.price * (Math.random()*0.5), 0);
+function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDepositCoin, onWithdrawCoin }: { assets:CryptoAsset[]; wallets:any[]; kycStatus:KycStatus; onDeposit:()=>void; onWithdraw:()=>void; onDepositCoin:()=>void; onWithdrawCoin:()=>void; }) {
+  const walletBySymbol = new Map(wallets.map(w => [String(w.symbol).toUpperCase(), w]));
+  const portfolioValue = wallets.reduce((sum,w) => sum + Number(w.total_balance ?? 0) * (assets.find(a => a.symbol.toUpperCase() === String(w.symbol).toUpperCase())?.price ?? 0), 0);
   return (
     <div style={{ padding:"20px 0" }}>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:24 }}>
         {[
           { label:"ارزش کل پورتفولیو", value:`$${portfolioValue.toFixed(2)}`, icon:"wallet", color:"#0891b2" },
-          { label:"تغییر امروز", value:"+$124.50", icon:"trending-up", color:"#10b981" },
-          { label:"سود/زیان کل", value:"+$2,840", icon:"bar-chart", color:"#7c3aed" },
+          { label:"تعداد دارایی‌ها", value:FA(wallets.length), icon:"coins", color:"#10b981" },
+          { label:"وضعیت داده", value:wallets.length ? "زنده" : "در انتظار ورود", icon:"activity", color:"#7c3aed" },
         ].map(c => (
           <div key={c.label} className="w-card" style={{ padding:"18px" }}>
             <div style={{ display:"flex", gap:10, alignItems:"center" }}>
@@ -889,8 +933,9 @@ function AssetsTab({ assets, kycStatus, onDeposit, onWithdraw, onDepositCoin, on
             </tr>
           </thead>
           <tbody>
-            {assets.map(a => {
-              const bal = parseFloat((Math.random()*2).toFixed(6));
+            {assets.filter(a => walletBySymbol.has(a.symbol.toUpperCase())).map(a => {
+              const wallet = walletBySymbol.get(a.symbol.toUpperCase());
+              const bal = Number(wallet?.total_balance ?? 0);
               return (
                 <tr key={a.id} style={{ borderBottom:"1px solid var(--w-border)" }}>
                   <td style={{ padding:"12px 14px" }}>
@@ -914,6 +959,7 @@ function AssetsTab({ assets, kycStatus, onDeposit, onWithdraw, onDepositCoin, on
                 </tr>
               );
             })}
+            {wallets.length === 0 && <tr><td colSpan={6} style={{ padding:"40px", textAlign:"center", color:"var(--w-muted)" }}>هنوز موجودی واقعی از حساب شما دریافت نشده است.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -1176,7 +1222,7 @@ function WithdrawCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatu
 }
 
 // ── Orders Tab ─────────────────────────────────────
-function OrdersTab() {
+function OrdersTab({ orders }: { orders:any[] }) {
   const [activeTab, setActiveTab] = useState<"open"|"history">("open");
   return (
     <div style={{ padding:"20px 0" }}>
@@ -1187,27 +1233,41 @@ function OrdersTab() {
           </button>
         ))}
       </div>
-      <div className="w-card" style={{ padding:"60px", textAlign:"center", color:"var(--w-muted)" }}>
-        <WI n="document" s={40} style={{ opacity:0.2, marginBottom:12 }}/>
-        <div style={{ fontSize:14, fontWeight:700 }}>{activeTab==="open"?"سفارش باز وجود ندارد":"تاریخچه‌ای یافت نشد"}</div>
-        <div style={{ fontSize:12, marginTop:4 }}>سفارشات خود را از بخش معاملات ثبت کنید</div>
+      <div className="w-card" style={{ overflow:"hidden" }}>
+        {orders.length===0 ? (
+          <div style={{ padding:"60px", textAlign:"center", color:"var(--w-muted)" }}>
+            <WI n="document" s={40} style={{ opacity:0.2, marginBottom:12 }}/>
+            <div style={{ fontSize:14, fontWeight:700 }}>سفارشی از حساب شما دریافت نشد</div>
+            <div style={{ fontSize:12, marginTop:4 }}>این بخش فقط داده واقعی An Sarraf را نمایش می‌دهد.</div>
+          </div>
+        ) : (
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+              <thead><tr style={{ background:"var(--w-card2)" }}>{["شناسه","جفت ارز","سمت","نوع","مقدار","وضعیت","تاریخ"].map(h=><th key={h} style={{ padding:"10px 12px", textAlign:"right", color:"var(--w-muted)" }}>{h}</th>)}</tr></thead>
+              <tbody>{orders.filter(o=>activeTab==="open" ? ["open","partially_filled"].includes(o.status) : !["open","partially_filled"].includes(o.status)).map(o=><tr key={o.id} style={{ borderBottom:"1px solid var(--w-border)" }}>
+                <td style={{ padding:"10px 12px", fontFamily:"monospace" }}>{o.id}</td>
+                <td style={{ padding:"10px 12px" }}>{o.base_asset_id}/{o.quote_asset_id}</td>
+                <td style={{ padding:"10px 12px", color:o.side==="buy"?"#10b981":"#f43f5e" }}>{o.side==="buy"?"خرید":"فروش"}</td>
+                <td style={{ padding:"10px 12px" }}>{o.order_type}</td>
+                <td style={{ padding:"10px 12px" }}>{o.quantity}</td>
+                <td style={{ padding:"10px 12px" }}>{o.status}</td>
+                <td style={{ padding:"10px 12px" }}>{new Date(o.created_at).toLocaleString("fa-IR")}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ── Transactions Tab ───────────────────────────────
-function TransactionsTab({ onSelectTx }: { onSelectTx:(tx:any)=>void }) {
+function TransactionsTab({ orders, deposits, withdrawals, onSelectTx }: { orders:any[]; deposits:any[]; withdrawals:any[]; onSelectTx:(tx:any)=>void }) {
   const [txType, setTxType] = useState("all");
   const TXNS = [
-    { type:"خرید", amount:"+0.0321 BTC", date:"۱۴۰۳/۰۸/۲۲", status:"موفق", txid:"abc1234...9ef0", color:"#10b981" },
-    { type:"فروش", amount:"-1.5 ETH", date:"۱۴۰۳/۰۸/۲۰", status:"موفق", txid:"def5678...1ab2", color:"#f43f5e" },
-    { type:"واریز", amount:"+50,000,000 ت", date:"۱۴۰۳/۰۸/۱۸", status:"موفق", txid:"paya-00012345", color:"#0891b2" },
-    { type:"برداشت", amount:"-200 USDT", date:"۱۴۰۳/۰۸/۱۶", status:"در انتظار", txid:"trc20xyz...abc", color:"#d97706" },
-    { type:"خرید", amount:"+500 USDT", date:"۱۴۰۳/۰۸/۱۵", status:"موفق", txid:"bsc3456...7def", color:"#10b981" },
-    { type:"واریز", amount:"+0.05 BTC", date:"۱۴۰۳/۰۸/۱۲", status:"موفق", txid:"btcnet...xyz", color:"#0891b2" },
-    { type:"فروش", amount:"-100 SOL", date:"۱۴۰۳/۰۸/۱۰", status:"موفق", txid:"solana...pqr", color:"#f43f5e" },
-    { type:"برداشت", amount:"-20,000,000 ت", date:"۱۴۰۳/۰۸/۰۸", status:"موفق", txid:"card-00098765", color:"#d97706" },
+    ...orders.map(o => ({ type:o.side==="buy"?"خرید":"فروش", amount:String(o.quantity), date:new Date(o.created_at).toLocaleDateString("fa-IR"), status:String(o.status), txid:String(o.id), color:o.side==="buy"?"#10b981":"#f43f5e" })),
+    ...deposits.map(d => ({ type:"واریز", amount:String(d.amount), date:new Date(d.created_at).toLocaleDateString("fa-IR"), status:String(d.status), txid:String(d.id), color:"#0891b2" })),
+    ...withdrawals.map(w => ({ type:"برداشت", amount:String(w.amount), date:new Date(w.created_at).toLocaleDateString("fa-IR"), status:String(w.status), txid:String(w.operation_id ?? w.id), color:"#d97706" })),
   ];
   const filtered = txType === "all" ? TXNS : TXNS.filter(t => t.type === txType);
   return (
