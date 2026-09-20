@@ -1236,36 +1236,14 @@ function TxDetailView({ tx, onBack }: { tx:any; onBack:()=>void }) {
 
 // ── Fees Tab ───────────────────────────────────────
 function FeesTab() {
-  const tiers = [
-    { label:"عادی",    vol:"کمتر از ۵۰۰ دلار",   maker:"۰.۱۵٪",  taker:"۰.۱۸٪" },
-    { label:"VIP 1",   vol:"۵۰۰ تا ۵۰۰۰",       maker:"۰.۱۲٪",  taker:"۰.۱۵٪" },
-    { label:"VIP 2",   vol:"۵۰۰۰ تا ۵۰۰۰۰",     maker:"۰.۱۰٪",  taker:"۰.۱۲٪" },
-    { label:"VIP 3",   vol:"۵۰۰۰۰ تا ۵۰۰۰۰۰",   maker:"۰.۰۸٪",  taker:"۰.۱۰٪" },
-    { label:"Market Maker",vol:"+۵۰۰,۰۰۰",       maker:"۰.۰۰٪",  taker:"۰.۰۵٪" },
-  ];
   return (
-    <div style={{ padding:"24px 0" }}>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>جدول کارمزدها</div>
-      <div className="w-card" style={{ overflow:"hidden" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-          <thead>
-            <tr style={{ background:"var(--w-card2)" }}>
-              {["سطح","حجم ۳۰ روزه (USDT)","کارمزد Maker","کارمزد Taker"].map(h=>(
-                <th key={h} style={{ padding:"12px 16px", textAlign:"right", color:"var(--w-muted)", fontWeight:600, fontSize:11 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tiers.map((t,i) => (
-              <tr key={i} style={{ borderBottom:"1px solid var(--w-border)", background:i===0?"rgba(8,145,178,0.04)":"transparent" }}>
-                <td style={{ padding:"12px 16px", fontWeight:700 }}>{t.label}{i===0&&<span style={{ fontSize:10, marginRight:6, background:"rgba(8,145,178,0.1)", color:"#0891b2", padding:"2px 6px", borderRadius:4 }}>سطح شما</span>}</td>
-                <td style={{ padding:"12px 16px" }}>{t.vol}</td>
-                <td style={{ padding:"12px 16px", color:"#10b981", fontWeight:700 }}>{t.maker}</td>
-                <td style={{ padding:"12px 16px", color:"#f43f5e", fontWeight:700 }}>{t.taker}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div style={{ padding:"24px 0", maxWidth:640 }}>
+      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>کارمزدها</div>
+      <div className="w-card" style={{ padding:"22px" }}>
+        <div style={{ fontSize:13, fontWeight:800, marginBottom:8 }}>کارمزد واقعی حساب</div>
+        <div style={{ fontSize:12, color:"var(--w-muted)", lineHeight:1.9 }}>
+          نرخ کارمزد این حساب باید از تنظیمات واقعی بک‌اند و ارائه‌دهنده دریافت شود. هیچ نرخ یا سطح VIP ساختگی در رابط نمایش داده نمی‌شود.
+        </div>
       </div>
     </div>
   );
@@ -1274,29 +1252,14 @@ function FeesTab() {
 // ── Security Tab ───────────────────────────────────
 function SecurityTab() {
   return (
-    <div style={{ padding:"24px 0", maxWidth:580 }}>
+    <div style={{ padding:"24px 0", maxWidth:640 }}>
       <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>امنیت حساب</div>
-      {[
-        { title:"تأیید دو مرحله‌ای (۲FA)", desc:"با Google Authenticator یا پیامک امنیت حساب را بالا ببرید", status:"فعال نشده", color:"#f43f5e", icon:"shield" },
-        { title:"ضد فیشینگ", desc:"یک کد شخصی انتخاب کنید که در همه ایمیل‌های آن صراف نمایش داده شود", status:"تنظیم نشده", color:"#d97706", icon:"lock" },
-        { title:"مدیریت دستگاه‌ها", desc:"مشاهده و مدیریت دستگاه‌هایی که وارد حساب شما شده‌اند", status:"۱ دستگاه", color:"#059669", icon:"device" },
-      ].map(item => (
-        <div key={item.title} className="w-card" style={{ padding:"18px", marginBottom:12 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <div style={{ width:40, height:40, borderRadius:11, background:`${item.color}15`, display:"flex", alignItems:"center", justifyContent:"center", color:item.color }}>
-              <WI n={item.icon} s={20}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{item.title}</div>
-              <div style={{ fontSize:11, color:"var(--w-muted)", marginTop:2 }}>{item.desc}</div>
-            </div>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <span style={{ fontSize:11, color:item.color, fontWeight:700 }}>{item.status}</span>
-              <button className="w-btn w-btn-ghost" style={{ padding:"6px 14px", fontSize:12 }}>تنظیم</button>
-            </div>
-          </div>
+      <div className="w-card" style={{ padding:"22px" }}>
+        <div style={{ fontSize:13, fontWeight:800, marginBottom:8 }}>مدیریت امنیت</div>
+        <div style={{ fontSize:12, color:"var(--w-muted)", lineHeight:1.9 }}>
+          وضعیت ۲FA، دستگاه‌ها و تنظیمات ضد فیشینگ تا زمان اتصال سرویس امنیت حساب از بک‌اند نمایش داده نمی‌شود.
         </div>
-      ))}
+      </div>
     </div>
   );
 }
@@ -1309,7 +1272,7 @@ function TradeSelectTab({ asset, onInstant, onSpot, onMargin, isLoggedIn, onAuth
   const cards = [
     { id:"instant", label:"خرید/فروش لحظه‌ای", sublabel:"لحظه‌ای", icon:"swap", color:"#059669", desc:"خرید یا فروش آنی با قیمت بازار. ساده‌ترین روش معامله.", badge:"پیشنهادی", onClick: isLoggedIn ? onInstant : onAuth },
     { id:"spot", label:"معامله اسپات", sublabel:"اسپات", icon:"bar-chart", color:"#0891b2", desc:"معامله با دفتر سفارشات کامل. بازار، لیمیت و استاپ-لیمیت.", badge:"حرفه‌ای", onClick: onSpot },
-    { id:"margin", label:"معامله تعهدی", sublabel:"مارجین", icon:"trending-up", color:"#7c3aed", desc:"معامله با اهرم تا ×۱۰. امکان Long و Short با استفاده از وام.", badge:"ریسک بالا", onClick: isLoggedIn ? onMargin : onAuth },
+    { id:"margin", label:"معامله تعهدی", sublabel:"مارجین", icon:"trending-up", color:"#7c3aed", desc:"API اجرایی معاملات تعهدی هنوز در بک‌اند آن صراف فعال نشده است.", badge:"فعلاً غیرفعال", onClick: ()=>{} },
   ];
   return (
     <div style={{ padding:"32px 0" }}>
