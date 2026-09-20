@@ -21,7 +21,7 @@ export async function reconcileSolvency(pool:Pool,provider:LiquidityProviderAdap
 
   const liabilityResponse=await fetch(
     (process.env.ACCOUNTING_SERVICE_URL??'http://localhost:4004').replace(/\/$/,'')+
-    '/internal/v1/ledger/accounts/balances?status=active&accountCodePrefix='+encodeURIComponent('ansarraf.customer.')+'&limit=500',
+    '/internal/v1/ledger/accounts/balances?status=active&accountCodePrefix='+encodeURIComponent('ansarraf.customer.')+'&groupByCurrency=true&limit=5000',
     {headers:{authorization:'Bearer '+String(process.env.ACCOUNTING_INTERNAL_TOKEN??'')},signal:AbortSignal.timeout(Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS??5000))}
   );
   const liabilityBody:any=await liabilityResponse.json().catch(()=>({}));
