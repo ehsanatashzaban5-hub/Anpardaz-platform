@@ -216,12 +216,8 @@ export async function settleProviderExecution(pool:Pool,providerOrderId:number,r
       );
     }
 
-    const operationId='ANSARRAF-PESET-'+hash({
-      providerOrderId,
-      quantity:d.quantity,
-      quoteAmount:d.quote_amount,
-      providerFee:d.providerFee
-    }).slice(0,40);
+    const operationId=String(po.operation_id??'').trim();
+    if(!operationId)throw new Error('provider_order_operation_id_missing');
 
     const inserted=await client.query(
       `INSERT INTO provider_trade_settlements
