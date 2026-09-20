@@ -20,6 +20,39 @@ async function fetchJson(url: string, init: RequestInit = {}, timeoutMs = 5000) 
   } finally {
     clearTimeout(timer);
   }
+  // Browser-facing admin proxy for An Pardaz banking/service operations.
+  const anpardazBase = () => (process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001').replace(/\/$/, '');
+
+  app.get('/api/v1/admin/ecosystem/anpardaz/operations', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
+    const result = await fetchJson(anpardazBase() + '/api/v1/services/operations' + q, { headers: { authorization: process.env.ANPARDAZ_INTERNAL_TOKEN ? 'Bearer ' + process.env.ANPARDAZ_INTERNAL_TOKEN : '' } });
+    return reply.code(result.status).send(result.body);
+  });
+
+  app.get('/api/v1/admin/ecosystem/anpardaz/operations/:operationId', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const operationId = (request.params as { operationId: string }).operationId?.trim();
+    if (!operationId || operationId.length > 200) return reply.code(400).send({ error: 'invalid_operation_id' });
+    const result = await fetchJson(anpardazBase() + '/internal/v1/admin/operations/' + encodeURIComponent(operationId) + '/trace', {
+      headers: { authorization: process.env.ANPARDAZ_INTERNAL_TOKEN ? 'Bearer ' + process.env.ANPARDAZ_INTERNAL_TOKEN : '' },
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
+  app.get('/api/v1/admin/ecosystem/anpardaz/users/:identityId', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const identityId = (request.params as { identityId: string }).identityId?.trim();
+    if (!identityId || identityId.length > 200) return reply.code(400).send({ error: 'invalid_identity_id' });
+    const result = await fetchJson(anpardazBase() + '/internal/v1/admin/users/' + encodeURIComponent(identityId) + '/summary', {
+      headers: { authorization: process.env.ANPARDAZ_INTERNAL_TOKEN ? 'Bearer ' + process.env.ANPARDAZ_INTERNAL_TOKEN : '' },
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
 }
 
 export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
