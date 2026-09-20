@@ -294,7 +294,7 @@ export default function WebPortal() {
         )}
       </main>
 
-      <WebFooter onNavigate={handleNavigate}/>
+      {page !== "admin" && <WebFooter onNavigate={handleNavigate}/>}
 
       {/* Auth modal — rendered ONLY when explicitly requested */}
       {showAuth && (
