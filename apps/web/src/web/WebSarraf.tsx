@@ -72,7 +72,12 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
   const [amount, setAmount]         = useState("");
   const [coinDetail, setCoinDetail] = useState<CryptoAsset|null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedTx, setSelectedTx] = useState<null|{type:string;amount:string;date:string;status:string;txid:string}>(null);
+  const [selectedTx, setSelectedTx] = useState<any>(null);
+  const [wallets, setWallets] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [deposits, setDeposits] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [backendKycStatus, setBackendKycStatus] = useState<KycStatus | null>(null);
   const isMobile = useIsMobile(900);
 
   const logoColor = (symbol: string) => { let h = 0; for (const ch of symbol) h = (h * 31 + ch.charCodeAt(0)) % 360; return \`hsl(\${h} 55% 42%)\`; };
@@ -120,6 +125,41 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
     return () => { active = false; window.clearInterval(id); };
   }, []);
 
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const token = window.localStorage.getItem("anpardaz:accessToken") ?? "";
+    if (!token) return;
+    let active = true;
+    const loadAccount = async () => {
+      try {
+        const headers = { authorization: \`Bearer \${token}\` };
+        const [walletR, orderR, tradeR, depositR, withdrawalR, kycR] = await Promise.all([
+          fetch(\`\${ANSARRAF_API_BASE}/api/v1/wallets\`, { headers, cache:"no-store" }),
+          fetch(\`\${ANSARRAF_API_BASE}/api/v1/orders\`, { headers, cache:"no-store" }),
+          fetch(\`\${ANSARRAF_API_BASE}/api/v1/trades\`, { headers, cache:"no-store" }),
+          fetch(\`\${ANSARRAF_API_BASE}/api/v1/deposits\`, { headers, cache:"no-store" }),
+          fetch(\`\${ANSARRAF_API_BASE}/api/v1/withdrawals\`, { headers, cache:"no-store" }),
+          fetch(\`\${ANSARRAF_API_BASE}/api/v1/kyc\`, { headers, cache:"no-store" }),
+        ]);
+        if (!active) return;
+        if (walletR.ok) setWallets((await walletR.json()).wallets ?? []);
+        if (orderR.ok) setOrders((await orderR.json()).orders ?? []);
+        if (depositR.ok) setDeposits((await depositR.json()).deposits ?? []);
+        if (withdrawalR.ok) setWithdrawals((await withdrawalR.json()).withdrawals ?? []);
+        if (kycR.ok) {
+          const status = String((await kycR.json()).kyc?.status ?? "");
+          setBackendKycStatus(status === "verified" ? "verified" : status === "pending" || status === "submitted" ? "pending" : status ? "not_verified" : null);
+        }
+        void tradeR;
+      } catch {
+        // Protected account views stay empty when the backend is unavailable; no demo data is inserted.
+      }
+    };
+    void loadAccount();
+    const id = window.setInterval(() => void loadAccount(), 5000);
+    return () => { active = false; window.clearInterval(id); };
+  }, [isLoggedIn]);
+
   const filtered = useMemo(() => {
     let list = liveAssets.filter(a =>
       (!filterFav || favorites.has(a.id)) &&
@@ -140,7 +180,8 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
   const selectAndTrade = (a: CryptoAsset) => { setAsset(a); setTab("trade-select"); };
 
   const needsLogin = !isLoggedIn;
-  const needsKyc   = isLoggedIn && kycStatus !== "verified";
+  const effectiveKycStatus = backendKycStatus ?? kycStatus;
+  const needsKyc   = isLoggedIn && effectiveKycStatus !== "verified";
 
   const [asks, setAsks] = useState<OrderBookEntry[]>([]);
   const [bids, setBids] = useState<OrderBookEntry[]>([]);
@@ -357,27 +398,27 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
             <AuthGate onAuth={onAuthRequired}/>
           )}
           {tab === "assets" && isLoggedIn && (
-            <AssetsTab assets={liveAssets.slice(0,12)} kycStatus={kycStatus} onDeposit={()=>setTab("deposit")} onWithdraw={()=>setTab("withdraw")} onDepositCoin={()=>setTab("deposit-coin")} onWithdrawCoin={()=>setTab("withdraw-coin")}/>
+            <AssetsTab assets={liveAssets.slice(0,12)} wallets={wallets} kycStatus={effectiveKycStatus} onDeposit={()=>setTab("deposit")} onWithdraw={()=>setTab("withdraw")} onDepositCoin={()=>setTab("deposit-coin")} onWithdrawCoin={()=>setTab("withdraw-coin")}/>
           )}
           {tab === "deposit" && isLoggedIn && (
-            <DepositTomanTab kycStatus={kycStatus}/>
+            <DepositTomanTab kycStatus={effectiveKycStatus}/>
           )}
           {tab === "deposit-coin" && isLoggedIn && (
-            <DepositCoinTab assets={liveAssets} kycStatus={kycStatus}/>
+            <DepositCoinTab assets={liveAssets} kycStatus={effectiveKycStatus}/>
           )}
           {tab === "withdraw" && isLoggedIn && (
-            <WithdrawTomanTab kycStatus={kycStatus}/>
+            <WithdrawTomanTab kycStatus={effectiveKycStatus}/>
           )}
           {tab === "withdraw-coin" && isLoggedIn && (
-            <WithdrawCoinTab assets={liveAssets} kycStatus={kycStatus}/>
+            <WithdrawCoinTab assets={liveAssets} kycStatus={effectiveKycStatus}/>
           )}
           {tab === "orders" && isLoggedIn && (
-            <OrdersTab/>
+            <OrdersTab orders={orders}/>
           )}
           {tab === "transactions" && isLoggedIn && (
             selectedTx
               ? <TxDetailView tx={selectedTx} onBack={()=>setSelectedTx(null)}/>
-              : <TransactionsTab onSelectTx={setSelectedTx}/>
+              : <TransactionsTab orders={orders} deposits={deposits} withdrawals={withdrawals} onSelectTx={setSelectedTx}/>
           )}
           {tab === "fees" && (
             <FeesTab/>
@@ -855,15 +896,16 @@ function AuthGate({ onAuth }: { onAuth:()=>void }) {
 }
 
 // ── Assets Tab ─────────────────────────────────────
-function AssetsTab({ assets, kycStatus, onDeposit, onWithdraw, onDepositCoin, onWithdrawCoin }: { assets:CryptoAsset[]; kycStatus:KycStatus; onDeposit:()=>void; onWithdraw:()=>void; onDepositCoin:()=>void; onWithdrawCoin:()=>void; }) {
-  const portfolioValue = assets.reduce((sum,a) => sum + a.price * (Math.random()*0.5), 0);
+function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDepositCoin, onWithdrawCoin }: { assets:CryptoAsset[]; wallets:any[]; kycStatus:KycStatus; onDeposit:()=>void; onWithdraw:()=>void; onDepositCoin:()=>void; onWithdrawCoin:()=>void; }) {
+  const walletBySymbol = new Map(wallets.map(w => [String(w.symbol).toUpperCase(), w]));
+  const portfolioValue = wallets.reduce((sum,w) => sum + Number(w.total_balance ?? (Number(w.available_balance ?? 0) + Number(w.locked_balance ?? 0))) * (assets.find(a => a.symbol.toUpperCase() === String(w.symbol).toUpperCase())?.price ?? 0), 0);
   return (
     <div style={{ padding:"20px 0" }}>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:24 }}>
         {[
           { label:"ارزش کل پورتفولیو", value:`$${portfolioValue.toFixed(2)}`, icon:"wallet", color:"#0891b2" },
-          { label:"تغییر امروز", value:"+$124.50", icon:"trending-up", color:"#10b981" },
-          { label:"سود/زیان کل", value:"+$2,840", icon:"bar-chart", color:"#7c3aed" },
+          { label:"تعداد دارایی‌ها", value:FA(wallets.length), icon:"trending-up", color:"#10b981" },
+          { label:"وضعیت داده", value:wallets.length ? "زنده" : "در انتظار ورود", icon:"bar-chart", color:"#7c3aed" },
         ].map(c => (
           <div key={c.label} className="w-card" style={{ padding:"18px" }}>
             <div style={{ display:"flex", gap:10, alignItems:"center" }}>
@@ -897,8 +939,9 @@ function AssetsTab({ assets, kycStatus, onDeposit, onWithdraw, onDepositCoin, on
             </tr>
           </thead>
           <tbody>
-            {assets.map(a => {
-              const bal = parseFloat((Math.random()*2).toFixed(6));
+            {assets.filter(a => walletBySymbol.has(a.symbol.toUpperCase())).map(a => {
+              const wallet = walletBySymbol.get(a.symbol.toUpperCase());
+              const bal = Number(wallet?.total_balance ?? (Number(wallet?.available_balance ?? 0) + Number(wallet?.locked_balance ?? 0)));
               return (
                 <tr key={a.id} style={{ borderBottom:"1px solid var(--w-border)" }}>
                   <td style={{ padding:"12px 14px" }}>
@@ -922,6 +965,7 @@ function AssetsTab({ assets, kycStatus, onDeposit, onWithdraw, onDepositCoin, on
                 </tr>
               );
             })}
+            {wallets.length === 0 && <tr><td colSpan={5} style={{ padding:"40px", textAlign:"center", color:"var(--w-muted)" }}>هنوز موجودی واقعی از حساب شما دریافت نشده است.</td></tr>}
           </tbody>
         </table>
       </div>
