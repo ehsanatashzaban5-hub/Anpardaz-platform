@@ -55,14 +55,19 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
       if (!platform.rows[0]) return reply.code(404).send({ error: 'user_not_found' });
 
       const ansarrafUrl = process.env.ANSARRAF_SERVICE_URL ?? 'http://localhost:4002';
+      const anpardazUrl = process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001';
       const accountingUrl = process.env.ACCOUNTING_SERVICE_URL ?? 'http://localhost:4004';
       const ansarrafToken = process.env.ANSARRAF_INTERNAL_TOKEN;
+      const anpardazToken = process.env.ANPARDAZ_INTERNAL_TOKEN;
       const accountingToken = process.env.ACCOUNTING_INTERNAL_TOKEN;
-      if (!ansarrafToken || !accountingToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
+      if (!ansarrafToken || !anpardazToken || !accountingToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
 
-      const [ansarraf, accounting] = await Promise.all([
+      const [ansarraf, anpardaz, accounting] = await Promise.all([
         fetchJson(`${ansarrafUrl.replace(/\/$/, '')}/internal/v1/admin/users/${encodeURIComponent(identityId)}/summary`, {
           headers: { authorization: `Bearer ${ansarrafToken}` },
+        }),
+        fetchJson(`${anpardazUrl.replace(/\/$/, '')}/internal/v1/admin/users/${encodeURIComponent(identityId)}/summary`, {
+          headers: { authorization: `Bearer ${anpardazToken}` },
         }),
         fetchJson(`${accountingUrl.replace(/\/$/, '')}/internal/v1/ledger/accounts?ownerIdentityId=${encodeURIComponent(identityId)}&limit=500`, {
           headers: { authorization: `Bearer ${accountingToken}` },
@@ -73,6 +78,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
         user: platform.rows[0],
         services: {
           ansarraf: ansarraf.ok ? ansarraf.body : { unavailable: true, status: ansarraf.status, error: ansarraf.body },
+          anpardaz: anpardaz.ok ? anpardaz.body : { unavailable: true, status: anpardaz.status, error: anpardaz.body },
           accounting: accounting.ok ? accounting.body : { unavailable: true, status: accounting.status, error: accounting.body },
         },
       };
