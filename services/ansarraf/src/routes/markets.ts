@@ -16,6 +16,31 @@ export function registerMarketRoutes(app: FastifyInstance, pool: Pool, marketDat
     if (symbol && !/^[A-Z0-9]+\/[A-Z0-9]+$/.test(symbol)) return reply.code(400).send({ error: 'invalid_symbol' });
     return { quotes: await marketData.getQuotes(symbol) };
   });
+  app.get('/api/v1/market-data/trades', async (request, reply) => {
+    if (!marketData) return reply.code(503).send({ error: 'market_data_unavailable' });
+    const q = request.query as { symbol?: string; limit?: string };
+    const symbol = q.symbol?.trim().toUpperCase() || '';
+    const limit = Math.min(50, Math.max(1, Number.parseInt(q.limit ?? '20', 10) || 20));
+    if (!symbol || !/^[A-Z0-9]+\/[A-Z0-9]+$/.test(symbol)) return reply.code(400).send({ error: 'invalid_symbol' });
+    const parts = symbol.split('/');
+    const assets = await pool.query<{ id: string; symbol: string }>(
+      "SELECT id,symbol FROM assets WHERE status='active' AND symbol=ANY($1::text[])",
+      [[parts[0], parts[1]]],
+    );
+    const bySymbol = new Map(assets.rows.map((row) => [row.symbol.toUpperCase(), row.id]));
+    const baseAssetId = bySymbol.get(parts[0]);
+    const quoteAssetId = bySymbol.get(parts[1]);
+    if (!baseAssetId || !quoteAssetId) return reply.code(404).send({ error: 'market_not_found' });
+    const trades = await pool.query(
+      `SELECT t.id,t.price::text,t.quantity::text,t.side,t.created_at
+       FROM trades t
+       JOIN orders o ON o.id=t.order_id
+       WHERE o.base_asset_id=$1 AND o.quote_asset_id=$2
+       ORDER BY t.created_at DESC,t.id DESC LIMIT $3`,
+      [baseAssetId, quoteAssetId, limit],
+    );
+    return { symbol, trades: trades.rows };
+  });
   app.get('/api/v1/orderbook', async (request, reply) => {
     const q = request.query as { baseAssetId?: string; quoteAssetId?: string; symbol?: string; limit?: string };
     let baseAssetId = q.baseAssetId?.trim() || '';
