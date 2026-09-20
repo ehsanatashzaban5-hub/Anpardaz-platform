@@ -84,7 +84,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     { preHandler: requireAuth },
     async (request, reply) => {
       const req = reqAuth(request);
-      if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
+      if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
       const operationId = request.params.operationId?.trim();
       if (!operationId || operationId.length > 200) return reply.code(400).send({ error: 'invalid_operation_id' });
       const ansarrafUrl = process.env.ANSARRAF_SERVICE_URL ?? 'http://localhost:4002';
