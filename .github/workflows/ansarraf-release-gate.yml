@@ -1,0 +1,51 @@
+name: An Sarraf Release Gate
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  database-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: ansarraf
+          POSTGRES_USER: ansarraf
+          POSTGRES_PASSWORD: ansarraf-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ansarraf -d ansarraf"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Apply An Sarraf migrations
+        env:
+          PGPASSWORD: ansarraf-ci
+        run: |
+          set -euo pipefail
+          for file in $(find databases/ansarraf -maxdepth 1 -name '*.sql' -print | sort); do
+            echo "Applying $file"
+            psql -h 127.0.0.1 -p 5432 -U ansarraf -d ansarraf -v ON_ERROR_STOP=1 -f "$file"
+          done
+      - name: Verify migration marker and KYC schema
+        env:
+          PGPASSWORD: ansarraf-ci
+        run: |
+          set -euo pipefail
+          test "$(psql -h 127.0.0.1 -p 5432 -U ansarraf -d ansarraf -Atqc "SELECT COUNT(*) FROM schema_migrations WHERE version='035_kyc_infrastructure'")" = "1"
+          psql -h 127.0.0.1 -p 5432 -U ansarraf -d ansarraf -Atqc "SELECT to_regclass('public.kyc_profiles')" | grep -qx 'kyc_profiles'
+          psql -h 127.0.0.1 -p 5432 -U ansarraf -d ansarraf -Atqc "SELECT to_regclass('public.kyc_audit_events')" | grep -qx 'kyc_audit_events'
+          psql -h 127.0.0.1 -p 5432 -U ansarraf -d ansarraf -Atqc "SELECT to_regclass('public.kyc_provider_events')" | grep -qx 'kyc_provider_events'
+      - name: Check for cross-database foreign keys
+        env:
+          PGPASSWORD: ansarraf-ci
+        run: |
+          set -euo pipefail
+          test -z "$(psql -h 127.0.0.1 -p 5432 -U ansarraf -d ansarraf -Atqc "SELECT conname FROM pg_constraint WHERE contype='f' AND pg_get_constraintdef(oid) ILIKE '%postgres%' LIMIT 1")"
