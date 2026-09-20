@@ -1,7 +1,7 @@
 import type {LiquidityProviderAdapter,ProviderBalance,ProviderOrderRequest,ProviderOrderResult,ProviderOrderStatus,ProviderWithdrawalRequest,ProviderWithdrawalResult} from './types.js';
 
 type WallexConfig={baseUrl:string;apiKey:string;timeoutMs:number};
-const text=(v:any)=>v===undefined||v===null?'0':String(v);
+const text=(v:any)=>v===undefined||v===null?'0':String(v);\nconst wallexSymbol=(symbol:string)=>symbol.replace(/\/TOMAN$/,'/TMN').toUpperCase();
 
 const status=(value:any):ProviderOrderStatus=>{
   const s=String(value??'').toUpperCase();
@@ -38,7 +38,7 @@ export class WallexAdapter implements LiquidityProviderAdapter{
   }
 
   async getOrderBook(symbol:string){
-    const body=await this.request('/v1/depth?symbol='+encodeURIComponent(symbol));
+    const body=await this.request('/v1/depth?symbol='+encodeURIComponent(wallexSymbol(symbol)));
     const data=body?.result??body?.data??body;
     const normalize=(rows:any[])=>rows.map((x:any)=>{
       if(Array.isArray(x))return [text(x[0]),text(x[1])] as [string,string];
@@ -63,7 +63,7 @@ export class WallexAdapter implements LiquidityProviderAdapter{
     const body=await this.request('/v1/account/orders',{
       method:'POST',
       body:JSON.stringify({
-        symbol:request.symbol,
+        symbol:wallexSymbol(request.symbol),
         type:request.orderType.toUpperCase(),
         side:request.side.toUpperCase(),
         quantity:request.quantity,
@@ -129,7 +129,7 @@ export class WallexAdapter implements LiquidityProviderAdapter{
     const fee= x?.fee!==undefined ? x.fee : fills.reduce((sum:any,fill:any)=>sum+Number(fill?.fee??0),0);
     const feeAsset=x?.feeAsset??fills.find((fill:any)=>fill?.feeAsset)?.feeAsset??null;
     return {
-      providerOrderId:x?.clientOrderId?String(x.clientOrderId):x?.orderId!==undefined?String(x.orderId):null,
+      providerOrderId:x?.orderId!==undefined?String(x.orderId):x?.id!==undefined?String(x.id):x?.clientOrderId?String(x.clientOrderId):null,
       clientOrderId:String(x?.clientOrderId??clientOrderId),
       status:status(x?.status),
       executedQuantity:text(x?.executedQty),
