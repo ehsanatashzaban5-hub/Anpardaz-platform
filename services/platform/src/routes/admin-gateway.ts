@@ -94,15 +94,20 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
       const operationId = request.params.operationId?.trim();
       if (!operationId || operationId.length > 200) return reply.code(400).send({ error: 'invalid_operation_id' });
       const ansarrafUrl = process.env.ANSARRAF_SERVICE_URL ?? 'http://localhost:4002';
+      const anpardazUrl = process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001';
       const ansarrafToken = process.env.ANSARRAF_INTERNAL_TOKEN;
-      if (!ansarrafToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
-      const trace = await fetchJson(
-        `${ansarrafUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`,
-        { headers: { authorization: `Bearer ${ansarrafToken}` } },
-        Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS ?? 5000) + 2000,
-      );
-      if (!trace.ok) return reply.code(trace.status).send({ error: 'ansarraf_trace_unavailable', upstream: trace.body });
-      return trace.body;
+      const anpardazToken = process.env.ANPARDAZ_INTERNAL_TOKEN;
+      if (!ansarrafToken || !anpardazToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
+      const [ansarraf, anpardaz] = await Promise.all([
+        fetchJson(`${ansarrafUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${ansarrafToken}` } }, Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS ?? 5000) + 2000),
+        fetchJson(`${anpardazUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${anpardazToken}` } }, Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS ?? 5000) + 2000),
+      ]);
+      if (!ansarraf.ok && !anpardaz.ok) return reply.code(404).send({ error: 'operation_not_found', ansarraf: ansarraf.body, anpardaz: anpardaz.body });
+      return {
+        operationId,
+        ansarraf: ansarraf.ok ? ansarraf.body : { unavailable: true, status: ansarraf.status, error: ansarraf.body },
+        anpardaz: anpardaz.ok ? anpardaz.body : { unavailable: true, status: anpardaz.status, error: anpardaz.body },
+      };
     },
   );
 }
