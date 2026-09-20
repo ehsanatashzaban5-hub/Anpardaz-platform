@@ -28,8 +28,12 @@ export default function AdminPanel(){
   const [withdrawals,setWithdrawals]=useState<any[]>([]);const [wdStatus,setWdStatus]=useState("");const [anpardazOps,setAnpardazOps]=useState<any[]>([]);const [anpardazOp,setAnpardazOp]=useState("");const [anpardazTrace,setAnpardazTrace]=useState<Json|null>(null);
   const [busy,setBusy]=useState(false);const [error,setError]=useState("");
 
+  // Local Codespace preview only. Enable with VITE_ADMIN_DEMO_MODE=true.
+  // This path is intentionally unavailable in production builds and uses no real token.
+  const demoMode=import.meta.env.DEV&&import.meta.env.VITE_ADMIN_DEMO_MODE==="true";
   const logout=()=>{sessionStorage.removeItem("anpardaz_admin_token");setToken("");setUser(null);};
   const load=async(t:string)=>{
+    if(demoMode&&t==="local-demo"){setUser({email:"local-admin",role:"super_admin"});setOverview(null);setHealth(null);return;}
     setBusy(true);setError("");
     try{
       const me=await api("/api/v1/auth/me",t);const role=me?.user?.role;
@@ -43,8 +47,10 @@ export default function AdminPanel(){
 
   const login=async()=>{
     setBusy(true);setLoginError("");
-    try{const x=await api("/api/v1/auth/login","", {method:"POST",body:JSON.stringify({email,password})});sessionStorage.setItem("anpardaz_admin_token",x.accessToken);setToken(x.accessToken)}
-    catch(e){setLoginError(e instanceof Error?e.message:"ورود ناموفق بود")}finally{setBusy(false)}
+    try{
+      if(demoMode&&email.trim()&&password){sessionStorage.setItem("anpardaz_admin_token","local-demo");setToken("local-demo");setUser({email:email.trim(),role:"super_admin"});return;}
+      const x=await api("/api/v1/auth/login","", {method:"POST",body:JSON.stringify({email,password})});sessionStorage.setItem("anpardaz_admin_token",x.accessToken);setToken(x.accessToken)
+    }catch(e){setLoginError(e instanceof Error?e.message:"ورود ناموفق بود")}finally{setBusy(false)}
   };
   const loadUser=async()=>{if(!identity.trim())return;setBusy(true);try{setUserSummary(await api("/api/v1/admin/ecosystem/users/"+encodeURIComponent(identity.trim()),token))}catch(e){setError(e instanceof Error?e.message:"user_lookup_failed")}finally{setBusy(false)}};
   const loadTrace=async()=>{if(!op.trim())return;setBusy(true);setTraceError("");try{setTrace(await api("/api/v1/admin/ecosystem/operations/"+encodeURIComponent(op.trim())+"/trace",token))}catch(e){setTrace(null);setTraceError(e instanceof Error?e.message:"trace_failed")}finally{setBusy(false)}};
