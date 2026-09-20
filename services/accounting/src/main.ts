@@ -26,11 +26,29 @@ app.get('/internal/v1/ledger/transactions/:id',guard,async(request,reply)=>{cons
 app.get('/internal/v1/ledger/transactions/by-operation/:operationId',guard,async(request,reply)=>{const operationId=decodeURIComponent((request.params as {operationId:string}).operationId);if(!operationId||operationId.length>200)return reply.code(400).send({error:'invalid_operation_id'});const t=await pool.query('SELECT * FROM journal_transactions WHERE operation_id=$1 ORDER BY id',[operationId]);const transactions=[];for(const row of t.rows){const e=await pool.query('SELECT * FROM journal_entries WHERE journal_transaction_id=$1 ORDER BY id',[row.id]);transactions.push({transaction:row,entries:e.rows});}return{transactions};});
 app.get('/internal/v1/ledger/accounts/:id/balance',guard,async(request,reply)=>{const id=Number((request.params as {id:string}).id);if(!Number.isSafeInteger(id))return reply.code(400).send({error:'invalid_id'});const r=await pool.query(`SELECT a.id,a.account_code,a.account_name,a.account_type,a.currency,COALESCE(SUM(CASE WHEN t.status='posted' THEN CASE WHEN a.account_type IN ('asset','expense') THEN CASE WHEN e.direction='debit' THEN e.amount ELSE -e.amount END ELSE CASE WHEN e.direction='credit' THEN e.amount ELSE -e.amount END END ELSE 0 END),0)::text AS balance FROM ledger_accounts a LEFT JOIN journal_entries e ON e.ledger_account_id=a.id LEFT JOIN journal_transactions t ON t.id=e.journal_transaction_id AND t.status='posted' WHERE a.id=$1 AND a.status='active' GROUP BY a.id`,[id]);if(!r.rows[0])return reply.code(404).send({error:'account_not_found'});return{balance:r.rows[0]};});
 app.get('/internal/v1/ledger/accounts/balances',guard,async(req,reply)=>{
-  const q=req.query as {accountCodePrefix?:string;currency?:string;status?:string;limit?:string};
+  const q=req.query as {accountCodePrefix?:string;currency?:string;status?:string;limit?:string;groupByCurrency?:string};
   const prefix=q.accountCodePrefix?.trim()||null;
   const parsed=Number(q.limit??500);
   const limit=Math.min(Math.max(Number.isFinite(parsed)?parsed:500,1),5000);
   if(!prefix||prefix.length>200)return reply.code(400).send({error:'account_code_prefix_required'});
+  if(q.groupByCurrency==='true'){
+    const r=await pool.query(`SELECT a.currency,
+      COALESCE(SUM(CASE WHEN t.status='posted' THEN
+        CASE WHEN a.account_type IN ('asset','expense')
+          THEN CASE WHEN e.direction='debit' THEN e.amount ELSE -e.amount END
+          ELSE CASE WHEN e.direction='credit' THEN e.amount ELSE -e.amount END
+        END ELSE 0 END),0)::text AS balance
+      FROM ledger_accounts a
+      LEFT JOIN journal_entries e ON e.ledger_account_id=a.id
+      LEFT JOIN journal_transactions t ON t.id=e.journal_transaction_id
+      WHERE a.account_code LIKE $1 || '%'
+        AND ($2::text IS NULL OR a.currency=$2)
+        AND ($3::text IS NULL OR a.status=$3)
+      GROUP BY a.currency
+      ORDER BY a.currency
+      LIMIT $4`,[prefix,q.currency??null,q.status??null,limit]);
+    return{accounts:r.rows};
+  }
   const r=await pool.query(`SELECT a.id,a.account_code,a.account_name,a.account_type,a.currency,a.status,
     COALESCE(SUM(CASE WHEN t.status='posted' THEN
       CASE WHEN a.account_type IN ('asset','expense')
