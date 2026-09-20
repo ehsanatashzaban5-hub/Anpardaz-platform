@@ -1345,80 +1345,63 @@ function TradeSelectTab({ asset, onInstant, onSpot, onMargin, isLoggedIn, onAuth
 function InstantTradeTab({ asset, onBack, isLoggedIn, onAuth }: { asset:CryptoAsset; onBack:()=>void; isLoggedIn:boolean; onAuth:()=>void }) {
   const [side, setSide] = useState<"buy"|"sell">("buy");
   const [amount, setAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
   const [done, setDone] = useState(false);
   const estimated = side === "buy" ? (parseFloat(amount)||0)/asset.price : (parseFloat(amount)||0)*asset.price;
+  const submit = async () => {
+    if (!isLoggedIn) return onAuth();
+    const input = Number(amount);
+    if (!Number.isFinite(input) || input <= 0 || !Number.isFinite(asset.price) || asset.price <= 0) { setMessage("مقدار معامله معتبر نیست."); return; }
+    const token = window.localStorage.getItem("anpardaz:accessToken") ?? "";
+    if (!token) return onAuth();
+    setSubmitting(true); setMessage("");
+    try {
+      const headers = { authorization:"Bearer " + token, "content-type":"application/json" };
+      const [assetsR, kycR] = await Promise.all([
+        fetch(ANSARRAF_API_BASE + "/api/v1/assets", { headers, cache:"no-store" }),
+        fetch(ANSARRAF_API_BASE + "/api/v1/kyc", { headers, cache:"no-store" }),
+      ]);
+      const assetsBody = await assetsR.json().catch(()=>({}));
+      const kycBody = await kycR.json().catch(()=>({}));
+      const status = String(kycBody?.kyc?.status ?? "").toLowerCase();
+      if (status && !["verified","approved"].includes(status)) { setMessage("برای معامله ابتدا احراز هویت را تکمیل و تأیید کنید."); return; }
+      const rows = Array.isArray(assetsBody?.assets) ? assetsBody.assets : [];
+      const quote = rows.find((x:any) => String(x.symbol).toUpperCase() === "USDT");
+      if (!quote) throw new Error("quote_asset_unavailable");
+      const quantity = side === "buy" ? input / asset.price : input;
+      const body:any = { baseAssetId:Number(asset.id), quoteAssetId:Number(quote.id), side, orderType:"market", quantity:quantity.toString(), idempotencyKey:crypto.randomUUID() };
+      if (side === "buy") body.quoteAmount = input.toString();
+      const response = await fetch(ANSARRAF_API_BASE + "/api/v1/orders", { method:"POST", headers, body:JSON.stringify(body) });
+      const result = await response.json().catch(()=>({}));
+      if (!response.ok) { const errors:any={insufficient_available_balance:"موجودی کافی نیست.",kyc_required:"احراز هویت لازم است.",invalid_order:"اطلاعات سفارش نامعتبر است."}; throw new Error(errors[result?.error] ?? "ثبت معامله انجام نشد."); }
+      setDone(true);
+    } catch (error) { setMessage((error as Error).message === "quote_asset_unavailable" ? "دارایی USDT در صراف در دسترس نیست." : ((error as Error).message || "ثبت معامله انجام نشد.")); }
+    finally { setSubmitting(false); }
+  };
   if (done) return (
     <div style={{ padding:"60px 24px", textAlign:"center", maxWidth:400, margin:"0 auto" }}>
       <div style={{ width:72, height:72, borderRadius:"50%", background:"rgba(16,185,129,0.12)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", color:"#10b981", fontSize:40 }}>✓</div>
-      <div style={{ fontSize:22, fontWeight:900, marginBottom:8 }}>{side==="buy"?"خرید موفق":"فروش موفق"}</div>
+      <div style={{ fontSize:22, fontWeight:900, marginBottom:8 }}>{side==="buy"?"خرید ثبت شد":"فروش ثبت شد"}</div>
       <div style={{ fontSize:14, color:"var(--w-muted)", marginBottom:6 }}>{amount} {side==="buy"?"USDT":asset.symbol}</div>
-      <div style={{ fontSize:14, fontWeight:800, marginBottom:24 }}>{estimated.toFixed(side==="buy"?6:2)} {side==="buy"?asset.symbol:"USDT"} دریافت شد</div>
-      <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
-        <button onClick={()=>{setDone(false);setAmount("");}} className="w-btn w-btn-ghost">معامله جدید</button>
-        <button onClick={onBack} className="w-btn w-btn-primary">بازگشت</button>
-      </div>
+      <div style={{ fontSize:14, fontWeight:800, marginBottom:24 }}>سفارش واقعی در بک‌اند آن صراف ثبت شد.</div>
+      <div style={{ display:"flex", gap:8, justifyContent:"center" }}><button onClick={()=>{setDone(false);setAmount("");}} className="w-btn w-btn-ghost">معامله جدید</button><button onClick={onBack} className="w-btn w-btn-primary">بازگشت</button></div>
     </div>
   );
   return (
     <div style={{ padding:"32px 0", maxWidth:440 }}>
-      <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:20 }}>
-        <WI n="arrow-right" s={13}/> انتخاب نوع معامله
-      </button>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-        <div style={{ width:44, height:44, borderRadius:"50%", background:asset.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:900, fontSize:13 }}>{asset.symbol.slice(0,3)}</div>
-        <div>
-          <div style={{ fontSize:16, fontWeight:900 }}>{asset.nameFa} ({asset.symbol})</div>
-          <div style={{ fontSize:13, fontWeight:800, color:clr(asset.change24h) }}>${fmtP(asset.price)} <span style={{ fontSize:11 }}>{asset.change24h>0?"+":""}{asset.change24h.toFixed(2)}%</span></div>
-        </div>
-      </div>
+      <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:20 }}><WI n="arrow-right" s={13}/> انتخاب نوع معامله</button>
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}><div style={{ width:44, height:44, borderRadius:"50%", background:asset.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:900, fontSize:13 }}>{asset.symbol.slice(0,3)}</div><div><div style={{ fontSize:16, fontWeight:900 }}>{asset.nameFa} ({asset.symbol})</div><div style={{ fontSize:13, fontWeight:800, color:clr(asset.change24h) }}>{Number.isFinite(asset.change24h) ? (asset.change24h>0?"+":"") + asset.change24h.toFixed(2) + "%" : "—"} · ${fmtP(asset.price)}</div></div></div>
       <div className="w-card" style={{ padding:"24px" }}>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", background:"var(--w-card2)", borderRadius:10, padding:3, marginBottom:20 }}>
-          <button onClick={()=>setSide("buy")} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="buy"?"#10b981":"transparent", color:side==="buy"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>خرید {asset.symbol}</button>
-          <button onClick={()=>setSide("sell")} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="sell"?"#f43f5e":"transparent", color:side==="sell"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>فروش {asset.symbol}</button>
-        </div>
-        <div style={{ marginBottom:14 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)", marginBottom:6 }}>
-            <span>{side==="buy"?"پرداخت می‌کنید":"می‌فروشید"}</span>
-            <span>موجودی: {side==="buy"?"0.00 USDT":`0.00 ${asset.symbol}`}</span>
-          </div>
-          <div style={{ position:"relative" }}>
-            <input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" className="w-input" style={{ paddingLeft:56, fontSize:16 }} inputMode="decimal"/>
-            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, fontWeight:700, color:"var(--w-muted)" }}>{side==="buy"?"USDT":asset.symbol}</span>
-          </div>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:6, marginBottom:16 }}>
-          {["25%","50%","75%","همه"].map(p=>(
-            <button key={p} style={{ padding:"6px", borderRadius:7, border:"1px solid var(--w-border)", background:"transparent", color:"var(--w-muted)", fontSize:12, cursor:"pointer", fontFamily:"Vazirmatn" }}>{p}</button>
-          ))}
-        </div>
-        {amount && (
-          <div style={{ padding:"12px 14px", background:"var(--w-card2)", borderRadius:9, marginBottom:16 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, marginBottom:4 }}>
-              <span style={{ color:"var(--w-muted)" }}>{side==="buy"?"دریافت می‌کنید":"معادل USDT"}</span>
-              <span style={{ fontWeight:800 }}>{estimated.toFixed(side==="buy"?6:2)} {side==="buy"?asset.symbol:"USDT"}</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)" }}>
-              <span>قیمت</span><span>${fmtP(asset.price)}</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)" }}>
-              <span>کارمزد (۰.۱٪)</span><span>{side==="buy"?`$${(parseFloat(amount)*0.001).toFixed(4)}`:`${(parseFloat(amount)*0.001).toFixed(6)} ${asset.symbol}`}</span>
-            </div>
-          </div>
-        )}
-        {!isLoggedIn ? (
-          <button onClick={onAuth} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e" }}>
-            <WI n="lock" s={15}/> ورود برای معامله
-          </button>
-        ) : (
-          <button disabled={!amount} onClick={()=>setDone(true)} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e", opacity:amount?1:0.5, fontSize:15 }}>
-            {side==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
-          </button>
-        )}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", background:"var(--w-card2)", borderRadius:10, padding:3, marginBottom:20 }}><button onClick={()=>{setSide("buy");setMessage("")}} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="buy"?"#10b981":"transparent", color:side==="buy"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>خرید {asset.symbol}</button><button onClick={()=>{setSide("sell");setMessage("")}} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="sell"?"#f43f5e":"transparent", color:side==="sell"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>فروش {asset.symbol}</button></div>
+        <div style={{ marginBottom:14 }}><div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)", marginBottom:6 }}><span>{side==="buy"?"پرداخت می‌کنید":"می‌فروشید"}</span><span>موجودی از حساب واقعی دریافت می‌شود</span></div><div style={{ position:"relative" }}><input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" className="w-input" style={{ paddingLeft:56, fontSize:16 }} inputMode="decimal"/><span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, fontWeight:700, color:"var(--w-muted)" }}>{side==="buy"?"USDT":asset.symbol}</span></div></div>
+        {amount && <div style={{ padding:"12px 14px", background:"var(--w-card2)", borderRadius:9, marginBottom:16 }}><div style={{ display:"flex", justifyContent:"space-between", fontSize:13, marginBottom:4 }}><span style={{ color:"var(--w-muted)" }}>{side==="buy"?"دریافت می‌کنید":"معادل USDT"}</span><span style={{ fontWeight:800 }}>{estimated.toFixed(side==="buy"?6:2)} {side==="buy"?asset.symbol:"USDT"}</span></div><div style={{ fontSize:11, color:"var(--w-muted)" }}>قیمت بازار: ${fmtP(asset.price)} · کارمزد طبق تنظیمات واقعی حساب</div></div>}
+        {message && <div style={{ padding:"10px 12px", background:"rgba(244,63,94,0.08)", color:"#f43f5e", borderRadius:8, fontSize:12, marginBottom:12 }}>{message}</div>}
+        {!isLoggedIn ? <button onClick={onAuth} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e" }}><WI n="lock" s={15}/> ورود برای معامله</button> : <button disabled={!amount || submitting} onClick={submit} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e", opacity:amount && !submitting?1:0.5, fontSize:15 }}>{submitting ? "در حال ثبت..." : (side==="buy"?"خرید ":"فروش ") + asset.symbol}</button>}
       </div>
     </div>
   );
 }
-
 // ── Support Tab ────────────────────────────────────
 function SupportTab({ isLoggedIn, onAuth }: { isLoggedIn:boolean; onAuth:()=>void }) { if(!isLoggedIn)return <div style={{padding:"60px 20px",textAlign:"center"}}><h2>پشتیبانی آن صراف</h2><p style={{color:"var(--w-muted)"}}>برای دسترسی وارد حساب شوید.</p><button className="w-btn w-btn-primary" onClick={onAuth}>ورود</button></div>; return <div className="w-card" style={{maxWidth:640,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>پشتیبانی آن صراف</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>سامانه تیکت/چت پشتیبانی آن صراف هنوز به Backend پشتیبانی متصل نشده است. برای جلوگیری از ثبت یا پاسخ ساختگی، این بخش تا اتصال سرویس واقعی غیرفعال است.</p></div>; }
 
