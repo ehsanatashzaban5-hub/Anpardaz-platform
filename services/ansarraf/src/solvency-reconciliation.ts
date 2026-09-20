@@ -21,17 +21,15 @@ export async function reconcileSolvency(pool:Pool,provider:LiquidityProviderAdap
 
   const liabilityResponse=await fetch(
     (process.env.ACCOUNTING_SERVICE_URL??'http://localhost:4004').replace(/\/$/,'')+
-    '/internal/v1/ledger/accounts/balances?status=active&accountCodePrefix='+encodeURIComponent('ansarraf.customer.')+'&groupByCurrency=true&limit=5000',
+    '/internal/v1/ledger/accounts/balances/by-currency?status=active&accountCodePrefix='+encodeURIComponent('ansarraf.customer.'),
     {headers:{authorization:'Bearer '+String(process.env.ACCOUNTING_INTERNAL_TOKEN??'')},signal:AbortSignal.timeout(Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS??5000))}
   );
   const liabilityBody:any=await liabilityResponse.json().catch(()=>({}));
   if(!liabilityResponse.ok)throw new Error('accounting_customer_balances_lookup_failed:'+liabilityResponse.status);
 
   const liabilities=new Map<string,string>();
-  for(const account of liabilityBody.accounts??[]){
-    const symbol=String(account.currency).toUpperCase();
-    const current=liabilities.get(symbol)??'0';
-    liabilities.set(symbol,(await pool.query('SELECT ($1::numeric+$2::numeric)::text AS value',[current,String(account.balance)])).rows[0].value);
+  for(const account of liabilityBody.balances??[]){
+    liabilities.set(String(account.currency).toUpperCase(),String(account.balance));
   }
 
   const assets=new Set<string>([...providerByAsset.keys(),...liabilities.keys()]);
