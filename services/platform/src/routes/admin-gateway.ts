@@ -95,15 +95,16 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
       if (!operationId || operationId.length > 200) return reply.code(400).send({ error: 'invalid_operation_id' });
       const ansarrafUrl = process.env.ANSARRAF_SERVICE_URL ?? 'http://localhost:4002';
       const anpardazUrl = process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001';
+      const accountingUrl = process.env.ACCOUNTING_SERVICE_URL ?? 'http://localhost:4004';
       const ansarrafToken = process.env.ANSARRAF_INTERNAL_TOKEN;
       const anpardazToken = process.env.ANPARDAZ_INTERNAL_TOKEN;
       const accountingToken = process.env.ACCOUNTING_INTERNAL_TOKEN;
       if (!ansarrafToken || !anpardazToken || !accountingToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
       const timeout = Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS ?? 5000) + 2000;
       const [ansarraf, anpardaz, accounting] = await Promise.all([
-        fetchJson(`${ansarrafUrl.replace(/\\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${ansarrafToken}` } }, timeout),
-        fetchJson(`${anpardazUrl.replace(/\\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${anpardazToken}` } }, timeout),
-        fetchJson(`${accountingUrl.replace(/\\/$/, '')}/internal/v1/ledger/transactions/by-operation/${encodeURIComponent(operationId)}`, { headers: { authorization: `Bearer ${accountingToken}` } }, timeout),
+        fetchJson(`${ansarrafUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${ansarrafToken}` } }, timeout),
+        fetchJson(`${anpardazUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${anpardazToken}` } }, timeout),
+        fetchJson(`${accountingUrl.replace(/\/$/, '')}/internal/v1/ledger/transactions/by-operation/${encodeURIComponent(operationId)}`, { headers: { authorization: `Bearer ${accountingToken}` } }, timeout),
       ]);
       if (!ansarraf.ok && !anpardaz.ok && !accounting.ok) return reply.code(404).send({ error: 'operation_not_found' });
       return {
