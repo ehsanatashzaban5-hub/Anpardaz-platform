@@ -139,28 +139,33 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
 
   const [asks, setAsks] = useState<OrderBookEntry[]>([]);
   const [bids, setBids] = useState<OrderBookEntry[]>([]);
+  const [recentTrades, setRecentTrades] = useState<{ price:number; amount:number; side:"buy"|"sell"; time:string }[]>([]);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       if (!selectedAsset.symbol) return;
       try {
-        const r = await fetch(`${ANSARRAF_API_BASE}/api/v1/orderbook?symbol=${encodeURIComponent(`${selectedAsset.symbol}/USDT`)}&limit=20`, { signal: AbortSignal.timeout(5000), cache: "no-store" });
-        if (!r.ok) throw new Error("orderbook_unavailable");
-        const d = await r.json();
+        const symbol = `${selectedAsset.symbol}/USDT`;
+        const [bookResponse, tradesResponse] = await Promise.all([
+          fetch(`${ANSARRAF_API_BASE}/api/v1/orderbook?symbol=${encodeURIComponent(symbol)}&limit=20`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/trades?symbol=${encodeURIComponent(symbol)}&limit=20`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
+        ]);
+        if (!bookResponse.ok) throw new Error("orderbook_unavailable");
+        const d = await bookResponse.json();
+        const td = tradesResponse.ok ? await tradesResponse.json() : null;
         if (!active) return;
         setBids(Array.isArray(d?.bids) ? d.bids.map((x: any) => ({ price: Number(x.price), amount: Number(x.amount), total: Number(x.total) })) : []);
         setAsks(Array.isArray(d?.asks) ? d.asks.map((x: any) => ({ price: Number(x.price), amount: Number(x.amount), total: Number(x.total) })) : []);
+        setRecentTrades(Array.isArray(td?.trades) ? td.trades.map((x: any) => ({ price: Number(x.price), amount: Number(x.quantity), side: x.side === "buy" ? "buy" : "sell", time: new Date(x.created_at).toLocaleTimeString("fa-IR", { minute: "2-digit", second: "2-digit" }) })) : []);
       } catch {
-        if (active) { setBids([]); setAsks([]); }
+        if (active) { setBids([]); setAsks([]); setRecentTrades([]); }
       }
     };
     void load();
     const id = window.setInterval(() => void load(), 3000);
     return () => { active = false; window.clearInterval(id); };
-  }, [selectedAsset.symbol]);
-
-  const PROTECTED_TABS: SarrafTab[] = ["assets","deposit","deposit-coin","withdraw","withdraw-coin","orders","transactions","security","forexbot"];
+  }, [selectedAsset.symbol]);  const PROTECTED_TABS: SarrafTab[] = ["assets","deposit","deposit-coin","withdraw","withdraw-coin","orders","transactions","security","forexbot"];
   const PROTECTED = PROTECTED_TABS.includes(tab);
 
   const navItems = TAB_GROUPS.flatMap(g => g.items);
@@ -313,6 +318,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 onAuth={onAuthRequired}
                 onSelectAsset={()=>setTab("markets")}
                 assets={liveAssets.slice(0,20)} onAssetChange={setAsset}
+                recentTrades={recentTrades}
                 favorites={favorites} onToggleFav={toggleFav}
                 tradeKind="spot"
                 onBack={()=>setTab("trade-select")}
@@ -586,7 +592,7 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
             {["TRC20","ERC20","BEP20"].map(net => (
               <div key={net} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:12, borderBottom:"1px solid var(--w-border)" }}>
                 <span style={{ color:"var(--w-muted)" }}>{net}</span>
-                <span style={{ fontWeight:700 }}>${fmtP(a.price*(1+Math.random()*0.001))}</span>
+                <span style={{ fontWeight:700 }}>${fmtP(a.price)}</span>
               </div>
             ))}
           </div>
@@ -597,8 +603,8 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
 }
 
 // ── Trade View ─────────────────────────────────────
-function TradeView({ asset, asks, bids, tradeType, onTradeType, tradeMode, onTradeMode, price, onPrice, amount, onAmount, isLoggedIn, needsKyc, onAuth, onSelectAsset, assets, onAssetChange, favorites, onToggleFav, tradeKind = "spot", onBack }: {
-  asset: CryptoAsset; asks: any[]; bids: any[];
+function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tradeMode, onTradeMode, price, onPrice, amount, onAmount, isLoggedIn, needsKyc, onAuth, onSelectAsset, assets, onAssetChange, favorites, onToggleFav, tradeKind = "spot", onBack }: {
+  asset: CryptoAsset; asks: any[]; bids: any[]; recentTrades: { price:number; amount:number; side:"buy"|"sell"; time:string }[];
   tradeType:"buy"|"sell"; onTradeType:(t:"buy"|"sell")=>void;
   tradeMode:"market"|"limit"|"stop-limit"; onTradeMode:(m:any)=>void;
   price:string; onPrice:(s:string)=>void;
@@ -808,17 +814,17 @@ function TradeView({ asset, asks, bids, tradeType, onTradeType, tradeMode, onTra
         {/* Recent trades */}
         <div style={{ padding:"14px", borderTop:"1px solid var(--w-border)", marginTop:"auto" }}>
           <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", marginBottom:8 }}>آخرین معاملات</div>
-          {Array.from({length:8},(_,i)=>{
-            const side = Math.random()>0.5?"buy":"sell";
-            return (
-              <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", fontSize:10, padding:"3px 0", borderBottom:"1px solid var(--w-border)", color:"var(--w-muted)" }}>
-                <span style={{ color:side==="buy"?"#10b981":"#f43f5e" }}>{fmtP(asset.price*(1+(Math.random()-0.5)*0.002))}</span>
-                <span style={{ textAlign:"center" }}>{(Math.random()*2+0.01).toFixed(4)}</span>
-                <span style={{ textAlign:"left" }}>{`${Math.floor(Math.random()*59)+1}ث`}</span>
-              </div>
-            );
-          })}
-        </div>
+          {recentTrades.length===0 ? (
+            <div style={{ padding:"18px 8px", textAlign:"center", color:"var(--w-muted)", fontSize:11 }}>
+              هنوز معامله‌ای برای این بازار ثبت نشده است.
+            </div>
+          ) : recentTrades.map((trade,i)=>(
+            <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", fontSize:10, padding:"4px 0", borderBottom:"1px solid var(--w-border)", color:"var(--w-muted)" }}>
+              <span style={{ color:trade.side==="buy"?"#10b981":"#f43f5e" }}>{fmtP(trade.price)}</span>
+              <span style={{ textAlign:"center" }}>{trade.amount.toFixed(6)}</span>
+              <span style={{ textAlign:"left" }}>{trade.time}</span>
+            </div>
+          ))        </div>
       </div>
     </div>
   );
