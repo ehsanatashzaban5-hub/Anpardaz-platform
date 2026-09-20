@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import type {FastifyBaseLogger} from 'fastify';
 import type {Pool} from 'pg';
 
@@ -21,7 +22,7 @@ export class AccountingOutboxWorker{
       const q=await client.query(`WITH candidate AS (SELECT id FROM accounting_outbox WHERE (status='pending' AND available_at<=NOW()) OR (status='failed' AND available_at<=NOW()) OR (status='processing' AND processing_started_at<NOW()-INTERVAL '5 minutes') ORDER BY available_at,id FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE accounting_outbox o SET status='processing',processing_started_at=NOW(),attempts=attempts+1 FROM candidate c WHERE o.id=c.id RETURNING o.*`);
       if(!q.rows[0]){await client.query('COMMIT');return false;} row=q.rows[0];await client.query('COMMIT');
     }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-    try{await this.postTrade(row);await this.pool.query(`UPDATE accounting_outbox SET status='posted',processed_at=NOW(),processing_started_at=NULL,last_error=NULL WHERE id=$1 AND status='processing'`,[row.id]);}
+    try{await this.postTrade(row);await this.recordAudit(row);await this.pool.query(`UPDATE accounting_outbox SET status='posted',processed_at=NOW(),processing_started_at=NULL,last_error=NULL WHERE id=$1 AND status='processing'`,[row.id]);}
     catch(error){const message=error instanceof Error?error.message:'accounting_post_failed';const seconds=Math.min(300,Math.max(1,2**Math.min(Number(row.attempts),8)));await this.pool.query(`UPDATE accounting_outbox SET status='failed',available_at=NOW()+($2::text)::interval,processing_started_at=NULL,last_error=$3 WHERE id=$1 AND status='processing'`,[row.id,seconds+' seconds',message.slice(0,2000)]);this.log.error({outboxId:row.id,attempts:row.attempts,error},'accounting outbox event failed');}
     return true;
   }
@@ -146,6 +147,39 @@ export class AccountingOutboxWorker{
     if(r.ok)return Number(r.body.account.id);
     if(r.status===409){r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));if(r.ok)return Number(r.body.account.id);}
     throw new Error('provider_expense_account_create_failed:'+r.status);
+  }
+  private async recordAudit(row:any){
+    const operationId=String(row.payload?.operationId??'').trim();
+    if(!operationId)return;
+    const client=await this.pool.connect();
+    try{
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[operationId]);
+      const previous=await client.query(
+        'SELECT event_hash FROM operation_audit_events WHERE operation_id=$1 ORDER BY id DESC LIMIT 1 FOR UPDATE',
+        [operationId],
+      );
+      const previousHash=previous.rows[0]?.event_hash??null;
+      const payload={
+        operationId,
+        eventType:String(row.event_type),
+        outboxId:String(row.id),
+        aggregateType:String(row.aggregate_type??''),
+        aggregateId:row.aggregate_id===undefined||row.aggregate_id===null?null:String(row.aggregate_id),
+        payload:row.payload??{},
+      };
+      const eventHash=createHash('sha256').update(JSON.stringify({...payload,previousHash})).digest('hex');
+      await client.query(
+        `INSERT INTO operation_audit_events
+         (operation_id,event_type,actor_type,aggregate_type,aggregate_id,event_payload,previous_hash,event_hash)
+         VALUES($1,$2,'SYSTEM',$3,$4,$5,$6,$7)`,
+        [operationId,String(row.event_type),String(row.aggregate_type??''),row.aggregate_id===undefined||row.aggregate_id===null?null:String(row.aggregate_id),row.payload??{},previousHash,eventHash],
+      );
+      await client.query('COMMIT');
+    }catch(error){
+      await client.query('ROLLBACK').catch(()=>undefined);
+      this.log.error({error,outboxId:row.id,operationId},'operation audit event failed');
+    }finally{client.release();}
   }
   private async asset(id:number){const r=await this.pool.query('SELECT id,symbol,status FROM assets WHERE id=$1',[id]);if(!r.rows[0]||r.rows[0].status!=='active')throw new Error('accounting_asset_not_active');return r.rows[0];}
   private async ensureRevenueAccount(symbol:string){
