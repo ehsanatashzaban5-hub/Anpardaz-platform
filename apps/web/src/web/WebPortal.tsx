@@ -246,7 +246,7 @@ export default function WebPortal() {
         onAuthClick={() => setShowAuth(true)}
         darkMode={darkMode}
         onToggleDark={() => setDarkMode(d => !d)}
-      />}
+      />
 
       <main style={{ paddingTop:"var(--w-header)" }}>
         {page === "home" && (
