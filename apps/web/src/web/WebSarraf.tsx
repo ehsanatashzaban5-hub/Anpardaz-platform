@@ -870,10 +870,12 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
               <WI n="shield" s={15}/> تأیید هویت برای معامله
             </button>
           ) : (
-            <button onClick={submitOrder} disabled={orderBusy} className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, background:tradeType==="buy"?"#10b981":"#f43f5e", opacity:orderBusy?0.65:1 }}>
-              {orderBusy ? "در حال ثبت..." : tradeType==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
-            </button>
-            {orderMessage && <div style={{ marginTop:8, padding:"8px 10px", borderRadius:8, background:"var(--w-card2)", color:"var(--w-muted)", fontSize:11, lineHeight:1.7 }}>{orderMessage}</div>}
+            <>
+              <button onClick={submitOrder} disabled={orderBusy} className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, background:tradeType==="buy"?"#10b981":"#f43f5e", opacity:orderBusy?0.65:1 }}>
+                {orderBusy ? "در حال ثبت..." : tradeType==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
+              </button>
+              {orderMessage && <div style={{ marginTop:8, padding:"8px 10px", borderRadius:8, background:"var(--w-card2)", color:"var(--w-muted)", fontSize:11, lineHeight:1.7 }}>{orderMessage}</div>}
+            </>
           )}
         </div>
         {/* Recent trades */}
