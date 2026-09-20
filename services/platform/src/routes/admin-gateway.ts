@@ -97,17 +97,20 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
       const anpardazUrl = process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001';
       const ansarrafToken = process.env.ANSARRAF_INTERNAL_TOKEN;
       const anpardazToken = process.env.ANPARDAZ_INTERNAL_TOKEN;
-      if (!ansarrafToken || !anpardazToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
-      const [ansarraf, anpardaz] = await Promise.all([
-        fetchJson(`${ansarrafUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${ansarrafToken}` } }, Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS ?? 5000) + 2000),
-        fetchJson(`${anpardazUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${anpardazToken}` } }, Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS ?? 5000) + 2000),
+      const accountingToken = process.env.ACCOUNTING_INTERNAL_TOKEN;
+      if (!ansarrafToken || !anpardazToken || !accountingToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
+      const timeout = Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS ?? 5000) + 2000;
+      const [ansarraf, anpardaz, accounting] = await Promise.all([
+        fetchJson(`${ansarrafUrl.replace(/\\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${ansarrafToken}` } }, timeout),
+        fetchJson(`${anpardazUrl.replace(/\\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${anpardazToken}` } }, timeout),
+        fetchJson(`${accountingUrl.replace(/\\/$/, '')}/internal/v1/ledger/transactions/by-operation/${encodeURIComponent(operationId)}`, { headers: { authorization: `Bearer ${accountingToken}` } }, timeout),
       ]);
-      if (!ansarraf.ok && !anpardaz.ok) return reply.code(404).send({ error: 'operation_not_found', ansarraf: ansarraf.body, anpardaz: anpardaz.body });
+      if (!ansarraf.ok && !anpardaz.ok && !accounting.ok) return reply.code(404).send({ error: 'operation_not_found' });
       return {
         operationId,
         ansarraf: ansarraf.ok ? ansarraf.body : { unavailable: true, status: ansarraf.status, error: ansarraf.body },
         anpardaz: anpardaz.ok ? anpardaz.body : { unavailable: true, status: anpardaz.status, error: anpardaz.body },
-      };
-    },
+        accounting: accounting.ok ? accounting.body : { unavailable: true, status: accounting.status, error: accounting.body },
+      };    },
   );
 }
