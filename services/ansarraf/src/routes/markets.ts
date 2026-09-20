@@ -17,7 +17,6 @@ export function registerMarketRoutes(app: FastifyInstance, pool: Pool, marketDat
     return { quotes: await marketData.getQuotes(symbol) };
   });
   app.get('/api/v1/market-data/trades', async (request, reply) => {
-    if (!marketData) return reply.code(503).send({ error: 'market_data_unavailable' });
     const q = request.query as { symbol?: string; limit?: string };
     const symbol = q.symbol?.trim().toUpperCase() || '';
     const limit = Math.min(50, Math.max(1, Number.parseInt(q.limit ?? '20', 10) || 20));
