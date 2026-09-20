@@ -891,7 +891,7 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
               <span style={{ textAlign:"center" }}>{trade.amount.toFixed(6)}</span>
               <span style={{ textAlign:"left" }}>{trade.time}</span>
             </div>
-          ))        </div>
+          ))}        </div>
       </div>
     </div>
   );
