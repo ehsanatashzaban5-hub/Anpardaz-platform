@@ -27,7 +27,7 @@ async function fetchJson(url: string, init: RequestInit = {}, timeoutMs = 5000) 
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
-    const result = await fetchJson(anpardazBase() + '/api/v1/services/operations' + q, { headers: { authorization: process.env.ANPARDAZ_INTERNAL_TOKEN ? 'Bearer ' + process.env.ANPARDAZ_INTERNAL_TOKEN : '' } });
+    const result = await fetchJson(anpardazBase() + '/api/v1/services/operations' + q, { headers: forwardUser(request) });
     return reply.code(result.status).send(result.body);
   });
 
