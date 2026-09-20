@@ -31,24 +31,6 @@ app.get('/internal/v1/ledger/accounts/balances',guard,async(req,reply)=>{
   const parsed=Number(q.limit??500);
   const limit=Math.min(Math.max(Number.isFinite(parsed)?parsed:500,1),5000);
   if(!prefix||prefix.length>200)return reply.code(400).send({error:'account_code_prefix_required'});
-  if(q.groupByCurrency==='true'){
-    const r=await pool.query(`SELECT a.currency,
-      COALESCE(SUM(CASE WHEN t.status='posted' THEN
-        CASE WHEN a.account_type IN ('asset','expense')
-          THEN CASE WHEN e.direction='debit' THEN e.amount ELSE -e.amount END
-          ELSE CASE WHEN e.direction='credit' THEN e.amount ELSE -e.amount END
-        END ELSE 0 END),0)::text AS balance
-      FROM ledger_accounts a
-      LEFT JOIN journal_entries e ON e.ledger_account_id=a.id
-      LEFT JOIN journal_transactions t ON t.id=e.journal_transaction_id
-      WHERE a.account_code LIKE $1 || '%'
-        AND ($2::text IS NULL OR a.currency=$2)
-        AND ($3::text IS NULL OR a.status=$3)
-      GROUP BY a.currency
-      ORDER BY a.currency
-      LIMIT $4`,[prefix,q.currency??null,q.status??null,limit]);
-    return{accounts:r.rows};
-  }
   const r=await pool.query(`SELECT a.id,a.account_code,a.account_name,a.account_type,a.currency,a.status,
     COALESCE(SUM(CASE WHEN t.status='posted' THEN
       CASE WHEN a.account_type IN ('asset','expense')
