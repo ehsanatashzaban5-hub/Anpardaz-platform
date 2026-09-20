@@ -360,6 +360,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
             <div style={{ display:"flex", gap:0, height:"calc(100vh - var(--w-header) - 52px)" }}>
               <TradeView
                 asset={selectedAsset} asks={asks} bids={bids}
+                recentTrades={recentTrades}
                 tradeType={tradeType} onTradeType={setTradeType}
                 tradeMode={tradeMode} onTradeMode={setTradeMode}
                 price={price} onPrice={setPrice}
@@ -641,7 +642,7 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
             {["TRC20","ERC20","BEP20"].map(net => (
               <div key={net} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:12, borderBottom:"1px solid var(--w-border)" }}>
                 <span style={{ color:"var(--w-muted)" }}>{net}</span>
-                <span style={{ fontWeight:700 }}>${fmtP(a.price*(1+Math.random()*0.001))}</span>
+                <span style={{ fontWeight:700 }}>${fmtP(a.price)}</span>
               </div>
             ))}
           </div>
@@ -652,8 +653,8 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
 }
 
 // ── Trade View ─────────────────────────────────────
-function TradeView({ asset, asks, bids, tradeType, onTradeType, tradeMode, onTradeMode, price, onPrice, amount, onAmount, isLoggedIn, needsKyc, onAuth, onSelectAsset, assets, onAssetChange, favorites, onToggleFav, tradeKind = "spot", onBack }: {
-  asset: CryptoAsset; asks: any[]; bids: any[];
+function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tradeMode, onTradeMode, price, onPrice, amount, onAmount, isLoggedIn, needsKyc, onAuth, onSelectAsset, assets, onAssetChange, favorites, onToggleFav, tradeKind = "spot", onBack }: {
+  asset: CryptoAsset; asks: any[]; bids: any[]; recentTrades: { price:number; amount:number; side:"buy"|"sell"; time:string }[];
   tradeType:"buy"|"sell"; onTradeType:(t:"buy"|"sell")=>void;
   tradeMode:"market"|"limit"|"stop-limit"; onTradeMode:(m:any)=>void;
   price:string; onPrice:(s:string)=>void;
@@ -863,17 +864,15 @@ function TradeView({ asset, asks, bids, tradeType, onTradeType, tradeMode, onTra
         {/* Recent trades */}
         <div style={{ padding:"14px", borderTop:"1px solid var(--w-border)", marginTop:"auto" }}>
           <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", marginBottom:8 }}>آخرین معاملات</div>
-          {Array.from({length:8},(_,i)=>{
-            const side = Math.random()>0.5?"buy":"sell";
-            return (
-              <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", fontSize:10, padding:"3px 0", borderBottom:"1px solid var(--w-border)", color:"var(--w-muted)" }}>
-                <span style={{ color:side==="buy"?"#10b981":"#f43f5e" }}>{fmtP(asset.price*(1+(Math.random()-0.5)*0.002))}</span>
-                <span style={{ textAlign:"center" }}>{(Math.random()*2+0.01).toFixed(4)}</span>
-                <span style={{ textAlign:"left" }}>{`${Math.floor(Math.random()*59)+1}ث`}</span>
-              </div>
-            );
-          })}
-        </div>
+          {recentTrades.length===0 ? (
+            <div style={{ padding:"18px 8px", textAlign:"center", color:"var(--w-muted)", fontSize:11 }}>هنوز معامله‌ای برای این بازار ثبت نشده است.</div>
+          ) : recentTrades.map((trade,i)=>(
+            <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", fontSize:10, padding:"4px 0", borderBottom:"1px solid var(--w-border)", color:"var(--w-muted)" }}>
+              <span style={{ color:trade.side==="buy"?"#10b981":"#f43f5e" }}>{fmtP(trade.price)}</span>
+              <span style={{ textAlign:"center" }}>{trade.amount.toFixed(6)}</span>
+              <span style={{ textAlign:"left" }}>{trade.time}</span>
+            </div>
+          ))        </div>
       </div>
     </div>
   );
@@ -1228,83 +1227,83 @@ function WithdrawCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatu
 }
 
 // ── Orders Tab ─────────────────────────────────────
-function OrdersTab() {
+function OrdersTab({ orders }: { orders:any[] }) {
   const [activeTab, setActiveTab] = useState<"open"|"history">("open");
+  const rows = orders.filter(o => activeTab === "open" ? ["open","partially_filled"].includes(o.status) : !["open","partially_filled"].includes(o.status));
   return (
     <div style={{ padding:"20px 0" }}>
       <div style={{ display:"flex", gap:12, marginBottom:16 }}>
         {(["open","history"] as const).map(t => (
-          <button key={t} onClick={()=>setActiveTab(t)} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${activeTab===t?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:activeTab===t?"rgba(8,145,178,0.08)":"transparent", color:activeTab===t?"#0891b2":"var(--w-muted)", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"Vazirmatn" }}>
+          <button key={t} onClick={()=>setActiveTab(t)} style={{ padding:"8px 20px", borderRadius:8, border:\`1px solid \${activeTab===t?"rgba(8,145,178,0.4)":"var(--w-border)"}\`, background:activeTab===t?"rgba(8,145,178,0.08)":"transparent", color:activeTab===t?"#0891b2":"var(--w-muted)", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"Vazirmatn" }}>
             {t==="open"?"سفارشات باز":"تاریخچه سفارشات"}
           </button>
         ))}
       </div>
-      <div className="w-card" style={{ padding:"60px", textAlign:"center", color:"var(--w-muted)" }}>
-        <WI n="document" s={40} style={{ opacity:0.2, marginBottom:12 }}/>
-        <div style={{ fontSize:14, fontWeight:700 }}>{activeTab==="open"?"سفارش باز وجود ندارد":"تاریخچه‌ای یافت نشد"}</div>
-        <div style={{ fontSize:12, marginTop:4 }}>سفارشات خود را از بخش معاملات ثبت کنید</div>
+      <div className="w-card" style={{ overflow:"hidden" }}>
+        {rows.length === 0 ? (
+          <div style={{ padding:"60px", textAlign:"center", color:"var(--w-muted)" }}>
+            <WI n="document" s={40} style={{ opacity:0.2, marginBottom:12 }}/>
+            <div style={{ fontSize:14, fontWeight:700 }}>{activeTab==="open"?"سفارش باز وجود ندارد":"تاریخچه‌ای یافت نشد"}</div>
+            <div style={{ fontSize:12, marginTop:4 }}>این بخش فقط سفارش‌های واقعی حساب شما را نمایش می‌دهد.</div>
+          </div>
+        ) : (
+          <div style={{ overflowX:"auto" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+              <thead><tr style={{ background:"var(--w-card2)" }}>{["شناسه","بازار","سمت","نوع","مقدار","قیمت","وضعیت","تاریخ"].map(h=><th key={h} style={{ padding:"10px 12px", textAlign:"right", color:"var(--w-muted)" }}>{h}</th>)}</tr></thead>
+              <tbody>{rows.map(o => (
+                <tr key={o.id} style={{ borderBottom:"1px solid var(--w-border)" }}>
+                  <td style={{ padding:"10px 12px", fontFamily:"monospace" }}>{o.id}</td>
+                  <td style={{ padding:"10px 12px" }}>{o.base_asset_id}/{o.quote_asset_id}</td>
+                  <td style={{ padding:"10px 12px", color:o.side==="buy"?"#10b981":"#f43f5e" }}>{o.side==="buy"?"خرید":"فروش"}</td>
+                  <td style={{ padding:"10px 12px" }}>{o.order_type}</td>
+                  <td style={{ padding:"10px 12px" }}>{o.quantity}</td>
+                  <td style={{ padding:"10px 12px" }}>{o.price ?? "بازار"}</td>
+                  <td style={{ padding:"10px 12px" }}>{o.status}</td>
+                  <td style={{ padding:"10px 12px" }}>{new Date(o.created_at).toLocaleString("fa-IR")}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // ── Transactions Tab ───────────────────────────────
-function TransactionsTab({ onSelectTx }: { onSelectTx:(tx:any)=>void }) {
+function TransactionsTab({ orders, deposits, withdrawals, onSelectTx }: { orders:any[]; deposits:any[]; withdrawals:any[]; onSelectTx:(tx:any)=>void }) {
   const [txType, setTxType] = useState("all");
   const TXNS = [
-    { type:"خرید", amount:"+0.0321 BTC", date:"۱۴۰۳/۰۸/۲۲", status:"موفق", txid:"abc1234...9ef0", color:"#10b981" },
-    { type:"فروش", amount:"-1.5 ETH", date:"۱۴۰۳/۰۸/۲۰", status:"موفق", txid:"def5678...1ab2", color:"#f43f5e" },
-    { type:"واریز", amount:"+50,000,000 ت", date:"۱۴۰۳/۰۸/۱۸", status:"موفق", txid:"paya-00012345", color:"#0891b2" },
-    { type:"برداشت", amount:"-200 USDT", date:"۱۴۰۳/۰۸/۱۶", status:"در انتظار", txid:"trc20xyz...abc", color:"#d97706" },
-    { type:"خرید", amount:"+500 USDT", date:"۱۴۰۳/۰۸/۱۵", status:"موفق", txid:"bsc3456...7def", color:"#10b981" },
-    { type:"واریز", amount:"+0.05 BTC", date:"۱۴۰۳/۰۸/۱۲", status:"موفق", txid:"btcnet...xyz", color:"#0891b2" },
-    { type:"فروش", amount:"-100 SOL", date:"۱۴۰۳/۰۸/۱۰", status:"موفق", txid:"solana...pqr", color:"#f43f5e" },
-    { type:"برداشت", amount:"-20,000,000 ت", date:"۱۴۰۳/۰۸/۰۸", status:"موفق", txid:"card-00098765", color:"#d97706" },
+    ...orders.map(o => ({ type:o.side==="buy"?"خرید":"فروش", amount:String(o.quantity), date:new Date(o.created_at).toLocaleDateString("fa-IR"), status:String(o.status), txid:String(o.id), color:o.side==="buy"?"#10b981":"#f43f5e" })),
+    ...deposits.map(d => ({ type:"واریز", amount:String(d.amount), date:new Date(d.created_at).toLocaleDateString("fa-IR"), status:String(d.status), txid:String(d.id), color:"#0891b2" })),
+    ...withdrawals.map(w => ({ type:"برداشت", amount:String(w.amount), date:new Date(w.created_at).toLocaleDateString("fa-IR"), status:String(w.status), txid:String(w.operation_id ?? w.id), color:"#d97706" })),
   ];
   const filtered = txType === "all" ? TXNS : TXNS.filter(t => t.type === txType);
   return (
     <div style={{ padding:"20px 0" }}>
       <div style={{ display:"flex", gap:8, marginBottom:16 }}>
         {["all","خرید","فروش","واریز","برداشت"].map(t=>(
-          <button key={t} onClick={()=>setTxType(t)} style={{ padding:"7px 16px", borderRadius:8, border:`1px solid ${txType===t?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:txType===t?"rgba(8,145,178,0.08)":"transparent", color:txType===t?"#0891b2":"var(--w-muted)", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"Vazirmatn" }}>
-            {t==="all"?"همه":t}
-          </button>
+          <button key={t} onClick={()=>setTxType(t)} className="w-btn w-btn-muted" style={{ padding:"7px 16px", borderColor:txType===t?"rgba(8,145,178,0.4)":"var(--w-border)", color:txType===t?"#0891b2":"var(--w-muted)" }}>{t==="all"?"همه":t}</button>
         ))}
-        <button style={{ marginRight:"auto", background:"none", border:"1px solid var(--w-border)", borderRadius:8, padding:"7px 14px", fontSize:12, cursor:"pointer", color:"var(--w-muted)", fontFamily:"Vazirmatn" }}>
-          <WI n="download" s={12}/> خروجی اکسل
-        </button>
       </div>
       <div className="w-card" style={{ overflow:"hidden" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-          <thead>
-            <tr style={{ background:"var(--w-card2)" }}>
-              {["نوع","مقدار","تاریخ","وضعیت","شناسه","جزئیات"].map(h=>(
-                <th key={h} style={{ padding:"10px 14px", textAlign:"right", color:"var(--w-muted)", fontWeight:600, fontSize:11 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((tx,i)=>(
-              <tr key={i} style={{ borderBottom:"1px solid var(--w-border)", cursor:"pointer", transition:"background 0.1s" }}
-                onMouseEnter={e=>(e.currentTarget as HTMLTableRowElement).style.background="var(--w-hover)"}
-                onMouseLeave={e=>(e.currentTarget as HTMLTableRowElement).style.background="transparent"}
-              >
-                <td style={{ padding:"12px 14px" }}>
-                  <span style={{ padding:"3px 10px", borderRadius:6, background:`${tx.color}15`, color:tx.color, fontSize:12, fontWeight:700 }}>{tx.type}</span>
-                </td>
+        {filtered.length===0 ? (
+          <div style={{ padding:"60px", textAlign:"center", color:"var(--w-muted)" }}>هنوز تراکنش واقعی برای این حساب ثبت نشده است.</div>
+        ) : (
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+            <thead><tr style={{ background:"var(--w-card2)" }}>{["نوع","مقدار","تاریخ","وضعیت","شناسه","جزئیات"].map(h=><th key={h} style={{ padding:"10px 14px", textAlign:"right", color:"var(--w-muted)", fontSize:11 }}>{h}</th>)}</tr></thead>
+            <tbody>{filtered.map((tx,i)=>(
+              <tr key={tx.txid+"-"+i} style={{ borderBottom:"1px solid var(--w-border)", cursor:"pointer" }} onClick={()=>onSelectTx(tx)}>
+                <td style={{ padding:"12px 14px" }}><span style={{ padding:"3px 10px", borderRadius:6, background:\`\${tx.color}15\`, color:tx.color, fontSize:12, fontWeight:700 }}>{tx.type}</span></td>
                 <td style={{ padding:"12px 14px", fontWeight:800, color:tx.color }}>{tx.amount}</td>
-                <td style={{ padding:"12px 14px", color:"var(--w-muted)", fontSize:12 }}>{tx.date}</td>
-                <td style={{ padding:"12px 14px" }}>
-                  <span style={{ padding:"2px 8px", borderRadius:5, background:tx.status==="موفق"?"rgba(16,185,129,0.1)":"rgba(217,119,6,0.1)", color:tx.status==="موفق"?"#10b981":"#d97706", fontSize:11, fontWeight:700 }}>{tx.status}</span>
-                </td>
-                <td style={{ padding:"12px 14px", fontSize:11, color:"var(--w-muted)", fontFamily:"monospace" }}>{tx.txid}</td>
-                <td style={{ padding:"12px 14px" }}>
-                  <button onClick={()=>onSelectTx(tx)} className="w-btn w-btn-muted" style={{ padding:"4px 12px", fontSize:11, borderRadius:6 }}>مشاهده</button>
-                </td>
+                <td style={{ padding:"12px 14px" }}>{tx.date}</td>
+                <td style={{ padding:"12px 14px" }}>{tx.status}</td>
+                <td style={{ padding:"12px 14px", fontFamily:"monospace", fontSize:11 }}>{tx.txid}</td>
+                <td style={{ padding:"12px 14px" }}>مشاهده</td>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            ))}</tbody>
+          </table>
+        )}
       </div>
     </div>
   );
