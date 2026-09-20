@@ -159,11 +159,28 @@ export default function WebPortal() {
   const [page,     setPage]     = useState<WebPage>("home");
   const [showAuth, setShowAuth] = useState(false);
   const [showKyc,  setShowKyc]  = useState(false);
+  const [showFirstVisit, setShowFirstVisit] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>("guest");
   const [darkMode, setDarkMode] = useState(true);
 
   // Scroll to top on page change
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [page]);
+
+  // First-visit notice: shown once per browser and never forced again after dismissal.
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem("anpardaz:web:first-visit-notice") !== "dismissed") {
+        setShowFirstVisit(true);
+      }
+    } catch {
+      setShowFirstVisit(true);
+    }
+  }, []);
+
+  const dismissFirstVisit = useCallback(() => {
+    try { window.localStorage.setItem("anpardaz:web:first-visit-notice", "dismissed"); } catch { /* storage unavailable */ }
+    setShowFirstVisit(false);
+  }, []);
 
   // Apply dark/light to body for background continuity
   useEffect(() => {
@@ -293,6 +310,58 @@ export default function WebPortal() {
       </main>
 
       <WebFooter onNavigate={handleNavigate}/>
+
+      {showFirstVisit && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="اطلاعیه بازدید اول"
+          onClick={dismissFirstVisit}
+          style={{
+            position:"fixed", inset:0, zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center",
+            padding:"24px", background:"rgba(0,0,0,0.42)", backdropFilter:"blur(6px)",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              position:"relative", width:"min(460px,100%)", padding:"34px 30px 28px", textAlign:"center",
+              background:"var(--w-card)", color:"var(--w-text)", border:"1px solid var(--w-border)",
+              borderRadius:22, boxShadow:"var(--w-shadow-lg)", animation:"wFirstVisitIn .22s ease both",
+            }}
+          >
+            <button
+              type="button"
+              onClick={dismissFirstVisit}
+              aria-label="بستن"
+              style={{
+                position:"absolute", top:12, left:12, width:34, height:34, borderRadius:10,
+                border:"1px solid var(--w-border)", background:"var(--w-card2)", color:"var(--w-muted)",
+                cursor:"pointer", fontSize:20, lineHeight:1,
+              }}
+            >×</button>
+            <div style={{
+              width:58, height:58, margin:"0 auto 18px", borderRadius:17,
+              display:"flex", alignItems:"center", justifyContent:"center",
+              background:"rgba(124,58,237,0.10)", border:"1px solid rgba(124,58,237,0.18)",
+            }}>
+              <WI n="sparkle" s={27} style={{ color:"var(--w-accent)" }}/>
+            </div>
+            <div style={{ fontSize:"clamp(18px,3vw,22px)", fontWeight:900, lineHeight:1.8 }}>
+              در حال تکمیل آن پرداز هستیم:
+            </div>
+            <button
+              type="button"
+              onClick={dismissFirstVisit}
+              className="w-btn w-btn-primary"
+              style={{ marginTop:24, minWidth:132, padding:"10px 22px" }}
+            >
+              متوجه شدم
+            </button>
+          </div>
+        </div>
+      )}
+      <style>{`@keyframes wFirstVisitIn { from { opacity:0; transform:translateY(10px) scale(.98); } to { opacity:1; transform:none; } }`}</style>
 
       {/* Auth modal — rendered ONLY when explicitly requested */}
       {showAuth && (
