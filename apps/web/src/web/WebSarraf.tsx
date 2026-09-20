@@ -96,7 +96,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
         const assetBody = await assetResponse.json();
         const quoteBody = await quoteResponse.json();
         const rows = Array.isArray(assetBody?.assets) ? assetBody.assets : [];
-        const quotes = Array.isArray(quoteBody?.quotes) ? quoteBody.quotes.filter((q: any) => !q.stale && Number(q.lastPrice) > 0) : [];
+        const quotes = Array.isArray(quoteBody?.quotes) ? quoteBody.quotes.filter((q: any) => q.provider === "wallex" && !q.stale && Number(q.lastPrice) > 0) : [];
         const bySymbol = new Map<string, any>();
         for (const q of quotes) {
           const current = bySymbol.get(q.symbol);
@@ -114,7 +114,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
             logoColor: logoColor(symbol), price, priceIrt, change24h: Number.NaN, volume24h: Number.NaN,
             marketCap: Number.NaN, high24h: Number.NaN, low24h: Number.NaN, rank: 0,
           };
-        });
+        }).filter((asset: CryptoAsset) => Number.isFinite(asset.price) && asset.price > 0);
         if (!active) return;
         setLiveAssets(mapped);
         setAsset(previous => previous ? (mapped.find(a => a.id === previous.id) ?? mapped[0] ?? null) : (mapped[0] ?? null));
