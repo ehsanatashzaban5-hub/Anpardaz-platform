@@ -822,7 +822,7 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
           {isLoggedIn && (
             <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)", marginBottom:12 }}>
               <span>موجودی:</span>
-              <span style={{ fontWeight:700 }}>{tradeType==="buy"?"0.00 USDT":`0.00 ${asset.symbol}`}</span>
+              <span style={{ fontWeight:700 }}>{"—"}</span>
             </div>
           )}
           {/* Price input (for limit) */}
@@ -843,31 +843,10 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
               <span style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", fontSize:11, color:"var(--w-muted)", fontWeight:700 }}>{asset.symbol}</span>
             </div>
           </div>
-          {/* Percent buttons */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:4, marginBottom:12 }}>
-            {["25%","50%","75%","100%"].map(p=>(
-              <button key={p} onClick={()=>onAmount(String(((parseFloat(p)/100)*(tradeType==="buy"?1000:0.5)).toFixed(4)))} style={{ padding:"5px", borderRadius:6, border:"1px solid var(--w-border)", background:"transparent", color:"var(--w-muted)", fontSize:11, cursor:"pointer", fontFamily:"Vazirmatn", transition:"all 0.1s" }}
-                onMouseEnter={e=>(e.currentTarget.style.borderColor="var(--w-accent)")}
-                onMouseLeave={e=>(e.currentTarget.style.borderColor="var(--w-border)")}
-              >{p}</button>
-            ))}
-          </div>
-          {/* Margin leverage slider */}
+          <div style={{ marginBottom:12, fontSize:11, color:"var(--w-muted)" }}>موجودی واقعی در زمان ثبت سفارش توسط backend بررسی می‌شود.</div>
           {tradeKind === "margin" && (
-            <div style={{ marginBottom:12 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-                <label style={{ fontSize:11, color:"var(--w-muted)", fontWeight:600 }}>اهرم (Leverage)</label>
-                <span style={{ fontSize:14, fontWeight:900, color:"#f59e0b" }}>×{FA(leverage)}</span>
-              </div>
-              <input type="range" min={1} max={10} value={leverage} onChange={e=>setLeverage(+e.target.value)}
-                style={{ width:"100%", accentColor:"#f59e0b" }}
-              />
-              <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"var(--w-muted)", marginTop:3 }}>
-                <span>×۱</span><span>×۵</span><span>×۱۰</span>
-              </div>
-              <div style={{ marginTop:8, padding:"8px 10px", background:"rgba(245,158,11,0.08)", borderRadius:8, fontSize:11, color:"#d97706" }}>
-                قیمت تسویه: <strong>${fmtP(tradeType==="buy" ? asset.price*(1-0.9/leverage) : asset.price*(1+0.9/leverage))}</strong>
-              </div>
+            <div style={{ marginBottom:12, padding:"10px 12px", background:"rgba(217,119,6,.07)", borderRadius:8, fontSize:11, color:"#b45309", lineHeight:1.8 }}>
+              معامله تعهدی در backend فعلی فعال نیست و سفارش مارجین ارسال نخواهد شد.
             </div>
           )}
           {/* Total */}
