@@ -240,16 +240,16 @@ export default function WebPortal() {
         ::-webkit-scrollbar-thumb { background: var(--w-border2); border-radius: 4px; }
       `}</style>
 
-      <WebHeader
+      {page !== "admin" && <WebHeader
         currentPage={page}
         onNavigate={handleNavigate}
         userRole={userRole}
         onAuthClick={() => setShowAuth(true)}
         darkMode={darkMode}
         onToggleDark={() => setDarkMode(d => !d)}
-      />
+      />}
 
-      <main style={{ paddingTop:"var(--w-header)" }}>
+      <main style={{ paddingTop:page === "admin" ? 0 : "var(--w-header)" }}>
         {page === "admin" && <AdminPanel/>}
         {page === "home" && (
           <WebHome onNavigate={handleNavigate}/>
