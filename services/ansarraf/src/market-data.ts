@@ -40,7 +40,7 @@ const PROVIDER_SYMBOLS: Record<string,string> = {
 
 function validNumber(value: unknown): value is string | number {
   if (typeof value === 'number') return Number.isFinite(value);
-  if (typeof value === 'string') return /^\\d+(?:\\.\\d+)?$/.test(value) && Number.isFinite(Number(value));
+  if (typeof value === 'string') return /^\d+(?:\.\d+)?$/.test(value) && Number.isFinite(Number(value));
   return false;
 }
 
@@ -171,6 +171,30 @@ export class MarketDataService {
       for (const quote of settled.value) {
         const fetchedAt = new Date().toISOString();
         this.cache.set(`${quote.provider}:${quote.symbol}`, { ...quote, fetchedAt, stale: false });
+
+        // Wallex is the execution/liquidity source for An Sarraf. Keep the
+        // internal asset catalogue synchronized from its live market universe.
+        if (provider === 'wallex') {
+          const [base, quoteAsset] = quote.symbol.split('/');
+          if (base && quoteAsset) {
+            const baseType = base === 'USDT' ? 'stablecoin' : 'crypto';
+            const normalizedQuote = quoteAsset.toUpperCase() === 'TOMAN' ? 'TOMAN' : quoteAsset.toUpperCase();
+            const quoteType = normalizedQuote === 'TOMAN' ? 'fiat' : normalizedQuote === 'USDT' ? 'stablecoin' : 'crypto';
+            await client.query(
+              `INSERT INTO assets(symbol,name,asset_type,decimals,status)
+               VALUES($1,$1,$2,18,'active')
+               ON CONFLICT(symbol) DO UPDATE SET status='active'`,
+              [base.toUpperCase(), baseType],
+            );
+            await client.query(
+              `INSERT INTO assets(symbol,name,asset_type,decimals,status)
+               VALUES($1,$1,$2,18,'active')
+               ON CONFLICT(symbol) DO UPDATE SET status='active'`,
+              [normalizedQuote, quoteType],
+            );
+          }
+        }
+
         await client.query(
           `INSERT INTO market_quotes(provider,symbol,last_price,bid_price,ask_price,fetched_at)
            VALUES($1,$2,$3,$4,$5,$6)
