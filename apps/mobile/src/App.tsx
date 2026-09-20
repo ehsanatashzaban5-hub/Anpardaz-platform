@@ -4043,7 +4043,7 @@ function CandleChart({price}:{price:number}){const [bars,setBars]=useState(()=>A
 function ExchangeDepositFlow({coins,onClose,onToman}:{coins:typeof EX_COINS;onClose:()=>void;onToman:()=>void}){
   const [asset,setAsset]=useState<string|null>(null),[network,setNetwork]=useState(""),[search,setSearch]=useState(""),[copied,setCopied]=useState<string|null>(null);
   const coin=coins.find(c=>c.symbol===asset);const networks=coin?.networks??[];
-  const rawAddr=`${asset?.toLowerCase()||"crypto"}1q7v3m5n8kp0a2r9d4x6w8h1`;
+  const rawAddr="";
   const copyAddr=async()=>{try{await navigator.clipboard?.writeText(rawAddr);setCopied("addr");setTimeout(()=>setCopied(null),2000)}catch{}};
   const qr=Array.from({length:121},(_,i)=>((i*i+i*7+(asset?.charCodeAt(0)||0))%5<2));
 
@@ -4114,7 +4114,7 @@ function ExchangeDepositFlow({coins,onClose,onToman}:{coins:typeof EX_COINS;onCl
               {qr.map((on,i)=><div key={i} style={{width:10,height:10,borderRadius:2,background:on?"#0a1a2a":"transparent"}}/>)}
             </div>
           </div>
-          <div style={{fontSize:12,color:"var(--text-muted)",fontWeight:600}}>اسکن QR برای دریافت آدرس</div>
+          <div style={{fontSize:12,color:"var(--text-muted)",fontWeight:600}}>آدرس واریز واقعی هنوز از Backend آن صراف صادر نمی‌شود</div>
         </div>
         {/* Address label */}
         <div style={{fontSize:14,color:"var(--text-muted)",marginBottom:10,fontWeight:700,textAlign:"right"}}>آدرس واریز {coin?.symbol}</div>
