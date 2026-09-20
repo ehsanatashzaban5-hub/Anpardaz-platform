@@ -1,0 +1,9 @@
+{
+  "name": "anpardaz-platform",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=24"
+  }
+}
