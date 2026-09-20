@@ -64,3 +64,53 @@ test('provider and reconciliation architecture remains provider-only', () => {
     assert.doesNotMatch(source, /private key|hot wallet|blockchain node|blockchain indexer/i);
   }
 });
+
+test('deposit and withdrawal E2E entry points are both KYC-gated before financial mutation', () => {
+  const source = fs.readFileSync(path.join(process.cwd(), 'src/routes/trading.ts'), 'utf8');
+  const deposit = source.slice(source.indexOf("app.post('/api/v1/deposits"));
+  const withdrawal = source.slice(source.indexOf("app.post('/api/v1/withdrawals"));
+  assert.match(deposit, /ensureKycRequired\(pool,customer\)/);
+  assert.match(withdrawal, /ensureKycRequired\(pool,customer\)/);
+  assert.match(withdrawal, /BEGIN/);
+  assert.match(withdrawal, /withdrawal_reservations/);
+});
+
+test('withdrawal approval path preserves separation of duties and dual approval controls', () => {
+  const source = fs.readFileSync(path.join(process.cwd(), 'src/routes/trading.ts'), 'utf8');
+  const i = source.indexOf("app.post('/api/v1/withdrawals/:id/approve");
+  assert.ok(i >= 0);
+  const block = source.slice(i, i + 12000);
+  assert.match(block, /approval_status/);
+  assert.match(block, /admin_id/);
+  assert.match(block, /dual|DUAL|approval/i);
+});
+
+test('provider execution and settlement preserve operation provenance', () => {
+  const execution = fs.readFileSync(path.join(process.cwd(), 'src/provider-execution-worker.ts'), 'utf8');
+  const settlement = fs.readFileSync(path.join(process.cwd(), 'src/provider-trade-settlement.ts'), 'utf8');
+  assert.match(execution, /operation_id|operationId/);
+  assert.match(settlement, /operationId/);
+  assert.match(settlement, /providerOrderId/);
+});
+
+test('unknown provider outcomes are not converted into blind retries', () => {
+  const withdrawal = fs.readFileSync(path.join(process.cwd(), 'src/provider-withdrawal-worker.ts'), 'utf8');
+  assert.match(withdrawal, /unknown|manual_review|MANUAL_REVIEW/i);
+  assert.match(withdrawal, /provider withdrawal|provider_withdrawal/i);
+});
+
+test('reconciliation and admin operation trace remain exposed', () => {
+  const reconciliation = fs.readFileSync(path.join(process.cwd(), 'src/provider-reconciliation.ts'), 'utf8');
+  const solvency = fs.readFileSync(path.join(process.cwd(), 'src/solvency-reconciliation.ts'), 'utf8');
+  const admin = fs.readFileSync(path.join(process.cwd(), 'src/routes/internal-admin.ts'), 'utf8');
+  assert.match(reconciliation, /PROVIDER_BALANCE/);
+  assert.match(solvency, /provider/i);
+  assert.match(admin, /operations\/:operationId\/trace/);
+  assert.match(admin, /kyc/);
+});
+
+test('web exchange surface and mobile reference are present', () => {
+  const root = path.resolve(process.cwd(), '../..');
+  assert.ok(fs.existsSync(path.join(root, 'apps/web/src/web/WebSarraf.tsx')));
+  assert.ok(fs.existsSync(path.join(root, 'apps/mobile/src/App.tsx')));
+});
