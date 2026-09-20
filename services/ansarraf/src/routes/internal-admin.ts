@@ -1,3 +1,4 @@
+import {reconcileOperation} from '../operation-reconciliation.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 
@@ -211,8 +212,8 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
           })),
         },
         reconciliation: {
+          operationEvidence: await reconcileOperation(pool, operationId),
           latestRuns: reconciliationRuns.rows,
-          note: 'Reconciliation runs are periodic evidence; they are not treated as a direct financial link to this operation unless an explicit operation reference exists.',
         },
       };
     },
