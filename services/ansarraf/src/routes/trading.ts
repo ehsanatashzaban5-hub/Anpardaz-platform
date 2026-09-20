@@ -3,6 +3,7 @@ import type {Pool} from 'pg';
 import {createHash,randomUUID} from 'node:crypto';
 import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
 import {provisionProviderExecution} from '../provider-execution.js';
+import {ensureKycRequired} from '../kyc.js';
 type R=FastifyRequest&{auth:AuthClaims};const r=(x:FastifyRequest)=>x as R;
 const dec=/^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/;const amount=(v:unknown)=>typeof v==='string'&&dec.test(v)&&v!=='0'&&!/^0\.0+$/.test(v);const id=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;const idem=(v:unknown)=>typeof v==='string'&&v.length>=8&&v.length<=200;const fp=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 
