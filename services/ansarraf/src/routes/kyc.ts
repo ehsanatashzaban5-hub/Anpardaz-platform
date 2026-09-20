@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import { ensureCustomer, requireAuth, type AuthClaims } from '../auth.js';
-import { adminDecideKyc, getKyc, getKycById, submitKyc } from './kyc.js';
+import { adminDecideKyc, getKyc, getKycById, submitKyc } from '../kyc.js';
 
 type R = FastifyRequest & { auth: AuthClaims };
 const ar = (x: FastifyRequest) => x as R;
