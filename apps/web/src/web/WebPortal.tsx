@@ -160,7 +160,7 @@ export default function WebPortal() {
   const [showAuth, setShowAuth] = useState(false);
   const [showKyc,  setShowKyc]  = useState(false);
   const [showFirstVisit, setShowFirstVisit] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole>("guest");
+  const [userRole, setUserRole] = useState<UserRole>(() => localStorage.getItem("anpardaz:web:role") === "user" ? "user" : "guest");
   const [darkMode, setDarkMode] = useState(true);
 
   // Scroll to top on page change
@@ -201,12 +201,15 @@ export default function WebPortal() {
     setShowAuth(true);
   }, []);
 
-  const handleAuthSuccess = useCallback(() => {
+  const handleAuthSuccess = useCallback((accessToken: string, email: string) => {
+    localStorage.setItem("anpardaz:accessToken", accessToken);
+    localStorage.setItem("anpardaz:web:email", email);
+    localStorage.setItem("anpardaz:web:role", "user");
     setUserRole("user");
     setShowAuth(false);
   }, []);
 
-  const isLoggedIn = userRole !== "guest";
+  const isLoggedIn = userRole !== "guest" && Boolean(localStorage.getItem("anpardaz:accessToken"));
 
   // Which section for WebContent
   const contentSection: ContentSection =
