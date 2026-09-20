@@ -23,6 +23,8 @@ const fmtVol = (n: number) => {
   return `$${n.toLocaleString()}`;
 };
 const clr = (n: number) => n >= 0 ? "#10b981" : "#f43f5e";
+const fmtChange = (n: number) => Number.isFinite(n) ? `${n > 0 ? "+" : ""}${n.toFixed(2)}%` : "—";
+const fmtMaybe = (n: number, formatter: (v:number)=>string) => Number.isFinite(n) ? formatter(n) : "—";
 
 type SarrafTab = "markets"|"trade-select"|"instant"|"spot"|"margin"|"assets"|"deposit"|"deposit-coin"|"withdraw"|"withdraw-coin"|"orders"|"transactions"|"fees"|"security"|"support"|"guide"|"forexbot";
 
@@ -283,7 +285,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 <div key={a.id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, cursor:"pointer" }} onClick={()=>{setAsset(a);setTab("trade-select");}}>
                   <span style={{ fontWeight:700, color:"var(--w-muted)" }}>{a.symbol}/USDT</span>
                   <span style={{ fontWeight:900 }}>${fmtP(a.price)}</span>
-                  <span style={{ color:clr(a.change24h), fontWeight:700, fontSize:11 }}>{a.change24h>0?"+":""}{a.change24h.toFixed(2)}%</span>
+                  <span style={{ color:clr(a.change24h), fontWeight:700, fontSize:11 }}>{fmtChange(a.change24h)}</span>
                 </div>
               ))}
             </div>
@@ -388,6 +390,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 onAuth={onAuthRequired}
                 onSelectAsset={()=>setTab("markets")}
                 assets={liveAssets.slice(0,20)} onAssetChange={setAsset}
+                recentTrades={recentTrades}
                 favorites={favorites} onToggleFav={toggleFav}
                 tradeKind="margin"
                 onBack={()=>setTab("trade-select")}
@@ -480,10 +483,10 @@ function MarketsTab({ assets, search, onSearch, sortBy, onSort, filterFav, onFil
           style={{ display:"flex", alignItems:"center", gap:5, padding:isMob?"7px 10px":"8px 14px", borderRadius:8, border:`1px solid ${filterFav?"rgba(251,191,36,0.5)":"var(--w-border)"}`, background:filterFav?"rgba(251,191,36,0.08)":"transparent", color:filterFav?"#f59e0b":"var(--w-muted)", fontSize:12, fontWeight:600, cursor:"pointer" }}>
           <WI n="star" s={13}/> {isMob?"":"علاقه‌مندی‌ها"}
         </button>
-        {(["rank","change","volume"] as const).map(s=>(
+        {(["price"] as const).map(s=>(
           <button key={s} onClick={()=>onSort(s)}
             style={{ padding:isMob?"7px 10px":"8px 14px", borderRadius:8, border:`1px solid ${sortBy===s?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:sortBy===s?"rgba(8,145,178,0.08)":"transparent", color:sortBy===s?"#0891b2":"var(--w-muted)", fontSize:12, fontWeight:600, cursor:"pointer" }}>
-            {s==="rank"?"رتبه":s==="change"?"تغییر":"حجم"}
+            {s==="price"?"قیمت":"قیمت"}
           </button>
         ))}
         {!isMob && <div style={{ fontSize:12, color:"var(--w-muted)", marginRight:"auto" }}>{FA(assets.length)} از {FA(totalCount)} ارز</div>}
@@ -508,7 +511,7 @@ function MarketsTab({ assets, search, onSearch, sortBy, onSort, filterFav, onFil
                   <button onClick={e=>{e.stopPropagation();onToggleFav(a.id);}} style={{ background:"none", border:"none", cursor:"pointer", color:favorites.has(a.id)?"#f59e0b":"var(--w-border)", padding:0, display:"flex" }}>
                     <WI n="star" s={12}/>
                   </button>
-                  {FA(a.rank)}
+                  {a.rank > 0 ? FA(a.rank) : "—"}
                 </div>
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                   <div style={{ width:28, height:28, borderRadius:"50%", background:a.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:9, fontWeight:900, flexShrink:0 }}>{a.symbol.slice(0,3)}</div>
@@ -524,8 +527,8 @@ function MarketsTab({ assets, search, onSearch, sortBy, onSort, filterFav, onFil
                     {a.change24h>0?"+":""}{a.change24h.toFixed(2)}%
                   </span>
                 </div>
-                <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{fmtVol(a.volume24h)}</div>
-                <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{fmtVol(a.marketCap)}</div>
+                <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{fmtMaybe(a.volume24h, fmtVol)}</div>
+                <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{fmtMaybe(a.marketCap, fmtVol)}</div>
                 <div style={{ display:"flex", justifyContent:"center" }}>
                   <button onClick={e=>{e.stopPropagation();onSelectTrade(a);}} className="w-btn w-btn-muted" style={{ padding:"4px 12px", fontSize:11, borderRadius:6 }}>معامله</button>
                 </div>
@@ -624,11 +627,11 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
           <div className="w-card" style={{ padding:"18px" }}>
             <div style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", marginBottom:12 }}>آمار بازار</div>
             {[
-              ["رتبه بازار", `#${FA(a.rank)}`],
-              ["بالاترین ۲۴ه", `$${fmtP(a.high24h)}`],
-              ["پایین‌ترین ۲۴ه", `$${fmtP(a.low24h)}`],
-              ["حجم ۲۴ه", fmtVol(a.volume24h)],
-              ["مارکت کپ", fmtVol(a.marketCap)],
+              ["رتبه بازار", a.rank > 0 ? `#${FA(a.rank)}` : "—"],
+              ["بالاترین ۲۴ه", Number.isFinite(a.high24h) ? `${fmtP(a.high24h)}` : "—"],
+              ["پایین‌ترین ۲۴ه", Number.isFinite(a.low24h) ? `${fmtP(a.low24h)}` : "—"],
+              ["حجم ۲۴ه", fmtMaybe(a.volume24h, fmtVol)],
+              ["مارکت کپ", fmtMaybe(a.marketCap, fmtVol)],
               ["قیمت تومان", fmtIrt(a.priceIrt)],
             ].map(([k,v]) => (
               <div key={k as string} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid var(--w-border)", fontSize:13 }}>
