@@ -82,15 +82,15 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
   const [backendKycStatus, setBackendKycStatus] = useState<KycStatus | null>(null);
   const isMobile = useIsMobile(900);
 
-  const logoColor = (symbol: string) => { let h = 0; for (const ch of symbol) h = (h * 31 + ch.charCodeAt(0)) % 360; return \`hsl(\${h} 55% 42%)\`; };
+  const logoColor = (symbol: string) => { let h = 0; for (const ch of symbol) h = (h * 31 + ch.charCodeAt(0)) % 360; return `hsl(${h} 55% 42%)`; };
 
   useEffect(() => {
     let active = true;
     const loadMarkets = async () => {
       try {
         const [assetResponse, quoteResponse] = await Promise.all([
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/assets\`, { signal: AbortSignal.timeout(7000), cache: "no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/market-data/quotes\`, { signal: AbortSignal.timeout(7000), cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/assets`, { signal: AbortSignal.timeout(7000), cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes`, { signal: AbortSignal.timeout(7000), cache: "no-store" }),
         ]);
         if (!assetResponse.ok || !quoteResponse.ok) throw new Error("market_data_unavailable");
         const assetBody = await assetResponse.json();
@@ -105,8 +105,8 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
         const tomanRate = Number(bySymbol.get("USDT/TOMAN")?.lastPrice || 0);
         const mapped: CryptoAsset[] = rows.map((row: any) => {
           const symbol = String(row.symbol).toUpperCase();
-          const usdt = bySymbol.get(\`\${symbol}/USDT\`);
-          const toman = bySymbol.get(\`\${symbol}/TOMAN\`);
+          const usdt = bySymbol.get(`${symbol}/USDT`);
+          const toman = bySymbol.get(`${symbol}/TOMAN`);
           const price = symbol === "USDT" ? tomanRate : Number(usdt?.lastPrice || 0);
           const priceIrt = symbol === "USDT" ? tomanRate : Number(toman?.lastPrice || (price > 0 && tomanRate > 0 ? price * tomanRate : 0));
           return {
@@ -134,14 +134,14 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
     let active = true;
     const loadAccount = async () => {
       try {
-        const headers = { authorization: \`Bearer \${token}\` };
+        const headers = { authorization: `Bearer ${token}` };
         const [walletR, orderR, tradeR, depositR, withdrawalR, kycR] = await Promise.all([
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/wallets\`, { headers, cache:"no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/orders\`, { headers, cache:"no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/trades\`, { headers, cache:"no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/deposits\`, { headers, cache:"no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/withdrawals\`, { headers, cache:"no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/kyc\`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/wallets`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/orders`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/trades`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/deposits`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/withdrawals`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/kyc`, { headers, cache:"no-store" }),
         ]);
         if (!active) return;
         if (walletR.ok) setWallets((await walletR.json()).wallets ?? []);
@@ -194,10 +194,10 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
     let active = true;
     const loadBook = async () => {
       try {
-        const symbol = \`\${selectedAsset.symbol}/USDT\`;
+        const symbol = `${selectedAsset.symbol}/USDT`;
       const [bookResponse, tradesResponse] = await Promise.all([
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/orderbook?symbol=\${encodeURIComponent(symbol)}&limit=20\`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/market-data/trades?symbol=\${encodeURIComponent(symbol)}&limit=20\`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/orderbook?symbol=${encodeURIComponent(symbol)}&limit=20`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/trades?symbol=${encodeURIComponent(symbol)}&limit=20`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
         ]);
         if (!bookResponse.ok) throw new Error("orderbook_unavailable");
         const book = await bookResponse.json();
@@ -698,7 +698,7 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
     setSubmitting(true); setSubmitMessage("");
     try {
       const token = window.localStorage.getItem("anpardaz:accessToken") ?? "";
-      const response = await fetch(\`\${ANSARRAF_API_BASE}/api/v1/orders\`, { method:"POST", headers:{ authorization:\`Bearer \${token}\`, "content-type":"application/json" }, body:JSON.stringify(body) });
+      const response = await fetch(`${ANSARRAF_API_BASE}/api/v1/orders`, { method:"POST", headers:{ authorization:`Bearer ${token}`, "content-type":"application/json" }, body:JSON.stringify(body) });
       const result = await response.json().catch(()=>({}));
       if (!response.ok) throw new Error(result?.error ?? "order_failed");
       onAmount(""); onPrice(""); setSubmitMessage("سفارش با موفقیت در آن صراف ثبت شد.");
@@ -1129,7 +1129,7 @@ function OrdersTab({ orders }: { orders:any[] }) {
     <div style={{ padding:"20px 0" }}>
       <div style={{ display:"flex", gap:12, marginBottom:16 }}>
         {(["open","history"] as const).map(t => (
-          <button key={t} onClick={()=>setActiveTab(t)} style={{ padding:"8px 20px", borderRadius:8, border:\`1px solid \${activeTab===t?"rgba(8,145,178,0.4)":"var(--w-border)"}\`, background:activeTab===t?"rgba(8,145,178,0.08)":"transparent", color:activeTab===t?"#0891b2":"var(--w-muted)", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"Vazirmatn" }}>
+          <button key={t} onClick={()=>setActiveTab(t)} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${activeTab===t?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:activeTab===t?"rgba(8,145,178,0.08)":"transparent", color:activeTab===t?"#0891b2":"var(--w-muted)", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"Vazirmatn" }}>
             {t==="open"?"سفارشات باز":"تاریخچه سفارشات"}
           </button>
         ))}
@@ -1189,7 +1189,7 @@ function TransactionsTab({ orders, deposits, withdrawals, onSelectTx }: { orders
             <thead><tr style={{ background:"var(--w-card2)" }}>{["نوع","مقدار","تاریخ","وضعیت","شناسه","جزئیات"].map(h=><th key={h} style={{ padding:"10px 14px", textAlign:"right", color:"var(--w-muted)", fontSize:11 }}>{h}</th>)}</tr></thead>
             <tbody>{filtered.map((tx,i)=>(
               <tr key={tx.txid+"-"+i} style={{ borderBottom:"1px solid var(--w-border)", cursor:"pointer" }} onClick={()=>onSelectTx(tx)}>
-                <td style={{ padding:"12px 14px" }}><span style={{ padding:"3px 10px", borderRadius:6, background:\`\${tx.color}15\`, color:tx.color, fontSize:12, fontWeight:700 }}>{tx.type}</span></td>
+                <td style={{ padding:"12px 14px" }}><span style={{ padding:"3px 10px", borderRadius:6, background:`${tx.color}15`, color:tx.color, fontSize:12, fontWeight:700 }}>{tx.type}</span></td>
                 <td style={{ padding:"12px 14px", fontWeight:800, color:tx.color }}>{tx.amount}</td>
                 <td style={{ padding:"12px 14px" }}>{tx.date}</td>
                 <td style={{ padding:"12px 14px" }}>{tx.status}</td>
