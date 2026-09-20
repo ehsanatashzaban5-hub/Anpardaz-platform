@@ -119,7 +119,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
 
   // Browser-facing admin proxy for An Sarraf operational actions.
   // The user's Platform JWT is forwarded; no service token is exposed to the browser.
-  const forwardUser = (request: FastifyRequest) => {
+  const forwardUser = (request: FastifyRequest): Record<string,string> => {
     const authorization = request.headers.authorization;
     return authorization ? { authorization } : {};
   };
