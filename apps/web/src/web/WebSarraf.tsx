@@ -600,7 +600,26 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
             <div style={{ fontSize:13, fontWeight:800 }}>نمودار تاریخی</div>
             <div style={{ fontSize:11, color:"var(--w-muted)" }}>پس از اضافه‌شدن API داده‌های تاریخی نمایش داده می‌شود.</div>
           </div>
-inBottom:10 }}>قیمت در شبکه‌ها</div>
+        {/* Stats */}
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          <div className="w-card" style={{ padding:"18px" }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", marginBottom:12 }}>آمار بازار</div>
+            {[
+              ["رتبه بازار", `#${FA(a.rank)}`],
+              ["بالاترین ۲۴ه", `$${fmtP(a.high24h)}`],
+              ["پایین‌ترین ۲۴ه", `$${fmtP(a.low24h)}`],
+              ["حجم ۲۴ه", fmtVol(a.volume24h)],
+              ["مارکت کپ", fmtVol(a.marketCap)],
+              ["قیمت تومان", fmtIrt(a.priceIrt)],
+            ].map(([k,v]) => (
+              <div key={k as string} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid var(--w-border)", fontSize:13 }}>
+                <span style={{ color:"var(--w-muted)" }}>{k}</span>
+                <span style={{ fontWeight:700 }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <div className="w-card" style={{ padding:"16px" }}>
+            <div style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", marginBottom:10 }}>قیمت در شبکه‌ها</div>
             {["TRC20","ERC20","BEP20"].map(net => (
               <div key={net} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:12, borderBottom:"1px solid var(--w-border)" }}>
                 <span style={{ color:"var(--w-muted)" }}>{net}</span>
