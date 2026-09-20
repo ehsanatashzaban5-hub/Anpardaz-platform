@@ -600,6 +600,7 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
             <div style={{ fontSize:13, fontWeight:800 }}>نمودار تاریخی</div>
             <div style={{ fontSize:11, color:"var(--w-muted)" }}>پس از اضافه‌شدن API داده‌های تاریخی نمایش داده می‌شود.</div>
           </div>
+        </div>
         {/* Stats */}
         <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
           <div className="w-card" style={{ padding:"18px" }}>
