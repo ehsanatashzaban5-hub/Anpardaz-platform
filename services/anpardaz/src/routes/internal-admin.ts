@@ -25,4 +25,16 @@ export function registerInternalAdminRoutes(app:FastifyInstance,pool:Pool){
     ]);
     return {customer,accounts:accounts.rows,cards:cards.rows,transfers:transfers.rows,topups:topups.rows};
   });
+
+  app.get('/internal/v1/admin/operations/:operationId/trace',async(request,reply)=>{
+    if(!authorized(request))return reply.code(401).send({error:'unauthorized'});
+    const operationId=(request.params as {operationId:string}).operationId?.trim();
+    if(!operationId||operationId.length>200)return reply.code(400).send({error:'invalid_operation_id'});
+    const [transfers,topups]=await Promise.all([
+      pool.query('SELECT * FROM transfer_requests WHERE operation_id=$1 ORDER BY id',[operationId]),
+      pool.query('SELECT * FROM topup_requests WHERE operation_id=$1 ORDER BY id',[operationId]),
+    ]);
+    if(!transfers.rows.length&&!topups.rows.length)return reply.code(404).send({error:'operation_not_found'});
+    return {operationId,transfers:transfers.rows,topups:topups.rows};
+  });
 }
