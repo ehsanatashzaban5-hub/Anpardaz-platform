@@ -121,16 +121,13 @@ export class ProviderReconciliationWorker{
       const customerPrefix='ansarraf.customer.';
       const liabilityResponse=await this.accountingRequest(
         'GET',
-        '/internal/v1/ledger/accounts/balances?status=active&accountCodePrefix='+encodeURIComponent(customerPrefix)+'&limit=5000'
+        '/internal/v1/ledger/accounts/balances/by-currency?status=active&accountCodePrefix='+encodeURIComponent(customerPrefix)
       );
       if(!liabilityResponse.ok)throw new Error('accounting_customer_balances_lookup_failed:'+liabilityResponse.status);
       const accountingBySymbol=new Map<string,string>();
-      for(const account of liabilityResponse.body.accounts??[]){
+      for(const account of liabilityResponse.body.balances??[]){
         const symbol=String(account.currency).toUpperCase();
-        const current=accountingBySymbol.get(symbol)??'0';
-        accountingBySymbol.set(symbol,String((await this.pool.query(
-          'SELECT ($1::numeric+$2::numeric)::text AS value',[current,String(account.balance)]
-        )).rows[0].value));
+        accountingBySymbol.set(symbol,String(account.balance));
       }
       const symbols=new Set<string>([
         ...customerWallets.rows.map(x=>String(x.symbol).toUpperCase()),
