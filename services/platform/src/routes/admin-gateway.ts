@@ -116,4 +116,72 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
         accounting: accounting.ok ? accounting.body : { unavailable: true, status: accounting.status, error: accounting.body },
       };    },
   );
+
+  // Browser-facing admin proxy for An Sarraf operational actions.
+  // The user's Platform JWT is forwarded; no service token is exposed to the browser.
+  const forwardUser = (request: FastifyRequest) => {
+    const authorization = request.headers.authorization;
+    return authorization ? { authorization } : {};
+  };
+  const sarrafBase = () => (process.env.ANSARRAF_SERVICE_URL ?? 'http://localhost:4002').replace(/\/$/, '');
+
+  app.get('/api/v1/admin/ecosystem/ansarraf/kyc', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/kyc' + q, { headers: forwardUser(request) });
+    return reply.code(result.status).send(result.body);
+  });
+
+  app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/kyc/:id/decision', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/kyc/' + encodeURIComponent(request.params.id) + '/decision', {
+      method: 'POST',
+      headers: forwardUser(request),
+      body: JSON.stringify(request.body ?? {}),
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
+  app.get('/api/v1/admin/ecosystem/ansarraf/withdrawals', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/withdrawals' + q, { headers: forwardUser(request) });
+    return reply.code(result.status).send(result.body);
+  });
+
+  app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/withdrawals/:id/approve', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(sarrafBase() + '/api/v1/withdrawals/' + encodeURIComponent(request.params.id) + '/approve', {
+      method: 'POST',
+      headers: forwardUser(request),
+      body: JSON.stringify(request.body ?? {}),
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
+  app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/withdrawals/:id/reject', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(sarrafBase() + '/api/v1/withdrawals/' + encodeURIComponent(request.params.id) + '/reject', {
+      method: 'POST',
+      headers: forwardUser(request),
+      body: JSON.stringify(request.body ?? {}),
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
+  app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/withdrawals/:id/reconcile', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'reconciliation.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/withdrawals/' + encodeURIComponent(request.params.id) + '/reconcile', {
+      method: 'POST',
+      headers: forwardUser(request),
+      body: JSON.stringify(request.body ?? {}),
+    });
+    return reply.code(result.status).send(result.body);
+  });
 }
