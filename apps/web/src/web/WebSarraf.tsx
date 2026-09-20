@@ -391,6 +391,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 onAuth={onAuthRequired}
                 onSelectAsset={()=>setTab("markets")}
                 assets={liveAssets.slice(0,20)} onAssetChange={setAsset}
+                wallets={wallets}
                 recentTrades={recentTrades}
                 favorites={favorites} onToggleFav={toggleFav}
                 tradeKind="margin"
