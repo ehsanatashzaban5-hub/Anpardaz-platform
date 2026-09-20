@@ -11,6 +11,7 @@ interface Props {
 }
 
 const API_BASE = ((import.meta as any).env?.VITE_PLATFORM_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 
 export default function WebAuthModal({ onClose, onSuccess }: Props) {
   const [mode, setMode] = useState<Mode>("login");
@@ -117,4 +118,35 @@ export default function WebAuthModal({ onClose, onSuccess }: Props) {
       </div>
     </div>
   );
+}
+
+
+export function WebKycModal({ onClose, currentStatus }: { onClose:()=>void; currentStatus:"not_verified"|"pending"|"verified"|"submitted" }) {
+  const [fullName,setFullName]=useState("");
+  const [nationalId,setNationalId]=useState("");
+  const [mobile,setMobile]=useState("");
+  const [birthDate,setBirthDate]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [message,setMessage]=useState("");
+  const submit=async()=>{
+    if(!fullName.trim()||!/^[0-9]{10}$/.test(nationalId)||!/^(?:09)[0-9]{9}$/.test(mobile)){setMessage("نام، کد ملی ۱۰ رقمی و موبایل معتبر لازم است.");return;}
+    setLoading(true);setMessage("");
+    try{
+      const token=typeof window!=="undefined"?window.localStorage.getItem("anpardaz:accessToken")??"":"";
+      const r=await fetch(`${ANSARRAF_API_BASE}/api/v1/kyc/submit`,{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${token}`},body:JSON.stringify({fullName,nationalId,mobile,birthDate:birthDate||undefined})});
+      const body=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(body?.error==="kyc_provider_not_configured"?"سرویس احراز هویت صراف هنوز به ارائه‌دهنده متصل نشده است.":body?.error??"ارسال احراز هویت ناموفق بود.");
+      setMessage("اطلاعات احراز هویت ثبت شد و برای بررسی ارسال شد.");
+    }catch(e){setMessage(e instanceof Error?e.message:"ارسال احراز هویت ناموفق بود.");}finally{setLoading(false);}
+  };
+  if(currentStatus==="verified")return <div onClick={e=>{if(e.target===e.currentTarget)onClose();}} style={{position:"fixed",inset:0,zIndex:600,background:"rgba(0,0,0,.58)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}><div className="w-card" style={{width:"100%",maxWidth:430,padding:28,textAlign:"center"}}><WI n="check" s={32} style={{color:"#10b981"}}/><h3>احراز هویت تأیید شده است</h3><button onClick={onClose} className="w-btn w-btn-primary">بستن</button></div></div>;
+  return <div onClick={e=>{if(e.target===e.currentTarget)onClose();}} style={{position:"fixed",inset:0,zIndex:600,background:"rgba(0,0,0,.58)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+    <div className="w-card" style={{width:"100%",maxWidth:460,padding:24}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}><div><div style={{fontSize:17,fontWeight:900}}>احراز هویت آن صراف</div><div style={{fontSize:11,color:"var(--w-muted)",marginTop:3}}>اطلاعات شما به‌صورت رمزنگاری‌شده در سرویس صراف ثبت می‌شود.</div></div><button onClick={onClose} style={{width:32,height:32,borderRadius:9,border:"1px solid var(--w-border)",background:"var(--w-card2)",cursor:"pointer"}}>×</button></div>
+      {[["نام و نام خانوادگی",fullName,setFullName,"text"],["کد ملی",nationalId,setNationalId,"text"],["شماره موبایل",mobile,setMobile,"tel"]].map(([label,value,setter,type])=><div key={String(label)} style={{marginBottom:11}}><label style={{display:"block",fontSize:11,fontWeight:700,color:"var(--w-muted)",marginBottom:5}}>{label}</label><input className="w-input" value={String(value)} onChange={e=>(setter as any)(e.target.value)} type={String(type)} dir="ltr"/></div>)}
+      <div style={{marginBottom:14}}><label style={{display:"block",fontSize:11,fontWeight:700,color:"var(--w-muted)",marginBottom:5}}>تاریخ تولد (اختیاری)</label><input className="w-input" value={birthDate} onChange={e=>setBirthDate(e.target.value)} type="date" dir="ltr"/></div>
+      {message&&<div style={{padding:"9px 11px",borderRadius:9,background:"var(--w-card2)",color:"var(--w-muted)",fontSize:11,lineHeight:1.8,marginBottom:12}}>{message}</div>}
+      <button onClick={submit} disabled={loading} className="w-btn w-btn-primary" style={{width:"100%",padding:11,opacity:loading?.65:1}}>{loading?"در حال ارسال...":"ارسال برای بررسی"}</button>
+    </div>
+  </div>;
 }
