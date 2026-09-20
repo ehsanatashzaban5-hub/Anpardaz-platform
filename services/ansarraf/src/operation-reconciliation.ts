@@ -25,17 +25,20 @@ export async function reconcileOperation(pool:Pool,operationId:string){
   else check('operation_exists','OK',{orders:orders.rows.length,withdrawals:withdrawals.rows.length,trades:trades.rows.length,providerOrders:providerOrders.rows.length,settlements:settlements.rows.length});
 
   for(const po of providerOrders.rows){
-    const linked=settlements.rows.filter((s:any)=>Number(s.provider_order_id)===Number(po.id));
-    const settledQty=linked.reduce((sum:number,s:any)=>sum+Number(s.quantity),0);
-    const settledQuote=linked.reduce((sum:number,s:any)=>sum+Number(s.quote_amount),0);
-    const qtyOk=Math.abs(settledQty-Number(po.settled_quantity))<=1e-12;
-    const quoteOk=Math.abs(settledQuote-Number(po.settled_quote_amount))<=1e-12;
-    check('provider_settlement_consistency',qtyOk&&quoteOk?'OK':'CRITICAL',{providerOrderId:po.id,providerOrderQuantity:po.quantity,providerSettledQuantity:po.settled_quantity,evidenceSettledQuantity:String(settledQty),providerSettledQuote:po.settled_quote_amount,evidenceSettledQuote:String(settledQuote),settlementStatus:po.settlement_status});
+    const aggregate=(await pool.query(
+      'SELECT COALESCE(SUM(quantity),0)::text AS quantity,COALESCE(SUM(quote_amount),0)::text AS quote_amount FROM provider_trade_settlements WHERE provider_order_id=$1 AND status=\'SETTLED\'',
+      [po.id],
+    )).rows[0];
+    const comparison=(await pool.query(
+      'SELECT ABS($1::numeric-$2::numeric)<=0.000000000000000001 AS qty_ok, ABS($3::numeric-$4::numeric)<=0.000000000000000001 AS quote_ok',
+      [aggregate.quantity,po.settled_quantity,aggregate.quote_amount,po.settled_quote_amount],
+    )).rows[0];
+    check('provider_settlement_consistency',comparison.qty_ok&&comparison.quote_ok?'OK':'CRITICAL',{providerOrderId:po.id,providerOrderQuantity:po.quantity,providerSettledQuantity:po.settled_quantity,evidenceSettledQuantity:aggregate.quantity,providerSettledQuote:po.settled_quote_amount,evidenceSettledQuote:aggregate.quote_amount,settlementStatus:po.settlement_status});
   }
 
   for(const order of orders.rows){
     const rs=reservations.rows.filter((r:any)=>Number(r.order_id)===Number(order.id));
-    const bad=rs.some((r:any)=>Number(r.consumed_amount)>Number(r.amount)+1e-12);
+    const bad=(await pool.query('SELECT EXISTS(SELECT 1 FROM wallet_reservations WHERE order_id=$1 AND consumed_amount>amount) AS bad',[order.id])).rows[0].bad;
     if(!rs.length&&['filled','cancelled','completed','rejected'].includes(String(order.status)))
       check('reservation_lifecycle','CRITICAL',{orderId:order.id,status:order.status,reason:'terminal_order_without_reservation_evidence'});
     else check('reservation_lifecycle',bad?'CRITICAL':'OK',{orderId:order.id,reservations:rs.length});
@@ -47,7 +50,7 @@ export async function reconcileOperation(pool:Pool,operationId:string){
   }
 
   if(provenance.rows.length){
-    const invalid=provenance.rows.some((p:any)=>String(p.operation_id)!==id||Number(p.amount)<=0);
+    const invalidOperation=provenance.rows.some((p:any)=>String(p.operation_id)!==id);\n    const invalidAmount=(await pool.query('SELECT EXISTS(SELECT 1 FROM asset_provenance WHERE operation_id=$1 AND amount<=0) AS invalid',[id])).rows[0].invalid;\n    const invalid=invalidOperation||invalidAmount;
     check('asset_provenance',invalid?'CRITICAL':'OK',{entries:provenance.rows.length});
   }else if(orders.rows.length||withdrawals.rows.length)check('asset_provenance','WARNING','Financial operation has no asset provenance evidence yet');
 
