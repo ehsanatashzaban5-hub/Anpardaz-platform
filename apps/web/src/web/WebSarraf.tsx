@@ -69,7 +69,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
   const [filterFav, setFilterFav]   = useState(false);
   const [favorites, setFavorites]   = useState<Set<string>>(new Set());
   const [tradeType, setTradeType]   = useState<"buy"|"sell">("buy");
-  const [tradeMode, setTradeMode]   = useState<"market"|"limit"|"stop-limit">("market");
+  const [tradeMode, setTradeMode]   = useState<"market"|"limit">("market");
   const [price, setPrice]           = useState("");
   const [amount, setAmount]         = useState("");
   const [coinDetail, setCoinDetail] = useState<CryptoAsset|null>(null);
@@ -371,6 +371,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 onAuth={onAuthRequired}
                 onSelectAsset={()=>setTab("markets")}
                 assets={liveAssets.slice(0,20)} onAssetChange={setAsset}
+                wallets={wallets}
                 favorites={favorites} onToggleFav={toggleFav}
                 tradeKind="spot"
                 onBack={()=>setTab("trade-select")}
@@ -656,10 +657,10 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
 }
 
 // ── Trade View ─────────────────────────────────────
-function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tradeMode, onTradeMode, price, onPrice, amount, onAmount, isLoggedIn, needsKyc, onAuth, onSelectAsset, assets, onAssetChange, favorites, onToggleFav, tradeKind = "spot", onBack }: {
-  asset: CryptoAsset; asks: any[]; bids: any[]; recentTrades: { price:number; amount:number; side:"buy"|"sell"; time:string }[];
+function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTradeType, tradeMode, onTradeMode, price, onPrice, amount, onAmount, isLoggedIn, needsKyc, onAuth, onSelectAsset, assets, onAssetChange, favorites, onToggleFav, tradeKind = "spot", onBack }: {
+  asset: CryptoAsset; asks: any[]; bids: any[]; recentTrades: { price:number; amount:number; side:"buy"|"sell"; time:string }[]; wallets:any[];
   tradeType:"buy"|"sell"; onTradeType:(t:"buy"|"sell")=>void;
-  tradeMode:"market"|"limit"|"stop-limit"; onTradeMode:(m:any)=>void;
+  tradeMode:"market"|"limit"; onTradeMode:(m:"market"|"limit")=>void;
   price:string; onPrice:(s:string)=>void;
   amount:string; onAmount:(s:string)=>void;
   isLoggedIn:boolean; needsKyc:boolean; onAuth:()=>void;
@@ -670,6 +671,41 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
   onBack?: ()=>void;
 }) {
   const [leverage, setLeverage] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState("");
+  const balanceSymbol = tradeType === "buy" ? "USDT" : asset.symbol.toUpperCase();
+  const wallet = wallets.find(w => String(w.symbol).toUpperCase() === balanceSymbol);
+  const availableBalance = Number(wallet?.available_balance ?? 0);
+  const submitOrder = async () => {
+    if (!isLoggedIn) return onAuth();
+    if (tradeKind === "margin") { setSubmitMessage("معاملات تعهدی هنوز در بک‌اند آن صراف فعال نشده است."); return; }
+    if (needsKyc) { setSubmitMessage("برای ثبت سفارش ابتدا احراز هویت را تکمیل کنید."); return; }
+    const qty = Number(amount);
+    const limitPrice = Number(price);
+    if (!Number.isFinite(qty) || qty <= 0) { setSubmitMessage("مقدار سفارش را وارد کنید."); return; }
+    if (tradeMode === "limit" && (!Number.isFinite(limitPrice) || limitPrice <= 0)) { setSubmitMessage("قیمت سفارش را وارد کنید."); return; }
+    const quoteAsset = assets.find(a => a.symbol.toUpperCase() === "USDT");
+    if (!quoteAsset) { setSubmitMessage("دارایی USDT در حساب صراف پیدا نشد."); return; }
+    const marketPrice = Number(asset.price);
+    if (tradeType === "buy" && tradeMode === "market" && (!Number.isFinite(marketPrice) || marketPrice <= 0)) { setSubmitMessage("قیمت لحظه‌ای این بازار در دسترس نیست."); return; }
+    const body:any = {
+      baseAssetId: Number(asset.id), quoteAssetId: Number(quoteAsset.id), side: tradeType,
+      orderType: tradeMode, quantity: qty.toString(),
+      ...(tradeMode === "limit" ? { price: limitPrice.toString() } : tradeType === "buy" ? { quoteAmount: (qty * marketPrice).toString() } : {}),
+      idempotencyKey: crypto.randomUUID(),
+    };
+    setSubmitting(true); setSubmitMessage("");
+    try {
+      const token = window.localStorage.getItem("anpardaz:accessToken") ?? "";
+      const response = await fetch(\`\${ANSARRAF_API_BASE}/api/v1/orders\`, { method:"POST", headers:{ authorization:\`Bearer \${token}\`, "content-type":"application/json" }, body:JSON.stringify(body) });
+      const result = await response.json().catch(()=>({}));
+      if (!response.ok) throw new Error(result?.error ?? "order_failed");
+      onAmount(""); onPrice(""); setSubmitMessage("سفارش با موفقیت در آن صراف ثبت شد.");
+    } catch (error) {
+      const map:any = { insufficient_available_balance:"موجودی کافی نیست.", invalid_order:"اطلاعات سفارش نامعتبر است.", kyc_required:"احراز هویت لازم است." };
+      setSubmitMessage(map[(error as Error).message] ?? "ثبت سفارش انجام نشد.");
+    } finally { setSubmitting(false); }
+  };
   const maxAsk = Math.max(...asks.map(a=>a.price));
   const minBid = Math.min(...bids.map(b=>b.price));
   const estimatedTotal = tradeMode==="market" ? asset.price*(parseFloat(amount)||0) : (parseFloat(price)||0)*(parseFloat(amount)||0);
@@ -771,9 +807,9 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
           </div>
           {/* Mode tabs */}
           <div style={{ display:"flex", gap:4, marginBottom:14 }}>
-            {(["market","limit","stop-limit"] as const).map(m=>(
+            {(["market","limit"] as const).map(m=>(
               <button key={m} onClick={()=>onTradeMode(m)} style={{ flex:1, padding:"5px 4px", borderRadius:6, border:"none", background:tradeMode===m?"var(--w-card)":"transparent", color:tradeMode===m?"var(--w-text)":"var(--w-muted)", fontWeight:tradeMode===m?700:400, fontSize:11, cursor:"pointer", fontFamily:"Vazirmatn", boxShadow:tradeMode===m?"var(--w-shadow)":"none" }}>
-                {m==="market"?"بازار":m==="limit"?"لیمیت":"استاپ"}
+                {m==="market"?"بازار":"لیمیت"}
               </button>
             ))}
           </div>
@@ -781,7 +817,7 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
           {isLoggedIn && (
             <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)", marginBottom:12 }}>
               <span>موجودی:</span>
-              <span style={{ fontWeight:700 }}>{tradeType==="buy"?"0.00 USDT":`0.00 ${asset.symbol}`}</span>
+              <span style={{ fontWeight:700 }}>{Number.isFinite(availableBalance) ? `${availableBalance.toFixed(8)} ${balanceSymbol}` : `0 ${balanceSymbol}`}</span>
             </div>
           )}
           {/* Price input (for limit) */}
@@ -805,7 +841,7 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
           {/* Percent buttons */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:4, marginBottom:12 }}>
             {["25%","50%","75%","100%"].map(p=>(
-              <button key={p} onClick={()=>onAmount(String(((parseFloat(p)/100)*(tradeType==="buy"?1000:0.5)).toFixed(4)))} style={{ padding:"5px", borderRadius:6, border:"1px solid var(--w-border)", background:"transparent", color:"var(--w-muted)", fontSize:11, cursor:"pointer", fontFamily:"Vazirmatn", transition:"all 0.1s" }}
+              <button key={p} onClick={()=>onAmount(((parseFloat(p)/100)*availableBalance).toFixed(8))} style={{ padding:"5px", borderRadius:6, border:"1px solid var(--w-border)", background:"transparent", color:"var(--w-muted)", fontSize:11, cursor:"pointer", fontFamily:"Vazirmatn", transition:"all 0.1s" }}
                 onMouseEnter={e=>(e.currentTarget.style.borderColor="var(--w-accent)")}
                 onMouseLeave={e=>(e.currentTarget.style.borderColor="var(--w-border)")}
               >{p}</button>
@@ -850,8 +886,8 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
               <WI n="shield" s={15}/> تأیید هویت برای معامله
             </button>
           ) : (
-            <button className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, background:tradeType==="buy"?"#10b981":"#f43f5e" }}>
-              {tradeType==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
+            <button onClick={submitOrder} disabled={submitting} className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, background:tradeType==="buy"?"#10b981":"#f43f5e", opacity:submitting?0.65:1 }}>
+              {submitting ? "در حال ثبت..." : tradeType==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
             </button>
           )}
         </div>
