@@ -101,14 +101,16 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
       const accountingToken = process.env.ACCOUNTING_INTERNAL_TOKEN;
       if (!ansarrafToken || !anpardazToken || !accountingToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
       const timeout = Number(process.env.ACCOUNTING_HTTP_TIMEOUT_MS ?? 5000) + 2000;
+      const platformOrders = await pool.query('SELECT id,user_id,product_id,offer_id,quantity::text,unit_price::text,currency,status,idempotency_key,operation_id,created_at,updated_at FROM market_orders WHERE operation_id=$1 ORDER BY id',[operationId]);
       const [ansarraf, anpardaz, accounting] = await Promise.all([
         fetchJson(`${ansarrafUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${ansarrafToken}` } }, timeout),
         fetchJson(`${anpardazUrl.replace(/\/$/, '')}/internal/v1/admin/operations/${encodeURIComponent(operationId)}/trace`, { headers: { authorization: `Bearer ${anpardazToken}` } }, timeout),
         fetchJson(`${accountingUrl.replace(/\/$/, '')}/internal/v1/ledger/transactions/by-operation/${encodeURIComponent(operationId)}`, { headers: { authorization: `Bearer ${accountingToken}` } }, timeout),
       ]);
-      if (!ansarraf.ok && !anpardaz.ok && !accounting.ok) return reply.code(404).send({ error: 'operation_not_found' });
+      if (!platformOrders.rows.length && !ansarraf.ok && !anpardaz.ok && !accounting.ok) return reply.code(404).send({ error: 'operation_not_found' });
       return {
         operationId,
+        platform: { marketOrders: platformOrders.rows },
         ansarraf: ansarraf.ok ? ansarraf.body : { unavailable: true, status: ansarraf.status, error: ansarraf.body },
         anpardaz: anpardaz.ok ? anpardaz.body : { unavailable: true, status: anpardaz.status, error: anpardaz.body },
         accounting: accounting.ok ? accounting.body : { unavailable: true, status: accounting.status, error: accounting.body },
