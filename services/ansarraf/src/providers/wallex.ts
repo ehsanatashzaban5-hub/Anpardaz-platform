@@ -2,7 +2,7 @@ import type {LiquidityProviderAdapter,ProviderBalance,ProviderOrderRequest,Provi
 
 type WallexConfig={baseUrl:string;apiKey:string;timeoutMs:number};
 const text=(v:any)=>v===undefined||v===null?'0':String(v);
-const wallexSymbol=(symbol:string)=>symbol.replace(/\/TOMAN$/,'/TMN').toUpperCase();
+const wallexSymbol=(symbol:string)=>{const normalized=symbol.toUpperCase();return normalized.endsWith("/TOMAN")?normalized.slice(0,-6)+"/TMN":normalized;};
 const status=(value:any):ProviderOrderStatus=>{const s=String(value??'').toUpperCase();if(['FILLED','DONE','COMPLETED'].includes(s))return 'FILLED';if(['PARTIALLY_FILLED','PARTIAL'].includes(s))return 'PARTIALLY_FILLED';if(['CANCELED','CANCELLED'].includes(s))return 'CANCELLED';if(['REJECTED','FAILED'].includes(s))return 'REJECTED';if(['NEW','OPEN','ACTIVE','PENDING','PARTIALLY_FILLED_PENDING'].includes(s))return 'SUBMITTED';return 'UNKNOWN';};
 
 export class WallexAdapter implements LiquidityProviderAdapter{
