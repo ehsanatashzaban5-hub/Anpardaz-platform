@@ -897,13 +897,11 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
           <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", marginBottom:8 }}>آخرین معاملات</div>
           {recentTrades.length===0 ? (
             <div style={{ padding:"18px 8px", textAlign:"center", color:"var(--w-muted)", fontSize:11 }}>هنوز معامله‌ای برای این بازار ثبت نشده است.</div>
-          ) : recentTrades.map((trade,i)=>(
-            <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", fontSize:10, padding:"4px 0", borderBottom:"1px solid var(--w-border)", color:"var(--w-muted)" }}>
-              <span style={{ color:trade.side==="buy"?"#10b981":"#f43f5e" }}>{fmtP(trade.price)}</span>
-              <span style={{ textAlign:"center" }}>{trade.amount.toFixed(6)}</span>
-              <span style={{ textAlign:"left" }}>{trade.time}</span>
-            </div>
-          ))}        </div>
+          ) : recentTrades.map((trade,i) => <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", fontSize:10, padding:"4px 0", borderBottom:"1px solid var(--w-border)", color:"var(--w-muted)" }}>
+            <span style={{ color:trade.side==="buy"?"#10b981":"#f43f5e" }}>{fmtP(trade.price)}</span>
+            <span style={{ textAlign:"center" }}>{trade.amount.toFixed(6)}</span>
+            <span style={{ textAlign:"left" }}>{trade.time}</span>
+          </div>)}        </div>
       </div>
     </div>
   );
