@@ -149,8 +149,8 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
         if (depositR.ok) setDeposits((await depositR.json()).deposits ?? []);
         if (withdrawalR.ok) setWithdrawals((await withdrawalR.json()).withdrawals ?? []);
         if (kycR.ok) {
-          const status = String((await kycR.json()).kyc?.status ?? "");
-          setBackendKycStatus(status === "verified" ? "verified" : status === "pending" || status === "submitted" ? "pending" : status ? "not_verified" : null);
+          const status = String((await kycR.json()).kyc?.status ?? "").toUpperCase();
+          setBackendKycStatus(status === "VERIFIED" || status === "APPROVED" ? "verified" : status === "ADMIN_REVIEW" || status === "PROVIDER_CHECKING" || status === "SUBMITTED" ? "pending" : status ? "not_verified" : null);
         }
         void tradeR;
       } catch {
@@ -1327,8 +1327,8 @@ function InstantTradeTab({ asset, onBack, isLoggedIn, onAuth }: { asset:CryptoAs
       ]);
       const assetsBody = await assetsR.json().catch(()=>({}));
       const kycBody = await kycR.json().catch(()=>({}));
-      const status = String(kycBody?.kyc?.status ?? "").toLowerCase();
-      if (status && !["verified","approved"].includes(status)) { setMessage("برای معامله ابتدا احراز هویت را تکمیل و تأیید کنید."); return; }
+      const status = String(kycBody?.kyc?.status ?? "").toUpperCase();
+      if (status && !["VERIFIED","APPROVED"].includes(status)) { setMessage("برای معامله ابتدا احراز هویت را تکمیل و تأیید کنید."); return; }
       const rows = Array.isArray(assetsBody?.assets) ? assetsBody.assets : [];
       const quote = rows.find((x:any) => String(x.symbol).toUpperCase() === "USDT");
       if (!quote) throw new Error("quote_asset_unavailable");
