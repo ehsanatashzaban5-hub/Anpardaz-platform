@@ -10718,7 +10718,7 @@ function CameraCardScanModal({onClose,onDetect}:{onClose:()=>void;onDetect:(num:
       <canvas ref={canvasRef} style={{display:"none"}}/>
       <div style={{padding:"20px 16px",background:"rgba(0,0,0,0.9)"}}>
         {phase==="camera"&&<>
-          <p style={{color:"rgba(255,255,255,0.6)",fontSize:12,textAlign:"center",marginBottom:16,lineHeight:1.7}}>از شماره کارت عکس بگیرید{"\n"}ما شماره کارت را برایتان وارد می‌کنیم.</p>
+          <p style={{color:"rgba(255,255,255,0.6)",fontSize:12,textAlign:"center",marginBottom:16,lineHeight:1.7}}>از شماره کارت عکس بگیرید<br/>ما شماره کارت را برایتان وارد می‌کنیم.</p>
           <button onClick={capture} style={{width:"100%",background:"var(--accent)",border:"none",borderRadius:14,padding:"15px",color:"#031522",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn"}}>گرفتن عکس</button>
         </>}
         {phase==="result"&&<>
