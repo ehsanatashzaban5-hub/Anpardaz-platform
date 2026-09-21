@@ -1,5 +1,54 @@
 BEGIN;
 
+-- KYC tables are created here for clean installations before adding media fields.
+CREATE TABLE IF NOT EXISTS kyc_profiles (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  customer_id BIGINT NOT NULL UNIQUE REFERENCES customers(id),
+  status TEXT NOT NULL DEFAULT 'KYC_REQUIRED',
+  submitted_data_encrypted TEXT,
+  submitted_data_hash TEXT,
+  submitted_at TIMESTAMPTZ,
+  provider_code TEXT,
+  provider_reference TEXT,
+  provider_identity_match BOOLEAN,
+  provider_mobile_match BOOLEAN,
+  provider_status TEXT,
+  provider_checked_at TIMESTAMPTZ,
+  admin_id TEXT,
+  admin_decision_reason TEXT,
+  approved_at TIMESTAMPTZ,
+  rejected_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS kyc_audit_events (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  kyc_profile_id BIGINT NOT NULL REFERENCES kyc_profiles(id),
+  actor_type TEXT NOT NULL,
+  actor_id TEXT,
+  action TEXT NOT NULL,
+  previous_status TEXT,
+  new_status TEXT,
+  operation_id TEXT,
+  provider_reference TEXT,
+  reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS kyc_provider_events (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  kyc_profile_id BIGINT NOT NULL REFERENCES kyc_profiles(id),
+  provider_code TEXT NOT NULL,
+  provider_reference TEXT,
+  event_type TEXT NOT NULL,
+  identity_match BOOLEAN,
+  mobile_match BOOLEAN,
+  provider_status TEXT,
+  error_code TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Manual settlement workflow: no automatic bank/provider transfer is implied.
 ALTER TABLE deposits ADD COLUMN IF NOT EXISTS deposit_method TEXT NOT NULL DEFAULT 'manual' CHECK (deposit_method IN ('manual','provider'));
 ALTER TABLE deposits ADD COLUMN IF NOT EXISTS user_reference_code CHAR(10);
