@@ -4355,10 +4355,8 @@ function PairLogos({base,quote="TMN",baseSize=26,quoteSize=15}:{base:string;quot
 // ─── Forex Bot Screen ─────────────────────────────────────────────────────────
 type BotStatus = "inactive"|"pending"|"active";
 interface BotSession{id:string;amount:number;activatedAt:string;deactivatedAt?:string;pnl?:number}
-function getBotState(phone:string):{status:BotStatus;amount:number;activatedAt?:string;lastDeactivatedAt?:string;sessions:BotSession[]}{
-  try{return JSON.parse(localStorage.getItem(`anp_bot_${phone}`)||"null")||{status:"inactive",amount:0,sessions:[]};}catch{return{status:"inactive",amount:0,sessions:[]};}
-}
-function saveBotState(phone:string,s:ReturnType<typeof getBotState>){localStorage.setItem(`anp_bot_${phone}`,JSON.stringify(s));}
+function getBotState(_phone:string):{status:BotStatus;amount:number;activatedAt?:string;lastDeactivatedAt?:string;sessions:BotSession[]}{return{status:"inactive",amount:0,sessions:[]};}
+function saveBotState(_phone:string,_s:ReturnType<typeof getBotState>){}
 
 function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void}){
   const [bs,setBs]=useState(()=>getBotState(user.phone));
@@ -4385,17 +4383,6 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
     }
   },[bs]);
 
-  useEffect(()=>{
-    if(bs.status==="pending"){
-      const t=setTimeout(()=>{
-        const next={...bs,status:"active" as BotStatus};
-        saveBotState(user.phone,next);
-        setBs(next);
-      },4000);
-      return()=>clearTimeout(t);
-    }
-  },[bs.status]);
-
   const displayUsdt = user.usdtBalance;
   const maxAlloc=Math.max(0,displayUsdt-3);
   const allocNum=Number(toLatinDigits(amount))||0;
@@ -4408,13 +4395,7 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
   const cooldownRemaining=bs.lastDeactivatedAt?Math.max(0,24*60*60*1000-(Date.now()-new Date(bs.lastDeactivatedAt).getTime())):0;
   const cooldownHours=Math.ceil(cooldownRemaining/3600000);
 
-  const candles=Array.from({length:12},(_,i)=>{
-    const h=30+Math.sin(i*1.3+tick*0.5)*18;
-    const l=h-10-Math.abs(Math.sin(i*0.8+tick*0.3))*15;
-    const o=l+Math.random()*((h-l)*0.3);
-    const c=l+Math.random()*((h-l)*0.7);
-    return{h,l,o,c,bull:c>=o};
-  });
+  const candles: Array<{h:number;l:number;o:number;c:number;bull:boolean}> = [];
 
   const faqTopics=[
     {q:"فارکس چیست؟",a:"فارکس (Foreign Exchange) بزرگترین بازار مالی جهان است که در آن ارزهای مختلف کشورها خرید و فروش می‌شوند. حجم روزانه آن به بیش از ۶ تریلیون دلار می‌رسد."},
