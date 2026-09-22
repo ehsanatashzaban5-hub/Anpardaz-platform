@@ -45,7 +45,7 @@ import logoPostBank from "@/imports/postbank.png";
 import logoMellat from "@/imports/bank-mellat.png";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const FALLBACK_RATE = 87500;
+const FALLBACK_RATE = 0;
 const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
 const KAVENEGAR_KEY = "";
 
@@ -95,21 +95,7 @@ const EX_PAIRS = [
   "SUI/USDT","PEPE/USDT","WIF/USDT","JUP/USDT",
   "BTC/TOMAN","ETH/TOMAN","USDT/TOMAN","BNB/TOMAN","SOL/TOMAN","DOGE/TOMAN",
 ];
-const INITIAL_PRICES: Record<string, number> = {
-  "BTC/USDT":67543,"ETH/USDT":3852,"BNB/USDT":608,
-  "XRP/USDT":0.621,"ADA/USDT":0.483,"SOL/USDT":187,
-  "AVAX/USDT":42.3,"DOT/USDT":8.52,"MATIC/USDT":0.953,
-  "LINK/USDT":18.7,"UNI/USDT":12.5,"ATOM/USDT":11.3,
-  "LTC/USDT":93.2,"ETC/USDT":36.5,"DOGE/USDT":0.1865,
-  "TRX/USDT":0.1285,"NEAR/USDT":8.25,"ALGO/USDT":0.221,
-  "VET/USDT":0.0473,"SHIB/USDT":0.0000267,
-  "APE/USDT":1.87,"OP/USDT":2.97,"ARB/USDT":1.27,
-  "INJ/USDT":38.5,"SUI/USDT":1.97,"PEPE/USDT":0.0000187,
-  "WIF/USDT":3.48,"JUP/USDT":1.14,
-  "BTC/TOMAN":67543*87500,"ETH/TOMAN":3852*87500,
-  "USDT/TOMAN":87500,"BNB/TOMAN":608*87500,
-  "SOL/TOMAN":187*87500,"DOGE/TOMAN":0.1865*87500,
-};
+const INITIAL_PRICES: Record<string, number> = {};
 const TV_SYMBOLS: Record<string,string> = {
   "BTC/USDT":"BINANCE:BTCUSDT","ETH/USDT":"BINANCE:ETHUSDT",
   "BNB/USDT":"BINANCE:BNBUSDT","XRP/USDT":"BINANCE:XRPUSDT",
@@ -3881,18 +3867,18 @@ function ExchangeInstantTrade({initialAsset,user,coins,onBack,onUpdate}:{initial
   const [pickerSearch,setPickerSearch]=useState("");
   const [processing,setProcessing]=useState(false);
   const [result,setResult]=useState<ReceiptData|null>(null);
-  const [error,setError]=useState("");
+  const [error,setError]=useState(""); const [liveWallets,setLiveWallets]=useState<Record<string,number>>({}); useEffect(()=>{let active=true;const load=async()=>{try{const w=await sarrafWalletMap();if(active)setLiveWallets(w);}catch{}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;clearInterval(id)}},[]);
 
   const selected=coins.find(c=>c.symbol===asset)??coins[0];
   // In buy mode: amount = quote currency (TMN or USDT). In sell mode: amount = base coin.
   const rawAmt=Number(amount)||0;
-  const priceInQuote=quote==="USDT"?selected.price/FALLBACK_RATE:selected.price;
+  const liveUsdtToman=Number(coins.find(c=>c.symbol==="USDT")?.price??0); const priceInQuote=quote==="USDT"?(liveUsdtToman>0?selected.price/liveUsdtToman:0):selected.price;
   const quoteSpent=side==="buy"?rawAmt:rawAmt*priceInQuote;
   const baseUnits=side==="buy"?rawAmt/Math.max(priceInQuote,1e-12):rawAmt;
   const feeRate=.003;
   const fee=quoteSpent*feeRate;
-  const quoteBalance=quote==="TMN"?user.tomanBalance:getCryptoBal(user,"USDT");
-  const baseBalance=getCryptoBal(user,asset);
+  const quoteBalance=quote==="TMN"?Number(liveWallets.TMN??0):Number(liveWallets.USDT??0);
+  const baseBalance=Number(liveWallets[String(asset).toUpperCase()]??0);
   const instantTomanNum=side==="buy"&&quote==="TMN"?Math.floor(rawAmt):0;
   const quoteLabel=quote==="TMN"?"تومان":"USDT";
   const fmtQ=(v:number)=>quote==="TMN"?fa(Math.round(v)):faFixed(v,4);
@@ -3982,7 +3968,7 @@ function MarginChartPage({asset:initAsset,coin:initCoin,coins,user,favorites,onT
   const percent=(x:number)=>{setAmount(String(user.tomanBalance*lev*x/100/price));setSelectedPct(x);};
   const [chartPositions,setChartPositions]=useState<ExPosition[]>(()=>DB.getExPositions(user.uid));
   const closeChartPosition=(pos:ExPosition,currentPrice:number)=>{const pnl=pos.side==="long"?(currentPrice-pos.entry)*pos.qty*pos.leverage:(pos.entry-currentPrice)*pos.qty*pos.leverage;const returnAmt=pos.margin+pnl-pos.fee;const next={...user,tomanBalance:user.tomanBalance+Math.max(0,returnAmt)};const updated=DB.getExPositions(user.uid).filter(p=>p.id!==pos.id);DB.saveExPositions(user.uid, updated);setChartPositions(updated);onUpdate(next,{id:genId(),userId:user.phone,type:"swap",fromAsset:"toman",toAsset:"toman",amount:pos.margin,convertedAmount:Math.max(0,returnAmt),fee:pos.fee,status:"done",createdAt:new Date().toISOString(),note:`بستن موقعیت · ${pos.side==="long"?"لانگ":"شورت"} ${pos.asset}/TMN · P&L: ${Math.round(pnl)} تومان`,source:"exchange",tradeType:"margin"});};
-  const exec=()=>{
+  const exec=()=>{setReceipt({title:"",status:"failed",detail:"معامله تعهدی فعلاً به Backend اجرایی متصل نیست و فعال نمی‌شود."});return;
     setMarginSubView(null);setProcessing(true);
     setTimeout(()=>{
       const buy=side==="long";
@@ -4188,65 +4174,65 @@ const EX_COINS=[
   // ─── Major / Stablecoin ───────────────────────────────────────────────────
   {symbol:"USDT",fa:"دلار تتر",price:0,change:.42,networks:["TRC۲۰","ERC۲۰","BEP۲۰"]},
   // ─── Top Layer-1 ─────────────────────────────────────────────────────────
-  {symbol:"BTC",fa:"بیت‌کوین",price:0,change:1.24,networks:["Bitcoin"]},
+  {symbol:"BTC",fa:"بیت‌کوین",price:0,change:Number.NaN,networks:["Bitcoin"]},
   {symbol:"ETH",fa:"اتریوم",price:0,change:-.68,networks:["ERC۲۰","Arbitrum"]},
-  {symbol:"SOL",fa:"سولانا",price:0,change:2.16,networks:["Solana"]},
+  {symbol:"SOL",fa:"سولانا",price:0,change:Number.NaN,networks:["Solana"]},
   {symbol:"BNB",fa:"بایننس کوین",price:0,change:.95,networks:["BEP۲۰"]},
   {symbol:"XRP",fa:"ریپل",price:0,change:.87,networks:["XRP Ledger"]},
   {symbol:"ADA",fa:"کاردانو",price:0,change:-.43,networks:["Cardano"]},
-  {symbol:"DOGE",fa:"دوج‌کوین",price:0,change:-1.12,networks:["Dogecoin"]},
-  {symbol:"TON",fa:"تون کوین",price:0,change:1.3,networks:["TON"]},
-  {symbol:"AVAX",fa:"اوالانچ",price:0,change:1.55,networks:["Avalanche","ERC۲۰"]},
-  {symbol:"SUI",fa:"سوئی",price:0,change:2.4,networks:["Sui"]},
+  {symbol:"DOGE",fa:"دوج‌کوین",price:0,change:Number.NaN,networks:["Dogecoin"]},
+  {symbol:"TON",fa:"تون کوین",price:0,change:Number.NaN,networks:["TON"]},
+  {symbol:"AVAX",fa:"اوالانچ",price:0,change:Number.NaN,networks:["Avalanche","ERC۲۰"]},
+  {symbol:"SUI",fa:"سوئی",price:0,change:Number.NaN,networks:["Sui"]},
   {symbol:"DOT",fa:"پولکادات",price:0,change:-.29,networks:["Polkadot"]},
-  {symbol:"LINK",fa:"چین‌لینک",price:0,change:2.1,networks:["ERC۲۰"]},
+  {symbol:"LINK",fa:"چین‌لینک",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   {symbol:"LTC",fa:"لایت‌کوین",price:0,change:.66,networks:["Litecoin"]},
   {symbol:"TRX",fa:"ترون",price:0,change:.33,networks:["TRC۲۰"]},
-  {symbol:"NEAR",fa:"نیر پروتکل",price:0,change:1.87,networks:["NEAR"]},
+  {symbol:"NEAR",fa:"نیر پروتکل",price:0,change:Number.NaN,networks:["NEAR"]},
   {symbol:"APT",fa:"آپتوس",price:0,change:-.63,networks:["Aptos"]},
   {symbol:"POL",fa:"پل (پالیگان)",price:0,change:.91,networks:["Polygon","ERC۲۰"]},
-  {symbol:"ICP",fa:"اینترنت کامپیوتر",price:0,change:-1.05,networks:["ICP"]},
+  {symbol:"ICP",fa:"اینترنت کامپیوتر",price:0,change:Number.NaN,networks:["ICP"]},
   {symbol:"ETC",fa:"اتریوم کلاسیک",price:0,change:-.8,networks:["ETC"]},
   {symbol:"BCH",fa:"بیت‌کوین کش",price:0,change:.45,networks:["Bitcoin Cash"]},
   {symbol:"XLM",fa:"استلار",price:0,change:.72,networks:["Stellar"]},
   {symbol:"ALGO",fa:"الگوریتم",price:0,change:-.6,networks:["Algorand"]},
   {symbol:"XTZ",fa:"تزوس",price:0,change:.35,networks:["Tezos"]},
-  {symbol:"EGLD",fa:"مولتی‌ورس ایکس",price:0,change:1.1,networks:["MultiversX"]},
+  {symbol:"EGLD",fa:"مولتی‌ورس ایکس",price:0,change:Number.NaN,networks:["MultiversX"]},
   {symbol:"FLOW",fa:"فلو",price:0,change:.55,networks:["Flow"]},
   {symbol:"ONE",fa:"هارمونی",price:0,change:-.4,networks:["Harmony"]},
   // ─── Layer-2 / Scaling ───────────────────────────────────────────────────
-  {symbol:"ARB",fa:"آربیتروم",price:0,change:1.8,networks:["Arbitrum"]},
-  {symbol:"STRK",fa:"استارک‌نت",price:0,change:2.1,networks:["Starknet"]},
+  {symbol:"ARB",fa:"آربیتروم",price:0,change:Number.NaN,networks:["Arbitrum"]},
+  {symbol:"STRK",fa:"استارک‌نت",price:0,change:Number.NaN,networks:["Starknet"]},
   {symbol:"MNT",fa:"منتل",price:0,change:.9,networks:["Mantle"]},
   {symbol:"FLR",fa:"فلر",price:0,change:-.5,networks:["Flare","ERC۲۰"]},
   // ─── DeFi ────────────────────────────────────────────────────────────────
-  {symbol:"AAVE",fa:"آوه",price:0,change:1.9,networks:["ERC۲۰"]},
-  {symbol:"UNI",fa:"یونی‌سواپ",price:0,change:1.22,networks:["ERC۲۰"]},
+  {symbol:"AAVE",fa:"آوه",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"UNI",fa:"یونی‌سواپ",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   {symbol:"CRV",fa:"کرو دائو",price:0,change:-.7,networks:["ERC۲۰"]},
   {symbol:"SNX",fa:"سینتتیکس",price:0,change:.6,networks:["ERC۲۰"]},
   {symbol:"BAL",fa:"بالانسر",price:0,change:.3,networks:["ERC۲۰"]},
   {symbol:"YFI",fa:"یرن فایننس",price:0,change:-.9,networks:["ERC۲۰"]},
   {symbol:"1INCH",fa:"وان اینچ",price:0,change:.8,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"SUSHI",fa:"سوشی‌سواپ",price:0,change:1.1,networks:["ERC۲۰"]},
+  {symbol:"SUSHI",fa:"سوشی‌سواپ",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   {symbol:"CAKE",fa:"پنکیک‌سواپ",price:0,change:.5,networks:["BEP۲۰"]},
   {symbol:"CVX",fa:"کانوکس فایننس",price:0,change:-.4,networks:["ERC۲۰"]},
-  {symbol:"DYDX",fa:"دی‌وای‌دی‌ایکس",price:0,change:1.3,networks:["ERC۲۰"]},
+  {symbol:"DYDX",fa:"دی‌وای‌دی‌ایکس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   {symbol:"RUNE",fa:"ثورچین",price:0,change:.9,networks:["THORChain"]},
-  {symbol:"ONDO",fa:"اوندو",price:0,change:1.5,networks:["ERC۲۰"]},
+  {symbol:"ONDO",fa:"اوندو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   {symbol:"OSMO",fa:"اوسموسیس",price:0,change:.4,networks:["Cosmos"]},
-  {symbol:"AERO",fa:"آئرودروم",price:0,change:1.2,networks:["Base"]},
+  {symbol:"AERO",fa:"آئرودروم",price:0,change:Number.NaN,networks:["Base"]},
   {symbol:"MORPHO",fa:"مورفو",price:0,change:.7,networks:["ERC۲۰"]},
-  {symbol:"ENA",fa:"اتنا",price:0,change:2.3,networks:["ERC۲۰"]},
+  {symbol:"ENA",fa:"اتنا",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── AI / Data ───────────────────────────────────────────────────────────
-  {symbol:"FET",fa:"فچ ای‌آی",price:0,change:1.6,networks:["ERC۲۰"]},
-  {symbol:"RENDER",fa:"رندر",price:0,change:2.0,networks:["Solana","ERC۲۰"]},
+  {symbol:"FET",fa:"فچ ای‌آی",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"RENDER",fa:"رندر",price:0,change:Number.NaN,networks:["Solana","ERC۲۰"]},
   {symbol:"GRT",fa:"گراف",price:0,change:.9,networks:["ERC۲۰"]},
-  {symbol:"TAO",fa:"بیتنسور",price:0,change:3.1,networks:["Bittensor"]},
-  {symbol:"CGPT",fa:"چین‌جی‌پی‌تی",price:0,change:1.4,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"KAITO",fa:"کایتو",price:0,change:2.8,networks:["ERC۲۰"]},
+  {symbol:"TAO",fa:"بیتنسور",price:0,change:Number.NaN,networks:["Bittensor"]},
+  {symbol:"CGPT",fa:"چین‌جی‌پی‌تی",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"KAITO",fa:"کایتو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Oracle / Infrastructure ─────────────────────────────────────────────
   {symbol:"ATOM",fa:"کازماس",price:0,change:.74,networks:["Cosmos"]},
-  {symbol:"PYTH",fa:"پیث نتورک",price:0,change:1.1,networks:["Solana","ERC۲۰"]},
+  {symbol:"PYTH",fa:"پیث نتورک",price:0,change:Number.NaN,networks:["Solana","ERC۲۰"]},
   {symbol:"BAND",fa:"بند پروتکل",price:0,change:.6,networks:["Cosmos","ERC۲۰"]},
   {symbol:"API3",fa:"ای‌پی‌آی تری",price:0,change:.4,networks:["ERC۲۰"]},
   {symbol:"NMR",fa:"نومرایر",price:0,change:-.5,networks:["ERC۲۰"]},
@@ -4255,7 +4241,7 @@ const EX_COINS=[
   {symbol:"AXS",fa:"اکسی اینفینیتی",price:0,change:.7,networks:["ERC۲۰","Ronin"]},
   {symbol:"SAND",fa:"سندباکس",price:0,change:-.6,networks:["ERC۲۰"]},
   {symbol:"MANA",fa:"دیسنترالند",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"GALA",fa:"گالا",price:0,change:1.2,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"GALA",fa:"گالا",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
   {symbol:"IMX",fa:"ایمیوتبل",price:0,change:.9,networks:["ImmutableX","ERC۲۰"]},
   {symbol:"ENJ",fa:"انجین کوین",price:0,change:.4,networks:["ERC۲۰"]},
   {symbol:"CHZ",fa:"چیلیز",price:0,change:.5,networks:["ERC۲۰","Chiliz"]},
@@ -4269,35 +4255,35 @@ const EX_COINS=[
   {symbol:"HBAR",fa:"هدرا",price:0,change:.6,networks:["Hedera"]},
   {symbol:"ZEN",fa:"هورایزن",price:0,change:.2,networks:["Horizen","ERC۲۰"]},
   // ─── Ecosystem / Exchange ────────────────────────────────────────────────
-  {symbol:"SEI",fa:"سی",price:0,change:1.7,networks:["Sei"]},
-  {symbol:"TIA",fa:"سلستیا",price:0,change:1.4,networks:["Celestia"]},
-  {symbol:"JUP",fa:"ژوپیتر",price:0,change:1.9,networks:["Solana"]},
+  {symbol:"SEI",fa:"سی",price:0,change:Number.NaN,networks:["Sei"]},
+  {symbol:"TIA",fa:"سلستیا",price:0,change:Number.NaN,networks:["Celestia"]},
+  {symbol:"JUP",fa:"ژوپیتر",price:0,change:Number.NaN,networks:["Solana"]},
   {symbol:"ORCA",fa:"اورکا",price:0,change:.8,networks:["Solana"]},
-  {symbol:"RAY",fa:"ردیوم",price:0,change:1.0,networks:["Solana"]},
-  {symbol:"KAS",fa:"کسپا",price:0,change:2.5,networks:["Kaspa"]},
-  {symbol:"OM",fa:"مانترا",price:0,change:1.8,networks:["ERC۲۰"]},
-  {symbol:"HYPE",fa:"هایپرلیکوئید",price:0,change:3.5,networks:["Hyperliquid"]},
+  {symbol:"RAY",fa:"ردیوم",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"KAS",fa:"کسپا",price:0,change:Number.NaN,networks:["Kaspa"]},
+  {symbol:"OM",fa:"مانترا",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"HYPE",fa:"هایپرلیکوئید",price:0,change:Number.NaN,networks:["Hyperliquid"]},
   {symbol:"EIGEN",fa:"آیگن لیر",price:0,change:.9,networks:["ERC۲۰"]},
-  {symbol:"ETHFI",fa:"اتر فای",price:0,change:1.1,networks:["ERC۲۰"]},
+  {symbol:"ETHFI",fa:"اتر فای",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Meme / Community ────────────────────────────────────────────────────
-  {symbol:"SHIB",fa:"شیبا اینو",price:0,change:-2.1,networks:["ERC۲۰"]},
-  {symbol:"PEPE",fa:"پپه",price:0,change:3.4,networks:["ERC۲۰"]},
-  {symbol:"FLOKI",fa:"فلوکی اینو",price:0,change:1.8,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"BONK",fa:"بونک",price:0,change:4.1,networks:["Solana"]},
-  {symbol:"WIF",fa:"داگ ویف هت",price:0,change:2.9,networks:["Solana"]},
-  {symbol:"NOT",fa:"نات‌کوین",price:0,change:1.6,networks:["TON"]},
-  {symbol:"HMSTR",fa:"همستر کامبت",price:0,change:-1.3,networks:["TON"]},
+  {symbol:"SHIB",fa:"شیبا اینو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"PEPE",fa:"پپه",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"FLOKI",fa:"فلوکی اینو",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"BONK",fa:"بونک",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"WIF",fa:"داگ ویف هت",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"NOT",fa:"نات‌کوین",price:0,change:Number.NaN,networks:["TON"]},
+  {symbol:"HMSTR",fa:"همستر کامبت",price:0,change:Number.NaN,networks:["TON"]},
   {symbol:"CATI",fa:"کتیزن",price:0,change:-.8,networks:["TON"]},
   {symbol:"MAJOR",fa:"میجر",price:0,change:.5,networks:["TON"]},
   {symbol:"DOGS",fa:"داگز",price:0,change:-.7,networks:["TON"]},
-  {symbol:"BOME",fa:"بوک آف میم",price:0,change:2.1,networks:["Solana"]},
-  {symbol:"MOG",fa:"ماگ کوین",price:0,change:3.2,networks:["ERC۲۰"]},
-  {symbol:"TURBO",fa:"توربو",price:0,change:1.5,networks:["ERC۲۰"]},
-  {symbol:"NEIRO",fa:"نیرو",price:0,change:2.7,networks:["ERC۲۰"]},
-  {symbol:"PENGU",fa:"پاجی پنگوئن",price:0,change:1.9,networks:["Solana"]},
+  {symbol:"BOME",fa:"بوک آف میم",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"MOG",fa:"ماگ کوین",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"TURBO",fa:"توربو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"NEIRO",fa:"نیرو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"PENGU",fa:"پاجی پنگوئن",price:0,change:Number.NaN,networks:["Solana"]},
   {symbol:"MEME",fa:"میم کوین",price:0,change:.8,networks:["ERC۲۰"]},
   // ─── Other notable ───────────────────────────────────────────────────────
-  {symbol:"WLD",fa:"ورلد کوین",price:0,change:1.2,networks:["ERC۲۰","Optimism"]},
+  {symbol:"WLD",fa:"ورلد کوین",price:0,change:Number.NaN,networks:["ERC۲۰","Optimism"]},
   {symbol:"MASK",fa:"ماسک نتورک",price:0,change:.6,networks:["ERC۲۰"]},
   {symbol:"ZRX",fa:"زیرو ایکس",price:0,change:.4,networks:["ERC۲۰"]},
   {symbol:"BAT",fa:"بیسیک اتنشن",price:0,change:.3,networks:["ERC۲۰"]},
@@ -4318,29 +4304,29 @@ const EX_COINS=[
   {symbol:"EDU",fa:"اوپن کامپوس",price:0,change:.6,networks:["ERC۲۰","BEP۲۰"]},
   {symbol:"BTTC",fa:"بیت تورنت",price:0,change:-.5,networks:["TRC۲۰","BEP۲۰"]},
   {symbol:"BICO",fa:"بایکونومی",price:0,change:.5,networks:["ERC۲۰"]},
-  {symbol:"VIRTUAL",fa:"ویرچوال پروتکل",price:0,change:2.1,networks:["Base","ERC۲۰"]},
+  {symbol:"VIRTUAL",fa:"ویرچوال پروتکل",price:0,change:Number.NaN,networks:["Base","ERC۲۰"]},
   {symbol:"KAIA",fa:"کایا",price:0,change:.6,networks:["Kaia"]},
   {symbol:"SUPER",fa:"سوپرورس",price:0,change:.7,networks:["ERC۲۰","Solana"]},
   {symbol:"TRB",fa:"تلور",price:0,change:.9,networks:["ERC۲۰"]},
   {symbol:"MDT",fa:"مژربل دیتا",price:0,change:.3,networks:["ERC۲۰","BEP۲۰"]},
   {symbol:"JST",fa:"جاست",price:0,change:.2,networks:["TRC۲۰"]},
-  {symbol:"TNSR",fa:"تنسور",price:0,change:1.0,networks:["Solana"]},
-  {symbol:"IO",fa:"آی‌او دات نت",price:0,change:1.3,networks:["Solana","ERC۲۰"]},
+  {symbol:"TNSR",fa:"تنسور",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"IO",fa:"آی‌او دات نت",price:0,change:Number.NaN,networks:["Solana","ERC۲۰"]},
   // ─── Layer-2 & Scaling (additional) ─────────────────────────────────────
-  {symbol:"OP",fa:"اپتیمیزم",price:0,change:1.5,networks:["Optimism","ERC۲۰"]},
+  {symbol:"OP",fa:"اپتیمیزم",price:0,change:Number.NaN,networks:["Optimism","ERC۲۰"]},
   {symbol:"ZK",fa:"زی‌کی‌سینک",price:0,change:-.9,networks:["zkSync"]},
-  {symbol:"MANTA",fa:"مانتا نتورک",price:0,change:1.1,networks:["Manta","ERC۲۰"]},
+  {symbol:"MANTA",fa:"مانتا نتورک",price:0,change:Number.NaN,networks:["Manta","ERC۲۰"]},
   {symbol:"ALT",fa:"آلت‌لیر",price:0,change:-.7,networks:["ERC۲۰","Arbitrum"]},
-  {symbol:"JTO",fa:"جیتو",price:0,change:1.3,networks:["Solana"]},
+  {symbol:"JTO",fa:"جیتو",price:0,change:Number.NaN,networks:["Solana"]},
   {symbol:"RDNT",fa:"ردینت کپیتال",price:0,change:-.5,networks:["Arbitrum","BNB Chain"]},
   {symbol:"NTRN",fa:"نوترون",price:0,change:.8,networks:["Cosmos"]},
   // ─── DeFi (additional) ───────────────────────────────────────────────────
   {symbol:"MKR",fa:"میکر دائو",price:0,change:.7,networks:["ERC۲۰"]},
   {symbol:"COMP",fa:"کامپاند",price:0,change:.5,networks:["ERC۲۰"]},
-  {symbol:"LDO",fa:"لیدو",price:0,change:1.2,networks:["ERC۲۰"]},
-  {symbol:"PENDLE",fa:"پندل",price:0,change:1.8,networks:["ERC۲۰","Arbitrum"]},
+  {symbol:"LDO",fa:"لیدو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"PENDLE",fa:"پندل",price:0,change:Number.NaN,networks:["ERC۲۰","Arbitrum"]},
   {symbol:"GMX",fa:"جی‌ام‌ایکس",price:0,change:.9,networks:["Arbitrum","Avalanche"]},
-  {symbol:"BLUR",fa:"بلور",price:0,change:1.4,networks:["ERC۲۰"]},
+  {symbol:"BLUR",fa:"بلور",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   {symbol:"FXS",fa:"فرکس شیر",price:0,change:.6,networks:["ERC۲۰"]},
   {symbol:"LQTY",fa:"لیکوییتی",price:0,change:.4,networks:["ERC۲۰"]},
   {symbol:"RPL",fa:"راکت پول",price:0,change:.8,networks:["ERC۲۰"]},
@@ -4351,27 +4337,27 @@ const EX_COINS=[
   {symbol:"BADGER",fa:"بجر",price:0,change:.5,networks:["ERC۲۰"]},
   // ─── Infrastructure & Oracle (additional) ────────────────────────────────
   {symbol:"ENS",fa:"اتریوم نیم سرویس",price:0,change:.9,networks:["ERC۲۰"]},
-  {symbol:"STX",fa:"استکس",price:0,change:1.2,networks:["Stacks"]},
-  {symbol:"ORDI",fa:"اوردی",price:0,change:2.1,networks:["Bitcoin"]},
+  {symbol:"STX",fa:"استکس",price:0,change:Number.NaN,networks:["Stacks"]},
+  {symbol:"ORDI",fa:"اوردی",price:0,change:Number.NaN,networks:["Bitcoin"]},
   {symbol:"STORJ",fa:"استورج",price:0,change:.4,networks:["ERC۲۰"]},
   {symbol:"ANKR",fa:"انکر",price:0,change:.5,networks:["ERC۲۰","BEP۲۰"]},
   {symbol:"ID",fa:"اسپیس آی‌دی",price:0,change:.8,networks:["BNB Chain","ERC۲۰"]},
   {symbol:"GTC",fa:"گیت‌کوین",price:0,change:.4,networks:["ERC۲۰"]},
   {symbol:"ARPA",fa:"آرپا",price:0,change:.3,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"ARKM",fa:"آرکام",price:0,change:1.1,networks:["ERC۲۰"]},
+  {symbol:"ARKM",fa:"آرکام",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   {symbol:"FLUX",fa:"فلاکس",price:0,change:.6,networks:["ERC۲۰","BEP۲۰"]},
   {symbol:"RVN",fa:"ریون‌کوین",price:0,change:.3,networks:["Ravencoin"]},
   {symbol:"POWR",fa:"پاور لجر",price:0,change:.4,networks:["ERC۲۰"]},
   {symbol:"CTSI",fa:"کارتسی",price:0,change:.3,networks:["ERC۲۰","BEP۲۰"]},
   // ─── Exchange Tokens ──────────────────────────────────────────────────────
-  {symbol:"BGB",fa:"بیت‌گت توکن",price:0,change:1.3,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"BGB",fa:"بیت‌گت توکن",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
   {symbol:"KCS",fa:"کوکوین توکن",price:0,change:.7,networks:["KCS"]},
   {symbol:"WOO",fa:"وو نتورک",price:0,change:.6,networks:["ERC۲۰","BEP۲۰"]},
   {symbol:"TWT",fa:"تراست والت توکن",price:0,change:.8,networks:["BEP۲۰"]},
   {symbol:"CRO",fa:"کرونوس",price:0,change:.5,networks:["Cronos","ERC۲۰"]},
   {symbol:"OKB",fa:"اوکی‌ایکس توکن",price:0,change:.9,networks:["ERC۲۰","OKC"]},
   // ─── Alternative Layer-1s ─────────────────────────────────────────────────
-  {symbol:"INJ",fa:"اینجکتیو",price:0,change:2.0,networks:["Injective","ERC۲۰"]},
+  {symbol:"INJ",fa:"اینجکتیو",price:0,change:Number.NaN,networks:["Injective","ERC۲۰"]},
   {symbol:"VET",fa:"وی‌چین",price:0,change:.6,networks:["VeChain"]},
   {symbol:"KAVA",fa:"کاوا",price:0,change:.7,networks:["Kava","Cosmos"]},
   {symbol:"CELO",fa:"سلو",price:0,change:.5,networks:["Celo"]},
@@ -4379,7 +4365,7 @@ const EX_COINS=[
   {symbol:"WAVES",fa:"ویوز",price:0,change:.4,networks:["Waves"]},
   {symbol:"NEO",fa:"نئو",price:0,change:.5,networks:["Neo"]},
   {symbol:"QTUM",fa:"کوانتوم",price:0,change:.3,networks:["Qtum"]},
-  {symbol:"FTM",fa:"فانتوم",price:0,change:1.1,networks:["Fantom","ERC۲۰","BEP۲۰"]},
+  {symbol:"FTM",fa:"فانتوم",price:0,change:Number.NaN,networks:["Fantom","ERC۲۰","BEP۲۰"]},
   {symbol:"EOS",fa:"ایوس",price:0,change:.4,networks:["EOS"]},
   {symbol:"HIVE",fa:"هایو",price:0,change:.3,networks:["Hive"]},
   {symbol:"LSK",fa:"لیسک",price:0,change:.5,networks:["Lisk"]},
@@ -4494,7 +4480,7 @@ const EX_COINS=[
   {symbol:"POLYX",fa:"پالی مش",price:0,change:.2,networks:["Polymesh"]},
   {symbol:"REQ",fa:"ریکوئست",price:0,change:.2,networks:["ERC۲۰","Polygon"]},
   // ─── Meme / Community (additional) ───────────────────────────────────────
-  {symbol:"TRUMP",fa:"ترامپ",price:0,change:1.2,networks:["Solana"]},
+  {symbol:"TRUMP",fa:"ترامپ",price:0,change:Number.NaN,networks:["Solana"]},
   {symbol:"BRETT",fa:"برت",price:0,change:.8,networks:["Base"]},
   {symbol:"PNUT",fa:"پینات",price:0,change:.9,networks:["Solana"]},
   {symbol:"MEW",fa:"میو کت",price:0,change:.7,networks:["Solana"]},
@@ -4554,7 +4540,7 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
     }
   },[bs.status]);
 
-  const displayUsdt = user.usdtBalance > 0 ? user.usdtBalance : 50;
+  const displayUsdt = user.usdtBalance;
   const maxAlloc=Math.max(0,displayUsdt-3);
   const allocNum=Number(toLatinDigits(amount))||0;
 
@@ -4574,7 +4560,7 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
   const handleDeactivate=()=>{
     setDeactivating(true);
     setTimeout(()=>{
-      const mockPnl=(Math.random()>0.5?1:-1)*allocNum*0.05;
+      const mockPnl=0;
       const returned=allocNum+(mockPnl>0?mockPnl:0);
       const nextUser={...user,usdtBalance:user.usdtBalance+returned};
       onUpdate(nextUser,{id:genId(),userId:user.phone,type:"service",fromAsset:"usdt",toAsset:"usdt",amount:returned,fee:0,status:"done",createdAt:new Date().toISOString(),note:`ربات فارکس · بازگشت ${faFixed(returned,2)} USDT · ${mockPnl>=0?"سود":"زیان"} ${faFixed(Math.abs(mockPnl),2)}`});
@@ -5598,7 +5584,7 @@ function WithdrawPage({asset,network,available,processing,withdrawAddr,setWithdr
 
 function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexBot}:{user:UserData;onBack:()=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onUpdateUser?:(u:UserData)=>void;transactions:TxRecord[];onForexBot?:()=>void}){
   type View="home"|"markets"|"trade"|"assets"|"withdraw"|"deposit"|"deposit-select"|"history"|"fees"|"guide"|"instant"|"spot"|"margin"|"spot-chart"|"margin-chart"|"support"|"tickets"|"chat"|"withdraw-select"|"toman-withdraw"|"toman-deposit"|"coin-select"|"network-select"|"withdraw-confirm"|"tx-detail"|"trade-type-select"|"trade-display-select";
-  const [view,setView]=useState<View>("home"),[search,setSearch]=useState(""),[marketFilter,setMarketFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[asset,setAsset]=useState("USDT"),[network,setNetwork]=useState(""),[amount,setAmount]=useState(""),[address,setAddress]=useState(""),[picker,setPicker]=useState<"coin"|"network"|null>(null),[favorite,setFavorite]=useState<string[]>(()=>{const DEFAULTS=["BTC","ETH","SOL","BNB","DOGE"];try{const s=localStorage.getItem(`anp_exchange_favorites_${user.uid}`);if(s===null){localStorage.setItem(`anp_exchange_favorites_${user.uid}`,JSON.stringify(DEFAULTS));return DEFAULTS;}return JSON.parse(s)}catch{return DEFAULTS}}),[selectedAsset,setSelectedAsset]=useState("USDT"),[tradePicker,setTradePicker]=useState(false),[tradeDisplayPicker,setTradeDisplayPicker]=useState<null|"spot"|"margin">(null),[depositOpen,setDepositOpen]=useState(false),[notice,setNotice]=useState(""),[tradeSide,setTradeSide]=useState<"buy"|"sell">("buy"),[tradeAmount,setTradeAmount]=useState(""),[processing,setProcessing]=useState(false),[receipt,setReceipt]=useState<ReceiptData|null>(null),[coins,setCoins]=useState(EX_COINS),[marketUpdated,setMarketUpdated]=useState<Date|null>(null),[feeDetail,setFeeDetail]=useState<string|null>(null),[showWithdrawOtp,setShowWithdrawOtp]=useState(false),[withdrawSummary,setWithdrawSummary]=useState<{amount:string;destination:string;network:string;address:string}>({amount:"",destination:"",network:"",address:""}),[txDetailRecord,setTxDetailRecord]=useState<TxRecord|null>(null),[prevView,setPrevView]=useState<View>("history"),[selReturnView,setSelReturnView]=useState<View>("withdraw"),[balUnit,setBalUnit]=useState<"tmn"|"usdt">("tmn"),[hidden,setHidden]=useState(false),[toDepositTab,setToDepositTab]=useState<"card"|"paya">("card"),[withdrawAddr,setWithdrawAddr]=useState(""),[withdrawAmt,setWithdrawAmt]=useState("");
+  const [view,setView]=useState<View>("home"),[search,setSearch]=useState(""),[marketFilter,setMarketFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[asset,setAsset]=useState("USDT"),[network,setNetwork]=useState(""),[amount,setAmount]=useState(""),[address,setAddress]=useState(""),[picker,setPicker]=useState<"coin"|"network"|null>(null),[favorite,setFavorite]=useState<string[]>(()=>{const DEFAULTS=["BTC","ETH","SOL","BNB","DOGE"];try{const s=localStorage.getItem(`anp_exchange_favorites_${user.uid}`);if(s===null){localStorage.setItem(`anp_exchange_favorites_${user.uid}`,JSON.stringify(DEFAULTS));return DEFAULTS;}return JSON.parse(s)}catch{return DEFAULTS}}),[selectedAsset,setSelectedAsset]=useState("USDT"),[tradePicker,setTradePicker]=useState(false),[tradeDisplayPicker,setTradeDisplayPicker]=useState<null|"spot"|"margin">(null),[depositOpen,setDepositOpen]=useState(false),[notice,setNotice]=useState(""),[tradeSide,setTradeSide]=useState<"buy"|"sell">("buy"),[tradeAmount,setTradeAmount]=useState(""),[processing,setProcessing]=useState(false),[receipt,setReceipt]=useState<ReceiptData|null>(null),[coins,setCoins]=useState(EX_COINS),[liveWallets,setLiveWallets]=useState<Record<string,number>>({}),[marketUpdated,setMarketUpdated]=useState<Date|null>(null),[feeDetail,setFeeDetail]=useState<string|null>(null),[showWithdrawOtp,setShowWithdrawOtp]=useState(false),[withdrawSummary,setWithdrawSummary]=useState<{amount:string;destination:string;network:string;address:string}>({amount:"",destination:"",network:"",address:""}),[txDetailRecord,setTxDetailRecord]=useState<TxRecord|null>(null),[prevView,setPrevView]=useState<View>("history"),[selReturnView,setSelReturnView]=useState<View>("withdraw"),[balUnit,setBalUnit]=useState<"tmn"|"usdt">("tmn"),[hidden,setHidden]=useState(false),[toDepositTab,setToDepositTab]=useState<"card"|"paya">("card"),[withdrawAddr,setWithdrawAddr]=useState(""),[withdrawAmt,setWithdrawAmt]=useState("");
   const pendingWithdrawCb=useRef<(()=>void)|null>(null);
   const [kycFlow,setKycFlow]=useState<null|"photo"|"profile"|"anim">(null);
   const [kycPhoto,setKycPhoto]=useState("");
@@ -5607,6 +5593,7 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexB
   const [pendingKycDest,setPendingKycDest]=useState<View>("assets");
   const goWithKyc=(dest:View)=>{if(user.kycDone){go(dest);return;}setPendingKycDest(dest);setKycFlow("photo");setKycFailed(false);};
   useEffect(()=>{let active=true;const load=async()=>{try{const r=await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes`,{signal:AbortSignal.timeout(7000),cache:"no-store"});if(!r.ok)throw new Error("market_data_unavailable");const d=await r.json();const quotes=Array.isArray(d?.quotes)?d.quotes:[];const live=quotes.filter((q:any)=>!q.stale&&Number(q.lastPrice)>0);const bySymbol=new Map<string,any>();for(const q of live){const current=bySymbol.get(q.symbol);if(!current||q.provider==="wallex")bySymbol.set(q.symbol,q);}const tomanRate=Number(bySymbol.get("USDT/TOMAN")?.lastPrice||0);if(active&&tomanRate>0&&_viewRef.current!=="withdraw-confirm"){setCoins(previous=>previous.map(c=>{if(c.symbol==="USDT")return {...c,price:tomanRate};const usdt=bySymbol.get(`${c.symbol}/USDT`);const toman=bySymbol.get(`${c.symbol}/TOMAN`);const price=toman?Number(toman.lastPrice):(usdt?tomanRate*Number(usdt.lastPrice):0);return {...c,price,change:usdt?.change??c.change,volume:usdt?.volume??(c as any).volume};}));setMarketUpdated(new Date());}}catch{/* keep the last verified backend quote; never synthesize a mock price */}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;window.clearInterval(id)}},[]);
+  useEffect(()=>{let active=true;const loadWallets=async()=>{try{const wallet=await sarrafWalletMap();if(active)setLiveWallets(wallet);}catch{if(active)setLiveWallets({});}};void loadWallets();const id=window.setInterval(()=>void loadWallets(),5000);return()=>{active=false;window.clearInterval(id)}},[]);
   const coin=coins.find(c=>c.symbol===asset)??coins[0]; const available=getCryptoBal(user,asset);
   const navBusy=useRef(false);
   const go=(next:View)=>{if(navBusy.current)return;navBusy.current=true;setView(next);setNotice("");setTimeout(()=>{navBusy.current=false},400)};
@@ -5624,7 +5611,7 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexB
   const selectCoin=(s:string)=>{setAsset(s);setSelectedAsset(s);setNetwork("");setPicker(null)};
   const toggleFavorite=(symbol:string)=>setFavorite(current=>{const next=current.includes(symbol)?current.filter(x=>x!==symbol):[...current,symbol];localStorage.setItem(`anp_exchange_favorites_${user.uid}`,JSON.stringify(next));return next});
   const openSelectedTrading=(target:"instant"|"spot"|"margin")=>{if(target==="instant"){go("instant")}else{setTradeDisplayPicker(target);go("trade-display-select")}};
-  const addressValue=`${asset.toLowerCase()}1q7v3m5nz8kp0a2r9d4x6w${network.replace(/[^A-Z]/g,"").toLowerCase()||"net"}8h1`;
+  const addressValue="";
   const ExchangeTopBar=()=><div className="exchange-top"><button onClick={onBack} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(124,58,237,0.1)",border:"1.5px solid rgba(124,58,237,0.25)",borderRadius:20,padding:"6px 12px 6px 10px",cursor:"pointer",fontFamily:"Vazirmatn",fontSize:11,fontWeight:700,color:"#9d71ea",flexShrink:0,whiteSpace:"nowrap"}}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>بازگشت به آن‌پرداز</button><div className="exchange-brand"><img src={anPardazLogo} className="exchange-logo-img" alt="آن‌پرداز"/><b>آن صراف</b></div><span className="connection"><i/> {marketUpdated?"نرخ زنده":"در حال اتصال"}</span></div>;
   const ExchangeFooterNav=()=>{
     const NAV_ITEMS:[string,string,JSX.Element][]=[
@@ -5653,10 +5640,10 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexB
   const Markets=()=>{const rows=coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(search.toLowerCase())).flatMap(c=>marketFilter==="همه"?[{c,pair:"TMN",price:c.price},{c,pair:"USDT",price:c.symbol==="USDT"?1:c.price/FALLBACK_RATE}]:[{c,pair:marketFilter==="تومان"?"TMN":"USDT",price:marketFilter==="تومان"?c.price:(c.symbol==="USDT"?1:c.price/FALLBACK_RATE)}]).filter(({c,pair})=>c.symbol!==pair);const openPair=(symbol:string)=>{selectCoin(symbol);navBusy.current=false;go('spot')};return <div className="exchange-page markets-pro"><div className="markets-title"><div><h2>بازارها</h2><small>نرخ‌ها به‌صورت زنده به‌روزرسانی می‌شوند</small></div><span className="live-dot"/></div><div className="market-search"><Icon name="search" size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="جستجوی ارز یا جفت‌ارز"/></div><div className="market-filters">{(["همه","تومان","دلار تتر"] as const).map(x=><button type="button" key={x} className={marketFilter===x?"active":""} onClick={()=>setMarketFilter(x)}>{x}</button>)}</div><div className="market-card-grid">{rows.map(({c,pair,price})=>{const vol=fa(Math.round((pair==="TMN"?price:price*FALLBACK_RATE)*.018));const isPos=c.change>=0;return <div className="market-card" key={`${c.symbol}-${pair}`} role="button" tabIndex={0} onClick={()=>openPair(c.symbol)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPair(c.symbol)}}}><div className="mc-top"><div className="mc-logos"><PairLogos base={c.symbol} quote={pair} baseSize={28} quoteSize={17}/></div><div className="mc-pair"><b>{c.symbol} / {pair}</b><small>{c.fa}</small></div><button type="button" aria-label={favorite.includes(c.symbol)?`حذف ${c.symbol} از علاقه‌مندی‌ها`:`افزودن ${c.symbol} به علاقه‌مندی‌ها`} className={favorite.includes(c.symbol)?"mc-star on":"mc-star"} onClick={e=>{e.stopPropagation();toggleFavorite(c.symbol)}}>★</button></div><div className="mc-price">{pair==="TMN"?`${fa(Math.round(price))} تومان`:`${faFixed(price,3)} دلار تتر`}</div><div className="mc-bottom"><span className={isPos?"mc-change positive":"mc-change negative"}>{isPos?"+":""}{faFixed(c.change,2)}٪</span><span className="mc-vol">حجم: {vol}</span></div></div>})} </div></div>};
   const Trade=()=>{const units=Number(tradeAmount)||0;const price=coin.price;const total=units*price;const submitTrade=()=>{if(!units){setReceipt({title:"",status:"failed",detail:"مقدار معامله را وارد کنید."});return}const curBal=getCryptoBal(user,asset);if(tradeSide==="buy"&&total>user.tomanBalance){setReceipt({title:"",status:"failed",detail:"موجودی تومان کافی نیست."});return}if(tradeSide==="sell"&&units>curBal){setReceipt({title:"",status:"failed",detail:`موجودی ${asset} کافی نیست.`});return}setProcessing(true);setTimeout(()=>{const buying=tradeSide==="buy";let next=buying?{...user,tomanBalance:user.tomanBalance-total}:{...user,tomanBalance:user.tomanBalance+total};next=withCryptoBal(next,asset,buying?curBal+units:curBal-units);onUpdate(next,{id:genId(),userId:user.phone,type:"swap",fromAsset:buying?"toman":asset,toAsset:buying?asset:"toman",amount:buying?total:units,convertedAmount:buying?units:total,fee:0,status:"done",createdAt:new Date().toISOString(),note:`معامله آنی · ${buying?"خرید":"فروش"} ${asset}`,source:"exchange",tradeType:"instant"});setProcessing(false);setReceipt({title:"سفارش آنی با موفقیت انجام شد",amount:`${buying?faFixed(units,4):fa(Math.round(total))} ${buying?asset:"تومان"}`,detail:"رسید معامله در تاریخچه تراکنش‌ها ثبت شد."});setTradeAmount("")},3000)};return <div className="exchange-page"><div className="page-title"><h2>معامله آنی</h2><button onClick={()=>go("markets")}>بازارها</button></div><div className="segmented"><button className={tradeSide==="buy"?"active":""} onClick={()=>setTradeSide("buy")}>خرید</button><button className={tradeSide==="sell"?"active":""} onClick={()=>setTradeSide("sell")}>فروش</button></div><AssetSelect label="دارایی"/><label className="exchange-field">مقدار {asset}<div className="field-input"><input value={toFaDigits(tradeAmount)} inputMode="decimal" onChange={e=>setTradeAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder="مقدار را وارد کنید"/><button onClick={()=>setTradeAmount(tradeSide==="sell"?String(getCryptoBal(user,asset)):String(Math.floor(user.tomanBalance/price*100)/100))}>همه</button></div></label><section className="fee-card"><span>قیمت لحظه‌ای</span><b>{fa(Math.round(price))} تومان</b><div><span>جمع معامله <strong>{fa(Math.round(total))} تومان</strong></span></div></section><button className="primary-button" onClick={submitTrade}>{tradeSide==="buy"?"خرید آنی":"فروش آنی"}</button><p className="muted-copy">معامله تعهدی پس از تکمیل احراز ریسک و اتصال کیف پول معاملاتی فعال خواهد شد.</p></div>};
   const Assets=()=>{
-  const tmnBal=user.tomanBalance;
-  const RATE=87500;
-  const totalTmn=Math.round(tmnBal+user.usdtBalance*RATE);
-  const totalUsdt=(tmnBal/RATE+user.usdtBalance);
+  const tmnBal=Number(liveWallets.TMN??0);
+  const RATE=Number(liveWallets.USDT??0);
+  const totalTmn=Math.round(tmnBal+Number(liveWallets.USDT??0)*RATE);
+  const totalUsdt=(tmnBal/RATE+Number(liveWallets.USDT??0));
   const EyeOpenIcon=()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
   const EyeOffIcon=()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
   const rawBal=balUnit==="tmn"?fa(totalTmn):faFixed(totalUsdt,4);
@@ -11097,7 +11084,7 @@ export default function App() {
   const updateUser=useCallback((u:UserData)=>{DB.saveUser(u);setUser(u)},[]);
   const updateWithTx=useCallback((u:UserData,tx:TxRecord)=>{const txs=[tx,...transactions];DB.saveUser(u);DB.saveTx(u.phone,txs);setUser(u);setTransactions(txs);if(localStorage.getItem(`anp_notifications_${u.uid}`)!=="off")playChime()},[transactions]);
 
-  const handleVerified=(phone:string)=>{DB.setCurrentPhone(phone);const existing=DB.getUser(phone);if(existing){setUser(existing);setTransactions(DB.getTx(phone));const hs=localStorage.getItem(`anp_home_services_${existing.uid}`);if(hs){try{const p=JSON.parse(hs);if(Array.isArray(p))setHomeServices(p);}catch{}}const hp=localStorage.getItem(`anp_home_platforms_${existing.uid}`);if(hp){try{const p=JSON.parse(hp);if(Array.isArray(p))setHomePlatforms(p);}catch{}}setShowCashback(localStorage.getItem(`anp_show_cashback_${existing.uid}`)!=="false");setAppState(existing.pin?"unlock-pin":"ready")}else{const uid=_genUid();const newUser:UserData={uid,name:"",family:"",nationalId:"",birthDate:"",phone,photo:"",pin:"",tomanBalance:10000000,usdtBalance:100,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(newUser);DB.setCurrentPhone(phone);setUser(newUser);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setPendingTour(true);setAppState("ready")}};
+  const handleVerified=(phone:string)=>{DB.setCurrentPhone(phone);const existing=DB.getUser(phone);if(existing){setUser(existing);setTransactions(DB.getTx(phone));const hs=localStorage.getItem(`anp_home_services_${existing.uid}`);if(hs){try{const p=JSON.parse(hs);if(Array.isArray(p))setHomeServices(p);}catch{}}const hp=localStorage.getItem(`anp_home_platforms_${existing.uid}`);if(hp){try{const p=JSON.parse(hp);if(Array.isArray(p))setHomePlatforms(p);}catch{}}setShowCashback(localStorage.getItem(`anp_show_cashback_${existing.uid}`)!=="false");setAppState(existing.pin?"unlock-pin":"ready")}else{const uid=_genUid();const newUser:UserData={uid,name:"",family:"",nationalId:"",birthDate:"",phone,photo:"",pin:"",tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(newUser);DB.setCurrentPhone(phone);setUser(newUser);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setPendingTour(true);setAppState("ready")}};
   const handleLogout=()=>{DB.setCurrentPhone("");setUser(null);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setHomePlatforms(DEFAULT_HOME_PLATFORMS);setShowCashback(true);setTab("home");setSubPage(null);setAppState("login")};
 
   const [obPhoto,setObPhoto]=useState("");
@@ -11112,7 +11099,7 @@ export default function App() {
   if(appState==="onboard-profile")return <OnboardProfile onDone={d=>{setObProfile(d);setAppState("onboard-pin")}} onBack={()=>setAppState("onboard-photo")} initialData={obProfile}/>;
   if(appState==="unlock-pin"&&user)return <PinUnlock user={user} onVerified={()=>setAppState("ready")}/>;
   if(appState==="onboard-pin")return <OnboardPin onDone={pin=>{setPendingPin(pin);setAppState("verify-anim")}} onSkip={()=>{setPendingPin("");setAppState("verify-anim")}} onBack={()=>setAppState("onboard-profile")}/>;
-  if(appState==="verify-anim")return <VerificationAnimation onSuccess={()=>{const u:UserData={uid:_genUid(),...obProfile,phone:pendingPhone,photo:obPhoto,pin:pendingPin,tomanBalance:10000000,usdtBalance:100,cryptoBalances:{},cards:[{id:"card-melat-1",number:"6104338761369582",bank:"بانک ملت",holderName:obProfile.name+" "+obProfile.family}],registeredAt:new Date().toISOString()};DB.saveUser(u);DB.setCurrentPhone(u.phone);setUser(u);setTransactions([]);setHomeServices(SERVICES.slice(0,8).map(s=>s.id));setHomeSkeleton(false);setAppState("ready");setPendingTour(true);}} onFail={()=>{setPendingPin("");setAppState("onboard-pin")}}/>;
+  if(appState==="verify-anim")return <VerificationAnimation onSuccess={()=>{const u:UserData={uid:_genUid(),...obProfile,phone:pendingPhone,photo:obPhoto,pin:pendingPin,tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[{id:"card-melat-1",number:"6104338761369582",bank:"بانک ملت",holderName:obProfile.name+" "+obProfile.family}],registeredAt:new Date().toISOString()};DB.saveUser(u);DB.setCurrentPhone(u.phone);setUser(u);setTransactions([]);setHomeServices(SERVICES.slice(0,8).map(s=>s.id));setHomeSkeleton(false);setAppState("ready");setPendingTour(true);}} onFail={()=>{setPendingPin("");setAppState("onboard-pin")}}/>;
   if(!user)return null;
 
   const initials=(user.name?.[0]??"")+(user.family?.[0]??"")||"؟";
