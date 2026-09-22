@@ -109,7 +109,7 @@ async function fetchNobitex(): Promise<Normalized[]> {
     if (!base || !['RLS','USDT'].includes(quote) || base === quote) continue;
     const appSymbol = `${base}/${quote === 'RLS' ? 'TOMAN' : 'USDT'}`;
     const divisor = quote === 'RLS' ? 10 : 1;
-    const q = normalize({ symbol: appSymbol, provider: 'nobitex', lastPrice: String(Number(market.latest ?? 0) / divisor), bidPrice: market.bestBuy == null ? null : String(Number(market.bestBuy) / divisor), askPrice: market.bestSell == null ? null : String(Number(market.bestSell) / divisor) });
+    const q = normalize({ symbol: appSymbol, provider: 'nobitex', lastPrice: String(Number(market.latest ?? 0) / divisor), bidPrice: market.bestBuy == null ? null : String(Number(market.bestBuy) / divisor), askPrice: market.bestSell == null ? null : String(Number(market.bestSell) / divisor), change24h: null, volume24h: null, high24h: null, low24h: null });
     if (q) result.push(q);
   }
   return result;
@@ -125,7 +125,7 @@ async function fetchTabdeal(): Promise<Normalized[]> {
       const bid = Array.isArray(data?.bids) ? data.bids[0]?.[0] : null;
       const ask = Array.isArray(data?.asks) ? data.asks[0]?.[0] : null;
       const last = bid && ask ? String((Number(bid) + Number(ask)) / 2) : String(bid ?? ask ?? '');
-      const q = normalize({ symbol: appSymbol, provider: 'tabdeal', lastPrice: last, bidPrice: bid ? String(bid) : null, askPrice: ask ? String(ask) : null });
+      const q = normalize({ symbol: appSymbol, provider: 'tabdeal', lastPrice: last, bidPrice: bid ? String(bid) : null, askPrice: ask ? String(ask) : null, change24h: null, volume24h: null, high24h: null, low24h: null });
       if (q) result.push(q);
     } catch {
       // A single market failure must not invalidate the other Tabdeal markets.
