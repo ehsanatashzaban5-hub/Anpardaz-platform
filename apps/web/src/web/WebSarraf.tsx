@@ -111,8 +111,13 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
           const priceIrt = symbol === "USDT" ? tomanRate : Number(toman?.lastPrice || (price > 0 && tomanRate > 0 ? price * tomanRate : 0));
           return {
             id: String(row.id), symbol, name: String(row.name), nameFa: String(row.name), logoUrl: undefined,
-            logoColor: logoColor(symbol), price, priceIrt, change24h: Number.NaN, volume24h: Number.NaN,
-            marketCap: Number.NaN, high24h: Number.NaN, low24h: Number.NaN, rank: 0,
+            logoColor: logoColor(symbol), price, priceIrt,
+            change24h: Number(usdt?.change24h ?? toman?.change24h ?? Number.NaN),
+            volume24h: Number(usdt?.volume24h ?? toman?.volume24h ?? Number.NaN),
+            marketCap: Number.NaN,
+            high24h: Number(usdt?.high24h ?? toman?.high24h ?? Number.NaN),
+            low24h: Number(usdt?.low24h ?? toman?.low24h ?? Number.NaN),
+            rank: 0,
           };
         }).filter((asset: CryptoAsset) => Number.isFinite(asset.price) && asset.price > 0);
         if (!active) return;
