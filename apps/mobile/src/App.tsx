@@ -1,36 +1,3967 @@
-function ExchangeChartPage({asset,coin,coins,user,favorites,onToggleFavorite,onBack,onInstant,onUpdate,onPairSelect}:{asset:string;coin:(typeof EX_COINS)[number];coins:typeof EX_COINS;user:UserData;favorites:string[];onToggleFavorite:(symbol:string)=>void;onBack:()=>void;onInstant:(asset:string)=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onPairSelect:(asset:string)=>void}){const liveRate=Number(coins.find(c=>c.symbol==="USDT")?.price??0);const tvTheme=localStorage.getItem("anp_theme")==="light"?"light":"dark";const [tab,setTab]=useState("آخرین سفارش‌ها"),[pairOpen,setPairOpen]=useState(false),[pairFilter,setPairFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[pairSearch,setPairSearch]=useState(""),[orderSide,setOrderSide]=useState<"buy"|"sell"|null>(null),[orderType,setOrderType]=useState("قیمت بازار"),[orderAmount,setOrderAmount]=useState(""),[processing,setProcessing]=useState(false),[receipt,setReceipt]=useState<ReceiptData|null>(null);const favorite=favorites.includes(asset);const toggle=()=>onToggleFavorite(asset);const closeOrder=()=>{setOrderSide(null);setOrderAmount("")};const submitOrder=()=>{if(!Number(orderAmount)||!orderSide)return;setReceipt({title:"",status:"failed",detail:"ثبت معامله از این بخش تا اتصال کامل آن به Backend غیرفعال است؛ هیچ معامله ساختگی ثبت نمی‌شود."});};return <div className="chart-trade-page"><header className="protrade-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><button className="pair-selector" onClick={()=>setPairOpen(true)}><PairLogos base={asset} baseSize={26} quoteSize={15}/><div className="ps-info"><div className="ps-pair-row"><b>{asset} / TMN</b><svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div><div className="ps-price-row"><span className="ps-price">{fa(Math.round(coin.price))} <small>تومان</small></span><em className={coin.change>=0?"ps-change positive":"ps-change negative"}>{coin.change>=0?"+":""}{faFixed(coin.change,2)}٪</em></div></div></button><button aria-label="افزودن به علاقه‌مندی‌ها" className={favorite?"pair-favorite active":"pair-favorite"} onClick={toggle}>{favorite?"★":"☆"}</button></header><div className="tv-chart-frame"><iframe title={`${asset} chart`} src={`https://www.tradingview.com/widgetembed/?symbol=BINANCE%3A${asset}USDT&interval=60&hidesidetoolbar=0&theme=${tvTheme}&style=1&timezone=Asia%2FTehran&withdateranges=1`} /></div><div className="chart-info-tabs">{["آخرین سفارش‌ها","لیست معامله‌ها","درباره ارز"].map(x=><button key={x} className={tab===x?"active":""} onClick={()=>setTab(x)}>{x}</button>)}</div>{tab==="درباره ارز"?<div className="chart-about"><b>{coin.fa}</b><p>نماد: {asset}</p><p>شبکه‌های پشتیبانی‌شده: {coin.networks.join("، ")}</p><p>قیمت و عمق بازار به‌صورت زنده به‌روزرسانی می‌شود.</p></div>:<div className="book-grid chart-book"><div><h3>فروشندگان</h3>{[1,2,3].map(i=><p className="ask" key={i}>{fa(Math.round(coin.price*(1+i/1000)))}<span>{faFixed(i*.14,4)}</span></p>)}<b className="mid">{fa(Math.round(coin.price))}</b><h3>خریداران</h3>{[1,2,3].map(i=><p className="bid" key={i}>{fa(Math.round(coin.price*(1-i/1000)))}<span>{faFixed(i*.12,4)}</span></p>)}</div><div><h3>{tab}</h3>{[1,2,3,4].map(i=><p key={i}>{toFaDigits(`۱۴:${30+i}`)}<span>{fa(Math.round(coin.price*(1+(i%2?1:-1)/2000)))}</span></p>)}</div></div>}<div className="sticky-trade"><button type="button" className="buy" onClick={()=>setOrderSide("buy")}>خرید</button><button type="button" className="sell" onClick={()=>setOrderSide("sell")}>فروش</button><button type="button" className="instant" onClick={()=>onInstant(asset)}>خرید و فروش آنی</button></div>{orderSide&&<div className="expage" dir="rtl" style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:50,overflowY:"auto"}}><div className="expage-header"><button className="back-btn" onClick={closeOrder}><Icon name="arrow" size={20}/></button><h2 className="expage-title">{orderSide==="buy"?"ثبت سفارش خرید":"ثبت سفارش فروش"} {asset}</h2><div style={{width:36}}/></div><div className="expage-body"><div className="chart-order-panel"><span className={orderSide==="buy"?"chart-order-symbol buy":"chart-order-symbol sell"}>{orderSide==="buy"?"خرید":"فروش"}</span><p>قیمت لحظه‌ای <b>{fa(Math.round(coin.price))} تومان</b></p><div className="chart-order-types">{["قیمت ثابت","قیمت بازار","حد ضرر"].map(type=><button type="button" key={type} className={orderType===type?"active":""} onClick={()=>setOrderType(type)}>{type}</button>)}</div>{orderType!=="قیمت بازار"&&<label>قیمت {orderType==="حد ضرر"?"فعال‌سازی":"سفارش"}<input inputMode="decimal" placeholder={fa(Math.round(coin.price))}/></label>}<label>مقدار {asset}<input autoFocus inputMode="decimal" value={toFaDigits(orderAmount)} onChange={e=>setOrderAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder="مقدار را وارد کنید"/></label><div className="chart-order-total"><span>مبلغ تقریبی</span><b>{fa(Math.round((Number(orderAmount)||0)*coin.price))} تومان</b></div><button className={orderSide==="buy"?"chart-order-submit buy":"chart-order-submit sell"} disabled={!Number(orderAmount)||processing} onClick={submitOrder}>{orderSide==="buy"?"ثبت سفارش خرید":"ثبت سفارش فروش"}</button></div></div>{processing&&<AnPardazLoadingOverlay text="در حال ثبت سفارش..."/>}</div>}{pairOpen&&<div className="expage" dir="rtl" style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:50,overflowY:"auto"}}><div className="expage-header"><button className="back-btn" onClick={()=>setPairOpen(false)}><Icon name="arrow" size={20}/></button><h2 className="expage-title">انتخاب جفت ارز</h2><div style={{width:36}}/></div><div className="expage-body"><div className="market-filters">{(["همه","تومان","دلار تتر"] as const).map(x=><button className={pairFilter===x?"active":""} onClick={()=>setPairFilter(x)} key={x}>{x}</button>)}</div><div className="exchange-asset-search"><Icon name="search" size={16}/><input value={pairSearch} onChange={e=>setPairSearch(e.target.value)} placeholder="جستجوی ارز"/></div><div className="pair-picker-grid">{coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(pairSearch.toLowerCase())).flatMap(c=>pairFilter==="همه"?[{c,p:"TMN"},{c,p:"USDT"}]:[{c,p:pairFilter==="تومان"?"TMN":"USDT"}]).filter(({c,p})=>c.symbol!==p).map(({c,p})=><button key={`${c.symbol}${p}`} className="pair-card" onClick={()=>{onPairSelect(c.symbol);setPairOpen(false)}}><PairLogos base={c.symbol} quote={p} baseSize={36} quoteSize={20}/><b>{c.symbol} / {p}</b><small>{p==="TMN"?fa(Math.round(c.price))+" تومان":faFixed(c.price/liveRate,3)+" دلار تتر"}</small><em className={c.change>=0?"pp-up":"pp-down"}>{Number.isFinite(c.change)?(c.change>=0?"+":"")+faFixed(c.change,2)+"٪":"—"}</em></button>)}</div></div></div>}{!orderSide&&!pairOpen&&processing&&<AnPardazLoadingOverlay text="در حال ثبت سفارش..."/>}{receipt&&<TransactionReceipt data={receipt} onClose={()=>setReceipt(null)}/>}</div>}
-function MarginChartPage({asset:initAsset,coin:initCoin,coins,user,favorites,onToggleFavorite,onBack,onUpdate,onAssetChange}:{asset:string;coin:(typeof EX_COINS)[number];coins:typeof EX_COINS;user:UserData;favorites:string[];onToggleFavorite:(s:string)=>void;onBack:()=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onAssetChange:(s:string)=>void}){\n  const liveRate=Number(coins.find(c=>c.symbol==="USDT")?.price??0);
-  const tvTheme=localStorage.getItem("anp_theme")==="light"?"light":"dark";
-  const [asset,setAsset]=useState(initAsset);
-  const [coin,setCoin]=useState(initCoin);
-  useEffect(()=>{const c=coins.find(x=>x.symbol===asset);if(c)setCoin(c);},[asset,coins]);
-  const [side,setSide]=useState<"long"|"short">("long"),[orderType,setOrderType]=useState("بازار"),[amount,setAmount]=useState(""),[priceInput,setPriceInput]=useState(""),[lev,setLev]=useState(5),[sl,setSl]=useState(""),[marginSubView,setMarginSubView]=useState<null|"confirm"|"pair">(null),[processing,setProcessing]=useState(false),[pairFilter,setPairFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[pairSearch,setPairSearch]=useState(""),[receipt,setReceipt]=useState<ReceiptData|null>(null),[selectedPct,setSelectedPct]=useState<number|null>(null);  const [liveMarginToman,setLiveMarginToman]=useState(0);useEffect(()=>{let active=true;const load=async()=>{try{const w=await sarrafWalletMap();if(active)setLiveMarginToman(Number(w.TMN??0));}catch{if(active)setLiveMarginToman(0);}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;window.clearInterval(id)}},[user.uid]);
-  const favorite=favorites.includes(asset);
-  const price=orderType==="قیمت ثابت"?(Number(priceInput)||coin.price):coin.price;
-  const qty=Number(amount)||0,total=price*qty,fee=total*.003,margin=total/lev;
-  const liq=side==="long"?price*(1-1/lev*.82):price*(1+1/lev*.82);
-  const risk=lev>=20?"زیاد ⚠️":lev>=5?"متوسط":"پایین";
-  const percent=(x:number)=>{setAmount(String(liveMarginToman*lev*x/100/price));setSelectedPct(x);};
-  const [chartPositions,setChartPositions]=useState<ExPosition[]>([]);
-  const closeChartPosition=(_pos:ExPosition,_currentPrice:number)=>{setReceipt({title:"",status:"failed",detail:"بستن موقعیت تا اتصال موتور واقعی Backend غیرفعال است."});};const exec=async()=>{if(mode==="margin"){setConfirm(false);setReceipt({title:"",status:"failed",detail:"معامله تعهدی هنوز به موتور اجرای واقعی Backend متصل نشده است؛ هیچ سفارش یا سود/زیان ساختگی ثبت نمی‌شود."});return}setProcessing(true);try{const type=orderType==="قیمت ثابت"?"limit":"market";const result=await sarrafPlaceOrder(asset,"TMN",side as "buy"|"sell",type,qty,type==="limit"?price:undefined,side==="buy"&&type==="market"?total:undefined);setConfirm(false);setAmount("");setSelectedPct(null);setReceipt({title:"سفارش آن صراف ثبت شد",status:"success",amount:faFixed(qty,6)+" "+asset,destination:"شناسه سفارش: "+String(result?.order?.id??result?.orderId??"—"),detail:"سفارش به Backend ارسال شد و وضعیت آن از تاریخچه واقعی پیگیری می‌شود."});const w=await sarrafWalletMap();setLiveWallets(w);const o=await sarrafOrders();setOrders(o as any);}catch(e){setReceipt({title:"",status:"failed",detail:e instanceof Error?e.message:"ثبت سفارش انجام نشد."});}finally{setProcessing(false)}};;const closePosition=()=>{setReceipt({title:"",status:"failed",detail:"بستن موقعیت تا اتصال کامل به Backend غیرفعال است؛ هیچ P&L محلی ثبت نمی‌شود."});};;const percent=(x:number)=>{setAmount(String((mode==="margin"?exToman*lev:exUsdt)*x/100/price));setSelectedPct(x);};if(picker==="chart"&&mode==="spot")return <ExchangeChartPage asset={asset} coin={coin} coins={coins} user={user} favorites={favorites} onToggleFavorite={onToggleFavorite} onBack={()=>setPicker(false)} onInstant={(next)=>onNavigate("instant",next)} onUpdate={onUpdate} onPairSelect={(next)=>{setAsset(next);onAssetChange(next)}}/>;if(picker==="chart"&&mode==="margin")return <MarginChartPage asset={asset} coin={coin} coins={coins} user={user} favorites={favorites} onToggleFavorite={onToggleFavorite} onBack={()=>setPicker(false)} onUpdate={onUpdate} onAssetChange={(next)=>{setAsset(next);onAssetChange(next)}}/>;return <div className="terminal-page"><header className="terminal-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={17}/></button><button className="pair-selector" onClick={()=>setPicker(true)}><PairLogos base={asset} baseSize={26} quoteSize={15}/><div className="ps-info"><div className="ps-pair-row"><b>{asset} / TMN</b><svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div><div className="ps-price-row"><span className="ps-price">{fa(Math.round(coin.price))} <small>تومان</small></span><em className={coin.change>=0?"ps-change positive":"ps-change negative"}>{coin.change>=0?"+":""}{faFixed(coin.change,2)}٪</em></div></div></button><button className="candle-icon" onClick={()=>setPicker("chart" as any)}><i/><i/><i/></button><button aria-label="افزودن به علاقه‌مندی‌ها" className={favorite?"pair-favorite active":"pair-favorite"} onClick={toggleFavorite}>{favorite?"★":"☆"}</button></header><div className="terminal-status"><span>قیمت زنده: {Number.isFinite(coin.price)&&coin.price>0?fa(Math.round(coin.price))+" تومان":"—"}</span><span>دفتر سفارش: داده واقعی هنوز دریافت نشده</span><b>● وضعیت بازار</b></div><main className="terminal-grid"><section className="terminal-book"><h2>خریداران / فروشندگان</h2><div className="book-head"><span>قیمت</span><span>مقدار</span><span>مجموع</span></div><div className="book-sells"><b>دفتر سفارش</b><div className="exchange-empty">دفتر سفارش زنده هنوز از Backend دریافت نشده است.</div></div></section><section className="terminal-form"><div className="terminal-tabs"><button className={side==="buy"||side==="long"?"active buy":""} onClick={()=>setSide(mode==="spot"?"buy":"long")}>{mode==="spot"?"خرید":"خرید (لانگ)"}</button><button className={side==="sell"||side==="short"?"active sell":""} onClick={()=>setSide(mode==="spot"?"sell":"short")}>{mode==="spot"?"فروش":"فروش (شورت)"}</button></div>{mode==="margin"&&<div className="terminal-leverage"><span>اهرم</span>{[1,2,3,5,10,20,50,100].map(x=><button className={lev===x?"active":""} onClick={()=>setLev(x)} key={x}>{x}x</button>)}</div>}<div className="terminal-order-types">{["قیمت ثابت","بازار","حد ضرر"].map(x=><button className={orderType===x?"active":""} onClick={()=>setOrderType(x)} key={x}>{x}</button>)}</div>{orderType!=="بازار"&&<label>قیمت {mode==="margin"?"ورود":""}<input value={toFaDigits(priceInput)} onChange={e=>setPriceInput(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder={fa(Math.round(coin.price))}/></label>}<label>مقدار<input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder={`${asset} مقدار`}/></label>{mode==="margin"&&<><div className="terminal-risk"><span>وجه تضمین<b>{fa(Math.round(margin))}</b></span><span>لیکویید<b>{fa(Math.round(liq))}</b></span><span>ریسک<b>{lev>=20?"زیاد":"متوسط"}</b></span></div></>}<label>مجموع<input readOnly value={fa(Math.round(total))} placeholder="مجموع"/></label><small>در دسترس: {mode==="spot"?(side==="buy"||side==="long"?`${faFixed(exUsdt,2)} USDT`:`${faFixed(exBase,4)} ${asset}`):`${fa(Math.round(exToman))} تومان`}</small><div className="percent-row">{[25,50,75,100].map(x=><button className={selectedPct===x?"pct-selected":""} onClick={()=>percent(x)} key={x}>{x}٪</button>)}</div><button className={`terminal-submit ${side==="buy"||side==="long"?"buy":"sell"}`} onClick={place}>{mode==="margin"?(side==="long"?"باز کردن لانگ":"باز کردن شورت"):(side==="buy"?"خرید":"فروش")}</button></section></main><section className="recent-trades"><h2>آخرین معامله‌ها</h2><div className="exchange-empty">معاملات اخیر زنده هنوز از Backend دریافت نشده است.</div></section><nav className="terminal-bottom-tabs">{(mode==="spot"?["سفارش‌های باز","سفارش‌های بسته شده","تاریخچه سفارش‌ها","تاریخچه معامله‌ها"]:["موقعیت‌های باز","سفارش‌های باز","تاریخچه موقعیت‌ها","تاریخچه معامله‌ها"]).map(x=><button className={bottom===x?"active":""} onClick={()=>setBottom(x)} key={x}>{x}</button>)}</nav><section className="terminal-bottom-content">{mode==="spot"?(<>{(()=>{const filtered=bottom==="سفارش‌های باز"?orders.filter(o=>o.mode==="spot"&&o.status==="open"):bottom==="سفارش‌های بسته شده"?orders.filter(o=>o.mode==="spot"&&o.status==="filled"):bottom==="تاریخچه سفارش‌ها"?orders.filter(o=>o.mode==="spot"):orders.filter(o=>o.mode==="spot"&&o.status==="filled");const allSpot=filtered;return filtered.length===0?<div className="empty-orders"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".3"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="16" x2="12" y2="16"/></svg><span>{bottom==="سفارش‌های باز"?"سفارش باز وجود ندارد":bottom==="سفارش‌های بسته شده"?"سفارش بسته‌ای یافت نشد":"تاریخچه‌ای یافت نشد"}</span></div>:<div className="orders-table"><div className="orders-head"><span>ارز</span><span>نوع</span><span>قیمت</span><span>مقدار</span><span>وضعیت</span></div>{filtered.map(o=><div key={o.id} className="order-row"><span><b>{o.pair}</b></span><span className={o.side==="buy"?"buy-label":"sell-label"}>{o.side==="buy"?"خرید":"فروش"}</span><span>{fa(Math.round(o.price))}</span><span>{faFixed(o.amount,4)}</span><span className={`order-status ${o.status}`}>{o.status==="filled"?"تکمیل":o.status==="open"?"باز":"لغو"}</span></div>)}</div>})()}</>):(bottom==="موقعیت‌های باز"?positions.length===0?<div className="empty-orders"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".3"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>موقعیت باز وجود ندارد</span></div>:<div className="positions-list">{positions.map(pos=>{const c=coins.find(x=>x.symbol===pos.asset)??coins[0];const pnl=pos.side==="long"?(c.price-pos.entry)*pos.qty*pos.leverage:(pos.entry-c.price)*pos.qty*pos.leverage;const roe=pos.margin>0?pnl/pos.margin*100:0;return <div key={pos.id} className="position-card"><div className="pos-top"><div className="pos-left"><span className={pos.side==="long"?"pos-side long":"pos-side short"}>{pos.side==="long"?"لانگ ↑":"شورت ↓"}</span><b className="pos-pair">{pos.asset}/TMN</b><span className="pos-lev">{pos.leverage}x</span></div><button className="close-pos-btn" onClick={()=>closePosition(pos,c.price)}>بستن موقعیت</button></div><div className="pos-grid"><div><span>قیمت ورود</span><b>{fa(Math.round(pos.entry))}</b></div><div><span>قیمت فعلی</span><b>{fa(Math.round(c.price))}</b></div><div><span>مقدار</span><b>{faFixed(pos.qty,4)}</b></div><div><span>وجه تضمین</span><b>{fa(Math.round(pos.margin))}</b></div><div><span>سود / زیان</span><b className={pnl>=0?"pnl-pos":"pnl-neg"}>{pnl>=0?"+":""}{fa(Math.round(pnl))} ت</b></div><div><span>ROE٪</span><b className={roe>=0?"pnl-pos":"pnl-neg"}>{roe>=0?"+":""}{faFixed(roe,2)}٪</b></div></div></div>})}</div>:<div className="empty-orders"><span>تاریخچه‌ای یافت نشد</span></div>)}</section>{picker===true&&<div className="expage" dir="rtl" style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:50}}><div className="expage-header"><button className="back-btn" onClick={()=>setPicker(false)}><Icon name="arrow" size={20}/></button><h2 className="expage-title">انتخاب جفت ارز</h2><div style={{width:36}}/></div><div className="expage-body"><div className="market-filters">{(["همه","تومان","دلار تتر"] as const).map(x=><button key={x} className={pairFilter===x?"active":""} onClick={()=>setPairFilter(x)}>{x}</button>)}</div><div className="exchange-asset-search"><Icon name="search" size={16}/><input value={pairSearch} onChange={e=>setPairSearch(e.target.value)} placeholder="جستجوی ارز"/></div><div className="pair-picker-grid">{coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(pairSearch.toLowerCase())).flatMap(c=>pairFilter==="همه"?[{c,p:"TMN"},{c,p:"USDT"}]:[{c,p:pairFilter==="تومان"?"TMN":"USDT"}]).filter(({c,p})=>c.symbol!==p).map(({c,p})=><button key={`${c.symbol}${p}`} className="pair-card" onClick={()=>{setAsset(c.symbol);onAssetChange(c.symbol);setPicker(false)}}><PairLogos base={c.symbol} quote={p} baseSize={36} quoteSize={20}/><b>{c.symbol} / {p}</b><small>{p==="TMN"?fa(Math.round(c.price))+" تومان":liveRate>0?faFixed(c.price/liveRate,3):"—"+" دلار تتر"}</small><em className={c.change>=0?"pp-up":"pp-down"}>{Number.isFinite(c.change)?(c.change>=0?"+":"")+faFixed(c.change,2)+"٪":"—"}</em></button>)}</div></div></div>}{confirm&&<div className="expage" dir="rtl" style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:50}}><div className="expage-header"><button className="back-btn" onClick={()=>setConfirm(false)}><Icon name="arrow" size={20}/></button><h2 className="expage-title">تأیید سفارش</h2><div style={{width:36}}/></div><div className="expage-body"><div className="exchange-confirm-lines"><div><span>نوع سفارش</span><b>{orderType}</b></div><div><span>نوع معامله</span><b>{side}</b></div><div><span>مقدار</span><b>{faFixed(qty,5)}</b></div><div><span>مجموع</span><b>{fa(Math.round(total+fee))}</b></div></div><div className="confirm-actions"><button className="outline-button" onClick={()=>setConfirm(false)}>انصراف</button><button className="primary-button" onClick={exec} disabled={processing}>تأیید</button></div></div></div>}{processing&&<AnPardazLoadingOverlay text="در حال انجام سفارش..."/>}</div>}
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { _ANP_BACK, useBackHandler } from "./backHandler";
+import AnBannerScreen from "./AnBanner";
+import AnHooshScreen from "./AnHoosh";
+import anPardazLogo from "@/imports/ChatGPT_Image_Aug_10__2026__06_38_53_PM__3_.png";
+import logoHekmat from "@/imports/Bank-Hekmat-Iranian-Logo.png";
+import logoMehr from "@/imports/Bank-Mehr-Iran.png";
+import logoHamrahAval from "@/imports/Hamrahe_Aval__2_.png";
+import logoIrancell from "@/imports/_wp-content_uploads_2023_12_MTNI-Logo-Yellow-FA-1024-563.png";
+import logoAnsar from "@/imports/bank-ansar.png";
+import logoKarafarin from "@/imports/bank-karafarin-3.png";
+import logoParsian from "@/imports/bank-parsian.png";
+import logoRefah from "@/imports/bank-refah.png";
+import logoRightel from "@/imports/new-logo4.png";
+import logoSarmayeh from "@/imports/bank-sarmayeh.png";
+import logoShahr from "@/imports/bank-shahr.png";
+import logoTejarat from "@/imports/bank-tejarat.png";
+import logoSanatMadan from "@/imports/Sanat-va-madan.png";
+import logoMeli from "@/imports/bank-meli__2_.png";
+import logoMelal from "@/imports/Melal-Credit-Institution-Logo.png";
+import logoToseeTaavon from "@/imports/Tosee-Taavon-Bank-Logo.png";
+import logoDi from "@/imports/bank-ayandeh.png";
+import logoIranZamin from "@/imports/bank-iranzamin.png";
+import logoKeshavarzi from "@/imports/Bank-Keshavarzi-Logo.png";
+import logoMaskan from "@/imports/bank-maskan.png";
+import logoResalat from "@/imports/bank-resalat.png";
+import logoSepah from "@/imports/bank-sepah.png";
+import slide2Img from "@/imports/ChatGPT_Image_Aug_26__2026__03_51_21_PM-1.png";
+import slide3Img from "@/imports/ChatGPT_Image_Aug_26__2026__03_27_20_PM.png";
+import logoGardeshgari from "@/imports/gardeshgari.png";
+import logoToseeSaderat from "@/imports/Export-Development-Bank-of-Iran-Logo.png";
+import billImgHamrah from "@/imports/67ea208c-b6ea-4a03-9408-156cfa836850.png";
+import billImgIrancell from "@/imports/8bd188ae-0d5a-41e2-b9e2-719e1850fb93.png";
+import billImgAb from "@/imports/ecad70dc-ed5e-4c95-aac7-cf369ea9d460.png";
+import billImgBrq from "@/imports/cb91bb35-cad8-4893-afb8-7256a27ae26e.png";
+import billImgMakhab from "@/imports/db7f952b-560e-4108-962f-40b21acd1fde.png";
+import charityLogoKomite from "@/imports/bd981266-0952-497e-adc2-6979c25929dd.png";
+import charityLogoRedCrescent from "@/imports/50ee0495-3e4f-4701-97e0-f37994adb0e1.png";
+import charityLogoChildren from "@/imports/3bea6472-d221-4630-b1c2-ad7882ba4659.png";
+import charityLogoBarekat from "@/imports/fea9ea50-c987-4daf-a63c-fc8720539963.png";
+import charityLogoEnvironment from "@/imports/39de94f2-ebfb-499f-8225-90f5f5c90ad7-1.png";
+import billImgGaz from "@/imports/dfbca881-b660-417c-b45e-7e5ab1120d16.png";
+import logoPostBank from "@/imports/postbank.png";
+import logoMellat from "@/imports/bank-mellat.png";
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+const liveRate = 0;
+const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
+const KAVENEGAR_KEY = "";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+type AppState = "splash" | "login" | "otp" | "unlock-pin" | "onboard-photo" | "onboard-profile" | "onboard-pin" | "verify-anim" | "ready";
+type MainTab = "home" | "history" | "profile";
+type SubPage = null | "transfer" | "tether-swap" | "exchange" | "charge" | "internet" | "bills" | "car-services" | "violations" | "freeway" | "tehran-traffic" | "insurance" | "sana" | "judiciary-bill" | "property-reg" | "charity" | "service" | "card-balance" | "charge-payment" | "charity-payment" | "bills-payment" | "violations-payment" | "forex-bot" | "cashback" | "financial-center" | "all-services" | "an-market" | "an-banner" | "an-hoosh";
+
+interface UserData {
+  uid: string;   // unique stable ID; never changes after creation
+  phone: string; name: string; family: string; nationalId: string;
+  birthDate: string; photo: string; pin: string;
+  tomanBalance: number; usdtBalance: number;
+  cryptoBalances: Record<string, number>;
+  cards: BankCard[]; registeredAt: string;
+  kycDone?: boolean;
+}
+interface BankCard { id: string; number: string; bank: string; holderName: string; expM?: string; expY?: string; }
+interface TxRecord {
+  id: string; userId: string;
+  type: "deposit" | "withdraw" | "swap" | "transfer" | "service";
+  fromAsset: string; toAsset: string;
+  amount: number; convertedAmount?: number; fee: number;
+  status: "pending" | "done" | "failed"; createdAt: string;
+  toAddress?: string; fromCard?: string; note?: string;
+  source?: "app" | "exchange"; tradeType?: string;
+}
+interface ExOrder {
+  id: string; pair: string; side: "buy" | "sell";
+  price: number; amount: number; total: number;
+  status: "open" | "filled" | "cancelled"; createdAt: string;
+  mode?: "spot" | "margin";
+}
+interface ExPosition {
+  id: string; asset: string; side: "long" | "short";
+  entry: number; qty: number; leverage: number; margin: number; fee: number; openedAt: string;
+}
+type ExAsset = "toman" | "USDT" | "BTC" | "ETH" | "BNB" | "SOL" | "DOGE" | "ADA";
+type ExWallet = Record<ExAsset, number>;
+
+// ─── Exchange Constants ────────────────────────────────────────────────────────
+const EX_PAIRS = [
+  "BTC/USDT","ETH/USDT","BNB/USDT","XRP/USDT","ADA/USDT","SOL/USDT",
+  "AVAX/USDT","DOT/USDT","MATIC/USDT","LINK/USDT","UNI/USDT","ATOM/USDT",
+  "LTC/USDT","ETC/USDT","DOGE/USDT","TRX/USDT","NEAR/USDT","ALGO/USDT",
+  "VET/USDT","SHIB/USDT","APE/USDT","OP/USDT","ARB/USDT","INJ/USDT",
+  "SUI/USDT","PEPE/USDT","WIF/USDT","JUP/USDT",
+  "BTC/TOMAN","ETH/TOMAN","USDT/TOMAN","BNB/TOMAN","SOL/TOMAN","DOGE/TOMAN",
+];
+const INITIAL_PRICES: Record<string, number> = {};
+const TV_SYMBOLS: Record<string,string> = {
+  "BTC/USDT":"BINANCE:BTCUSDT","ETH/USDT":"BINANCE:ETHUSDT",
+  "BNB/USDT":"BINANCE:BNBUSDT","XRP/USDT":"BINANCE:XRPUSDT",
+  "ADA/USDT":"BINANCE:ADAUSDT","SOL/USDT":"BINANCE:SOLUSDT",
+  "AVAX/USDT":"BINANCE:AVAXUSDT","DOT/USDT":"BINANCE:DOTUSDT",
+  "MATIC/USDT":"BINANCE:MATICUSDT","LINK/USDT":"BINANCE:LINKUSDT",
+  "UNI/USDT":"BINANCE:UNIUSDT","ATOM/USDT":"BINANCE:ATOMUSDT",
+  "LTC/USDT":"BINANCE:LTCUSDT","ETC/USDT":"BINANCE:ETCUSDT",
+  "DOGE/USDT":"BINANCE:DOGEUSDT","TRX/USDT":"BINANCE:TRXUSDT",
+  "NEAR/USDT":"BINANCE:NEARUSDT","ALGO/USDT":"BINANCE:ALGOUSDT",
+  "VET/USDT":"BINANCE:VETUSDT","SHIB/USDT":"BINANCE:SHIBUSDT",
+  "APE/USDT":"BINANCE:APEUSDT","OP/USDT":"BINANCE:OPUSDT",
+  "ARB/USDT":"BINANCE:ARBUSDT","INJ/USDT":"BINANCE:INJUSDT",
+  "SUI/USDT":"BINANCE:SUIUSDT","PEPE/USDT":"BINANCE:PEPEUSDT",
+  "WIF/USDT":"BINANCE:WIFUSDT","JUP/USDT":"BINANCE:JUPUSDT",
+  "USDT/TOMAN":"NOBITEX:USDTIRT","BTC/TOMAN":"NOBITEX:BTCIRT",
+  "ETH/TOMAN":"NOBITEX:ETHIRT","BNB/TOMAN":"NOBITEX:BNBIRT",
+  "SOL/TOMAN":"NOBITEX:SOLIRT","DOGE/TOMAN":"NOBITEX:DOGEIRT",
+};
+
+// ─── Storage ──────────────────────────────────────────────────────────────────
+function _genUid(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+}
+const DB = {
+  getUser:(p:string):UserData|null=>{
+    try{
+      const raw=JSON.parse(localStorage.getItem(`anp_user_${p}`)??"null");
+      if(!raw)return null;
+      const u:UserData={uid:"",cryptoBalances:{},...raw};
+      if(!u.cards?.length)u.cards=[{id:"card-melat-1",number:"6104338761369582",bank:"بانک ملت",holderName:(u.name||"")+" "+(u.family||"")}];
+      // Backfill uid for users registered before this field existed
+      if(!u.uid){u.uid="uid_"+p.replace(/[^0-9]/g,"");localStorage.setItem(`anp_user_${p}`,JSON.stringify(u));}
+      return u;
+    }catch{return null}
+  },
+  saveUser:(u:UserData)=>localStorage.setItem(`anp_user_${u.phone}`,JSON.stringify(u)),
+  currentPhone:()=>localStorage.getItem("anp_current")??"",
+  setCurrentPhone:(p:string)=>localStorage.setItem("anp_current",p),
+  getTx:(p:string):TxRecord[]=>{try{return JSON.parse(localStorage.getItem(`anp_tx_${p}`)??"[]")}catch{return[]}},
+  saveTx:(p:string,t:TxRecord[])=>localStorage.setItem(`anp_tx_${p}`,JSON.stringify(t)),
+  userExists:(p:string)=>!!localStorage.getItem(`anp_user_${p}`),
+  // Exchange data — ALL keyed by uid so different users never share wallet/orders/positions
+  getExWallet:(_uid:string):ExWallet=>({toman:0,USDT:0,BTC:0,ETH:0,BNB:0,SOL:0,DOGE:0,ADA:0}),saveExWallet:(_uid:string,_w:ExWallet)=>undefined,getExOrders:(_uid:string):ExOrder[]=>[],saveExOrders:(_uid:string,_o:ExOrder[])=>undefined,getExPositions:(_uid:string):ExPosition[]=>[],saveExPositions:(_uid:string,_p:ExPosition[])=>undefined,
+};
+
+// ─── Operator Detection ───────────────────────────────────────────────────────
+const OPERATORS = {
+  mci:      {id:"mci",      name:"همراه اول", color:"#f5a623", textColor:"#fff",    logo:logoHamrahAval as string},
+  irancell: {id:"irancell", name:"ایرانسل",   color:"#FFD700", textColor:"#071D2C", logo:logoIrancell as string},
+  rightel:  {id:"rightel",  name:"رایتل",      color:"#9C27B0", textColor:"#fff",    logo:logoRightel as string},
+} as const;
+type OperatorId = keyof typeof OPERATORS;
+type Operator = (typeof OPERATORS)[OperatorId];
+function detectOperator(phone:string):Operator|null{
+  const n=phone.replace(/^0/,"").slice(0,3);
+  const map:Record<string,OperatorId>={
+    "910":"mci","911":"mci","912":"mci","913":"mci","914":"mci","915":"mci",
+    "916":"mci","917":"mci","918":"mci","919":"mci","990":"mci","991":"mci",
+    "992":"mci","932":"mci","931":"mci",
+    "930":"irancell","933":"irancell","935":"irancell","936":"irancell",
+    "937":"irancell","938":"irancell","939":"irancell","901":"irancell",
+    "902":"irancell","903":"irancell","904":"irancell","905":"irancell","941":"irancell",
+    "920":"rightel","921":"rightel","922":"rightel",
+  };
+  const id=map[n];return id?OPERATORS[id]:null;
+}
+function OperatorBadge({op,size="md"}:{op:Operator;size?:"sm"|"md"}){
+  const pad=size==="sm"?"4px 8px":"6px 12px";const fs=size==="sm"?11:13;const imgSz=size==="sm"?18:22;
+  return <span style={{display:"inline-flex",alignItems:"center",gap:5,background:op.color+"22",border:`1.5px solid ${op.color}66`,borderRadius:20,padding:pad,fontSize:fs,fontWeight:700,fontFamily:"Vazirmatn",flexShrink:0,color:"var(--text-primary)"} as React.CSSProperties}>
+    <img src={op.logo} alt={op.name} style={{width:imgSz,height:imgSz,objectFit:"contain",flexShrink:0}} decoding="async"/>
+    {op.name}
+  </span>;
+}
+function BankLogo({bankName,size=42,rounded=12}:{bankName:string;size?:number;rounded?:number}){
+  const info=getBankInfo(bankName);
+  if(info?.logo){
+    return <div style={{width:size,height:size,borderRadius:rounded,overflow:"hidden",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"1px solid rgba(0,0,0,0.08)"}}>
+      <img src={info.logo} alt={bankName} style={{width:"80%",height:"80%",objectFit:"contain"}} decoding="async"/>
+    </div>;
+  }
+  return <div style={{width:size,height:size,borderRadius:rounded,background:info?.color||"#2d6b4a",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:size*0.38,fontFamily:"Vazirmatn",flexShrink:0}}>
+    {bankName.slice(0,1)}
+  </div>;
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+async function fetchUSDTRate():Promise<number|null>{
+  try{const r=await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes?symbol=USDT/TOMAN`,{signal:AbortSignal.timeout(7000),cache:"no-store"});if(!r.ok)throw new Error("market_data_unavailable");const d=await r.json();const live=d?.quotes?.filter((q:any)=>!q.stale&&Number(q.lastPrice)>0);const preferred=live?.find((q:any)=>q.provider==="wallex")??live?.[0];return preferred?Number(preferred.lastPrice):null;}catch{return null}
+}
+type SarrafAssetRecord={id:number|string;symbol:string;status?:string};async function sarrafRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANSARRAF_API_BASE)throw new Error("ansarraf_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const r=await fetch(`${ANSARRAF_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data?.error??"ansarraf_request_failed"));return data;}async function sarrafAssets():Promise<SarrafAssetRecord[]>{const d=await sarrafRequest("/api/v1/assets");return Array.isArray(d?.assets)?d.assets:[]}function sarrafAssetId(assets:SarrafAssetRecord[],symbol:string){const aliases=symbol==="TMN"?["TMN","TOMAN","IRT","IRR"]:symbol==="USDT"?["USDT"]:[symbol];const a=assets.find(x=>aliases.includes(String(x.symbol).toUpperCase())&&x.status!=="disabled");if(!a)throw new Error(`asset_not_available:${symbol}`);return a.id;}async function sarrafPlaceOrder(baseSymbol:string,quoteSymbol:string,side:"buy"|"sell",orderType:"market"|"limit",quantity:number,price?:number,quoteAmount?:number){const assets=await sarrafAssets();const body:any={baseAssetId:sarrafAssetId(assets,baseSymbol),quoteAssetId:sarrafAssetId(assets,quoteSymbol),side,orderType,quantity:String(quantity),idempotencyKey:crypto.randomUUID()};if(orderType==="limit")body.price=String(price);else if(side==="buy")body.quoteAmount=String(quoteAmount??0);return sarrafRequest("/api/v1/orders",{method:"POST",body:JSON.stringify(body)});}async function sarrafWalletMap():Promise<Record<string,number>>{const d=await sarrafRequest("/api/v1/wallets");const out:Record<string,number>={};for(const w of d?.wallets??[])out[String(w.symbol).toUpperCase()]=Number(w.available_balance??0);return out;}async function sarrafOrders():Promise<any[]>{const d=await sarrafRequest("/api/v1/orders");return Array.isArray(d?.orders)?d.orders:[]}
+async function sarrafOrderBook(symbol:string){const d=await sarrafRequest(`/api/v1/orderbook?symbol=${encodeURIComponent(symbol)}&limit=20`);return {bids:Array.isArray(d?.bids)?d.bids:[],asks:Array.isArray(d?.asks)?d.asks:[]};}
+async function sarrafSubmitKyc(payload:{fullName:string;nationalId:string;mobile:string;birthDate:string}){return sarrafRequest("/api/v1/kyc",{method:"POST",body:JSON.stringify(payload)});}
+
+async function sendOTP(phone:string,code:string):Promise<{ok:boolean;devCode?:string}>{
+  if(!KAVENEGAR_KEY)return{ok:false,devCode:code};
+  try{const url=`https://api.kavenegar.com/v1/${KAVENEGAR_KEY}/sms/send.json`;const body=new URLSearchParams({receptor:phone,message:`کد تأیید آن‌پرداز: ${code}`,sender:"10004346"});const r=await fetch(url,{method:"POST",body});const d=await r.json();return{ok:d.return?.status===200}}catch{return{ok:false,devCode:code}}
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+const toFaDigits=(value:string)=>value.replace(/[0-9]/g,d=>"۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
+const toLatinDigits=(value:string)=>value.replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
+function normalizeIranianPhone(tel:string):string{
+  const d=toLatinDigits(tel).replace(/[\s\-().]/g,"");
+  if(d.startsWith("+98"))return "0"+d.slice(3);
+  if(d.startsWith("0098"))return "0"+d.slice(4);
+  if(d.startsWith("98")&&d.length===12)return "0"+d.slice(2);
+  return d;
+}
+const fa=(v:number|string)=>new Intl.NumberFormat("fa-IR").format(Number(v));
+const faFixed=(v:number,d=4)=>new Intl.NumberFormat("fa-IR",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
+function genOTP(){return String(Math.floor(100000+Math.random()*900000))}
+function genId(){return"TX"+Date.now().toString(36).toUpperCase()}
+
+// ─── Mobile Back-Button Stack ──────────────────────────────────────────────────
+// Screens push a handler when mounted; the topmost handler wins on back-press.
+
+// ─── FloatInput — RTL floating-label input ────────────────────────────────────
+function FloatInput({label,value,onChange,type="text",inputMode,dir="rtl",maxLength,readOnly,autoFocus,onFocus,onBlur,className,style,suffix,multiline}:{label:string;value:string;onChange?:(v:string)=>void;type?:string;inputMode?:React.HTMLAttributes<HTMLInputElement>["inputMode"];dir?:"rtl"|"ltr";maxLength?:number;readOnly?:boolean;autoFocus?:boolean;onFocus?:()=>void;onBlur?:()=>void;className?:string;style?:React.CSSProperties;suffix?:string;multiline?:boolean}){
+  const hasVal=value.length>0;
+  const sharedProps={className:`fl-input${dir==="ltr"?" ltr":""}${className?" "+className:""}`,value,onChange:onChange?((e:React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement>)=>onChange(e.target.value)):undefined,readOnly,maxLength,dir,placeholder:" ",autoFocus,onFocus,onBlur};
+  return(
+    <div className={`fl-wrap${hasVal?" fl-has-value":""}${suffix?" fl-has-suffix":""}${multiline?" fl-multiline":""}`} style={style}>
+      {multiline
+        ?<textarea {...sharedProps as React.TextareaHTMLAttributes<HTMLTextAreaElement>} rows={3}/>
+        :<input {...sharedProps as React.InputHTMLAttributes<HTMLInputElement>} type={type} inputMode={inputMode} style={suffix?{paddingLeft:suffix.length*10+16}:undefined}/>
+      }
+      {suffix&&<span className="fl-suffix">{suffix}</span>}
+      <label className="fl-label">{label}</label>
+    </div>
+  );
+}
+
+// ─── Contacts picker (Contact Picker API → Capacitor → fallback) ──────────────
+async function pickContactPhone():Promise<string|null>{
+  // Standard Contact Picker API (Chrome Android 80+, Edge Android)
+  const cm=(navigator as any).contacts;
+  if(cm&&typeof cm.select==="function"){
+    try{
+      const res=await cm.select(["tel"],{multiple:false});
+      const tel=res?.[0]?.tel?.[0];
+      if(tel)return normalizeIranianPhone(String(tel));
+      return null; // user cancelled
+    }catch{return null;}
+  }
+  // Capacitor native Contacts plugin (if installed)
+  const cap=(window as any).Capacitor;
+  if(cap?.isNativePlatform?.()){
+    try{
+      const plugin=cap.Plugins?.Contacts;
+      if(plugin){
+        const perm=await plugin.requestPermissions?.().catch(()=>null);
+        if(!perm||perm.contacts==="granted"||perm.contacts==="prompt"){
+          const res=await plugin.pickContact?.().catch(()=>null);
+          const tel=res?.contact?.phones?.[0]?.number;
+          if(tel)return normalizeIranianPhone(String(tel));
+          return null;
+        }
+      }
+    }catch{/* plugin not available */}
+  }
+  // Last resort: use a hidden <input type="tel"> to trigger native phone picker
+  return new Promise(resolve=>{
+    const inp=document.createElement("input");
+    inp.type="tel";inp.style.cssText="position:fixed;opacity:0;pointer-events:none;top:0;left:0;width:1px;height:1px";
+    document.body.appendChild(inp);
+    let done=false;
+    const finish=(v:string|null)=>{if(done)return;done=true;document.body.removeChild(inp);resolve(v)};
+    inp.addEventListener("change",()=>finish(inp.value?normalizeIranianPhone(inp.value):null));
+    inp.addEventListener("blur",()=>setTimeout(()=>finish(inp.value?normalizeIranianPhone(inp.value):null),300));
+    inp.focus();inp.click();
+    setTimeout(()=>finish(null),30000);
+  });
+}
+
+const getCryptoBal=(u:UserData,sym:string)=>sym==="USDT"?u.usdtBalance:(u.cryptoBalances?.[sym]??0);
+const withCryptoBal=(u:UserData,sym:string,amt:number):UserData=>sym==="USDT"?{...u,usdtBalance:amt}:{...u,cryptoBalances:{...(u.cryptoBalances??{}),[sym]:amt}};
+function isBSCAddress(s:string){return/^0x[0-9a-fA-F]{40}$/.test(s.trim())}
+function isTRC20Address(s:string){return/^T[A-Za-z1-9]{33}$/.test(s.trim())}
+function isIranPhone(s:string){return/^09[0-9]{9}$/.test(toLatinDigits(s).trim())}
+function playChime(){try{const c=new AudioContext();[523,659,784,1047].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=f;o.type="sine";g.gain.setValueAtTime(0,c.currentTime+i*0.11);g.gain.linearRampToValueAtTime(0.15,c.currentTime+i*0.11+0.03);g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+i*0.11+0.42);o.start(c.currentTime+i*0.11);o.stop(c.currentTime+i*0.11+0.5)})}catch{}}
+function numToFaWords(n:number):string{
+  if(!n||isNaN(n))return"";
+  const ONES=["","یک","دو","سه","چهار","پنج","شش","هفت","هشت","نه","ده","یازده","دوازده","سیزده","چهارده","پانزده","شانزده","هفده","هجده","نوزده"];
+  const TENS=["","","بیست","سی","چهل","پنجاه","شصت","هفتاد","هشتاد","نود"];
+  const H=["","صد","دویست","سیصد","چهارصد","پانصد","ششصد","هفتصد","هشتصد","نهصد"];
+  function u3(x:number):string{if(x===0)return"";const pts:string[]=[];if(x>=100){pts.push(H[Math.floor(x/100)]);x%=100}if(x>0){if(x<20)pts.push(ONES[x]);else{if(Math.floor(x/10))pts.push(TENS[Math.floor(x/10)]);if(x%10)pts.push(ONES[x%10])}}return pts.join(" و ")}
+  const parts:string[]=[];
+  const b=Math.floor(n/1_000_000_000);if(b){parts.push(u3(b)+" میلیارد");n%=1_000_000_000}
+  const m=Math.floor(n/1_000_000);if(m){parts.push(u3(m)+" میلیون");n%=1_000_000}
+  const k=Math.floor(n/1_000);if(k){parts.push(u3(k)+" هزار");n%=1_000}
+  if(n)parts.push(u3(n));
+  return parts.join(" و ");
+}
+function fmtCard(n:string){return n.replace(/(.{4})/g,"$1 ").trim()}
+function fmtPrice(p:number):string{if(p>=1000)return fa(Math.round(p));if(p>=1)return faFixed(p,4);if(p>=0.001)return faFixed(p,6);return faFixed(p,8)}
+
+// ─── Icon ─────────────────────────────────────────────────────────────────────
+function Icon({name,size=22,stroke=1.8}:{name:string;size?:number;stroke?:number}){
+  const P:Record<string,ReactNode>={
+    bell:<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
+    eye:<><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></>,
+    "eye-off":<><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></>,
+    sun:<><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>,
+    moon:<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>,
+    plus:<path d="M12 5v14M5 12h14"/>,
+    send:<><path d="m21 3-7 18-4-8-7-4 18-6Z"/><path d="m10 13 4-4"/></>,
+    swap:<><path d="M7 7h12l-3-3M17 17H5l3 3"/></>,
+    receipt:<><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></>,
+    home:<><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-6h6v6"/></>,
+    chart:<><path d="M4 19V5M4 19h17"/><path d="m7 15 4-4 3 2 5-6"/></>,
+    user:<><circle cx="12" cy="8" r="4"/><path d="M4 21c.8-4 3.4-6 8-6s7.2 2 8 6"/></>,
+    arrow:<path d="m14 6-6 6 6 6"/>,
+    "arrow-left":<path d="m10 18 6-6-6-6"/>,
+    check:<path d="m5 12 4 4L19 6"/>,
+    clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+    camera:<><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></>,
+    shield:<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>,
+    info:<><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></>,
+    lock:<><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+    x:<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    credit:<><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></>,
+    phone:<><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.55 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></>,
+    question:<><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></>,
+    wallet:<><path d="M4 7a2 2 0 0 1 2-2h12v14H6a2 2 0 0 1-2-2V7Z"/><path d="M18 9h3v7h-3a2 2 0 0 1 0-4h3"/></>,
+    chevron:<path d="m9 18 6-6-6-6"/>,
+    delete:<path d="M20 5H9l-7 7 7 7h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"/>,
+    menu:<><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></>,
+    wifi:<><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></>,
+    car:<><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><path d="m6 7 2-4h8l2 4"/></>,
+    "shield-check":<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></>,
+    "file-text":<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></>,
+    gavel:<><path d="M14 13 8.5 7.5"/><path d="m4.5 20.5 3-3"/><path d="M10.5 7.5 6.5 3.5a1.41 1.41 0 0 0-2 2L8.5 9.5"/><path d="M14 13l4 4a1.41 1.41 0 0 1-2 2l-4-4"/></>,
+    building:<><rect x="2" y="2" width="20" height="20"/><path d="M9 22v-4h6v4M2 9h20M2 15h20M9 2v20M15 2v20"/></>,
+    "trending-up":<><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></>,
+    settings:<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
+    "log-out":<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
+    search:<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    contacts:<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+    deposit:<><path d="M12 22V12"/><path d="m7 17 5 5 5-5"/><path d="M20 6H4a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/></>,
+    heart:<><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></>,
+    moto:<><path d="M5 17H3a2 2 0 0 1-2-2v-2h9M9 5v8"/><circle cx="15" cy="17" r="3"/><circle cx="5" cy="17" r="3"/><path d="M9 5H6l-3 5M15 7h5l2 5M17 7l-2 5"/></>,
+    upload:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>,
+  };
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{P[name]??<circle cx="12" cy="12" r="10"/>}</svg>;
+}
+
+// ─── Shared Brand Loader ──────────────────────────────────────────────────────
+// Single reusable component — same animation at any size.
+// size=104 → full overlay; size=28 → inside a button.
+function BrandLoader({size=104}:{size?:number}){
+  const r=size/100;
+  const border=(n:number)=>Math.max(1.5,Math.round(n*r));
+  return <span style={{position:"relative",width:size,height:size,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0} as React.CSSProperties}>
+    <span style={{position:"absolute",inset:0,borderRadius:"50%",border:`${border(3)}px solid transparent`,borderTopColor:"#00D6B0",borderRightColor:"rgba(0,214,176,0.35)",animation:"procSpin 1.1s linear infinite"} as React.CSSProperties}/>
+    <span style={{position:"absolute",inset:Math.round(14*r),borderRadius:"50%",border:`${border(2)}px solid transparent`,borderBottomColor:"rgba(0,214,176,0.6)",borderLeftColor:"rgba(0,214,176,0.18)",animation:"procSpin 0.72s linear infinite reverse"} as React.CSSProperties}/>
+    {size>=60&&<span style={{position:"absolute",inset:-Math.round(8*r),borderRadius:"50%",background:"radial-gradient(circle,rgba(0,214,176,0.18) 0%,transparent 65%)",animation:"procGlow 2s ease-in-out infinite"} as React.CSSProperties}/>}
+    <img src={anPardazLogo} style={{width:Math.round(62*r),height:Math.round(62*r),borderRadius:Math.round(18*r),objectFit:"contain",position:"relative",zIndex:1} as React.CSSProperties} alt="آن‌پرداز"/>
+  </span>
+}
+function AnPardazLoadingOverlay({text="در حال پردازش...",badge}:{text?:string;badge?:React.ReactNode}){
+  return createPortal(<div className="proc-overlay"><BrandLoader size={104}/>{badge&&<div style={{marginTop:14,marginBottom:-4}}>{badge}</div>}<div className="proc-text" style={{marginTop:8}}>{text}</div></div>, document.body);
+}
+
+type ReceiptData = { title:string; amount?:string; destination?:string; status?:"success"|"failed"; detail?:string };
+// ── Receipt design system helpers ──
+
+function parseDescGroups(detail:string):[string,string][]|null{
+  if(!detail||!detail.includes(" · "))return null;
+  const parts=detail.split(" · ").map(s=>s.trim()).filter(Boolean);
+  if(parts.length<2)return null;
+  const phoneIdx=parts.findIndex(p=>/^[۰0]?[۹9][\d۰-۹]{9,10}$/.test(p.replace(/[\s\-]/g,"")));
+  const amountIdx=parts.findIndex(p=>/ریال|تومان/.test(p));
+  if(phoneIdx>=0&&parts.length>=3){
+    const g:[string,string][]=[];
+    if(phoneIdx>0)g.push(["ارائه‌دهنده",parts[0]]);
+    const pkg=parts.slice(1,phoneIdx).join(" · ");
+    if(pkg)g.push(["بسته",pkg]);
+    g.push(["شماره همراه",parts[phoneIdx]]);
+    if(amountIdx>=0&&amountIdx!==phoneIdx)g.push(["مبلغ",parts[amountIdx]]);
+    return g.length>=2?g:null;
+  }
+  return null;
+}
+
+function ReceiptFireworks({active}:{active:boolean}){
+  const ref=useRef<HTMLCanvasElement>(null);
+  useEffect(()=>{
+    if(!active)return;
+    const cv=ref.current;if(!cv)return;
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    cv.width=cv.offsetWidth*dpr;cv.height=cv.offsetHeight*dpr;
+    const ctx=cv.getContext("2d")!;ctx.scale(dpr,dpr);
+    const W=cv.offsetWidth,H=cv.offsetHeight,cx=W/2,cy=H/2;
+    type P={x:number;y:number;vx:number;vy:number;r:number;c:string;a:number;d:number};
+    const clrs=["#00CC8F","#00E5A0","#33FFB5","#80FFD8","#FFFFFF","#B3FFEA"];
+    const ps:P[]=[];
+    for(let b=0;b<9;b++){
+      const ang=(b/9)*Math.PI*2-Math.PI/2,dist=50+(b%2)*22;
+      const bx=cx+Math.cos(ang)*dist,by=cy+Math.sin(ang)*dist;
+      for(let i=0;i<10;i++){
+        const a=Math.random()*Math.PI*2,spd=1.2+Math.random()*3.5;
+        ps.push({x:bx,y:by,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd-0.5,r:1.2+Math.random()*2.8,c:clrs[Math.floor(Math.random()*clrs.length)],a:1,d:0.011+Math.random()*0.015});
+      }
+      for(let i=0;i<4;i++){
+        const a=Math.random()*Math.PI*2;
+        ps.push({x:bx,y:by,vx:Math.cos(a)*(4+Math.random()*5),vy:Math.sin(a)*(4+Math.random()*5),r:0.7,c:"#FFFFFF",a:1,d:0.02+Math.random()*0.02});
+      }
+    }
+    let raf:number;
+    const frame=()=>{
+      ctx.clearRect(0,0,W,H);let alive=false;
+      for(const p of ps){
+        if(p.a<=0)continue;alive=true;
+        p.x+=p.vx;p.y+=p.vy;p.vy+=0.07;p.vx*=0.97;p.vy*=0.97;p.a-=p.d;
+        ctx.save();ctx.globalAlpha=Math.max(0,p.a);ctx.fillStyle=p.c;
+        if(p.r>1.5){ctx.shadowColor=p.c;ctx.shadowBlur=5;}
+        ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();ctx.restore();
+      }
+      if(alive)raf=requestAnimationFrame(frame);
+    };
+    raf=requestAnimationFrame(frame);
+    return()=>cancelAnimationFrame(raf);
+  },[active]);
+  return active?<canvas ref={ref} style={{position:"absolute",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:10}}/>:null;
+}
+
+function TransactionReceipt({data,onClose}:{data:ReceiptData;onClose:()=>void}){
+  const isFailed=data.status==="failed";
+  const isPending=false;
+  const [exiting,setExiting]=useState(false);
+  const [phase,setPhase]=useState(0);
+  const [captured,setCaptured]=useState(false);
+  const [toast,setToast]=useState("");
+  const [copyDone,setCopyDone]=useState(false);
+  const sheetRef=useRef<HTMLDivElement>(null);
+  const cachedPng=useRef<string|null>(null);
+  const trackId=useRef(toFaDigits(String(Date.now()).slice(-8))).current;
+  const timeStr=useRef(new Intl.DateTimeFormat("fa-IR",{year:"numeric",month:"long",day:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date())).current;
+
+  useEffect(()=>{
+    const ts=[
+      setTimeout(()=>setPhase(1),0),
+      setTimeout(()=>setPhase(2),1200),
+      setTimeout(()=>setPhase(3),2600),
+      setTimeout(()=>setPhase(4),3050),
+      setTimeout(()=>setPhase(5),5200),
+      setTimeout(()=>{
+        if(!sheetRef.current)return;
+        import("html-to-image").then(({toPng})=>{
+          if(sheetRef.current)toPng(sheetRef.current,{pixelRatio:2}).then(d=>{cachedPng.current=d;}).catch(()=>{});
+        }).catch(()=>{});
+      },5500),
+    ];
+    return()=>ts.forEach(clearTimeout);
+  },[]);
+
+  const close=()=>{setExiting(true);setTimeout(onClose,320);};
+  const descGroups=parseDescGroups(data.detail||"");
+  const rows:[string,string][]=[
+    ...(data.destination?[["مقصد/مبدا",data.destination] as [string,string]]:[]),
+    ["تاریخ و ساعت",timeStr],
+    ["کد پیگیری",trackId],
+    ...(!descGroups&&data.detail?[["توضیحات",data.detail] as [string,string]]:[]),
+  ];
+
+  const doSave=(url:string)=>{
+    const a=document.createElement("a");a.href=url;a.download="رسید-آن‌پرداز.png";
+    if(navigator.canShare){fetch(url).then(r=>r.blob()).then(blob=>{const f=new File([blob],"رسید-آن‌پرداز.png",{type:"image/png"});navigator.canShare({files:[f]})?navigator.share({files:[f],title:"رسید آن‌پرداز"}).catch(()=>a.click()):a.click();});}else{a.click();}
+    setToast("رسید در گالری ذخیره شد");setTimeout(()=>{setToast("");setCaptured(false);},2500);
+  };
+  const handleDownload=()=>{
+    if(!sheetRef.current||captured)return;
+    setCaptured(true);
+    if(cachedPng.current){doSave(cachedPng.current);return;}
+    import("html-to-image").then(({toPng})=>toPng(sheetRef.current!,{pixelRatio:2}).then(url=>{cachedPng.current=url;doSave(url);}).catch(()=>{setToast("ذخیره ناموفق");setTimeout(()=>{setToast("");setCaptured(false);},2000);})).catch(()=>{setToast("ذخیره ناموفق");setTimeout(()=>{setToast("");setCaptured(false);},2000);});
+  };
+  const handleShare=()=>{
+    const txt=[`آن‌پرداز — ${data.title}`,`وضعیت: ${isFailed?"ناموفق":isPending?"در انتظار":"موفق"}`,data.amount?`مبلغ: ${data.amount}`:"",`تاریخ: ${timeStr}`,`کد پیگیری: ${trackId}`].filter(Boolean).join("\n");
+    navigator.share?navigator.share({title:"رسید آن‌پرداز",text:txt}).catch(()=>{}):navigator.clipboard?.writeText(txt).catch(()=>{});
+  };
+  const handleCopy=()=>{
+    const lines=["رسید تراکنش","─────────────────",...(data.title?[`نوع تراکنش: ${data.title}`]:[]),...(data.amount?[`مبلغ: ${toFaDigits(data.amount)}`]:[]),...(data.destination?[`مقصد/مبدا: ${data.destination}`]:[]),`وضعیت: ${isFailed?"ناموفق":isPending?"در انتظار":"موفق"}`,`تاریخ و ساعت: ${timeStr}`,`کد پیگیری: ${trackId}`,...(data.detail?[`توضیحات: ${data.detail}`]:[]),"─────────────────","آن پرداز پیشرو در خدمات بانکی و دارایی های دیجیتال"];
+    navigator.clipboard?.writeText(lines.join("\n")).then(()=>{setCopyDone(true);setToast("رسید کپی شد");setTimeout(()=>{setToast("");setCopyDone(false);},2000);}).catch(()=>{});
+  };
+
+  const heroMod=isFailed?" rds-hero-failed":isPending?" rds-hero-pending":"";
+  const sepMod=isFailed?" rds-failed":isPending?" rds-pending":"";
+  const statusText=isFailed?"ناموفق":isPending?"در انتظار":"موفق";
+  const statusMod=isFailed?" rds-failed":isPending?" rds-pending":"";
+  const heroTitle=isFailed?"تراکنش ناموفق بود":isPending?"تراکنش در حال پردازش":"تراکنش با موفقیت انجام شد";
+  const heroSub=isFailed?"متأسفانه این تراکنش تکمیل نشد، لطفاً دوباره تلاش کنید":isPending?"تراکنش شما در حال بررسی در شبکه بانکی است":"تراکنش شما با موفقیت در شبکه بانکی تأیید شد";
+  const amountStr=data.amount?data.amount.replace(/\s*ریال\s*$/,"").trim():null;
+
+  return(
+    <>
+      {/* Border sweep overlay — fires animation on mount */}
+      {phase>=1&&phase<=2&&(
+        <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:8600}}>
+          <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{display:"block"}}>
+            <path d="M 50 0 L 100 0 L 100 100 L 0 100 L 0 0 L 50 0"
+              fill="none" stroke="#00CC8F" strokeWidth="3" strokeLinecap="round"
+              vectorEffect="non-scaling-stroke" pathLength="1"
+              className="rds-sweep-path"/>
+          </svg>
+        </div>
+      )}
+      {/* Main receipt screen */}
+      <div className={`rds-screen${exiting?" rds-exiting":""}`} dir="rtl" ref={sheetRef}>
+        {/* Hero */}
+        <div className={`rds-hero${heroMod}`}>
+          <div className="rds-topbar">
+            <img src={anPardazLogo} alt="آن‌پرداز" className="rds-app-logo"/>
+            <h1 className="rds-app-name">آن‌پرداز</h1>
+            <button className="rds-close-btn" onClick={close}>بستن</button>
+          </div>
+          <div className="rds-check-area" style={{position:"relative"}}>
+            <div className={`rds-check-container${phase>=2?" rds-check-visible":""}`}>
+              <div className={`rds-check-ring${phase>=3?" rds-check-filled":""}`}>
+                {!isFailed&&!isPending?(
+                  <svg width="46" height="46" viewBox="0 0 46 46" fill="none">
+                    <polyline points="10,24 19,33 36,14" stroke="white" strokeWidth="4.5"
+                      strokeLinecap="round" strokeLinejoin="round"
+                      pathLength="1" strokeDasharray="1"
+                      strokeDashoffset={phase>=2?0:1}
+                      style={{transition:phase>=2?"stroke-dashoffset 0.52s ease-out 0.1s":"none"}}/>
+                  </svg>
+                ):isPending?(
+                  <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                ):(
+                  <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.8" strokeLinecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                )}
+              </div>
+            </div>
+            <ReceiptFireworks active={phase>=4&&phase<5}/>
+          </div>
+          <div className="rds-hero-text" style={{opacity:phase>=2?1:0,transition:"opacity 0.45s ease 0.2s"}}>
+            <h2 className="rds-success-title">{heroTitle}</h2>
+            <p className="rds-success-sub">{heroSub}</p>
+            {amountStr&&(
+              <div className="rds-amount-display">
+                <span className="rds-amount-value">{toFaDigits(amountStr)}</span>
+                <span className="rds-amount-unit">ریال</span>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* Wavy separator */}
+        <div className={`rds-ticket-sep${sepMod}`}>
+          <svg width="100%" height="18" viewBox="0 0 390 18" preserveAspectRatio="none">
+            <path d="M0 0 Q9.75 12 19.5 0 Q29.25 12 39 0 Q48.75 12 58.5 0 Q68.25 12 78 0 Q87.75 12 97.5 0 Q107.25 12 117 0 Q126.75 12 136.5 0 Q146.25 12 156 0 Q165.75 12 175.5 0 Q185.25 12 195 0 Q204.75 12 214.5 0 Q224.25 12 234 0 Q243.75 12 253.5 0 Q263.25 12 273 0 Q282.75 12 292.5 0 Q302.25 12 312 0 Q321.75 12 331.5 0 Q341.25 12 351 0 Q360.75 12 370.5 0 Q380.25 12 390 0 L390 18 L0 18 Z" fill="var(--app-bg)"/>
+          </svg>
+        </div>
+        {/* Scroll area */}
+        <div className="rds-scroll" style={{opacity:phase>=1?1:0,transition:"opacity 0.55s ease"}}>
+          {toast&&<div className="rds-toast">{toast}</div>}
+          <div className="rds-status-row">
+            <span className={`rds-status-badge${statusMod}`}><span className="rds-status-dot"/>{statusText}</span>
+            {data.title&&<span className="rds-tx-type-label">{data.title}</span>}
+          </div>
+          <div className="rds-info-card">
+            {rows.map(([k,v],i)=>(
+              <div key={i} className="rds-info-row" style={{opacity:phase>=3?1:0,transform:phase>=3?"none":"translateX(10px)",transition:`opacity 0.3s ease ${0.05*i}s,transform 0.3s ease ${0.05*i}s`}}>
+                <span className="rds-info-label">{k}</span>
+                <span className={`rds-info-value${k==="کد پیگیری"?" ltr":""}`}>{v}</span>
+              </div>
+            ))}
+          </div>
+          {descGroups&&(
+            <div className="rds-desc-card" style={{opacity:phase>=3?1:0,transition:"opacity 0.4s ease 0.2s"}}>
+              <div className="rds-desc-header"><span className="rds-desc-header-label">جزئیات سرویس</span></div>
+              {descGroups.map(([k,v],i)=>(
+                <div key={i} className="rds-desc-row" style={{opacity:phase>=3?1:0,transition:`opacity 0.3s ease ${0.06+0.05*i}s`}}>
+                  <span className="rds-desc-label">{k}</span>
+                  <span className="rds-desc-value">{v}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="rds-referral-card" style={{opacity:phase>=4?1:0,transition:"opacity 0.5s ease"}}>
+            <div className="rds-referral-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <div className="rds-referral-text">
+              <div className="rds-referral-title">دوستانتان را دعوت کنید</div>
+              <div className="rds-referral-sub">با معرفی آن‌پرداز، هر دو پاداش دریافت کنید</div>
+            </div>
+            <button className="rds-referral-btn">دعوت</button>
+          </div>
+          <div className="rds-watermark" style={{marginBottom:10}}>آن‌پرداز · رسید رسمی پرداخت</div>
+        </div>
+        {/* Action bar */}
+        <div className="rds-action-bar" style={{opacity:phase>=3?1:0,transition:"opacity 0.4s ease 0.5s"}}>
+          <div className="rds-action-row-primary">
+            <button className="rds-btn-download" onClick={handleDownload} disabled={captured}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              {captured?"در حال ذخیره...":"دریافت رسید"}
+            </button>
+            <button className={`rds-btn-icon${copyDone?" done":""}`} onClick={handleCopy} aria-label="کپی رسید">{copyDone?"✓":"کپی"}</button>
+            <button className="rds-btn-icon" onClick={handleShare} aria-label="اشتراک‌گذاری">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            </button>
+          </div>
+          <button className="rds-support-link" onClick={close}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            سوال دارید؟ تماس با پشتیبانی
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Bill Icon Components ─────────────────────────────────────────────────────
+const BILL_IMG_MAP:Record<string,string>={
+  hamrah: billImgHamrah as string,
+  irancell: billImgIrancell as string,
+  water: billImgAb as string,
+  electric: billImgBrq as string,
+  makhab: billImgMakhab as string,
+  gas: billImgGaz as string,
+};
+function BillIcon({type,size=64}:{type:string;size?:number}){
+  const icons:Record<string,{bg:string;fg:string;svg:React.ReactNode}>={
+    hamrah:{
+      bg:"#00853e",fg:"#fff",
+      svg:<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* SIM card silhouette */}
+        <rect x="16" y="12" width="24" height="32" rx="4" fill="#fff" opacity="0.15"/>
+        <rect x="20" y="18" width="16" height="20" rx="2" fill="#fff" opacity="0.9"/>
+        <rect x="22" y="22" width="12" height="12" rx="1.5" fill="#00853e"/>
+        {/* signal bars */}
+        <rect x="23" y="27" width="2.5" height="4" rx="1" fill="#fff"/>
+        <rect x="26.5" y="25" width="2.5" height="6" rx="1" fill="#fff"/>
+        <rect x="30" y="23" width="2.5" height="8" rx="1" fill="#fff"/>
+      </svg>,
+    },
+    irancell:{
+      bg:"#f5c800",fg:"#1a1200",
+      svg:<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* SIM card */}
+        <rect x="16" y="12" width="24" height="32" rx="4" fill="#1a1200" opacity="0.12"/>
+        <rect x="20" y="18" width="16" height="20" rx="2" fill="#1a1200" opacity="0.85"/>
+        <rect x="22" y="22" width="12" height="12" rx="1.5" fill="#f5c800"/>
+        {/* signal bars */}
+        <rect x="23" y="27" width="2.5" height="4" rx="1" fill="#1a1200"/>
+        <rect x="26.5" y="25" width="2.5" height="6" rx="1" fill="#1a1200"/>
+        <rect x="30" y="23" width="2.5" height="8" rx="1" fill="#1a1200"/>
+      </svg>,
+    },
+    makhab:{
+      bg:"#6b3fa0",fg:"#fff",
+      svg:<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* telephone handset */}
+        <path d="M20 18C20 18 18 22 18 28C18 34 20 38 20 38L24 34C24 34 22.5 31 22.5 28C22.5 25 24 22 24 22L20 18Z" fill="#fff" opacity="0.9"/>
+        <path d="M36 18C36 18 38 22 38 28C38 34 36 38 36 38L32 34C32 34 33.5 31 33.5 28C33.5 25 32 22 32 22L36 18Z" fill="#fff" opacity="0.9"/>
+        <circle cx="28" cy="28" r="5" fill="#fff" opacity="0.95"/>
+        {/* WiFi waves */}
+        <path d="M22 21C22 21 24.5 18.5 28 18.5C31.5 18.5 34 21 34 21" stroke="#fff" strokeWidth="2" strokeLinecap="round" opacity="0.6"/>
+        <path d="M19 17C19 17 22.5 13.5 28 13.5C33.5 13.5 37 17 37 17" stroke="#fff" strokeWidth="2" strokeLinecap="round" opacity="0.35"/>
+      </svg>,
+    },
+    water:{
+      bg:"#0277bd",fg:"#fff",
+      svg:<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M28 12C28 12 16 25 16 32C16 39 21.4 44 28 44C34.6 44 40 39 40 32C40 25 28 12 28 12Z" fill="#fff" opacity="0.95"/>
+        <path d="M28 12C28 12 16 25 16 32C16 39 21.4 44 28 44" fill="#fff" opacity="0.0"/>
+        {/* inner highlight */}
+        <path d="M24 30C23 27 24 23 26 21" stroke="#0277bd" strokeWidth="2.5" strokeLinecap="round" opacity="0.4"/>
+      </svg>,
+    },
+    gas:{
+      bg:"#e65100",fg:"#fff",
+      svg:<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* flame */}
+        <path d="M28 42C28 42 18 36 18 27C18 20 23 15 28 12C28 12 25 18 28 22C31 18 34 14 34 14C34 14 38 20 38 27C38 36 28 42 28 42Z" fill="#fff" opacity="0.95"/>
+        <path d="M28 42C28 42 22 37 22 30C22 25 25 22 28 20C28 20 26 24 28 26.5C30 24 31.5 21 31.5 21C31.5 21 34 25 34 30C34 37 28 42 28 42Z" fill="#e65100" opacity="0.5"/>
+      </svg>,
+    },
+    electric:{
+      bg:"#e6a800",fg:"#1a1000",
+      svg:<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* lightning bolt */}
+        <path d="M31 12L18 30H28L25 44L38 24H28Z" fill="#1a1000" opacity="0.88"/>
+      </svg>,
+    },
+  };
+  const icon=icons[type];
+  if(!icon){
+    return <div style={{width:size,height:size,borderRadius:"22%",background:"var(--card-bg2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.35,color:"var(--text-muted)",flexShrink:0}}>؟</div>;
+  }
+  const scaled=Math.round(size*0.88);
+  return(
+    <div style={{width:size,height:size,borderRadius:Math.round(size*0.26),background:icon.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden"}}>
+      <div style={{width:scaled,height:scaled,display:"flex",alignItems:"center",justifyContent:"center"}}>{icon.svg}</div>
+    </div>
+  );
+}
+function _BillIconLegacy_unused({type}:{type:string}){
+  const d={bg:"#888",content:<text x="24" y="30" textAnchor="middle" fontSize="18" fill="white">؟</text>};
+  return <svg viewBox="0 0 48 48" width={56} height={56} style={{display:"block",borderRadius:14}}>
+    <rect width={48} height={48} rx={14} fill={d.bg}/>
+    {d.content}
+  </svg>;
+}
+
+// ─── Splash ───────────────────────────────────────────────────────────────────
+function SplashScreen(){
+  return <div className="splash-screen">
+    <div className="splash-content">
+      <div className="splash-logo-wrap">
+        <div className="splash-glow" style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:0}}/>
+        <img className="splash-logo-image" src={anPardazLogo} alt="لوگوی آن‌پرداز" style={{position:"relative",zIndex:2}} decoding="sync" fetchPriority="high"/>
+        <div className="splash-logo-ring r1"/><div className="splash-logo-ring r2"/>
+      </div>
+      <div className="splash-name">
+        <div className="splash-title">آن‌پرداز</div>
+        <div className="splash-sub">نقل و انتقال آنی پول و دارایی های دیجیتال</div>
+      </div>
+    </div>
+    <div className="splash-dots"><span/><span/><span/></div>
+  </div>;
+}
+
+// ─── Privacy & Terms Full-Screen Page ────────────────────────────────────────
+function PrivacyPage({onClose}:{onClose:()=>void}){
+  const sections=[
+    {id:"intro",title:null,body:[
+      "این صفحه مربوط به شرکت «دیار آتیه گشا» است که از این پس در این متن با عنوان «دیار آتیه گشا»، «ما» یا «اپلیکیشن ما» از آن یاد می‌شود. ما خود را متعهد به حفاظت از حریم خصوصی کاربران و صیانت از اطلاعات آنها می‌دانیم.",
+      "این ضوابط نحوه جمع‌آوری، استفاده، نگهداری و حفاظت از اطلاعات کاربران را توضیح می‌دهد. با استفاده از خدمات اپلیکیشن، کاربر تأیید می‌کند که این قوانین و ضوابط را مطالعه کرده و با آنها موافقت دارد.",
+      "ما تلاش می‌کنیم اطلاعات لازم را به‌صورت شفاف در اختیار کاربران قرار دهیم تا بتوانند درباره استفاده از خدمات و اطلاعاتی که در اختیار اپلیکیشن قرار می‌دهند، تصمیم آگاهانه بگیرند.",
+    ]},
+    {id:"collection",title:"جمع‌آوری و استفاده از اطلاعات",body:[
+      "برای ارائه خدمات سریع‌تر، دقیق‌تر و امن‌تر، ممکن است برخی اطلاعاتی را که کاربر مستقیماً در اپلیکیشن وارد می‌کند جمع‌آوری و پردازش کنیم.",
+      "اطلاعاتی که دریافت می‌شود متناسب با نوع خدمت مورد استفاده خواهد بود و برای ارائه، تکمیل، پشتیبانی، امنیت و بهبود خدمات مورد استفاده قرار می‌گیرد.",
+      "این اطلاعات ممکن است شامل نام و نام خانوادگی، شماره تلفن همراه، اطلاعات هویتی، اطلاعات مربوط به تراکنش‌ها و سایر اطلاعات مورد نیاز برای ارائه خدمات باشد.",
+    ]},
+    {id:"perms",title:"مجوزهای مورد نیاز",body:[
+      "بسته به نوع خدماتی که کاربر استفاده می‌کند، ممکن است اپلیکیشن درخواست دسترسی به برخی امکانات دستگاه را داشته باشد.",
+    ],items:[
+      {label:"مخاطبین",text:"در برخی خدمات، کاربر ممکن است بتواند برای مخاطبین خود خدماتی مانند شارژ یا بسته اینترنت خریداری کند. در صورت استفاده از چنین قابلیتی، دسترسی به مخاطبین دستگاه ممکن است مورد نیاز باشد."},
+      {label:"مکان",text:"در صورت ارائه خدماتی که به موقعیت جغرافیایی کاربر نیاز دارند، ممکن است دسترسی به موقعیت مکانی درخواست شود."},
+      {label:"دوربین",text:"در برخی خدمات مانند اسکن اطلاعات، بارکد یا QR Code ممکن است دسترسی به دوربین مورد نیاز باشد."},
+      {label:"عکس، رسانه و فایل",text:"در خدماتی که نیاز به بارگذاری مدارک، تصاویر یا فایل دارند، ممکن است دسترسی به تصاویر و فایل‌های دستگاه درخواست شود."},
+    ],footer:"هر مجوز متناسب با نیاز همان خدمت درخواست خواهد شد."},
+    {id:"security",title:"امنیت اطلاعات",body:[
+      "ما تلاش می‌کنیم اطلاعات کاربران را با استفاده از اقدامات امنیتی مناسب محافظت کنیم.",
+      "اطلاعات در زیرساخت‌های امن نگهداری شده و دسترسی به اطلاعات تا حد امکان محدود و کنترل‌شده خواهد بود.",
+      "اطلاعات حساس کاربران با استفاده از روش‌های امنیتی مناسب محافظت می‌شوند.",
+      "کاربر نیز موظف است اطلاعات ورود، رمزها و سایر اطلاعات امنیتی حساب خود را در اختیار اشخاص دیگر قرار ندهد.",
+    ]},
+    {id:"logdata",title:"اطلاعات رخدادها (Log Data)",body:[
+      "در هنگام استفاده از اپلیکیشن، ممکن است برای شناسایی خطاها، بررسی مشکلات فنی، افزایش امنیت و بهبود عملکرد سرویس، برخی اطلاعات فنی مربوط به رخدادها ثبت شود.",
+      "این اطلاعات ممکن است شامل شناسه دستگاه، سیستم‌عامل و نسخه آن، مدل دستگاه، آدرس IP، تاریخ و زمان رخداد و اطلاعات فنی مرتبط با سرویس مورد استفاده باشد.",
+    ]},
+    {id:"improve",title:"استفاده از اطلاعات برای بهبود خدمات",body:[
+      "ممکن است برخی داده‌های غیرحساس و اطلاعات مربوط به نحوه استفاده از خدمات، برای تحلیل عملکرد سرویس‌ها و شناخت بهتر نیازهای کاربران مورد استفاده قرار گیرد.",
+      "هدف از این کار، بهبود کیفیت، امنیت، عملکرد و تجربه کاربری خدمات است.",
+      "در صورت استفاده از سرویس‌ها یا ابزارهای شخص ثالث، نحوه پردازش اطلاعات تابع ضوابط و سیاست‌های مربوط به آنها نیز خواهد بود.",
+    ]},
+    {id:"financial",title:"خدمات مالی و تراکنش‌ها",body:[
+      "برای ارائه برخی خدمات مالی، پرداختی و صرافی، ممکن است مطابق الزامات قانونی و مقررات مراجع ذی‌صلاح، اطلاعات هویتی، بانکی، پرداختی و تراکنشی کاربر دریافت و پردازش شود.",
+      "این اطلاعات برای احراز هویت، انجام تراکنش، کنترل‌های امنیتی، جلوگیری از سوءاستفاده و رعایت الزامات قانونی مورد استفاده قرار می‌گیرد.",
+      "سوابق تراکنش‌ها ممکن است مطابق الزامات قانونی و عملیاتی برای مدت مورد نیاز نگهداری شوند.",
+    ]},
+    {id:"kyc",title:"احراز هویت",body:[
+      "برای استفاده از برخی خدمات، ممکن است احراز هویت کاربر الزامی باشد.",
+      "اطلاعات مورد نیاز برای احراز هویت، متناسب با نوع خدمت و الزامات قانونی دریافت و بررسی خواهد شد.",
+      "در صورت عدم تکمیل یا تأیید احراز هویت، ممکن است دسترسی به برخی خدمات محدود شود.",
+    ]},
+    {id:"minors",title:"حریم خصوصی کودکان و نوجوانان",body:[
+      "خدمات این اپلیکیشن برای استفاده افراد واجد شرایط قانونی و مطابق مقررات مربوطه طراحی شده است.",
+      "در صورت مشخص شدن استفاده غیرمجاز افراد فاقد شرایط لازم، ممکن است دسترسی به حساب محدود یا متوقف شود.",
+    ]},
+    {id:"updates",title:"اطلاع‌رسانی و به‌روزرسانی قوانین",body:[
+      "با توجه به توسعه خدمات و تغییر الزامات قانونی یا فنی، ممکن است این قوانین و ضوابط در آینده به‌روزرسانی شوند.",
+      "نسخه جدید قوانین پس از انتشار در همین بخش در دسترس کاربران قرار خواهد گرفت.",
+      "ادامه استفاده از خدمات پس از اعمال تغییرات، مطابق مقررات، به منزله پذیرش نسخه به‌روزشده خواهد بود.",
+    ]},
+    {id:"rights",title:"حقوق کاربر",body:[
+      "کاربر می‌تواند در خصوص نحوه استفاده از خدمات، اطلاعات مربوط به حساب و مسائل مرتبط با حریم خصوصی خود از طریق راه‌های ارتباطی رسمی شرکت درخواست اطلاعات یا پشتیبانی کند.",
+      "درخواست‌های کاربران مطابق قوانین و مقررات قابل اجرا بررسی خواهند شد.",
+    ]},
+  ] as const;
+  return <div className="privacy-page" dir="rtl">
+    <header className="privacy-header">
+      <button className="privacy-close-btn" onClick={onClose} aria-label="بستن"><Icon name="x" size={20}/></button>
+      <div className="privacy-header-title">
+        <img src={anPardazLogo} alt="آن‌پرداز" className="privacy-logo"/>
+        <h1>قوانین فعالیت و ضوابط حریم خصوصی</h1>
+      </div>
+    </header>
+    <div className="privacy-body">
+      <div className="privacy-badge">شرکت دیار آتیه گشا</div>
+      {sections.map(s=><section key={s.id} className="privacy-section">
+        {s.title&&<h2 className="privacy-section-title">{s.title}</h2>}
+        {"body" in s&&(s as any).body.map((p:string,i:number)=><p key={i} className="privacy-para">{p}</p>)}
+        {"items" in s&&(s as any).items&&<ul className="privacy-items">{(s as any).items.map((it:any,i:number)=><li key={i}><b>{it.label}:</b> {it.text}</li>)}</ul>}
+        {"footer" in s&&(s as any).footer&&<p className="privacy-para privacy-footer-note">{(s as any).footer}</p>}
+      </section>)}
+      <section className="privacy-section privacy-contact">
+        <h2 className="privacy-section-title">تماس با ما</h2>
+        <div className="privacy-contact-grid">
+          <div><span>شرکت</span><b>دیار آتیه گشا</b></div>
+          <div><span>نام سایت</span><b>آن پرداز</b></div>
+          <div><span>وب‌سایت</span><b dir="ltr">Anpardaz.ir</b></div>
+          <div><span>ایمیل</span><b dir="ltr">info@Anpardaz.ir</b></div>
+        </div>
+      </section>
+      <p className="privacy-update-note">آخرین به‌روزرسانی: ۱۴۰۴</p>
+    </div>
+  </div>;
+}
+
+// ─── Phone Login ──────────────────────────────────────────────────────────────
+function PhoneLogin({onSend}:{onSend:(p:string,c:string,d?:string)=>void}){
+  const [phone,setPhone]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");const [showPrivacy,setShowPrivacy]=useState(false);
+  const submit=async()=>{const p=phone.trim();if(!isIranPhone(p)){setErr("شماره موبایل معتبر نیست.");return;}setErr("");setLoading(true);const code=genOTP();const res=await sendOTP(p,code);setLoading(false);onSend(p,code,res.devCode)};
+  if(showPrivacy)return <PrivacyPage onClose={()=>setShowPrivacy(false)}/>;
+  return <div className="auth-screen" dir="rtl">
+    <div className="auth-logo-area">
+      <img className="auth-logo-image" src={anPardazLogo} alt="لوگوی آن‌پرداز" decoding="sync" fetchPriority="high"/>
+      <div style={{marginTop:12,textAlign:"center"}}><div style={{fontSize:20,fontWeight:900,color:"#F4FAFC"}}>آن‌پرداز</div><div style={{fontSize:11,color:"#00D6B0",marginTop:4,lineHeight:1.5}}>نقل و انتقال آنی پول و دارایی های دیجیتال</div></div>
+    </div>
+    <div className="auth-card">
+      <h2 style={{fontSize:18,fontWeight:800,color:"#F4FAFC",marginBottom:8}}>ورود به حساب</h2>
+      <p style={{fontSize:13,color:"#888",marginBottom:20}}>شماره موبایل خود را وارد کنید. کد تأیید برایتان پیامک می‌شود.</p>
+      <label style={{fontSize:13,color:"#aaa",display:"block",marginBottom:6}}>شماره موبایل</label>
+      <div className={`auth-input-wrap ${err?"error":""}`}>
+        <input className="auth-input ltr" value={toFaDigits(phone)} onChange={e=>setPhone(toLatinDigits(e.target.value))} placeholder="شماره موبایل" inputMode="tel" maxLength={11} dir="ltr" onKeyDown={e=>e.key==="Enter"&&submit()}/>
+      </div>
+      {err&&<p className="field-err">{err}</p>}
+      <button className="primary-button" style={{marginTop:20}} onClick={submit} disabled={loading}>{loading?"در حال ارسال...":"دریافت کد تأیید"}</button>
+      <button className="privacy-link-btn" onClick={()=>setShowPrivacy(true)}>پذیرش قوانین فعالیت و ضوابط حریم خصوصی</button>
+    </div>
+  </div>;
+}
+
+// ─── OTP Verify ───────────────────────────────────────────────────────────────
+function OTPVerify({phone,correctCode,devCode,onVerified,onBack}:{phone:string;correctCode:string;devCode?:string;onVerified:(p:string)=>void;onBack?:()=>void}){
+  const [digits,setDigits]=useState<string[]>(Array(6).fill(""));
+  const [err,setErr]=useState("");
+  const [resendLeft,setResendLeft]=useState(120);
+  const refs=useRef<(HTMLInputElement|null)[]>([]);
+  useEffect(()=>{if(resendLeft<=0)return;const t=setTimeout(()=>setResendLeft(v=>v-1),1000);return()=>clearTimeout(t)},[resendLeft]);
+  const code=digits.join("");
+  const doVerify=(d:string[])=>{
+    const c=d.join("");
+    if(c===correctCode){onVerified(phone);}
+    else if(c.length===6){setErr("کد واردشده صحیح نیست؛ دوباره تلاش کنید.");}
+  };
+  const write=(i:number,v:string)=>{
+    const d=toLatinDigits(v).replace(/\D/g,"");
+    if(!d)return;
+    const n=[...digits];
+    d.slice(0,6-i).split("").forEach((x,j)=>{n[i+j]=x});
+    setDigits(n);
+    setErr("");
+    const nextIdx=Math.min(5,i+d.length);
+    refs.current[nextIdx]?.focus();
+    doVerify(n);
+  };
+  const handleKeyDown=(i:number,e:React.KeyboardEvent<HTMLInputElement>)=>{
+    if(e.key==="Backspace"){
+      e.preventDefault();
+      if(digits[i]){
+        const n=[...digits];n[i]="";setDigits(n);setErr("");
+      } else if(i>0){
+        const n=[...digits];n[i-1]="";setDigits(n);setErr("");
+        refs.current[i-1]?.focus();
+      }
+    } else if(e.key==="Enter"){
+      doVerify(digits);
+    }
+  };
+  return <div className="auth-screen" dir="rtl"><div className="auth-logo-area"><img className="auth-logo-image" src={anPardazLogo} alt="لوگوی آن‌پرداز"/></div><div className="auth-card">
+    {onBack&&<button className="auth-back-btn" onClick={onBack}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>بازگشت</button>}
+    <div className="auth-kicker">ورود امن</div><h2>کد تأیید</h2><p>کد شش‌رقمی ارسال‌شده به <b>{phone.replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[+d])}</b> را وارد کنید.</p>
+    {devCode&&<div className="dev-code">حالت آزمایشی · کد ورود: <b>{devCode.replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[+d])}</b></div>}
+    <div className="otp-boxes" dir="ltr">{digits.map((d,i)=><input key={i} ref={el=>{refs.current[i]=el}} value={d?"۰۱۲۳۴۵۶۷۸۹"[+d]:""} inputMode="numeric" aria-label={`رقم ${fa(i+1)} کد تأیید`} onChange={e=>write(i,e.target.value)} onKeyDown={e=>handleKeyDown(i,e)}/>)}</div>
+    {err&&<p className="field-err">{err}</p>}<button className="primary-button" disabled={code.length!==6} onClick={()=>doVerify(digits)}>تأیید و ادامه</button><p className="auth-resend">{resendLeft>0?`ارسال دوباره کد تا ${fa(Math.ceil(resendLeft/60))} دقیقه دیگر`:<button onClick={()=>setResendLeft(120)}>ارسال دوباره کد</button>}</p>
+  </div></div>;
+}
+
+function OnboardPhoto({onDone,onBack,initialAccepted}:{onDone:(p:string)=>void;onBack?:()=>void;initialAccepted?:boolean}){
+  const [legal,setLegal]=useState(!initialAccepted),[scrolled,setScrolled]=useState(false),[accepted,setAccepted]=useState(initialAccepted||false),[recording,setRecording]=useState(false),[videoReady,setVideoReady]=useState(false),[cardReady,setCardReady]=useState(false),[preview,setPreview]=useState(""),[err,setErr]=useState("");
+  const live=useRef<HTMLVideoElement>(null), recorder=useRef<MediaRecorder|null>(null), streamRef=useRef<MediaStream|null>(null), chunks=useRef<Blob[]>([]), videoFile=useRef<HTMLInputElement>(null), cardFile=useRef<HTMLInputElement>(null);
+  useEffect(()=>()=>streamRef.current?.getTracks().forEach(track=>track.stop()),[]);
+  const start=async()=>{try{setErr("");const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"user"},width:{ideal:720},height:{ideal:960}},audio:true});streamRef.current=stream;chunks.current=[];setRecording(true);requestAnimationFrame(async()=>{if(live.current){live.current.srcObject=stream;await live.current.play().catch(()=>setErr("نمایش دوربین آغاز نشد؛ مجوز دوربین را بررسی کنید."))}const r=new MediaRecorder(stream);recorder.current=r;r.ondataavailable=e=>{if(e.data.size)chunks.current.push(e.data)};r.onstop=()=>{setVideoReady(chunks.current.length>0);stream.getTracks().forEach(t=>t.stop());streamRef.current=null};r.start(300)})}catch{setErr("دسترسی دوربین یا میکروفن فعال نیست. لطفاً مجوزها را تأیید کنید یا ویدیو را بارگذاری کنید.")}};
+  const stop=()=>{if(live.current&&live.current.videoWidth){const c=document.createElement("canvas");c.width=live.current.videoWidth;c.height=live.current.videoHeight;c.getContext("2d")?.drawImage(live.current,0,0);setPreview(c.toDataURL("image/jpeg",.75))}recorder.current?.stop();setRecording(false)};
+  const content=<><h2 style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",margin:"0 0 12px"}}>قوانین و شرایط استفاده از آن‌پرداز</h2><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",marginBottom:14}}>آن‌پرداز یک ابزار مدیریت مالی و دارایی دیجیتال است. افتتاح حساب و استفاده از خدمات، به معنی پذیرش این شرایط است.</p><h3 style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",margin:"18px 0 8px"}}>احراز هویت و مسئولیت کاربر</h3><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",margin:"0 0 10px"}}>کاربر متعهد است اطلاعات هویتی، شماره همراه، کارت بانکی و مدارک خود را صحیح، متعلق به خود و به‌روز وارد کند. استفاده از حساب شخص دیگر، ارائه مدرک جعلی یا هرگونه تلاش برای دورزدن احراز هویت ممنوع است.</p><h3 style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",margin:"18px 0 8px"}}>امنیت حساب</h3><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",margin:"0 0 10px"}}>حفظ رمز، کد تأیید و دسترسی دستگاه بر عهده کاربر است. آن‌پرداز هرگز رمز یا کد یک‌بارمصرف را از طریق تماس یا پیام درخواست نمی‌کند. در صورت مشاهده فعالیت مشکوک، خدمات می‌تواند موقتاً محدود شود.</p><h3 style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",margin:"18px 0 8px"}}>تراکنش‌ها و دارایی دیجیتال</h3><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",margin:"0 0 10px"}}>کاربر پیش از تأیید هر انتقال باید مقصد، شبکه، مبلغ و کارمزد را بررسی کند. تراکنش‌های ثبت‌شده در شبکه بلاک‌چین پس از تأیید قابل بازگشت نیستند.</p><h3 style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",margin:"18px 0 8px"}}>حریم خصوصی و مقررات</h3><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",margin:"0 0 10px"}}>اطلاعات فقط برای ارائه خدمات، کنترل تقلب و اجرای تکالیف قانونی پردازش می‌شود. آن‌پرداز در چارچوب قوانین جمهوری اسلامی ایران و الزامات مبارزه با پول‌شویی عمل می‌کند.</p><h3 style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",margin:"18px 0 8px"}}>محدودیت‌ها</h3><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",margin:"0 0 10px"}}>استفاده از خدمات برای فعالیت غیرقانونی، پول‌شویی، تأمین مالی اقدامات ممنوع یا ایجاد اختلال در سامانه ممنوع است.</p><p style={{fontSize:14,lineHeight:1.9,color:"var(--text-muted)",marginTop:14}}>با ادامه این مسیر، اعلام می‌کنید که متن را به‌طور کامل مطالعه کرده و آن را می‌پذیرید.</p></>;
+  return <><div className="auth-screen" dir="rtl"><div className="auth-card verification-card">
+    {onBack&&<button className="auth-back-btn" onClick={onBack}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>بازگشت</button>}
+    <div className="auth-kicker">مرحله ۱ از ۳ · احراز هویت</div>
+    <h2 style={{fontSize:22,fontWeight:900,color:"var(--text-primary)",margin:"0 0 10px"}}>تأیید هویت تصویری</h2>
+    <p style={{fontSize:15,color:"var(--text-muted)",lineHeight:1.8,marginBottom:16}}>متن تعهد را با صدای واضح بخوانید و در حین ضبط به دوربین نگاه کنید.</p>
+    <div className="camera-stage">{recording?<><video ref={live} muted playsInline className="video-preview"/><div className="recording-badge"><i/> در حال ضبط</div></>:preview?<img src={preview} alt="پیش‌نمایش ویدیو"/>:<div className="camera-placeholder"><Icon name="camera" size={35}/><span style={{fontSize:13}}>پس از شروع ضبط، تصویر دوربین اینجا دیده می‌شود.</span></div>}<div className="pledge-overlay" style={{fontSize:13,lineHeight:2}}>«من … نام و نام خانوادگی … با اطلاع کامل از قوانین نرم‌افزار آن‌پرداز، حساب کاربری خود را افتتاح می‌کنم.»</div></div>
+    <div className="verify-row" style={{paddingTop:16}}>
+      <div><b style={{fontSize:15}}>ویدیوی تعهد</b><span style={{fontSize:13}}>{videoReady?"✓ ویدیو دریافت شد":"ضبط یا بارگذاری الزامی"}</span></div>
+      {!videoReady?<button className="outline-button" style={{fontSize:14,padding:"10px 16px"}} onClick={recording?stop:start}>{recording?"پایان و ثبت ویدیو":"شروع ضبط ویدیو"}</button>:<span className="verify-ok">✓</span>}
+    </div>
+    <input ref={videoFile} type="file" accept="video/*" hidden onChange={e=>{if(e.target.files?.[0]){setVideoReady(true);setPreview("")}}}/>
+    {!videoReady&&!recording&&<button className="outline-button" style={{width:"100%",marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:14,padding:"12px"}} onClick={()=>videoFile.current?.click()}><Icon name="upload" size={16}/> آپلود ویدئو</button>}
+    <div className="verify-row">
+      <div><b style={{fontSize:15}}>تصویر کارت ملی</b><span style={{fontSize:13}}>{cardReady?"✓ مدرک دریافت شد":"بارگذاری تصویر الزامی"}</span></div>
+      <button className="outline-button" style={{fontSize:14,padding:"10px 16px"}} onClick={()=>cardFile.current?.click()}>{cardReady?"تغییر":"انتخاب فایل"}</button>
+    </div>
+    <input ref={cardFile} type="file" accept="image/*" hidden onChange={e=>{if(e.target.files?.[0])setCardReady(true)}}/>
+    {err&&<p className="field-err" style={{fontSize:14}}>{err}</p>}
+    <button className="primary-button" style={{marginTop:16,fontSize:15,padding:"15px"}} disabled={!accepted||!videoReady||!cardReady} onClick={()=>onDone(preview||"")}>ادامه</button>
+  </div></div>
+  {legal&&<div className="receipt-page" dir="rtl">
+    <div className="receipt-page-header">
+      <button className="back-btn" onClick={()=>setLegal(false)}><Icon name="arrow" size={20}/></button>
+      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>پیش از ادامه، قوانین را بخوانید</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="receipt-page-body">
+      <div className="legal-modal">
+        <div className="modal-head"><span style={{fontSize:12}}>مطالعه تا انتها الزامی است</span></div>
+        <div className="legal-copy" style={{fontSize:15,lineHeight:1.9}} onScroll={e=>{const el=e.currentTarget;if(el.scrollTop+el.clientHeight>=el.scrollHeight-8)setScrolled(true)}}>{content}</div>
+        <label className="legal-check" style={{fontSize:14}}><input type="checkbox" disabled={!scrolled} checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>قوانین و شرایط را خواندم و می‌پذیرم.</span></label>
+        <button className="primary-button" style={{margin:"0 16px 16px",fontSize:15,padding:"14px"}} disabled={!accepted} onClick={()=>setLegal(false)}>پذیرش و ادامه</button>
+      </div>
+    </div>
+  </div>}
+  </>;
+}
+
+function OnboardProfile({onDone,onBack,initialData}:{onDone:(d:{name:string;family:string;nationalId:string;birthDate:string})=>void;onBack?:()=>void;initialData?:{name:string;family:string;nationalId:string;birthDate:string}}){
+  const parseDate=(bd:string)=>{if(!bd)return{y:"۱۳۷۰",m:"۰۱",day:"۰۱"};const parts=bd.split("/");return{y:parts[0]||"۱۳۷۰",m:parts[1]||"۰۱",day:parts[2]||"۰۱"}};
+  const [d,setD]=useState({name:initialData?.name||"",family:initialData?.family||"",nationalId:initialData?.nationalId||"",birthDate:initialData?.birthDate||""});
+  const [err,setErr]=useState("");
+  const initParsed=parseDate(initialData?.birthDate||"");
+  const [date,setDate]=useState(initParsed);
+  const [picker,setPicker]=useState<"y"|"m"|"day"|null>(null);
+  const years=Array.from({length:90},(_,i)=>toFaDigits(String(1320+i)));
+  const two=(n:number)=>toFaDigits(String(n).padStart(2,"0"));
+  const title=picker==="y"?"انتخاب سال":picker==="m"?"انتخاب ماه":"انتخاب روز";
+  const options=picker==="y"?years:picker==="m"?Array.from({length:12},(_,i)=>two(i+1)):Array.from({length:31},(_,i)=>two(i+1));
+  const confirm=()=>{if(!d.name||!d.family||d.nationalId.length!==10){setErr("نام، نام خانوادگی و کد ملی ده‌رقمی الزامی است.");return}onDone({...d,birthDate:`${date.y}/${date.m}/${date.day}`})};
+  return <><div className="auth-screen" dir="rtl" style={{justifyContent:"center",minHeight:"100dvh"}}>
+    <div className="auth-card" style={{margin:"16px",padding:"24px 20px"}}>
+      {onBack&&<button className="auth-back-btn" onClick={onBack}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>بازگشت</button>}
+      <div className="auth-kicker" style={{fontSize:13,marginBottom:10}}>مرحله ۲ از ۳</div>
+      <h2 style={{fontSize:22,fontWeight:900,color:"var(--text-primary)",margin:"0 0 20px"}}>اطلاعات شخصی</h2>
+      <div className="form-stack" style={{gap:16}}>
+        <label style={{fontSize:14,color:"var(--text-secondary)",display:"block",fontWeight:600}}>نام
+          <input style={{marginTop:8,fontSize:16,padding:"13px 14px",borderRadius:14,width:"100%",boxSizing:"border-box",border:"1.5px solid var(--border-color)",background:"var(--input-bg)",color:"var(--text-primary)",outline:"none",fontFamily:"Vazirmatn"}} value={d.name} onChange={e=>setD(p=>({...p,name:e.target.value}))}/>
+        </label>
+        <label style={{fontSize:14,color:"var(--text-secondary)",display:"block",fontWeight:600}}>نام خانوادگی
+          <input style={{marginTop:8,fontSize:16,padding:"13px 14px",borderRadius:14,width:"100%",boxSizing:"border-box",border:"1.5px solid var(--border-color)",background:"var(--input-bg)",color:"var(--text-primary)",outline:"none",fontFamily:"Vazirmatn"}} value={d.family} onChange={e=>setD(p=>({...p,family:e.target.value}))}/>
+        </label>
+        <label style={{fontSize:14,color:"var(--text-secondary)",display:"block",fontWeight:600}}>کد ملی
+          <input
+            style={{marginTop:8,fontSize:20,padding:"13px 14px",borderRadius:14,width:"100%",boxSizing:"border-box",border:"1.5px solid var(--border-color)",background:"var(--input-bg)",color:"var(--text-primary)",outline:"none",fontFamily:"Vazirmatn",letterSpacing:4,direction:"ltr",textAlign:"center"}}
+            value={toFaDigits(d.nationalId)}
+            inputMode="numeric"
+            maxLength={10}
+            dir="ltr"
+            onKeyDown={e=>{const ok=["Backspace","Delete","Tab","ArrowLeft","ArrowRight","Home","End"];if(ok.includes(e.key)||e.ctrlKey||e.metaKey)return;if(!/^[0-9۰-۹]$/.test(e.key)){e.preventDefault();return}if(d.nationalId.length>=10)e.preventDefault();}}
+            onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,10);setD(p=>({...p,nationalId:v}))}}
+          />
+        </label>
+      </div>
+      <label style={{marginTop:22,display:"block",marginBottom:0,fontSize:14,color:"var(--text-secondary)",fontWeight:600}}>تاریخ تولد
+        <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr 1fr",gap:10,marginTop:10}}>
+          <button type="button" style={{border:"1.5px solid var(--border-color)",background:"var(--input-bg)",borderRadius:14,color:"var(--text-primary)",padding:"13px 8px",fontFamily:"Vazirmatn",fontSize:18,fontWeight:700,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}} onClick={()=>setPicker("y")}>{date.y}<small style={{fontSize:11,color:"var(--text-muted)",fontWeight:400}}>سال</small></button>
+          <button type="button" style={{border:"1.5px solid var(--border-color)",background:"var(--input-bg)",borderRadius:14,color:"var(--text-primary)",padding:"13px 8px",fontFamily:"Vazirmatn",fontSize:18,fontWeight:700,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}} onClick={()=>setPicker("m")}>{date.m}<small style={{fontSize:11,color:"var(--text-muted)",fontWeight:400}}>ماه</small></button>
+          <button type="button" style={{border:"1.5px solid var(--border-color)",background:"var(--input-bg)",borderRadius:14,color:"var(--text-primary)",padding:"13px 8px",fontFamily:"Vazirmatn",fontSize:18,fontWeight:700,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}} onClick={()=>setPicker("day")}>{date.day}<small style={{fontSize:11,color:"var(--text-muted)",fontWeight:400}}>روز</small></button>
+        </div>
+      </label>
+      {err&&<p className="field-err" style={{fontSize:14,marginTop:12}}>{err}</p>}
+      <button className="primary-button" style={{marginTop:28,fontSize:15,padding:"15px"}} onClick={confirm}>ادامه</button>
+    </div>
+  </div>
+  {picker&&<div className="receipt-page" dir="rtl">
+    <div className="receipt-page-header">
+      <button className="back-btn" onClick={()=>setPicker(null)}><Icon name="arrow" size={20}/></button>
+      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>{title}</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="receipt-page-body">
+      <div className="date-option-grid" style={{paddingTop:16,paddingBottom:20}}>
+        {options.map(v=><button key={v} style={{fontSize:15,padding:"12px 4px",borderRadius:12,fontWeight:600,fontFamily:"Vazirmatn",border:"1px solid var(--border-color)",background:date[picker!]===v?"var(--accent)":"var(--card-bg2)",color:date[picker!]===v?"#000":"var(--text-primary)",cursor:"pointer"}} className={date[picker!]===v?"active":""} onClick={()=>{setDate(p=>({...p,[picker!]:v}));setPicker(null)}}>{v}</button>)}
+      </div>
+    </div>
+  </div>}
+  </>;
+}
+
+
+// ─── Onboard PIN ──────────────────────────────────────────────────────────────
+function OnboardPin({onDone,onSkip,onBack}:{onDone:(pin:string)=>void;onSkip?:()=>void;onBack?:()=>void}){
+  const [step,setStep]=useState<"enter"|"confirm">("enter");const [first,setFirst]=useState("");const [cur,setCur]=useState("");const [err,setErr]=useState("");
+  const tap=(d:string)=>{const next=cur+d;if(next.length>4)return;setCur(next);if(next.length===4){setTimeout(()=>{if(step==="enter"){setFirst(next);setCur("");setStep("confirm");setErr("")}else{if(next===first)onDone(next);else{setErr("رمزها یکسان نیستند.");setFirst("");setCur("");setStep("enter")}}},150)}};
+  const del=()=>setCur(p=>p.slice(0,-1));
+  const KEYS=["1","2","3","4","5","6","7","8","9","","0","del"];
+  const FA_DIG:Record<string,string>={"1":"۱","2":"۲","3":"۳","4":"۴","5":"۵","6":"۶","7":"۷","8":"۸","9":"۹","0":"۰"};
+  return <div className="auth-screen" dir="rtl" style={{justifyContent:"center",alignItems:"center",minHeight:"100dvh"}}>
+    <div className="auth-card pin-card" style={{margin:"16px",width:"100%",maxWidth:380,boxSizing:"border-box"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        {onBack?<button className="auth-back-btn" style={{margin:0}} onClick={()=>{setStep("enter");setFirst("");setCur("");setErr("");onBack()}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>بازگشت</button>:<div/>}
+        {onSkip&&<button onClick={onSkip} style={{background:"none",border:"none",color:"var(--text-muted)",fontSize:13,cursor:"pointer",fontFamily:"Vazirmatn",padding:"4px 8px",textDecoration:"underline"}}>رد کردن</button>}
+      </div>
+      <div style={{fontSize:13,color:"#00D6B0",fontWeight:700,marginBottom:10}}>مرحله ۳ از ۳</div>
+      <div style={{display:"flex",justifyContent:"center",marginBottom:14,color:"#00D6B0"}}><Icon name="lock" size={36}/></div>
+      <h2 style={{fontSize:22,fontWeight:900,color:"#F4FAFC",textAlign:"center",marginBottom:8}}>{step==="enter"?"رمز ۴ رقمی بسازید":"تأیید رمز"}</h2>
+      <p style={{fontSize:14,color:"var(--text-muted)",textAlign:"center",lineHeight:1.7,marginBottom:4}}>{step==="enter"?"یک رمز ۴ رقمی برای ورود به حساب انتخاب کنید":"رمز انتخابی خود را دوباره وارد کنید"}</p>
+      <div style={{display:"flex",justifyContent:"center",gap:16,margin:"22px 0"}}>
+        {[0,1,2,3].map(i=><div key={i} style={{width:16,height:16,borderRadius:"50%",background:cur.length>i?"#00D6B0":"rgba(120,190,210,0.2)",transition:"background 0.2s",boxShadow:cur.length>i?"0 0 12px rgba(0,214,176,0.5)":"none"}}/>)}
+      </div>
+      {err&&<p className="field-err" style={{textAlign:"center",fontSize:14,marginBottom:10}}>{err}</p>}
+      <div dir="ltr" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginTop:4}}>
+        {KEYS.map((k,i)=>k===""?<div key={i}/>:k==="del"?<button key={i} style={{height:68,borderRadius:16,background:"#071D2C",border:"1px solid rgba(120,190,210,0.15)",cursor:"pointer",color:"#F4FAFC",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={del}><Icon name="delete" size={22}/></button>:<button key={i} style={{height:68,borderRadius:16,background:"#071D2C",border:"1px solid rgba(120,190,210,0.15)",cursor:"pointer",color:"#F4FAFC",fontSize:28,fontWeight:700,fontFamily:"Vazirmatn"}} onClick={()=>tap(k)}>{FA_DIG[k]}</button>)}
+      </div>
+    </div>
+  </div>;
+}
+
+// ─── Verification Animation ───────────────────────────────────────────────────
+function VerificationAnimation({onSuccess,onFail}:{onSuccess:()=>void;onFail:()=>void}){
+  const [phase,setPhase]=useState<"loading"|"success"|"fail">("loading");
+  const [count,setCount]=useState(6);
+  const [fadeOut,setFadeOut]=useState(false);
+
+  useEffect(()=>{
+    if(phase!=="loading")return;
+    if(count<=0){
+      setPhase("success");
+      setTimeout(()=>{
+        setFadeOut(true);
+        setTimeout(()=>onSuccess(),700);
+      },2000);
+      return;
+    }
+    const t=setTimeout(()=>setCount(c=>c-1),1000);
+    return()=>clearTimeout(t);
+  },[count,phase]);
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"#020e18",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",opacity:fadeOut?0:1,transition:"opacity 0.7s ease"}} dir="rtl">
+      {phase==="loading"&&(
+        <div style={{position:"relative",width:120,height:120}}>
+          <svg width={120} height={120} viewBox="0 0 120 120" style={{position:"absolute",inset:0}}>
+            <circle cx={60} cy={60} r={52} fill="none" stroke="rgba(0,214,176,0.12)" strokeWidth={7}/>
+            <circle cx={60} cy={60} r={52} fill="none" stroke="#00D6B0" strokeWidth={7}
+              strokeDasharray={`${2*Math.PI*52*0.72} ${2*Math.PI*52*0.28}`}
+              strokeLinecap="round"
+              style={{transformOrigin:"50% 50%",animation:"spinVerify 1.2s linear infinite"}}/>
+          </svg>
+          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,fontWeight:900,color:"#00D6B0",fontFamily:"Vazirmatn"}}>{toFaDigits(String(count))}</div>
+        </div>
+      )}
+      {phase==="success"&&(
+        <div style={{width:120,height:120,animation:"fadeInScale 0.35s ease forwards"}}>
+          <svg width={120} height={120} viewBox="0 0 120 120">
+            <circle cx={60} cy={60} r={52} fill="none" stroke="rgba(0,214,176,0.18)" strokeWidth={5}/>
+            <circle cx={60} cy={60} r={52} fill="none" stroke="#00D6B0" strokeWidth={5}
+              strokeDasharray={`${2*Math.PI*52}`}
+              strokeDashoffset={0}
+              style={{animation:"circleIn 0.5s ease forwards"}}/>
+            <polyline points="34,62 52,80 86,42" fill="none" stroke="#00D6B0" strokeWidth={7} strokeLinecap="round" strokeLinejoin="round"
+              style={{animation:"checkDraw 0.6s ease 0.4s forwards",strokeDasharray:72,strokeDashoffset:72}}/>
+          </svg>
+        </div>
+      )}
+      {phase==="fail"&&(
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:24,padding:32}}>
+          <div style={{width:120,height:120}}>
+            <svg width={120} height={120} viewBox="0 0 120 120">
+              <circle cx={60} cy={60} r={52} fill="none" stroke="rgba(229,57,53,0.2)" strokeWidth={5}/>
+              <circle cx={60} cy={60} r={52} fill="none" stroke="#e53935" strokeWidth={5}/>
+              <line x1={40} y1={40} x2={80} y2={80} stroke="#e53935" strokeWidth={7} strokeLinecap="round"/>
+              <line x1={80} y1={40} x2={40} y2={80} stroke="#e53935" strokeWidth={7} strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:18,fontWeight:900,color:"#e53935",marginBottom:8}}>احراز هویت تایید نشد</div>
+            <div style={{fontSize:13,color:"rgba(255,255,255,0.45)",marginBottom:24}}>لطفاً مراحل تنظیم رمز را دوباره انجام دهید</div>
+            <button className="primary-button" style={{background:"#e53935",minWidth:200}} onClick={onFail}>تلاش مجدد</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PinUnlock({user,onVerified}:{user:UserData;onVerified:()=>void}){
+  const [pin,setPin]=useState(""),[error,setError]=useState(""),[support,setSupport]=useState(false);
+  const tap=(digit:string)=>{const next=pin+digit;if(next.length>4)return;setPin(next);setError("");if(next.length===4)setTimeout(()=>{if(next===user.pin)onVerified();else{setPin("");setError("رمز امنیتی صحیح نیست. دوباره تلاش کنید.")}},150)};
+  const keys=["1","2","3","4","5","6","7","8","9","","0","del"];
+  return <div className="auth-screen" dir="rtl"><div className="auth-card pin-card pin-unlock-card"><img src={anPardazLogo} alt="آن‌پرداز" className="pin-logo"/><div style={{display:"flex",justifyContent:"center",marginBottom:12,color:"#00D6B0"}}><Icon name="lock" size={32}/></div><h2>رمز امنیتی را وارد کنید</h2><p>برای ورود به حساب {toFaDigits(user.phone)}، رمز ۴ رقمی خود را وارد کنید.</p><div style={{display:"flex",justifyContent:"center",gap:16,margin:"20px 0"}}>{[0,1,2,3].map(i=><div key={i} style={{width:16,height:16,borderRadius:"50%",background:pin.length>i?"#00D6B0":"rgba(120,190,210,0.2)",transition:"background 0.2s"}}/>)}</div>{error&&<p className="field-err" style={{textAlign:"center"}}>{error}</p>}<div dir="ltr" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>{keys.map((key,i)=>key===""?<div key={i}/>:key==="del"?<button key={i} onClick={()=>setPin(v=>v.slice(0,-1))} style={{height:68,borderRadius:16,background:"#071D2C",border:"1px solid rgba(120,190,210,0.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#F4FAFC"}}><Icon name="delete" size={22}/></button>:<button key={i} onClick={()=>tap(key)} style={{height:68,borderRadius:16,background:"#071D2C",border:"1px solid rgba(120,190,210,0.15)",fontSize:28,fontWeight:700,fontFamily:"Vazirmatn",color:"#F4FAFC",cursor:"pointer"}}>{toFaDigits(key)}</button>)}</div><button className="forgot-pin" onClick={()=>setSupport(true)}>رمز خود را فراموش کرده‌اید؟</button></div>{support&&<div className="receipt-page" dir="rtl"><div className="receipt-page-header"><button className="back-btn" onClick={()=>setSupport(false)}><Icon name="arrow" size={20}/></button><h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>بازیابی رمز امنیتی</h2><div style={{width:36}}/></div><div className="receipt-page-body" style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 24px"}}><img src={anPardazLogo} alt="آن‌پرداز" style={{width:64,height:64,borderRadius:16,marginBottom:20}}/><h3 style={{marginBottom:12}}>بازیابی رمز امنیتی</h3><p style={{textAlign:"center",lineHeight:1.8,marginBottom:8}}>برای غیرفعال کردن رمز فراموش‌شده، با پشتیبانی آن‌پرداز تماس بگیرید.</p><div style={{fontSize:18,fontWeight:900,color:"#00D6B0",letterSpacing:2,margin:"12px 0",fontFamily:"Vazirmatn",direction:"ltr"}}>۰۹۳۷۵۴۳۷۱۰۶</div><button className="primary-button" style={{marginTop:16,width:"100%"}} onClick={()=>setSupport(false)}>متوجه شدم</button></div></div>}</div>;
+}
+
+// ─── Bank detection by card prefix ───────────────────────────────────────────
+// 6-digit BINs (spec-provided) take priority; 4-digit prefixes as fallback
+const BANK_BIN6:Record<string,string>={
+  "627412":"بانک اقتصاد نوین",
+  "504706":"بانک شهر",
+  "627381":"بانک انصار",
+  "603769":"بانک صادرات",
+  "505785":"بانک ایران زمین",
+  "627961":"بانک صنعت و معدن",
+  "622106":"بانک پارسیان","639194":"بانک پارسیان","627884":"بانک پارسیان",
+  "606373":"بانک مهر ایران",
+  "639599":"بانک قوامین",
+  "627488":"بانک کارآفرین","502910":"بانک کارآفرین",
+  "639347":"بانک پاسارگاد","502229":"بانک پاسارگاد",
+  "603770":"بانک کشاورزی",
+  "636214":"بانک آینده",
+  "505416":"بانک گردشگری",
+  "627753":"بانک تجارت",
+  "502908":"توسعه تعاون",
+  "636795":"بانک مرکزی",
+  "628023":"بانک مسکن",
+  "627648":"توسعه صادرات","207177":"توسعه صادرات",
+  "610433":"بانک ملت","991975":"بانک ملت",
+  "636949":"بانک حکمت ایرانیان",
+  "502938":"بانک دی",
+  "603799":"بانک ملی",
+  "589463":"بانک رفاه",
+  "606256":"اعتباری ملل",
+  "621986":"بانک سامان",
+  "639370":"مهر اقتصاد",
+  "589210":"بانک سپه",
+  "627760":"پست بانک",
+  "639607":"بانک سرمایه",
+  "628157":"مؤسسه اعتباری توسعه",
+  "639346":"بانک سینا",
+  "505801":"مؤسسه اعتباری کوثر",
+  "6399":"بانک رسالت",
+};
+const BANK_PREFIX:Record<string,string>={
+  "6037":"بانک ملی","6036":"بانک ملی",
+  "6219":"بانک سامان",
+  "6104":"بانک رفاه","6105":"بانک رفاه",
+  "5894":"بانک سپه","5895":"بانک سپه",
+  "6228":"بانک پاسارگاد","5022":"بانک پاسارگاد",
+  "5028":"بانک پارسیان","6221":"بانک پارسیان","6223":"بانک پارسیان",
+  "6274":"بانک اقتصاد نوین","6063":"بانک اقتصاد نوین","5606":"بانک اقتصاد نوین",
+  "6362":"بانک ایران زمین",
+  "9891":"بانک تجارت","6280":"بانک تجارت","5892":"بانک تجارت",
+  "5859":"توسعه صادرات",
+  "6276":"بانک صادرات","6279":"بانک صادرات",
+  "6369":"بانک ملت","6379":"بانک ملت",
+  "6273":"بانک مسکن",
+  "6395":"بانک قوامین",
+  "9101":"پست بانک",
+  "6034":"بانک کشاورزی","6033":"بانک کشاورزی",
+  "6392":"بانک سینا",
+  "6270":"بانک کارآفرین","6271":"بانک کارآفرین","6272":"بانک کارآفرین",
+  "6397":"بانک سرمایه",
+  "6393":"بانک حکمت ایرانیان",
+  "6378":"بانک دی",
+  "5041":"بانک شهر",
+  "5057":"بانک گردشگری",
+  "6381":"توسعه تعاون",
+  "6394":"بانک مهر ایران",
+  "6277":"بانک انصار",
+  "6399":"بانک رسالت",
+  "6064":"بانک صنعت و معدن",
+};
+type BankInfo={color:string;textColor:string;logo?:string;abbr:string};
+const BANK_THEME:Record<string,BankInfo>={
+  "بانک ملی":              {color:"#003d82",textColor:"#fff",logo:logoMeli,abbr:"ملی"},
+  "بانک سامان":            {color:"#039be5",textColor:"#fff",abbr:"سام"},
+  "بانک رفاه":             {color:"#3949AB",textColor:"#fff",logo:logoRefah,abbr:"رفاه"},
+  "بانک سپه":              {color:"#37474F",textColor:"#fff",logo:logoSepah,abbr:"سپه"},
+  "بانک پاسارگاد":         {color:"#1565C0",textColor:"#fff",abbr:"پاس"},
+  "بانک پارسیان":          {color:"#5D4037",textColor:"#fff",logo:logoParsian,abbr:"پار"},
+  "بانک اقتصاد نوین":      {color:"#1a237e",textColor:"#fff",abbr:"اقن"},
+  "بانک ایران زمین":       {color:"#7B1FA2",textColor:"#fff",logo:logoIranZamin,abbr:"ایز"},
+  "بانک تجارت":            {color:"#2b3990",textColor:"#fff",logo:logoTejarat,abbr:"تجا"},
+  "توسعه صادرات":          {color:"#1b5e20",textColor:"#fff",logo:logoToseeSaderat,abbr:"تصد"},
+  "بانک صادرات":           {color:"#1565C0",textColor:"#fff",abbr:"صاد"},
+  "بانک ملت":              {color:"#c62828",textColor:"#fff",logo:logoMellat,abbr:"ملت"},
+  "بانک مسکن":             {color:"#E8521A",textColor:"#fff",logo:logoMaskan,abbr:"مسکن"},
+  "بانک قوامین":           {color:"#1565C0",textColor:"#fff",abbr:"قوا"},
+  "پست بانک":              {color:"#2e7d32",textColor:"#fff",logo:logoPostBank,abbr:"پست"},
+  "بانک کشاورزی":          {color:"#2e7d32",textColor:"#fff",logo:logoKeshavarzi,abbr:"کشا"},
+  "بانک سینا":             {color:"#0288d1",textColor:"#fff",abbr:"سینا"},
+  "بانک کارآفرین":         {color:"#1a9a4a",textColor:"#fff",logo:logoKarafarin,abbr:"کار"},
+  "بانک سرمایه":           {color:"#1e3a5f",textColor:"#fff",logo:logoSarmayeh,abbr:"سرم"},
+  "بانک حکمت ایرانیان":   {color:"#1565C0",textColor:"#fff",logo:logoHekmat,abbr:"حکم"},
+  "بانک دی":               {color:"#009688",textColor:"#fff",logo:logoDi,abbr:"دی"},
+  "بانک شهر":              {color:"#e53935",textColor:"#fff",logo:logoShahr,abbr:"شهر"},
+  "بانک گردشگری":          {color:"#c62828",textColor:"#fff",logo:logoGardeshgari,abbr:"گرد"},
+  "توسعه تعاون":           {color:"#00897B",textColor:"#fff",logo:logoToseeTaavon,abbr:"تتع"},
+  "بانک مهر ایران":        {color:"#2e7d32",textColor:"#fff",logo:logoMehr,abbr:"مهر"},
+  "بانک انصار":            {color:"#8b0000",textColor:"#fff",logo:logoAnsar,abbr:"انص"},
+  "بانک رسالت":            {color:"#0097A7",textColor:"#fff",logo:logoResalat,abbr:"رسا"},
+  "بانک صنعت و معدن":      {color:"#B8972E",textColor:"#fff",logo:logoSanatMadan,abbr:"صم"},
+  "اعتباری ملل":           {color:"#1565C0",textColor:"#fff",logo:logoMelal,abbr:"ملل"},
+  "بانک آینده":            {color:"#6A1B9A",textColor:"#fff",abbr:"آین"},
+  "مهر اقتصاد":            {color:"#388E3C",textColor:"#fff",abbr:"مهر"},
+  "مؤسسه اعتباری توسعه":  {color:"#1565C0",textColor:"#fff",abbr:"توس"},
+  "مؤسسه اعتباری کوثر":   {color:"#7B1FA2",textColor:"#fff",abbr:"کوث"},
+};
+function getBankInfo(name:string):BankInfo|undefined{
+  if(!name)return undefined;
+  const direct=BANK_THEME[name];if(direct)return direct;
+  const key=Object.keys(BANK_THEME).find(k=>name.includes(k.replace("بانک ",""))||k.includes(name));
+  return key?BANK_THEME[key]:undefined;
+}
+function detectBank(num:string):string{
+  const n=num.replace(/\s/g,"");
+  return BANK_BIN6[n.slice(0,6)]||BANK_PREFIX[n.slice(0,4)]||"";
+}
+
+// ─── Clipboard Icon Button ────────────────────────────────────────────────────
+function PasteIconBtn({onPaste,filter}:{onPaste:(v:string)=>void;filter?:(v:string)=>string}){
+  const [flash,setFlash]=useState(false);
+  const handle=async()=>{
+    try{
+      const t=await navigator.clipboard.readText();
+      onPaste(filter?filter(t.trim()):t.trim());
+      setFlash(true);setTimeout(()=>setFlash(false),500);
+    }catch{}
+  };
+  return <button type="button" className={`paste-icon-btn${flash?" flash":""}`} onClick={handle} aria-label="الصاق از کلیپ‌بورد">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2"/>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+  </button>;
+}
+
+// ─── OTP Cooldown Button ─────────────────────────────────────────────────────
+function OtpCooldownBtn({onRequest,cardId,noCard}:{onRequest:()=>void;cardId?:string;noCard?:boolean}){
+  const storageKey=cardId?`anp_otp_cd_${cardId}`:"";
+  const getInitialCd=()=>{if(!storageKey)return 0;try{const ts=Number(localStorage.getItem(storageKey)||0);if(!ts)return 0;const elapsed=Math.floor((Date.now()-ts)/1000);const remaining=40-elapsed;return remaining>0?remaining:0;}catch{return 0;}};
+  const [cd,setCd]=useState(getInitialCd);
+  const [showNoCard,setShowNoCard]=useState(false);
+  const r=9,circ=2*Math.PI*r;
+  const handle=()=>{
+    if(cd>0)return;
+    if(noCard){setShowNoCard(true);setTimeout(()=>setShowNoCard(false),3000);return;}
+    onRequest();
+    if(storageKey)localStorage.setItem(storageKey,String(Date.now()));
+    setCd(40);
+  };
+  useEffect(()=>{
+    if(cd<=0)return;
+    const t=setTimeout(()=>setCd(c=>c-1),1000);
+    return()=>clearTimeout(t);
+  },[cd]);
+  return(
+    <>
+      <button type="button" className={`otp-request-btn${cd>0?" otp-cooldown":""}`}
+        onClick={handle} aria-label="درخواست رمز پویا"
+        style={{display:"flex",alignItems:"center",justifyContent:"center",userSelect:"none",pointerEvents:"auto",cursor:cd>0?"default":"pointer",minWidth:88,minHeight:44}}>
+        {cd>0?(
+          <span className="otp-cd-wrap">
+            <svg width="22" height="22" viewBox="0 0 22 22" style={{flexShrink:0}}>
+              <circle cx="11" cy="11" r={r} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="2.5"/>
+              <circle cx="11" cy="11" r={r} fill="none" stroke="rgba(255,255,255,0.88)" strokeWidth="2.5"
+                strokeDasharray={circ}
+                strokeDashoffset={circ*(1-cd/40)}
+                strokeLinecap="round"
+                transform="rotate(-90 11 11)"
+                style={{transition:"stroke-dashoffset 0.95s linear"} as React.CSSProperties}/>
+            </svg>
+            <span className="otp-cd-num">{cd}</span>
+          </span>
+        ):<span>رمز پویا</span>}
+      </button>
+      {showNoCard&&<div style={{margin:"12px 16px",padding:"16px",borderRadius:14,background:"rgba(255,140,0,0.1)",border:"1px solid rgba(255,140,0,0.3)",color:"var(--text-primary)",display:"flex",alignItems:"flex-start",gap:12,direction:"rtl"}}>
+        <span style={{flex:1,fontSize:14,lineHeight:1.7}}>لطفا ابتدا کارت بانکی مورد نظر خود را انتخاب کنید</span>
+        <button onClick={()=>setShowNoCard(false)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",fontSize:18,lineHeight:1}}>✕</button>
+      </div>}
+    </>
+  );
+}
+
+// ─── Animated Card Input ──────────────────────────────────────────────────────
+const CARD_SAMPLE="۶۱۰۴ ۶۶۴۳ ۷۶۴۴ ۷۸۹۷";
+function AnimatedCardInput({value,onChange,className,style,...rest}:{value:string;onChange:(v:string)=>void;className?:string;style?:React.CSSProperties;[k:string]:unknown}){
+  const [tick,setTick]=useState(0);
+  const {placeholder:customPlaceholder,...restStripped}=rest as {placeholder?:string;[k:string]:unknown};
+  useEffect(()=>{
+    if(value){setTick(0);return;}
+    if(tick>=CARD_SAMPLE.length)return;
+    // Delay start of card animation when a custom hint placeholder is provided
+    const delay=tick===0&&customPlaceholder?2800:90;
+    const t=setTimeout(()=>setTick(n=>n+1),delay);
+    return()=>clearTimeout(t);
+  },[tick,value,customPlaceholder]);
+  useEffect(()=>{if(!value)setTick(0);},[value]);
+  return <input {...restStripped as object}
+    className={`${className||""} card-anim-input`}
+    style={style}
+    value={value}
+    onChange={e=>onChange(e.target.value)}
+    placeholder={tick>0?CARD_SAMPLE.slice(0,tick):(customPlaceholder||"شماره کارت")}
+  />;
+}
+
+// ─── Global Sticky Action Button ─────────────────────────────────────────────
+function StickyActionBtn({label,onClick,disabled,loading,loadingText}:{
+  label:string;onClick:()=>void;disabled?:boolean;loading?:boolean;loadingText?:string;noBleed?:boolean;
+}){
+  return createPortal(
+    <div className="sab-fixed-portal">
+      <button className="sab-btn" onClick={onClick} disabled={disabled||loading} aria-disabled={disabled||loading}>
+        {loading?(
+          <span className="sab-loading">
+            <svg className="sab-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+            {loadingText||"در حال پردازش..."}
+          </span>
+        ):label}
+      </button>
+    </div>,
+    document.body
+  );
+}
+
+// ─── Destination Card Picker Screen ──────────────────────────────────────────
+interface DestCard {id:string;number:string;bank:string;holderName:string}
+function getDestCards(phone:string):DestCard[]{
+  try{
+    const stored=JSON.parse(localStorage.getItem(`anp_dest_cards_${phone}`)??"null");
+    if(Array.isArray(stored)&&stored.length>0)return stored;
+    // seed sample cards
+    const seed:DestCard[]=[
+      {id:"dc1",number:"6037997599887766",bank:"بانک ملی",holderName:"علی احمدی"},
+      {id:"dc2",number:"6104338700112233",bank:"بانک ملت",holderName:"مریم رضایی"},
+      {id:"dc3",number:"5892101234567890",bank:"بانک سپه",holderName:"حسین کریمی"},
+      {id:"dc4",number:"6274129876543210",bank:"بانک اقتصاد نوین",holderName:"زهرا محمدی"},
+    ];
+    localStorage.setItem(`anp_dest_cards_${phone}`,JSON.stringify(seed));
+    return seed;
+  }catch{return[]}
+}
+function saveDestCards(phone:string,cards:DestCard[]){try{localStorage.setItem(`anp_dest_cards_${phone}`,JSON.stringify(cards))}catch{}}
+
+function CardPickerScreen({phone,onSelect,onBack}:{phone:string;onSelect:(card:DestCard)=>void;onBack:()=>void}){
+  const [cards,setCards]=useState<DestCard[]>(()=>getDestCards(phone));
+  const [nameSearch,setNameSearch]=useState("");
+  const [numInput,setNumInput]=useState("");
+  const [showCameraScan,setShowCameraScan]=useState(false);
+  const [deleteConfirmId,setDeleteConfirmId]=useState<string|null>(null);
+  const fmtCardInput=(v:string)=>v.replace(/\D/g,"").slice(0,16).replace(/(.{4})(?=.)/g,"$1 ");
+
+  const rawNum=toLatinDigits(numInput).replace(/\D/g,"");
+  const manualBank=rawNum.length>=4?detectBank(rawNum):"";
+
+  const filtered=cards.filter(c=>{
+    const n=nameSearch.trim();
+    const byName=!n||c.holderName.includes(n);
+    const byNum=!rawNum||c.number.includes(rawNum);
+    return byName&&byNum;
+  });
+
+  const doDelete=(id:string)=>{
+    const next=cards.filter(c=>c.id!==id);
+    setCards(next);saveDestCards(phone,next);
+    setDeleteConfirmId(null);
+  };
+
+  const useManual=()=>{
+    if(rawNum.length===16){
+      onSelect({id:"manual-"+rawNum,number:rawNum,bank:manualBank||"کارت بانکی",holderName:""});
+    }
+  };
+
+  useBackHandler(onBack);
+
+  return (
+    <div className="subscreen" dir="rtl" style={{display:"flex",flexDirection:"column",height:"100%",background:"var(--subscreen-bg)"}}>
+
+      {/* ── Header ── */}
+      <div className="subscreen-header" style={{flexShrink:0}}>
+        <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+        <h2 className="subscreen-title">انتخاب کارت مقصد</h2>
+        <div style={{width:36}}/>
+      </div>
+
+      {/* ── Search fields ── */}
+      <div style={{padding:"12px 16px 0",flexShrink:0,display:"flex",flexDirection:"column",gap:10}}>
+
+        {/* Name search — large bold text */}
+        <div style={{display:"flex",alignItems:"center",gap:10,background:"var(--input-bg)",border:"1.5px solid var(--border-color)",borderRadius:14,padding:"13px 16px"}}>
+          <Icon name="search" size={18}/>
+          <input
+            style={{flex:1,background:"none",border:"none",outline:"none",color:"var(--text-primary)",fontSize:17,fontWeight:700,fontFamily:"Vazirmatn",direction:"rtl",minWidth:0}}
+            placeholder="جستجو بر اساس نام"
+            value={nameSearch}
+            onChange={e=>setNameSearch(e.target.value)}
+          />
+          {nameSearch&&(
+            <button onClick={()=>setNameSearch("")} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",padding:0,flexShrink:0,display:"flex",alignItems:"center"}}>
+              <Icon name="x" size={16}/>
+            </button>
+          )}
+        </div>
+
+        {/* Card number input — large bold digits */}
+        <div style={{display:"flex",alignItems:"center",gap:10,background:"var(--input-bg)",border:`1.5px solid ${rawNum.length===16?"var(--accent)":"var(--border-color)"}`,borderRadius:14,padding:"13px 16px",transition:"border-color .2s"}}>
+          {manualBank
+            ?<BankLogo bankName={manualBank} size={28} rounded={8}/>
+            :<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.8" strokeLinecap="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h4"/></svg>
+          }
+          <input
+            dir="ltr"
+            style={{flex:1,background:"none",border:"none",outline:"none",color:"var(--text-primary)",fontSize:19,fontWeight:800,fontFamily:"Vazirmatn",letterSpacing:"0.08em",textAlign:"right",minWidth:0}}
+            placeholder="شماره کارت"
+            inputMode="numeric"
+            maxLength={19}
+            value={toFaDigits(fmtCardInput(numInput))}
+            onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,16);setNumInput(v)}}
+          />
+          {numInput?<button onClick={()=>setNumInput("")} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",padding:0,flexShrink:0,display:"flex",alignItems:"center"}}><Icon name="x" size={16}/></button>
+          :<button onClick={()=>setShowCameraScan(true)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--accent)",padding:4,flexShrink:0,display:"flex",alignItems:"center"}} title="اسکن کارت">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </button>}
+        </div>
+        {showCameraScan&&<CameraCardScanModal onClose={()=>setShowCameraScan(false)} onDetect={num=>{setNumInput(num);setShowCameraScan(false);}}/>}
+
+        {/* Use manual card — appears only when 16 digits are typed */}
+        {rawNum.length===16&&(
+          <button onClick={useManual} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(0,214,176,0.08)",border:"1.5px solid rgba(0,214,176,0.28)",borderRadius:14,padding:"13px 16px",cursor:"pointer",fontFamily:"Vazirmatn",transition:"all .15s"}}>
+            <span style={{fontSize:16,fontWeight:700,color:"var(--accent)"}}>استفاده از این شماره کارت</span>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              {manualBank&&<BankLogo bankName={manualBank} size={28} rounded={8}/>}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round"><path d="m9 18-6-6 6-6"/></svg>
+            </div>
+          </button>
+        )}
+      </div>
+
+      {/* ── Section label ── */}
+      <div style={{padding:"14px 16px 6px",flexShrink:0}}>
+        <span style={{fontSize:13,color:"var(--text-muted)",fontWeight:700}}>
+          {nameSearch||rawNum?"نتایج جستجو":"کارت‌های قبلی"}
+        </span>
+      </div>
+
+      {/* ── Saved card list ── */}
+      <div style={{flex:1,overflowY:"auto",padding:"0 16px 40px",scrollbarWidth:"none"}}>
+        {filtered.length===0?(
+          <div style={{textAlign:"center",padding:"52px 20px",color:"var(--text-muted)"}}>
+            <div style={{width:60,height:60,borderRadius:18,background:"var(--card-bg2)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
+              <Icon name="credit" size={28}/>
+            </div>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:8,color:"var(--text-secondary)"}}>
+              {nameSearch||rawNum?"کارتی یافت نشد":"کارتی ذخیره نشده"}
+            </div>
+            <div style={{fontSize:13,color:"var(--text-faint)",lineHeight:1.8}}>
+              {nameSearch||rawNum?"جستجوی دیگری امتحان کنید":"شماره کارت را وارد کنید"}
+            </div>
+          </div>
+        ):filtered.map(c=>{
+          const isDeleting=deleteConfirmId===c.id;
+          return (
+            <div key={c.id} style={{marginBottom:12}}>
+              {/* Card row */}
+              <div
+                onClick={()=>!isDeleting&&onSelect(c)}
+                style={{display:"flex",alignItems:"center",gap:12,background:"var(--card-bg)",border:"1.5px solid var(--border-color)",borderRadius:16,padding:"14px 14px",cursor:"pointer",transition:"all .18s",userSelect:"none",WebkitUserSelect:"none" as any}}>
+                <BankLogo bankName={c.bank} size={48} rounded={14}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:15,fontWeight:800,color:"var(--text-primary)",marginBottom:4}}>{c.holderName||"—"}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:"var(--text-secondary)",direction:"ltr",textAlign:"right",letterSpacing:"0.06em"}}>{toFaDigits(fmtCard(c.number))}</div>
+                  <div style={{fontSize:12,color:"rgba(0,214,176,0.7)",marginTop:4}}>{c.bank}</div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8,flexShrink:0}}>
+                  {/* Text-label delete button */}
+                  <button
+                    onClick={e=>{e.stopPropagation();setDeleteConfirmId(c.id)}}
+                    style={{background:"rgba(232,81,42,0.08)",border:"1px solid rgba(232,81,42,0.22)",borderRadius:10,padding:"5px 12px",cursor:"pointer",color:"#e8512a",fontSize:13,fontWeight:700,fontFamily:"Vazirmatn",flexShrink:0,lineHeight:1.4}}>
+                    حذف
+                  </button>
+                </div>
+              </div>
+
+              {/* Inline delete confirmation */}
+              {isDeleting&&(
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(232,81,42,0.07)",border:"1px solid rgba(232,81,42,0.2)",borderRadius:12,padding:"12px 16px",marginTop:6,gap:10}}>
+                  <span style={{fontSize:14,color:"#e8512a",fontFamily:"Vazirmatn",fontWeight:700}}>حذف این کارت؟</span>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>setDeleteConfirmId(null)} style={{background:"var(--card-bg2)",border:"1px solid var(--border-color)",borderRadius:10,padding:"7px 16px",color:"var(--text-secondary)",fontSize:13,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:700}}>انصراف</button>
+                    <button onClick={()=>doDelete(c.id)} style={{background:"#e8512a",border:"none",borderRadius:10,padding:"7px 16px",color:"#fff",fontSize:13,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:800}}>حذف شود</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Bottom hint ── */}
+      <div style={{flexShrink:0,padding:"10px 16px max(20px,env(safe-area-inset-bottom))",background:"linear-gradient(to top,var(--app-bg) 75%,transparent)",textAlign:"center"}}>
+        <span style={{fontSize:12,color:"var(--text-muted)"}}>برای انتخاب کارت، روی آن ضربه بزنید</span>
+      </div>
+
+    </div>
+  );
+}
+
+// ─── Transfer Screen ──────────────────────────────────────────────────────────
+type TransferSource="toman"|"usdt"|string;
+function TetherSwapScreen({user,rate,onUpdate,onBack}:{user:UserData;rate:number;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void}){
+  const [from,setFrom]=useState<"toman"|"usdt">("toman"),[amount,setAmount]=useState(""),[err,setErr]=useState(""),[processing,setProcessing]=useState(false),[receipt,setReceipt]=useState<ReceiptData|null>(null); const to=from==="toman"?"usdt":"toman";const num=parseFloat(toLatinDigits(amount))||0;const result=rate>0?(from==="toman"?num/rate:num*rate):0;
+  const swapTomanNum=from==="toman"?Math.floor(num):0;
+  const submit=()=>{if(rate<=0){setErr("نرخ لحظه‌ای تتر در دسترس نیست؛ لطفاً چند لحظه بعد دوباره تلاش کنید.");return}if(!num){setErr("مبلغ تبدیل را وارد کنید.");return}if(from==="toman"&&num>user.tomanBalance){setErr("موجودی تومان کافی نیست.");return}if(from==="usdt"&&num>user.usdtBalance){setErr("موجودی دلار تتر کافی نیست.");return}setProcessing(true);setTimeout(()=>{const next:UserData={...user,tomanBalance:from==="toman"?user.tomanBalance-num:user.tomanBalance+result,usdtBalance:from==="usdt"?user.usdtBalance-num:user.usdtBalance+result};onUpdate(next,{id:genId(),userId:user.phone,type:"swap",fromAsset:from,toAsset:to,amount:num,convertedAmount:result,fee:0,status:"done",createdAt:new Date().toISOString(),source:"app",tradeType:"conversion"});playChime();setProcessing(false);setReceipt({title:"تبدیل با موفقیت انجام شد",amount:`${to==="toman"?fa(Math.round(result)):faFixed(result,2)} ${to==="toman"?"تومان":"دلار تتر"}`,detail:"نرخ لحظه‌ای در رسید ثبت شد."});setAmount("");setErr("")},3000)};
+  return <><div className="subscreen" dir="rtl"><div className="subscreen-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">تبدیل دلار تتر</h2><div style={{width:36}}/></div><div className="subscreen-body">
+    <div className="swap-segment">
+      <button className={from==="toman"?"active":""} onClick={()=>setFrom("toman")}>
+        <span className="swap-seg-coins"><span className="seg-coin seg-tmn">ت</span><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 5.5h9M6.5 2l3.5 3.5-3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg><span className="seg-coin seg-usdt">$</span></span>
+        <span>تومان به تتر</span>
+      </button>
+      <button className={from==="usdt"?"active":""} onClick={()=>setFrom("usdt")}>
+        <span className="swap-seg-coins"><span className="seg-coin seg-usdt">$</span><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 5.5h9M6.5 2l3.5 3.5-3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg><span className="seg-coin seg-tmn">ت</span></span>
+        <span>تتر به تومان</span>
+      </button>
+    </div>
+    <div style={{marginBottom:from==="toman"&&swapTomanNum>0?4:0}}>
+    <div className="exchange-input"><label style={{minWidth:"max-content",whiteSpace:"nowrap",paddingLeft:10}}>پرداخت می‌کنم</label><div className="currency-chip">{from==="toman"?"تومان":"دلار تتر"}</div><input value={from==="toman"?(swapTomanNum?fa(swapTomanNum):""):toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} inputMode="decimal" dir="ltr" placeholder="" aria-label="مبلغ تبدیل"/></div>
+    {from==="toman"&&swapTomanNum>0&&<div className="amount-words" style={{marginRight:16,marginBottom:4}}>{numToFaWords(swapTomanNum)} تومان</div>}
+    </div><div className="swap-midline"><Icon name="swap" size={17}/></div><div className="exchange-input destination"><label style={{minWidth:"max-content",whiteSpace:"nowrap",paddingLeft:10}}>دریافت می‌کنم</label><div className="currency-chip">{to==="toman"?"تومان":"دلار تتر"}</div><output>{num?(to==="toman"?fa(Math.round(result)):faFixed(result,2)):""}</output></div><div className="rate-row" style={{marginTop:12}}><span>نرخ لحظه‌ای</span><b>{fa(Math.round(rate))} تومان</b></div>{err&&<p className="field-err">{err}</p>}
+    <StickyActionBtn label="تأیید تبدیل" onClick={submit} disabled={processing||!num} loading={processing} loadingText="در حال تبدیل..."/>
+    </div></div>{processing&&<AnPardazLoadingOverlay text="در حال تبدیل دارایی..."/>}{receipt&&<TransactionReceipt data={receipt} onClose={()=>setReceipt(null)}/>}</>;
+}
+
+function TransferScreen({user,onUpdate,transactions,onBack,onDone}:{user:UserData;rate:number;onUpdate:(u:UserData,tx:TxRecord)=>void;transactions:TxRecord[];onBack:()=>void;onDone:()=>void}){
+  const [step,setStep]=useState<1|2>(1);
+  // Step 1 state
+  const [srcCardId,setSrcCardId]=useState("");
+  const [destRaw,setDestRaw]=useState("");
+  const [destCard,setDestCard]=useState<{number:string;bank:string;holderName:string}|null>(null);
+  const [destDropOpen,setDestDropOpen]=useState(false);
+  const [destPickerOpen,setDestPickerOpen]=useState(false);
+  const [amount,setAmount]=useState("");
+  const [note,setNote]=useState("");
+  const [srcPickerOpen,setSrcPickerOpen]=useState(false);
+  const [step1Err,setStep1Err]=useState("");
+  // Step 2 state
+  const [otp,setOtp]=useState("");const [cvv2,setCvv2]=useState("");
+  const [expM,setExpM]=useState("");const [expY,setExpY]=useState("");
+  const cvv2Ref=useRef<HTMLInputElement>(null);const expMRef=useRef<HTMLInputElement>(null);const expYRef=useRef<HTMLInputElement>(null);
+  const [processing,setProcessing]=useState(false);const [receipt,setReceipt]=useState<ReceiptData|null>(null);
+  const [step2Err,setStep2Err]=useState("");
+  const fmtCardInput=(v:string)=>v.replace(/\D/g,"").slice(0,16).replace(/(.{4})(?=.)/g,"$1 ");
+  const srcCard=user.cards.find(c=>c.id===srcCardId);
+  const destClean=destRaw.replace(/\s/g,"");
+  const destBank=destClean.length>=4?detectBank(destClean):"";
+  const amountNum=parseInt(toLatinDigits(amount).replace(/,/g,""))||0;
+
+  // History suggestions from past transactions
+  const destSuggestions=useMemo(()=>{
+    const q=destClean;
+    const seen=new Set<string>();
+    const base=transactions.filter(t=>t.type==="transfer"&&t.toAddress&&t.toAddress!=="exchange_wallet");
+    if(q.length===0){
+      // Show recent unique transfer destinations when field is focused and empty
+      return base.map(t=>t.toAddress!).filter(a=>{if(seen.has(a))return false;seen.add(a);return true}).slice(0,4);
+    }
+    if(q.length<2&&!/[؀-ۿ]/.test(q))return[];
+    return base.filter(t=>{
+      const addr=t.toAddress!;
+      if(addr.includes(q))return true;
+      const bank=detectBank(addr)||"";
+      if(bank&&q.length>=2&&bank.includes(q))return true;
+      return false;
+    }).map(t=>t.toAddress!).filter(a=>{if(seen.has(a))return false;seen.add(a);return true}).slice(0,4);
+  },[destClean,transactions]);
+
+  const step1Valid=!!srcCard&&destClean.length===16&&amountNum>0;
+  const goNext=()=>{
+    if(!srcCard){setStep1Err("کارت مبدا را انتخاب کنید.");return}
+    if(destClean.length!==16){setStep1Err("شماره کارت مقصد ۱۶ رقمی باشد.");return}
+    if(!amountNum){setStep1Err("مبلغ انتقال را وارد کنید.");return}
+    setStep1Err("");setStep(2);
+  };
+
+  const step2Valid=toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
+  const transfer=()=>{
+    if(!otp){setStep2Err("رمز پویا را وارد کنید.");return}
+    if(!cvv2){setStep2Err("CVV2 را وارد کنید.");return}
+    if(!expM||!expY){setStep2Err("تاریخ انقضا را وارد کنید.");return}
+    setStep2Err("");setProcessing(true);
+    setTimeout(()=>{
+      const now=new Date();
+      const tx:TxRecord={id:genId(),userId:user.phone,type:"transfer",fromAsset:"toman",toAsset:"toman",amount:amountNum,fee:0,status:"done",createdAt:now.toISOString(),toAddress:destClean,fromCard:srcCard?.id,note:`${srcCard?.bank||""} · ${note||"کارت به کارت"} · ${srcCard?.number?.slice(-4)||""}`,source:"app"};
+      onUpdate(user,tx);
+      playChime();setProcessing(false);
+      setReceipt({title:"انتقال با موفقیت انجام شد",amount:`${fa(amountNum)} ریال`,destination:toFaDigits(fmtCard(destClean)),status:"success",detail:`کارت مبدا: ${toFaDigits(fmtCard(srcCard?.number??""))}`});
+    },3000);
+  };
+
+  // ── Destination Card Picker — true full-page replacement ──
+  if(step===1&&destPickerOpen) return <CardPickerScreen phone={user.phone} onSelect={c=>{setDestRaw(c.number);setDestCard({number:c.number,bank:c.bank,holderName:c.holderName});setDestPickerOpen(false)}} onBack={()=>setDestPickerOpen(false)}/>;
+
+  // ── STEP 1 ──
+  if(step===1) return <>
+    <div className="subscreen" dir="rtl">
+      <div className="subscreen-header">
+        <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+        <h2 className="subscreen-title">انتقال وجه</h2>
+        <div style={{width:36}}/>
+      </div>
+      <div className="subscreen-body">
+        <div className="banking-form">
+
+          {/* Source card */}
+          <div className="bform-field">
+            <button className="cb-card-selector" onClick={()=>setSrcPickerOpen(true)} type="button">
+              {srcCard?(
+                <div className="cb-card-sel-inner">
+                  <BankLogo bankName={srcCard.bank} size={38} rounded={11}/>
+                  <div className="cb-card-sel-text">
+                    <span className="cb-card-bank-name">{srcCard.bank}</span>
+                    <span className="cb-card-num-large" dir="ltr">{toFaDigits(fmtCard(srcCard.number))}</span>
+                  </div>
+                  <div className="cb-card-sel-chevron">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+              ):(
+                <div className="cb-card-sel-inner">
+                  <div className="cb-card-icon-empty">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h4"/></svg>
+                  </div>
+                  <span className="cb-card-placeholder-text">انتخاب کارت مبدا</span>
+                  <div className="cb-card-sel-chevron">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+              )}
+            </button>
+          </div>
+
+          {/* Destination card */}
+          <div className="bform-field">
+            <button className="cb-card-selector" onClick={()=>setDestPickerOpen(true)} type="button">
+              {destClean.length===16&&destCard?(
+                <div className="cb-card-sel-inner">
+                  {destCard.bank&&<BankLogo bankName={destCard.bank} size={38} rounded={11}/>}
+                  <div className="cb-card-sel-text">
+                    {destCard.bank&&<span className="cb-card-bank-name">{destCard.bank}</span>}
+                    <span className="cb-card-num-large" dir="ltr">{toFaDigits(fmtCard(destClean))}</span>
+                  </div>
+                  <div className="cb-card-sel-chevron">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+              ):(
+                <div className="cb-card-sel-inner">
+                  <div className="cb-card-icon-empty">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20M6 15h4"/></svg>
+                  </div>
+                  <span className="cb-card-placeholder-text">انتخاب کارت مقصد</span>
+                  <div className="cb-card-sel-chevron">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+              )}
+            </button>
+          </div>
+
+          {/* Amount */}
+          <div className="bform-field">
+            <FloatInput label="مبلغ" value={amountNum?fa(amountNum):""} onChange={v=>{const n=toLatinDigits(v).replace(/[^0-9]/g,"");setAmount(n)}} inputMode="numeric" dir="ltr" suffix="ریال"/>
+            {amountNum>0&&<div className="amount-words">معادل {numToFaWords(Math.floor(amountNum/10))} تومان</div>}
+          </div>
+
+          {/* Note */}
+          <div className="bform-field">
+            <FloatInput label="توضیحات (اختیاری)" value={note} onChange={v=>setNote(v)} dir="rtl" multiline/>
+          </div>
+
+          {step1Err&&<p className="field-err">{step1Err}</p>}
+        </div>
+        <StickyActionBtn label="مرحله بعد" onClick={goNext} disabled={!step1Valid}/>
+      </div>
+    </div>
+
+    {/* Source card picker — inline page */}
+    {srcPickerOpen&&<div className="receipt-page" dir="rtl">
+      <div className="receipt-page-header">
+        <button className="back-btn" onClick={()=>setSrcPickerOpen(false)}><Icon name="arrow" size={20}/></button>
+        <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>انتخاب کارت مبدا</h2>
+        <div style={{width:36}}/>
+      </div>
+      <div className="receipt-page-body">
+        {user.cards.length===0&&<p className="bs-empty">کارتی ثبت نشده. از پروفایل کارت اضافه کنید.</p>}
+        {user.cards.map(c=>(
+          <button key={c.id} className={`bs-card-item${srcCardId===c.id?" active":""}`}
+            onClick={()=>{setSrcCardId(c.id);setSrcPickerOpen(false);if(c.expM)setExpM(toFaDigits(c.expM));if(c.expY)setExpY(toFaDigits(c.expY))}}>
+            <BankLogo bankName={c.bank} size={48} rounded={14}/>
+            <div className="bs-card-info">
+              <span className="bs-card-bank">{c.bank}</span>
+              <span className="bs-card-holder">{c.holderName}</span>
+              <span className="bs-card-num" dir="ltr">{toFaDigits(fmtCard(c.number))}</span>
+            </div>
+            {srcCardId===c.id&&<div className="bs-card-check"><Icon name="check" size={16} stroke={2.5}/></div>}
+          </button>
+        ))}
+      </div>
+    </div>}
+  </>;
+
+  // ── STEP 2 (confirm + pay) ──
+  return <>
+    <div className="subscreen" dir="rtl">
+      <div className="subscreen-header">
+        <button className="back-btn" onClick={()=>setStep(1)}><Icon name="arrow" size={20}/></button>
+        <h2 className="subscreen-title">تأیید انتقال</h2>
+        <div style={{width:36}}/>
+      </div>
+      <div className="subscreen-body">
+        {/* Summary cards row */}
+        <div className="tr-summary-row">
+          <div className="tr-summary-card">
+            <div className="tr-summary-label">از مبدا</div>
+            <BankLogo bankName={srcCard?.bank||""} size={48} rounded={14}/>
+            <div className="tr-summary-bank">{srcCard?.bank||"—"}</div>
+            <div className="tr-summary-num" dir="ltr">{toFaDigits(fmtCard(srcCard?.number||""))}</div>
+          </div>
+          <div className="tr-summary-arrow">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          </div>
+          <div className="tr-summary-card">
+            <div className="tr-summary-label">به مقصد</div>
+            <BankLogo bankName={destBank} size={48} rounded={14}/>
+            <div className="tr-summary-bank">{destBank||"کارت"}</div>
+            <div className="tr-summary-num" dir="ltr">{toFaDigits(fmtCard(destClean))}</div>
+          </div>
+        </div>
+
+        {/* Amount */}
+        <div className="tr-amount-block">
+          <div className="tr-amount-label">مبلغ انتقال</div>
+          <div className="tr-amount-value">{fa(amountNum)}<span>ریال</span></div>
+          <div className="amount-words" style={{textAlign:"center",marginTop:4}}>{fa(amountNum)} ریال · معادل {numToFaWords(Math.floor(amountNum/10))} تومان</div>
+        </div>
+
+        <div className="banking-form">
+          {/* OTP */}
+          <div className="fin-otp-row">
+            <FinField label="رمز پویا" value={otp} onChange={setOtp} maxLength={5}
+              onFilled={()=>cvv2Ref.current?.focus()}/>
+            <OtpCooldownBtn key={srcCard?.number||"none"} onRequest={()=>setStep2Err("")} cardId={srcCard?.number} noCard={!srcCard}/>
+          </div>
+
+          {/* CVV2 */}
+          <FinField label="CVV2" value={cvv2} onChange={setCvv2} maxLength={3}
+            inputRef={cvv2Ref} onFilled={()=>expMRef.current?.focus()}/>
+
+          {/* Expiry */}
+          <div className="fin-exp-row">
+            <FinExpField label="ماه انقضا" value={expM} onChange={setExpM}
+              inputRef={expMRef} maxLength={2} onFilled={()=>expYRef.current?.focus()}/>
+            <div className="fin-exp-sep">/</div>
+            <FinExpField label="سال انقضا" value={expY} onChange={setExpY}
+              inputRef={expYRef} maxLength={2}/>
+          </div>
+
+          {step2Err&&<p className="field-err">{step2Err}</p>}
+        </div>
+        <StickyActionBtn label="انتقال" onClick={transfer} disabled={processing||!step2Valid} loading={processing} loadingText="در حال انتقال..."/>
+      </div>
+    </div>
+    {processing&&<AnPardazLoadingOverlay text="در حال انتقال وجه..."/>}
+    {receipt&&<TransactionReceipt data={receipt} onClose={()=>{setReceipt(null);onDone();}}/>}
+  </>;
+}
+
+
+// ─── Internet Package Screens (Irancell + MCI) ────────────────────────────────
+type IrancellPkg={id:string;name:string;dur:string;durFilter:"روزانه"|"هفتگی"|"پانزده روزه"|"ماهانه"|"سه ماهه"|"چهار ماهه";type:"internet"|"call";price:string;info?:string;special?:boolean};
+const _IC_PKGS:IrancellPkg[]=[
+  // هفتگی — اینترنت
+  {id:"w1",name:"هفتگی ۲۰۰ مگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۸۱,۹۰۰"},
+  {id:"w2",name:"هفتگی ۷۵۰ مگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۵۷,۴۰۰",special:true},
+  {id:"w3",name:"هفتگی ۱.۵ گیگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۰۶,۷۰۰"},
+  {id:"w4",name:"هفتگی ۲.۵ گیگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۴۶,۶۰۰",special:true},
+  {id:"w5",name:"هفتگی ۴ گیگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۳۰۴,۴۰۰"},
+  // ۱۵ روزه — اینترنت
+  {id:"f1",name:"۱۵ روزه ۴۰۰ مگ",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۱۳۳,۷۰۰",info:"مدت زمان بسته ۱۵ روز می‌باشد"},
+  {id:"f2",name:"۷۵۰ مگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۱۷۰,۷۰۰",info:"مدت زمان بسته ۱۵ روز می‌باشد"},
+  {id:"f3",name:"بسته ۱.۵ گیگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۱۸,۱۰۰",info:"مدت زمان بسته ۱۵ روز می‌باشد",special:true},
+  {id:"f4",name:"بسته ۲.۵ گیگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۷۵,۰۰۰",info:"مدت زمان بسته ۱۵ روز می‌باشد"},
+  {id:"f5",name:"بسته ۵.۵ گیگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۳۱۳,۰۰۰",info:"مدت زمان بسته ۱۵ روز می‌باشد",special:true},
+  // ماهانه — اینترنت
+  {id:"m0",name:"ماهانه ۱ گیگ",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱۹۹,۱۰۰"},
+  {id:"m1",name:"۸ گیگ اینترنت ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۶۹,۰۰۰",special:true},
+  {id:"m2",name:"۸ گیگ اینترنت ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۷۳,۰۰۰"},
+  {id:"m3",name:"۸ گیگ اینترنت ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۶۸۷,۰۰۰"},
+  {id:"m4",name:"۱۵ گیگ اینترنت ۷ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۸۲۸,۰۰۰"},
+  {id:"m5",name:"۳ گیگ اینترنت ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۸۵۴,۰۰۰"},
+  {id:"m6",name:"۱ گیگ اینترنت ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۹۸۷,۰۰۰"},
+  // سه ماهه
+  {id:"t1",name:"۴۵ گیگ سه ماهه",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۳,۴۵۸,۰۰۰",special:true},
+  {id:"t2",name:"۶۰ گیگ سه ماهه",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۴,۶۵۵,۰۰۰"},
+  {id:"t3",name:"۸۰ گیگ سه ماهه",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۶,۱۳۵,۰۰۰"},
+  // چهار ماهه
+  {id:"q1",name:"۱۰۰ گیگ چهار ماهه",dur:"چهار ماهه",durFilter:"چهار ماهه",type:"internet",price:"۷,۵۵۰,۰۰۰"},
+  // مکالمه — call
+  {id:"c1",name:"بسته یکماهه ۱۰۰ دقیقه‌ای داخل شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۷۷,۷۴۰"},
+  {id:"c2",name:"بسته یکماهه ۲۰۰ دقیقه‌ای داخل شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۱۴۴,۰۴۰"},
+  {id:"c3",name:"بسته یکماهه ۴۰۰ دقیقه‌ای داخل شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۲۶۶,۷۶۰"},
+  {id:"c4",name:"بسته یکماهه ۸۰۰ دقیقه‌ای داخل شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۴۹۴,۰۰۰"},
+];
+const _IC_DUR_FILTERS=["روزانه","هفتگی","۱۵ روزه","ماهانه","سه ماهه","پیشنهاد ویژه"] as const;
+
+// shared sub-components for both operator screens
+function _PkgChipBtn({label,active,onClick}:{label:string;active:boolean;onClick:()=>void}){
+  return <button onClick={onClick} className={`anp-chip-btn${active?" anp-chip-btn--active":""}`} style={{flexShrink:0,display:"flex",alignItems:"center",gap:4,padding:"7px 14px",borderRadius:22,border:`1.5px solid ${active?"#00D6B0":"var(--border-color,rgba(255,255,255,0.1))"}`,background:active?"rgba(0,214,176,0.13)":"var(--card-bg2,rgba(255,255,255,0.04))",color:active?"#00D6B0":"var(--text-secondary)",fontSize:12,fontFamily:"Vazirmatn",cursor:"pointer",whiteSpace:"nowrap",transition:"all .15s",fontWeight:active?700:400}}>
+    {label}
+    <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 5l3 3 3-3"/></svg>
+  </button>;
+}
+function _DurChipBtn({label,active,onClick}:{label:string;active:boolean;onClick:()=>void}){
+  return <button onClick={onClick} className={`anp-dur-chip${active?" anp-dur-chip--active":""}`} style={{flexShrink:0,padding:"7px 14px",borderRadius:22,border:`1.5px solid ${active?"#00D6B0":"var(--border-color,rgba(255,255,255,0.1))"}`,background:active?"rgba(0,214,176,0.13)":"var(--card-bg2,rgba(255,255,255,0.04))",color:active?"#00D6B0":"var(--text-secondary)",fontSize:12,fontFamily:"Vazirmatn",cursor:"pointer",whiteSpace:"nowrap",transition:"all .15s",fontWeight:active?700:400}}>{label}</button>;
+}
+function _SortSheet({sortBy,setSortBy,onClose}:{sortBy:string|null;setSortBy:(v:"price-asc"|"price-desc"|null)=>void;onClose:()=>void}){
+  return <>
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:200}}/>
+    <div style={{position:"fixed",bottom:0,right:0,left:0,background:"var(--card-bg2,#131e27)",borderRadius:"22px 22px 0 0",padding:"20px 16px 40px",zIndex:201,fontFamily:"Vazirmatn",direction:"rtl"}}>
+      <div style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)",margin:"0 auto 20px"}}/>
+      <div style={{fontSize:15,fontWeight:800,color:"var(--text-primary)",marginBottom:16}}>مرتب‌سازی</div>
+      {([["price-asc","قیمت: کمترین به بیشترین"],["price-desc","قیمت: بیشترین به کمترین"]] as [string,string][]).map(([key,label])=>(
+        <button key={key} onClick={()=>{setSortBy(key as "price-asc"|"price-desc");onClose();}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:sortBy===key?"rgba(0,214,176,0.1)":"transparent",border:`1px solid ${sortBy===key?"rgba(0,214,176,0.3)":"rgba(255,255,255,0.08)"}`,borderRadius:12,padding:"13px 14px",marginBottom:8,cursor:"pointer",color:sortBy===key?"#00D6B0":"var(--text-primary)",fontSize:13,fontFamily:"Vazirmatn",textAlign:"right"}}>
+          {label}{sortBy===key&&<svg width="14" height="14" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+        </button>
+      ))}
+      {sortBy&&<button onClick={()=>{setSortBy(null);onClose();}} style={{width:"100%",background:"none",border:"1px solid rgba(255,255,255,0.08)",borderRadius:12,padding:"12px",marginTop:4,cursor:"pointer",color:"var(--text-muted)",fontSize:12,fontFamily:"Vazirmatn"}}>حذف مرتب‌سازی</button>}
+    </div>
+  </>;
+}
+
+// ─── Irancell Postpaid Package View ──────────────────────────────────────────
+function IrancellPkgView({phone,simType,onBack,onGoToPayment}:{phone:string;simType:"postpaid"|"prepaid";onBack:()=>void;onGoToPayment:(d:{phone:string;operator:Operator|null;amount:string;type:"internet"})=>void}){
+  const [durFilter,setDurFilter]=useState<string|null>(null);
+  const [pkgType,setPkgType]=useState<"internet"|"call"|null>(null);
+  const [sortBy,setSortBy]=useState<"price-asc"|"price-desc"|null>(null);
+  const [selId,setSelId]=useState<string|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [showSort,setShowSort]=useState(false);
+  const [showType,setShowType]=useState(false);
+  useEffect(()=>{const t=setTimeout(()=>setLoading(false),900);return()=>clearTimeout(t);},[]);
+  const operator=OPERATORS.irancell;
+  const filtered=_IC_PKGS.filter(p=>{
+    if(durFilter==="پیشنهاد ویژه")return p.special===true;
+    if(durFilter==="۱۵ روزه")return p.durFilter==="پانزده روزه";
+    if(durFilter)return p.durFilter===durFilter;
+    if(pkgType)return p.type===pkgType;
+    return true;
+  }).sort((a,b)=>{if(!sortBy)return 0;const pa=parseFloat(a.price.replace(/[^0-9]/g,""));const pb=parseFloat(b.price.replace(/[^0-9]/g,""));return sortBy==="price-asc"?pa-pb:pb-pa;});
+  const selPkg=_IC_PKGS.find(p=>p.id===selId)??null;
+  const buy=()=>{if(!selPkg)return;onGoToPayment({phone,operator,amount:`${selPkg.name} — ${selPkg.price} ریال`,type:"internet"});};
+  const IcCard=({p}:{p:IrancellPkg})=>{const isSel=selId===p.id;const volMatch=p.name.match(/[\d.]+\s*(?:گیگ(?:ابایت)?|مگ(?:ابایت)?|GB|MB)/i);const volLabel=volMatch?volMatch[0]:null;return <button onClick={()=>setSelId(isSel?null:p.id)} className={`anp-ic-card${isSel?" anp-ic-card--sel":""}`} style={{display:"flex",alignItems:"center",width:"100%",background:isSel?"rgba(0,214,176,0.1)":"var(--card-bg,rgba(255,255,255,0.05))",border:`1.5px solid ${isSel?"#00D6B0":"var(--border-light,rgba(255,255,255,0.09))"}`,borderRadius:18,padding:"16px 14px",cursor:"pointer",textAlign:"right",marginBottom:10,transition:"all .15s",fontFamily:"Vazirmatn",position:"relative",boxSizing:"border-box",boxShadow:isSel?"0 0 0 3px rgba(0,214,176,0.1)":"none"}}>
+    {p.special&&<div style={{position:"absolute",top:-1,right:14,background:"rgba(0,214,176,0.18)",border:"1px solid rgba(0,214,176,0.4)",color:"#00D6B0",fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:"0 0 8px 8px",fontFamily:"Vazirmatn"}}>پیشنهاد ویژه</div>}
+    <div style={{flex:1,paddingTop:p.special?6:0,minWidth:0}}>
+      {volLabel&&<div style={{fontSize:20,fontWeight:900,color:"var(--text-primary)",lineHeight:1.2,marginBottom:3,textAlign:"right"}}>{volLabel}</div>}
+      <div style={{fontSize:volLabel?12:14,fontWeight:volLabel?600:800,color:volLabel?"var(--text-secondary)":"var(--text-primary)",marginBottom:4,textAlign:"right",lineHeight:1.4}}>{p.name}</div>
+      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+        <span style={{fontSize:11,color:"var(--text-muted)",background:"var(--card-bg2,rgba(255,255,255,0.07))",padding:"2px 8px",borderRadius:6,border:"1px solid var(--border-faint,rgba(255,255,255,0.06))"}}>{p.dur}</span>
+        {p.type==="call"&&<span style={{fontSize:11,color:"rgba(200,160,255,0.85)",background:"rgba(160,100,255,0.1)",padding:"2px 8px",borderRadius:6}}>مکالمه</span>}
+        {p.info&&<span style={{fontSize:11,color:"var(--text-muted)",lineHeight:1.4}}>{p.info}</span>}
+      </div>
+    </div>
+    <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,marginRight:10}}>
+      <div style={{textAlign:"left"}}><div style={{fontSize:15,fontWeight:900,color:"#00D6B0",direction:"ltr",whiteSpace:"nowrap"}}>{p.price}</div><div style={{fontSize:10,color:"rgba(0,214,176,0.6)",marginTop:1,textAlign:"left"}}>ریال</div></div>
+      <div style={{width:28,height:28,borderRadius:"50%",background:isSel?"#00D6B0":"transparent",border:`2px solid ${isSel?"#00D6B0":"var(--border-color,rgba(255,255,255,0.25))"}`,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s",flexShrink:0}}>
+        {isSel&&<svg width="13" height="13" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#071d2c" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+      </div>
+    </div>
+  </button>;};
+  return <>
+  <div className="subscreen" dir="rtl" style={{display:"flex",flexDirection:"column",height:"100%",position:"relative"}}>
+    <div className="subscreen-header" style={{flexShrink:0}}>
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">{simType==="prepaid"?"اینترنت ایرانسل اعتباری":"اینترنت ایرانسل دائمی"}</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div style={{flexShrink:0,overflowX:"auto",display:"flex",gap:8,padding:"10px 14px",scrollbarWidth:"none",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+      <_PkgChipBtn label="مرتب‌سازی" active={sortBy!==null} onClick={()=>setShowSort(true)}/>
+      <_PkgChipBtn label={pkgType==="call"?"مکالمه":pkgType==="internet"?"اینترنت":"نوع بسته"} active={pkgType!==null} onClick={()=>setShowType(true)}/>
+      {_IC_DUR_FILTERS.map(f=><_DurChipBtn key={f} label={f} active={durFilter===f} onClick={()=>setDurFilter(durFilter===f?null:f)}/>)}
+    </div>
+    <div style={{flex:1,overflowY:"auto",padding:"14px 14px 320px",scrollbarWidth:"none"}}>
+      {loading?([1,2,3,4,5].map(i=><div key={i} style={{height:78,borderRadius:18,background:"rgba(255,255,255,0.05)",marginBottom:10,animation:"pulse 1.4s ease-in-out infinite",animationDelay:`${i*0.1}s`}}/>)):filtered.length===0?(<div style={{textAlign:"center",padding:"60px 20px",fontFamily:"Vazirmatn"}}><div style={{margin:"0 auto 14px",width:56,height:56,borderRadius:18,background:"rgba(0,214,176,0.07)",border:"1px solid rgba(0,214,176,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="rgba(0,214,176,0.5)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div><div style={{fontSize:15,fontWeight:700,color:"var(--text-secondary)",marginBottom:6}}>بسته‌ای موجود نیست</div><div style={{fontSize:12,color:"var(--text-muted)"}}>بسته‌ای در این دسته موجود نیست</div></div>):(filtered.map(p=><IcCard key={p.id} p={p}/>))}
+    </div>
+    {selPkg&&<div className="sab-pkg-preview"><span className="sab-pkg-preview-name">{selPkg.name}</span><span className="sab-pkg-preview-price">{selPkg.price} <span>ریال</span></span></div>}
+    <StickyActionBtn label="همین بسته را می‌خرم" onClick={buy} disabled={!selId} noBleed/>
+  </div>
+  {showSort&&<_SortSheet sortBy={sortBy} setSortBy={setSortBy} onClose={()=>setShowSort(false)}/>}
+  {showType&&<>
+    <div onClick={()=>setShowType(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:200}}/>
+    <div style={{position:"fixed",bottom:0,right:0,left:0,background:"var(--card-bg2,#131e27)",borderRadius:"22px 22px 0 0",padding:"20px 16px 40px",zIndex:201,fontFamily:"Vazirmatn",direction:"rtl"}}>
+      <div style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)",margin:"0 auto 20px"}}/>
+      <div style={{fontSize:15,fontWeight:800,color:"var(--text-primary)",marginBottom:16}}>نوع بسته</div>
+      {([["internet","اینترنت"],["call","مکالمه"]] as [string,string][]).map(([key,label])=>{
+        const isAct=pkgType===key;
+        return <button key={key} onClick={()=>{setPkgType(pkgType===key?null:key as "internet"|"call");setDurFilter(null);setShowType(false);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:isAct?"rgba(0,214,176,0.1)":"transparent",border:`1px solid ${isAct?"rgba(0,214,176,0.3)":"rgba(255,255,255,0.08)"}`,borderRadius:12,padding:"13px 14px",marginBottom:8,cursor:"pointer",color:isAct?"#00D6B0":"var(--text-primary)",fontSize:13,fontFamily:"Vazirmatn",textAlign:"right"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isAct?"#00D6B0":"rgba(255,255,255,0.5)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{key==="internet"?<><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill={isAct?"#00D6B0":"rgba(255,255,255,0.5)"} stroke="none"/></>:<><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.81a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.5 16z"/></>}</svg>
+          <span style={{flex:1}}>{label}</span>
+          {isAct&&<svg width="14" height="14" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+        </button>;
+      })}
+    </div>
+  </>}
+  </>;
+}
+
+// ─── MCI (Hamrah Aval) Prepaid Package Screen ─────────────────────────────────
+type MciPkg={id:string;name:string;dur:string;durFilter:string;type:"internet"|"call"|"sms";price:string;desc?:string;badge?:"recent"|"special"};
+const _MCI_SPECIAL:MciPkg[]=[
+  {id:"sp1",name:"آلفا+ ۱ ماهه ۵ گیگ",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۴۴۷,۶۰۰",badge:"recent"},
+  {id:"sp2",name:"۵۰ گیگ یک ماهه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳,۸۳۵,۰۰۰",badge:"special"},
+  {id:"sp3",name:"بسته ۳۰ روزه ۶ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۳۳,۹۰۰",badge:"special"},
+];
+const _MCI_PKGS:MciPkg[]=[
+  // روزانه
+  {id:"da1",name:"بسته ۱ روزه ۵۰۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۹۲,۸۰۰"},
+  {id:"da2",name:"بسته ۱ روزه ۷۵۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۱۱,۸۰۰"},
+  {id:"da3",name:"بسته ۱ روزه ۱ گیگ",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۲۱,۳۰۰"},
+  {id:"da4",name:"بسته ۱ روزه ۲ گیگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۵۹,۳۰۰"},
+  // هفتگی
+  {id:"wk1",name:"بسته ۷ روزه ۲۰۰ مگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۸۱,۹۰۰"},
+  {id:"wk2",name:"بسته ۷ روزه ۳۰۰ مگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۰۴,۲۰۰"},
+  {id:"wk3",name:"بسته ۷ روزه ۵۰۰ مگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۳۲,۷۰۰"},
+  {id:"wk4",name:"بسته ۷ روزه ۷۵۰ مگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۵۷,۲۰۰"},
+  {id:"wk5",name:"بسته ۷ روزه ۱.۵ گیگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۰۶,۷۰۰"},
+  {id:"wk6",name:"بسته ۷ روزه ۲.۵ گیگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۴۶,۶۰۰"},
+  // سه روزه
+  {id:"td1",name:"۳ روزه ۱۵۰ مگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۶۱,۲۰۰"},
+  {id:"td2",name:"۳ روزه ۲۵۰ مگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۸۳,۴۰۰"},
+  {id:"td3",name:"۳ روزه ۴۰۰ مگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۱۰۰,۵۰۰"},
+  {id:"td4",name:"۳ روزه ۷۵۰ مگ",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۱۲۷,۰۰۰"},
+  {id:"td5",name:"۳ روزه ۱.۵ گیگ",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۱۷۰,۷۰۰"},
+  {id:"td6",name:"بسته پیامک همراهی",dur:"سه روزه",durFilter:"سه روزه",type:"sms",price:"۱۶,۹۰۰",desc:"بسته پیامک همراهی سه روزه با ۹۰ پیامک (فارسی و انگلیسی)"},
+  // پانزده روزه
+  {id:"fd1",name:"۷۵۰ مگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۱۷۰,۷۰۰"},
+  {id:"fd2",name:"۱.۵ گیگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۱۸,۱۰۰"},
+  {id:"fd3",name:"۲.۵ گیگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۷۵,۰۰۰"},
+  // ماهانه
+  {id:"mn1",name:"آلفا+ ۱ ماهه ۵ گیگ",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۴۴۷,۶۰۰",badge:"recent"},
+  {id:"mn2",name:"بسته ۳۰ روزه ۶ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۳۳,۹۰۰",badge:"special"},
+  {id:"mn3",name:"بسته مکالمه همراهی",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۲۱۰,۰۰۰",desc:"بسته مکالمه همراهی ۳۰ روزه ۶۰۰ دقیقه"},
+  {id:"mn4",name:"بسته اینترنت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱,۶۲۸,۴۰۰",desc:"بسته اینترنت همراهی، ۳۰ روزه، ۳۰ گیگابایت"},
+  {id:"mn5",name:"۵۰ گیگ یک ماهه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳,۸۳۵,۰۰۰",badge:"special"},
+  {id:"mn6",name:"بسته اینترنت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲,۸۰۰,۰۰۰",desc:"بسته اینترنت همراهی، ۳۰ روزه، ۵۰ گیگابایت"},
+  {id:"mn7",name:"بسته اینترنت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳,۱۵۰,۰۰۰",desc:"بسته اینترنت همراهی، ۳۰ روزه، ۶۰ گیگابایت"},
+  // سه ماهه
+  {id:"tm1",name:"سه ماهه ۴۵ گیگ",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۳,۴۵۸,۰۰۰"},
+  {id:"tm2",name:"۶۰ گیگ سه ماهه",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۴,۶۰۵,۰۰۰"},
+  {id:"tm3",name:"۸۰ گیگ سه ماهه",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۶,۱۳۵,۰۰۰"},
+];
+const _MCI_DUR_FILTERS=["روزانه","هفتگی","سه روزه","پانزده روزه","ماهانه","سه ماهه"];
+
+function MciPrepaidInternetScreen({phone,simType,onBack,onGoToPayment}:{phone:string;simType:"postpaid"|"prepaid";onBack:()=>void;onGoToPayment:(d:{phone:string;operator:Operator|null;amount:string;type:"internet"})=>void}){
+  const [durFilter,setDurFilter]=useState<string|null>(null);
+  const [pkgType,setPkgType]=useState<"internet"|"call"|"sms"|null>(null);
+  const [sortBy,setSortBy]=useState<"price-asc"|"price-desc"|null>(null);
+  const [selId,setSelId]=useState<string|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [showSort,setShowSort]=useState(false);
+  const [showType,setShowType]=useState(false);
+  useEffect(()=>{const t=setTimeout(()=>setLoading(false),1000);return()=>clearTimeout(t);},[]);
+  const operator=OPERATORS.mci;
+
+  const allPkgs=[..._MCI_PKGS];
+  const filtered=(durFilter||pkgType?allPkgs.filter(p=>{
+    const durOk=!durFilter||p.durFilter===durFilter;
+    const typeOk=!pkgType||p.type===pkgType;
+    return durOk&&typeOk;
+  }):allPkgs).sort((a,b)=>{if(!sortBy)return 0;const pa=parseFloat(a.price.replace(/[^0-9]/g,""));const pb=parseFloat(b.price.replace(/[^0-9]/g,""));return sortBy==="price-asc"?pa-pb:pb-pa;});
+
+  const selPkg=[..._MCI_SPECIAL,..._MCI_PKGS].find(p=>p.id===selId)??null;
+  const buy=()=>{if(!selPkg)return;onGoToPayment({phone,operator,amount:`${selPkg.name} — ${selPkg.price} ریال`,type:"internet"});};
+
+  const Badge=({type}:{type:"recent"|"special"})=>type==="recent"?null:<span style={{display:"inline-flex",alignItems:"center",padding:"2px 9px",borderRadius:8,fontSize:10,fontWeight:700,fontFamily:"Vazirmatn",background:"rgba(0,214,176,0.12)",color:"#00D6B0",border:"1px solid rgba(0,214,176,0.3)"}}>پیشنهاد آن‌پرداز</span>;
+
+  const MciCard=({p,showSpecialSection}:{p:MciPkg;showSpecialSection?:boolean})=>{
+    const isSel=selId===p.id;
+    const volMatch=(p.name+" "+(p.desc||"")).match(/[\d.]+\s*(?:گیگ(?:ابایت)?|مگ(?:ابایت)?|GB|MB)/i);
+    const volLabel=volMatch?volMatch[0]:null;
+    const durLabel=p.dur;
+    return <button onClick={()=>setSelId(isSel?null:p.id)} className={`anp-mci-card${isSel?" anp-mci-card--sel":""}`} style={{display:"flex",alignItems:"center",width:"100%",background:isSel?"rgba(0,214,176,0.1)":"var(--card-bg)",border:`1.5px solid ${isSel?"#00D6B0":"var(--border-light,rgba(255,255,255,0.09))"}`,borderRadius:20,padding:"15px 14px",cursor:"pointer",textAlign:"right",marginBottom:10,transition:"all .15s",fontFamily:"Vazirmatn",boxSizing:"border-box",position:"relative",boxShadow:isSel?"0 0 0 3px rgba(0,214,176,0.1)":"none"}}>
+      {/* Right: text */}
+      <div style={{flex:1,minWidth:0}}>
+        {volLabel&&<div style={{fontSize:20,fontWeight:900,color:"var(--text-primary)",lineHeight:1.2,marginBottom:3,textAlign:"right"}}>{volLabel}</div>}
+        <div style={{fontSize:volLabel?12:15,fontWeight:volLabel?600:800,color:volLabel?"var(--text-secondary)":"var(--text-primary)",marginBottom:4,lineHeight:1.4,textAlign:"right"}}>{p.name}</div>
+        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+          <span style={{fontSize:11,color:"var(--text-muted)",background:"var(--card-bg2,rgba(255,255,255,0.07))",padding:"2px 8px",borderRadius:5}}>{durLabel}</span>
+          {p.type==="call"&&<span style={{fontSize:10,color:"rgba(180,140,255,0.85)",background:"rgba(140,100,255,0.12)",padding:"1px 7px",borderRadius:5}}>مکالمه</span>}
+          {p.type==="sms"&&<span style={{fontSize:10,color:"rgba(250,180,50,0.9)",background:"rgba(250,180,50,0.1)",padding:"1px 7px",borderRadius:5}}>پیامک</span>}
+        </div>
+        {p.desc&&!volLabel&&<div style={{fontSize:11,color:"var(--text-muted)",lineHeight:1.55,marginTop:4}}>{p.desc}</div>}
+        {p.badge&&<div style={{marginTop:4}}><Badge type={p.badge}/></div>}
+      </div>
+      {/* Left: price + radio indicator */}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",justifyContent:"center",flexShrink:0,marginRight:12,gap:8}}>
+        <div style={{textAlign:"left"}}>
+          <div style={{fontSize:15,fontWeight:900,color:"#00D6B0",direction:"ltr",whiteSpace:"nowrap"}}>{p.price}</div>
+          <div style={{fontSize:10,color:"rgba(0,214,176,0.5)",textAlign:"left"}}>ریال</div>
+        </div>
+        <div style={{width:24,height:24,borderRadius:"50%",background:isSel?"#00D6B0":"transparent",border:`2px solid ${isSel?"#00D6B0":"var(--border-color,rgba(255,255,255,0.3))"}`,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s",flexShrink:0}}>
+          {isSel&&<svg width="12" height="12" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#071d2c" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+        </div>
+      </div>
+    </button>;
+  };
+
+  const showSpecial=!durFilter&&!pkgType;
+
+  return <>
+  <div className="subscreen anp-pkg-screen" dir="rtl" style={{display:"flex",flexDirection:"column",height:"100%",position:"relative",background:"#111"}}>
+    {/* Header */}
+    <div className="anp-pkg-header" style={{display:"flex",alignItems:"center",padding:"0 16px",height:64,borderBottom:"1px solid rgba(255,255,255,0.07)",flexShrink:0,background:"#111",position:"sticky",top:0,zIndex:10}}>
+      <button onClick={onBack} className="anp-pkg-back" style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l6-6-6-6"/></svg>
+      </button>
+      <h2 className="anp-pkg-title" style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800,color:"#fff",fontFamily:"Vazirmatn",margin:0}}>{simType==="postpaid"?"اینترنت همراه اول دائمی":"اینترنت همراه اول اعتباری"}</h2>
+      <div style={{width:36}}/>
+    </div>
+
+    {/* Filter bar */}
+    <div className="anp-pkg-filters" style={{flexShrink:0,overflowX:"auto",display:"flex",gap:8,padding:"10px 14px",scrollbarWidth:"none",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+      <_PkgChipBtn label="مرتب‌سازی" active={sortBy!==null} onClick={()=>setShowSort(true)}/>
+      <_PkgChipBtn label={pkgType?"نوع: "+{internet:"اینترنت",call:"مکالمه",sms:"پیامک"}[pkgType]:"نوع بسته"} active={pkgType!==null} onClick={()=>setShowType(true)}/>
+      {_MCI_DUR_FILTERS.map(f=><_DurChipBtn key={f} label={f} active={durFilter===f} onClick={()=>setDurFilter(durFilter===f?null:f)}/>)}
+    </div>
+
+    {/* Scrollable list */}
+    <div className="anp-pkg-list" style={{flex:1,overflowY:"auto",padding:"14px 14px 320px",scrollbarWidth:"none",background:"#111"}}>
+      {loading?([1,2,3,4,5].map(i=><div key={i} style={{height:82,borderRadius:20,background:"rgba(255,255,255,0.05)",marginBottom:10,animation:"pulse 1.4s ease-in-out infinite",animationDelay:`${i*0.1}s`}}/>)):(
+        <>
+          {/* پیشنهادات ویژه */}
+          {showSpecial&&<>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <span style={{fontSize:14,fontWeight:800,color:"var(--text-primary)",fontFamily:"Vazirmatn"}}>پیشنهادات ویژه</span>
+              <div style={{flex:1,height:1,background:"var(--border-faint,rgba(255,255,255,0.08))"}}/>
+            </div>
+            {_MCI_SPECIAL.map(p=><MciCard key={p.id} p={p} showSpecialSection/>)}
+            <div style={{display:"flex",alignItems:"center",gap:8,margin:"14px 0 10px"}}>
+              <span style={{fontSize:14,fontWeight:800,color:"var(--text-primary)",fontFamily:"Vazirmatn"}}>همه بسته‌ها</span>
+              <div style={{flex:1,height:1,background:"var(--border-faint,rgba(255,255,255,0.08))"}}/>
+              <span style={{fontSize:11,color:"var(--text-muted)",fontFamily:"Vazirmatn"}}>{_MCI_PKGS.length} بسته</span>
+            </div>
+          </>}
+          {/* All / filtered packages */}
+          {filtered.length===0?(<div style={{textAlign:"center",padding:"60px 20px",fontFamily:"Vazirmatn"}}><div style={{margin:"0 auto 14px",width:54,height:54,borderRadius:18,background:"rgba(0,214,176,0.07)",border:"1px solid rgba(0,214,176,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(0,214,176,0.5)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div><div style={{fontSize:15,fontWeight:700,color:"rgba(255,255,255,0.55)",marginBottom:6}}>بسته‌ای موجود نیست</div><div style={{fontSize:12,color:"rgba(255,255,255,0.3)"}}>بسته‌ای در این دسته موجود نیست</div></div>):(filtered.map(p=><MciCard key={p.id} p={p}/>))}
+        </>
+      )}
+    </div>
+    {selPkg&&<div className="sab-pkg-preview"><span className="sab-pkg-preview-name">{selPkg.name}</span><span className="sab-pkg-preview-price">{selPkg.price} <span>ریال</span></span></div>}
+    <StickyActionBtn label="همین بسته را می‌خرم" onClick={buy} disabled={!selId} noBleed/>
+  </div>
+  {showSort&&<_SortSheet sortBy={sortBy} setSortBy={setSortBy} onClose={()=>setShowSort(false)}/>}
+  {showType&&<>
+    <div onClick={()=>setShowType(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:200}}/>
+    <div className="anp-filter-sheet" style={{position:"fixed",bottom:0,right:0,left:0,background:"#1a1a1a",borderRadius:"22px 22px 0 0",padding:"20px 16px 40px",zIndex:201,fontFamily:"Vazirmatn",direction:"rtl"}}>
+      <div className="anp-filter-sheet-handle" style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)",margin:"0 auto 20px"}}/>
+      <div className="anp-filter-sheet-title" style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:16}}>نوع بسته</div>
+      {([["internet","اینترنت"],["call","مکالمه"],["sms","پیامک"]] as [string,string][]).map(([key,label])=>{
+        const isAct=pkgType===key;
+        const icPath=key==="internet"?<><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill={isAct?"#00D6B0":"rgba(255,255,255,0.5)"} stroke="none"/></>:key==="call"?<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.81a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.5 16z"/>:<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>;
+        return <button key={key} className={`anp-filter-btn${isAct?" anp-filter-btn-active":""}`} onClick={()=>{setPkgType(pkgType===key?null:key as "internet"|"call"|"sms");setDurFilter(null);setShowType(false);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:isAct?"rgba(0,214,176,0.1)":"transparent",border:`1px solid ${isAct?"rgba(0,214,176,0.3)":"rgba(255,255,255,0.08)"}`,borderRadius:12,padding:"13px 14px",marginBottom:8,cursor:"pointer",color:isAct?"#00D6B0":"#fff",fontSize:13,fontFamily:"Vazirmatn",textAlign:"right"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isAct?"#00D6B0":"rgba(255,255,255,0.5)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{icPath}</svg>
+          <span style={{flex:1}}>{label}</span>
+          {isAct&&<svg width="14" height="14" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+        </button>;
+      })}
+    </div>
+  </>}
+  </>;
+}
+
+// ─── Rightel Prepaid Package Screen ──────────────────────────────────────────
+type RightelPkg={id:string;name:string;dur:string;durFilter:string;type:"internet"|"call"|"sms"|"roaming"|"combo";price:string;desc?:string;badge?:"recent"|"special"};
+const _RT_SPECIAL:RightelPkg[]=[
+  {id:"rs1",name:"۳۰روزه ۳ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳۳۸,۴۰۰",badge:"recent"},
+  {id:"rs2",name:"۳۰ روزه ۵۰ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲,۹۰۰,۰۰۰",badge:"special"},
+  {id:"rs3",name:"۳۰ روزه ۲۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱,۵۱۰,۰۰۰",badge:"special"},
+];
+const _RT_PKGS:RightelPkg[]=[
+  // روزانه
+  {id:"rd1",name:"روزانه ۱۰۰ مگ",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۳۸,۲۰۰"},
+  {id:"rd2",name:"۱ روزه ۳۰۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۶۹,۳۰۰"},
+  {id:"rd3",name:"۱ روزه ۵۰۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۸۷,۷۰۰"},
+  {id:"rd4",name:"۱ روزه ۱ گیگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۱۷,۵۰۰"},
+  {id:"rd5",name:"۱ روزه ۳ گیگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۷۹,۸۰۰"},
+  // سه روزه
+  {id:"r3d1",name:"۳ روزه ۱۵۰ مگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۶۱,۴۰۰"},
+  {id:"r3d2",name:"۳ روزه ۱ گیگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۱۵۴,۳۰۰"},
+  {id:"r3d3",name:"۳ روزه ۳ گیگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۲۲۵,۱۰۰"},
+  // هفتگی
+  {id:"rw1",name:"۷ روزه ۵۰۰ مگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۳۰,۲۰۰"},
+  {id:"rw2",name:"۷ روزه ۱ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۷۹,۸۰۰"},
+  {id:"rw3",name:"۷ روزه ۳ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۶۳,۳۰۰"},
+  {id:"rw4",name:"۷ روزه ۶ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۳۵۸,۲۰۰"},
+  // پانزده روزه
+  {id:"rf1",name:"۱۵ روزه (۱.۵ گیگابایت)",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۰۸,۱۰۰"},
+  {id:"rf2",name:"۱۵ روزه ۵ گیگابایت",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۳۳۸,۴۰۰"},
+  // ماهانه اینترنت
+  {id:"rm1",name:"۳۰ روزه ۱ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱۸۶,۹۰۰"},
+  {id:"rm2",name:"۳۰ روزه ۲ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲۵۴,۸۰۰"},
+  {id:"rm3",name:"۳۰روزه ۳ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳۳۸,۴۰۰",badge:"recent"},
+  {id:"rm4",name:"۳۰ روزه ۴ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳۷۶,۶۰۰"},
+  {id:"rm5",name:"ماهانه ۵ گیگ",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۴۱۴,۸۰۰"},
+  {id:"rm6",name:"۳۰ روزه ۷ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۲۳,۰۰۰"},
+  {id:"rm7",name:"۳۰ روزه ۸ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۸۴,۰۰۰"},
+  {id:"rm8",name:"۳۰ روزه ۱۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۹۹۹,۰۰۰"},
+  {id:"rm9",name:"۳۰ روزه ۲۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱,۵۱۰,۰۰۰",badge:"special"},
+  {id:"rm10",name:"۳۰ روزه ۵۰ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲,۹۰۰,۰۰۰",badge:"special"},
+  // دو ماهه
+  {id:"r2m1",name:"۶۰ روزه ۳۵ گیگابایت",dur:"دو ماهه",durFilter:"دو ماهه",type:"internet",price:"۲,۶۶۰,۰۰۰"},
+  // سه ماهه
+  {id:"r3m1",name:"۹۰ روزه ۴۵ گیگابایت",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۳,۳۳۰,۰۰۰"},
+  {id:"r3m2",name:"۹۰ روزه ۶۰ گیگابایت",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۴,۳۳۰,۰۰۰"},
+  // یک ساله
+  {id:"ry1",name:"۳۶۵ روزه ۱۵۰ گیگابایت",dur:"یک ساله",durFilter:"یک ساله",type:"internet",price:"۸,۸۵۰,۰۰۰"},
+  {id:"ry2",name:"۳۶۵ روزه ۳۰۰ گیگابایت",dur:"یک ساله",durFilter:"یک ساله",type:"internet",price:"۱۶,۹۰۰,۰۰۰"},
+  // پیامک
+  {id:"rsms1",name:"۳۰ روزه ۲۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۴۴,۰۰۰"},
+  {id:"rsms2",name:"۳۰ روزه ۵۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۱۰۰,۰۰۰"},
+  {id:"rsms3",name:"۳۰ روزه ۱۰۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۱۷۰,۰۰۰"},
+  {id:"rsms4",name:"۳۰ روزه ۲۰۰ پیامک",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۴۵,۰۰۰"},
+  {id:"rsms5",name:"۱ ماهه ۵۰۰ پیامک فارسی-انگلیسی",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۱۳۳,۵۰۰"},
+  // مکالمه
+  {id:"rcl1",name:"۱۵۰ دقیقه تماس صوتی درون و برون شبکه ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۹۸,۰۰۰"},
+  {id:"rcl2",name:"۳۰ روزه ۵۰۰ دقیقه مکالمه درون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۲۲۴,۰۰۰"},
+  {id:"rcl3",name:"۵۰۰ دقیقه تماس صوتی درون و برون شبکه ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۳۲۰,۰۰۰"},
+  {id:"rcl4",name:"۳۰ روزه ۱۰۰۰ دقیقه مکالمه درون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۳۹۰,۰۰۰"},
+  // رومینگ
+  {id:"rro1",name:"عراق ۱۰۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۹۹۰,۰۰۰",desc:"رومینگ عراق"},
+  {id:"rro2",name:"عراق ۳۵۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۳,۳۰۰,۰۰۰",desc:"رومینگ عراق"},
+  {id:"rro3",name:"عراق ۷۵۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۶,۵۰۰,۰۰۰",desc:"رومینگ عراق"},
+];
+const _RT_DUR_FILTERS=["روزانه","هفتگی","ماهانه","سه ماهه","یک ساله"];
+const _RT_TYPE_OPTS:[string,string,string,string][]=[["internet","اینترنت","📶",""],["call","مکالمه","📞",""],["sms","پیامک","💬",""],["roaming","رومینگ","🌍",""]];
+const _RT_SORT_OPTS:[string,string][]=[["price-asc","ارزان‌ترین"],["price-desc","گران‌ترین"],["special","پیشنهادی"],["popular","محبوب‌ترین"]];
+
+// ─── Rightel Postpaid data ────────────────────────────────────────────────────
+const _RT_POST_SPECIAL:RightelPkg[]=[
+  {id:"ps1",name:"۳۰ روزه ۲۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱,۵۱۰,۰۰۰",badge:"special"},
+  {id:"ps2",name:"۳۰ روزه ۵۰ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲,۹۰۰,۰۰۰",badge:"special"},
+];
+const _RT_POST_PKGS:RightelPkg[]=[
+  // ماهانه — اینترنت
+  {id:"pm1",name:"۳۰ روزه ۱ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱۸۶,۹۰۰"},
+  {id:"pm2",name:"۳۰ روزه ۲ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲۵۴,۸۰۰"},
+  {id:"pm3",name:"۳۰ روزه ۳ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳۳۸,۴۰۰"},
+  {id:"pm4",name:"۳۰ روزه ۴ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳۷۶,۶۰۰"},
+  {id:"pm5",name:"ماهانه ۵ گیگ",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۴۱۴,۸۰۰"},
+  {id:"pm6",name:"۳۰ روزه ۷ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۲۳,۰۰۰"},
+  {id:"pm7",name:"۳۰ روزه ۸ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۸۴,۰۰۰"},
+  {id:"pm8",name:"۳۰ روزه ۱۰ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۶۹۹,۰۰۰"},
+  {id:"pm9",name:"۳۰ روزه ۱۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۹۹۹,۰۰۰"},
+  {id:"pm10",name:"۳۰ روزه ۲۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱,۵۱۰,۰۰۰",badge:"special"},
+  {id:"pm11",name:"۳۰ روزه ۵۰ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲,۹۰۰,۰۰۰",badge:"special"},
+  // دو ماهه
+  {id:"pb1",name:"۶۰ روزه ۳۵ گیگابایت",dur:"دو ماهه",durFilter:"دو ماهه",type:"internet",price:"۲,۶۶۰,۰۰۰"},
+  // سه ماهه
+  {id:"pt1",name:"۹۰ روزه ۴۵ گیگابایت",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۳,۳۳۰,۰۰۰"},
+  {id:"pt2",name:"۹۰ روزه ۶۰ گیگابایت",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۴,۳۳۰,۰۰۰"},
+  // شش ماهه
+  {id:"ph1",name:"۱۸۰ روزه ۵۰ گیگابایت",dur:"شش ماهه",durFilter:"شش ماهه",type:"internet",price:"۳,۵۰۰,۰۰۰"},
+  {id:"ph2",name:"۱۸۰ روزه ۸۰ گیگابایت",dur:"شش ماهه",durFilter:"شش ماهه",type:"internet",price:"۵,۳۰۰,۰۰۰"},
+  // یک ساله
+  {id:"py1",name:"۳۶۵ روزه ۱۵۰ گیگابایت",dur:"یک ساله",durFilter:"یک ساله",type:"internet",price:"۸,۸۵۰,۰۰۰"},
+  {id:"py2",name:"۳۶۵ روزه ۳۰۰ گیگابایت",dur:"یک ساله",durFilter:"یک ساله",type:"internet",price:"۱۶,۹۰۰,۰۰۰"},
+  // پانزده روزه
+  {id:"pf1",name:"۱۵ روزه (۱.۵ گیگابایت)",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۰۸,۱۰۰"},
+  {id:"pf2",name:"۱۵ روزه ۳ گیگابایت",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۳۰۱,۶۰۰"},
+  {id:"pf3",name:"۱۵ روزه ۵ گیگابایت",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۳۳۸,۴۰۰"},
+  // هفتگی — اینترنت
+  {id:"pw1",name:"۷ روزه ۵۰۰ مگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۳۰,۲۰۰"},
+  {id:"pw2",name:"۷ روزه ۱ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۷۹,۸۰۰"},
+  {id:"pw3",name:"۷ روزه ۳ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۶۳,۳۰۰"},
+  {id:"pw4",name:"۷ روزه ۶ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۳۵۸,۲۰۰"},
+  // سه روزه
+  {id:"p3d1",name:"۳ روزه ۱۵۰ مگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۶۱,۴۰۰"},
+  {id:"p3d2",name:"۳ روزه ۱ گیگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۱۵۴,۳۰۰"},
+  {id:"p3d3",name:"۳ روزه ۳ گیگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۲۲۵,۱۰۰"},
+  // روزانه
+  {id:"pd1",name:"روزانه ۱۰۰ مگ",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۳۸,۲۰۰"},
+  {id:"pd2",name:"۱ روزه ۳۰۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۶۹,۳۰۰"},
+  {id:"pd3",name:"۱ روزه ۵۰۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۸۷,۷۰۰"},
+  {id:"pd4",name:"۱ روزه ۱ گیگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۱۷,۵۰۰"},
+  {id:"pd5",name:"۱ روزه ۳ گیگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۷۹,۸۰۰"},
+  // پیامک
+  {id:"psms1",name:"۳۰ روزه ۲۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۴۰,۰۰۰"},
+  {id:"psms2",name:"۳۰ روزه ۵۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۹۰,۰۰۰"},
+  {id:"psms3",name:"۳۰ روزه ۱۰۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۱۶۰,۰۰۰"},
+  {id:"psms4",name:"۱ ماهه ۲۰۰ پیامک فارسی-انگلیسی",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۴۰,۰۰۰"},
+  // مکالمه
+  {id:"pcl1",name:"۱۵۰ دقیقه تماس صوتی درون و برون شبکه ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۹۸,۰۰۰"},
+  {id:"pcl2",name:"۳۰ روزه ۵۰۰ دقیقه مکالمه درون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۲۲۴,۰۰۰"},
+  {id:"pcl3",name:"۵۰۰ دقیقه تماس صوتی درون و برون شبکه ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۳۲۰,۰۰۰"},
+  {id:"pcl4",name:"۳۰ روزه ۱۰۰۰ دقیقه مکالمه درون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۳۹۰,۰۰۰"},
+  // ترکیبی
+  {id:"pcb1",name:"۳۰ دقیقه مکالمه + ۲۰ پیامک ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"combo",price:"۷,۰۹۰,۰۰۰",desc:"۲۰ پیامک"},
+  // رومینگ
+  {id:"pro1",name:"عراق ۱۰۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۹۹۰,۰۰۰",desc:"عراق ۱۰۰ مگابایت ۷ روزه"},
+  {id:"pro2",name:"عراق ۳۵۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۳,۳۰۰,۰۰۰",desc:"عراق ۳۵۰ مگابایت ۷ روزه"},
+  {id:"pro3",name:"عراق ۷۵۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۶,۵۰۰,۰۰۰",desc:"عراق ۷۵۰ مگابایت ۷ روزه"},
+];
+const _RT_POST_DUR_FILTERS=["روزانه","هفتگی","سه روزه","پانزده روزه","ماهانه","دو ماهه","سه ماهه","شش ماهه","یک ساله"];
+const _RT_POST_TYPE_OPTS:[string,string,string][]=[["internet","اینترنت","📶"],["call","مکالمه","📞"],["sms","پیامک","💬"],["combo","ترکیبی","📦"],["roaming","رومینگ","🌍"]];
+
+function RightelPostpaidInternetScreen({phone,onBack,onGoToPayment}:{phone:string;user?:UserData;onUpdate?:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onGoToPayment:(d:{phone:string;operator:Operator|null;amount:string;type:"internet"})=>void}){
+  const [durFilter,setDurFilter]=useState<string|null>(null);
+  const [typeFilter,setTypeFilter]=useState<string|null>(null);
+  const [sortBy,setSortBy]=useState<string|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [showSort,setShowSort]=useState(false);
+  const [showType,setShowType]=useState(false);
+  const [selId,setSelId]=useState<string|null>(null);
+  useEffect(()=>{const t=setTimeout(()=>setLoading(false),900);return()=>clearTimeout(t);},[]);
+
+  const filtered=[..._RT_POST_PKGS].filter(p=>{
+    if(durFilter&&p.durFilter!==durFilter)return false;
+    if(typeFilter&&p.type!==typeFilter)return false;
+    return true;
+  }).sort((a,b)=>{
+    const pa=()=>parseFloat(a.price.replace(/[^0-9]/g,""));
+    const pb=()=>parseFloat(b.price.replace(/[^0-9]/g,""));
+    if(sortBy==="price-asc")return pa()-pb();
+    if(sortBy==="price-desc")return pb()-pa();
+    if(sortBy==="special")return (b.badge?1:0)-(a.badge?1:0);
+    return 0;
+  });
+  const showSpecial=!durFilter&&!typeFilter;
+  const selPkg=[..._RT_POST_PKGS,..._RT_POST_SPECIAL].find(p=>p.id===selId)??null;
+
+  const typeLabels:{[k:string]:string}={internet:"اینترنت",call:"مکالمه",sms:"پیامک",roaming:"رومینگ",combo:"ترکیبی"};
+  const typeColors:{[k:string]:[string,string]}={internet:["rgba(0,214,176,0.12)","rgba(0,214,176,0.75)"],call:["rgba(160,100,255,0.12)","rgba(180,140,255,0.85)"],sms:["rgba(250,180,50,0.12)","rgba(250,180,50,0.9)"],combo:["rgba(100,200,120,0.12)","rgba(120,220,140,0.85)"],roaming:["rgba(100,160,255,0.12)","rgba(100,200,255,0.85)"]};
+
+  const TypePill=({t}:{t:string})=>{const [bg,color]=typeColors[t]??["rgba(255,255,255,0.08)","rgba(255,255,255,0.5)"];return <span style={{fontSize:10,background:bg,color,padding:"1px 7px",borderRadius:6,fontFamily:"Vazirmatn"}}>{typeLabels[t]??t}</span>;};
+
+  const RTBadge2=({type}:{type:"recent"|"special"})=>type==="recent"?null:<span style={{display:"inline-flex",padding:"2px 9px",borderRadius:8,fontSize:10,fontWeight:700,fontFamily:"Vazirmatn",background:"rgba(0,214,176,0.12)",color:"#00D6B0",border:"1px solid rgba(0,214,176,0.3)"}}>پیشنهاد آن‌پرداز</span>;
+
+  const PostCard=({p}:{p:RightelPkg})=>{const isSel=selId===p.id;const volMatch=(p.name+" "+(p.desc||"")).match(/[\d.]+\s*(?:گیگ(?:ابایت)?|مگ(?:ابایت)?|GB|MB)/i);const volLabel=volMatch?volMatch[0]:null;return <button onClick={()=>setSelId(isSel?null:p.id)} className={`anp-rt-card${isSel?" anp-rt-card--sel":""}`} style={{display:"flex",alignItems:"center",width:"100%",background:isSel?"rgba(0,214,176,0.1)":"var(--card-bg)",border:`1.5px solid ${isSel?"#00D6B0":"var(--border-light,rgba(255,255,255,0.09))"}`,borderRadius:22,padding:"16px 14px",cursor:"pointer",textAlign:"right",marginBottom:10,transition:"all .15s",fontFamily:"Vazirmatn",boxSizing:"border-box",boxShadow:isSel?"0 0 0 3px rgba(0,214,176,0.1)":"none"}}>
+    <div style={{flex:1,minWidth:0}}>
+      {volLabel&&<div style={{fontSize:20,fontWeight:900,color:"var(--text-primary)",lineHeight:1.2,marginBottom:2,textAlign:"right"}}>{volLabel}</div>}
+      <div style={{fontSize:volLabel?12:15,fontWeight:volLabel?600:800,color:volLabel?"var(--text-secondary)":"var(--text-primary)",marginBottom:4,lineHeight:1.4,textAlign:"right"}}>{p.name}</div>
+      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+        <span style={{fontSize:11,color:"var(--text-muted)",background:"var(--card-bg2,rgba(255,255,255,0.07))",padding:"2px 8px",borderRadius:5}}>{p.dur}</span>
+        <TypePill t={p.type}/>
+      </div>
+      {p.desc&&!volLabel&&<div style={{fontSize:11,color:"var(--text-muted)",marginTop:4,lineHeight:1.5}}>{p.desc}</div>}
+      {p.badge&&<div style={{marginTop:4}}><RTBadge2 type={p.badge}/></div>}
+    </div>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",justifyContent:"center",flexShrink:0,marginRight:12,gap:8}}>
+      <div style={{textAlign:"left"}}><div style={{fontSize:15,fontWeight:900,color:"#00D6B0",direction:"ltr",whiteSpace:"nowrap"}}>{p.price}</div><div style={{fontSize:10,color:"rgba(0,214,176,0.5)",textAlign:"left",marginTop:1}}>ریال</div></div>
+      <div style={{width:24,height:24,borderRadius:"50%",background:isSel?"#00D6B0":"transparent",border:`2px solid ${isSel?"#00D6B0":"var(--border-color,rgba(255,255,255,0.3))"}`,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s",flexShrink:0}}>
+        {isSel&&<svg width="12" height="12" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#071d2c" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+      </div>
+    </div>
+  </button>;};
+
+  return <>
+  <div className="subscreen anp-pkg-screen" dir="rtl" style={{display:"flex",flexDirection:"column",height:"100%",position:"relative",background:"#111"}}>
+    {/* Header */}
+    <div className="anp-pkg-header" style={{display:"flex",alignItems:"center",padding:"0 14px",height:64,borderBottom:"1px solid rgba(255,255,255,0.07)",flexShrink:0,background:"#111"}}>
+      <button onClick={onBack} className="anp-pkg-back" style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l6-6-6-6"/></svg>
+      </button>
+      <h2 className="anp-pkg-title" style={{flex:1,textAlign:"center",fontSize:16,fontWeight:800,color:"#fff",fontFamily:"Vazirmatn",margin:0}}>اینترنت رایتل دائمی</h2>
+      <div className="anp-pkg-simtype-badge" style={{padding:"4px 10px",background:"rgba(0,214,176,0.12)",border:"1px solid rgba(0,214,176,0.35)",borderRadius:10,fontSize:11,fontWeight:700,color:"#00D6B0",fontFamily:"Vazirmatn",flexShrink:0}}>دائمی</div>
+    </div>
+
+    {/* Filter bar */}
+    <div className="anp-pkg-filters" style={{flexShrink:0,overflowX:"auto",display:"flex",gap:8,padding:"10px 14px",scrollbarWidth:"none",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+      <_PkgChipBtn label="مرتب‌سازی" active={sortBy!==null} onClick={()=>setShowSort(true)}/>
+      <_PkgChipBtn label={typeFilter?typeLabels[typeFilter]??"نوع بسته":"نوع بسته"} active={typeFilter!==null} onClick={()=>setShowType(true)}/>
+      {_RT_POST_DUR_FILTERS.map(f=><_DurChipBtn key={f} label={f} active={durFilter===f} onClick={()=>setDurFilter(durFilter===f?null:f)}/>)}
+    </div>
+
+    {/* Package list */}
+    <div className="anp-pkg-list" style={{flex:1,overflowY:"auto",padding:"14px 14px 320px",scrollbarWidth:"none",background:"#111"}}>
+      {loading?([1,2,3,4,5].map(i=><div key={i} style={{height:82,borderRadius:22,background:"rgba(255,255,255,0.05)",marginBottom:10,animation:"pulse 1.4s ease-in-out infinite",animationDelay:`${i*0.1}s`}}/>)):(
+        <>
+          {showSpecial&&<>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <span style={{fontSize:14,fontWeight:800,color:"var(--text-primary)",fontFamily:"Vazirmatn"}}>پیشنهادات ویژه</span>
+              <div style={{flex:1,height:1,background:"var(--border-faint,rgba(255,255,255,0.08))"}}/>
+            </div>
+            {_RT_POST_SPECIAL.map(p=><PostCard key={p.id} p={p}/>)}
+            <div style={{display:"flex",alignItems:"center",gap:8,margin:"14px 0 10px"}}>
+              <span style={{fontSize:14,fontWeight:800,color:"var(--text-primary)",fontFamily:"Vazirmatn"}}>همه بسته‌ها</span>
+              <div style={{flex:1,height:1,background:"var(--border-faint,rgba(255,255,255,0.08))"}}/>
+              <span style={{fontSize:11,color:"var(--text-muted)",fontFamily:"Vazirmatn"}}>{_RT_POST_PKGS.length} بسته</span>
+            </div>
+          </>}
+          {filtered.length===0?<div style={{textAlign:"center",padding:"60px 20px",fontFamily:"Vazirmatn"}}><div style={{margin:"0 auto 14px",width:54,height:54,borderRadius:18,background:"rgba(0,214,176,0.07)",border:"1px solid rgba(0,214,176,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(0,214,176,0.5)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div><div style={{fontSize:15,fontWeight:700,color:"rgba(255,255,255,0.55)",marginBottom:6}}>بسته‌ای موجود نیست</div><div style={{fontSize:12,color:"rgba(255,255,255,0.3)"}}>فیلتر را تغییر دهید</div></div>:filtered.map(p=><PostCard key={p.id} p={p}/>)}
+        </>
+      )}
+    </div>
+
+    {selPkg&&<div className="sab-pkg-preview"><span className="sab-pkg-preview-name">{selPkg.name}</span><span className="sab-pkg-preview-price">{selPkg.price} <span>ریال</span></span></div>}
+    <StickyActionBtn label="همین بسته را می‌خرم" onClick={()=>selPkg&&onGoToPayment({phone,operator:OPERATORS.rightel,amount:`${selPkg.name} — ${selPkg.price} ریال`,type:"internet"})} disabled={!selPkg} noBleed/>
+  </div>
+
+  {/* Sort sheet */}
+  {showSort&&<>
+    <div onClick={()=>setShowSort(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200}}/>
+    <div style={{position:"fixed",bottom:0,right:0,left:0,background:"#1a1a1a",borderRadius:"22px 22px 0 0",padding:"20px 16px 40px",zIndex:201,fontFamily:"Vazirmatn",direction:"rtl"}}>
+      <div style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)",margin:"0 auto 20px"}}/>
+      <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:16}}>مرتب‌سازی</div>
+      {_RT_SORT_OPTS.map(([key,label])=><button key={key} onClick={()=>{setSortBy(sortBy===key?null:key);setShowSort(false);}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:sortBy===key?"rgba(0,214,176,0.1)":"transparent",border:`1px solid ${sortBy===key?"rgba(0,214,176,0.3)":"rgba(255,255,255,0.08)"}`,borderRadius:12,padding:"13px 14px",marginBottom:8,cursor:"pointer",color:sortBy===key?"#00D6B0":"#fff",fontSize:13,fontFamily:"Vazirmatn",textAlign:"right"}}>
+        {label}{sortBy===key&&<svg width="14" height="14" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+      </button>)}
+    </div>
+  </>}
+
+  {/* Type filter sheet */}
+  {showType&&<>
+    <div onClick={()=>setShowType(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200}}/>
+    <div className="anp-filter-sheet" style={{position:"fixed",bottom:0,right:0,left:0,background:"#1a1a1a",borderRadius:"22px 22px 0 0",padding:"20px 16px 40px",zIndex:201,fontFamily:"Vazirmatn",direction:"rtl"}}>
+      <div className="anp-filter-sheet-handle" style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)",margin:"0 auto 20px"}}/>
+      <div className="anp-filter-sheet-title" style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:16}}>نوع بسته</div>
+      {_RT_POST_TYPE_OPTS.map(([key,label])=>{const isAct=typeFilter===key;const pkgIconPath=(k:string)=>k==="internet"?<><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill={isAct?"#00D6B0":"rgba(255,255,255,0.5)"} stroke="none"/></>:k==="call"?<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.81a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.5 16z"/>:k==="sms"?<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>:k==="combo"?<><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></>:<><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></>;return <button key={key} className={`anp-filter-btn${isAct?" anp-filter-btn-active":""}`} onClick={()=>{setTypeFilter(typeFilter===key?null:key);setDurFilter(null);setShowType(false);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:isAct?"rgba(0,214,176,0.1)":"transparent",border:`1px solid ${isAct?"rgba(0,214,176,0.3)":"rgba(255,255,255,0.08)"}`,borderRadius:12,padding:"13px 14px",marginBottom:8,cursor:"pointer",color:isAct?"#00D6B0":"#fff",fontSize:13,fontFamily:"Vazirmatn",textAlign:"right"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isAct?"#00D6B0":"rgba(255,255,255,0.5)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{pkgIconPath(key)}</svg>
+          <span style={{flex:1}}>{label}</span>
+          {isAct&&<svg width="14" height="14" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+        </button>;})}
+    </div>
+  </>}
+  </>;
+}
+
+// Generic SIM type selection — shared across all operators
+function SimTypeScreen({phone,operator,onBack,onSelect}:{phone:string;operator:Operator;onBack:()=>void;onSelect:(t:"postpaid"|"prepaid")=>void}){
+  const [chosen,setChosen]=useState<"postpaid"|"prepaid"|null>(null);
+  const col=operator.id==="mci"?"#009856":operator.color;
+  const colRgb=operator.id==="mci"?"0,152,86":col==="#9C27B0"?"156,39,176":col==="#FFD700"?"255,215,0":"0,188,212";
+  return <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">نوع سیم‌کارت</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      <div className="anp-simtype-phone-info" style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",background:`rgba(${colRgb},0.08)`,border:`1px solid rgba(${colRgb},0.2)`,borderRadius:14,marginBottom:24}}>
+        <OperatorBadge op={operator} size="sm"/>
+        <div>
+          <div style={{fontSize:15,fontWeight:800,color:"var(--text-primary)",fontFamily:"Vazirmatn"}}>{toFaDigits(phone)}</div>
+          <div className="anp-simtype-op-name" style={{fontSize:11,color:`rgba(${colRgb},0.9)`,fontFamily:"Vazirmatn",marginTop:1}}>{operator.name}</div>
+        </div>
+      </div>
+      <div style={{fontSize:15,fontWeight:700,color:"var(--text-primary)",fontFamily:"Vazirmatn",marginBottom:14,textAlign:"right"}}>نوع سیم‌کارت خود را انتخاب کنید</div>
+      {(["postpaid","prepaid"] as const).map(t=>{
+        const isPrepaid=t==="prepaid";const isChosen=chosen===t;
+        return <button key={t} className={`anp-simtype-btn${isChosen?" anp-simtype-btn--chosen":""}`} onClick={()=>setChosen(t)} style={{display:"flex",alignItems:"center",gap:14,width:"100%",background:isChosen?`rgba(${colRgb},0.1)`:"var(--card-bg)",border:`2px solid ${isChosen?col:"var(--border-color)"}`,borderRadius:18,padding:"18px 16px",marginBottom:12,cursor:"pointer",textAlign:"right",transition:"all .2s",fontFamily:"Vazirmatn",boxSizing:"border-box"}}>
+          <div className={`anp-simtype-icon${isChosen?" anp-simtype-icon--chosen":""}`} style={{width:46,height:46,borderRadius:14,background:isChosen?`rgba(${colRgb},0.18)`:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"background .2s"}}>
+            {isPrepaid
+              ? <svg className="anp-simtype-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={isChosen?col:"rgba(255,255,255,0.55)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20"/><path d="M6 15h4"/><path d="M14 15h4"/></svg>
+              : <svg className="anp-simtype-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={isChosen?col:"rgba(255,255,255,0.55)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M9 22v-3h6v3"/><circle cx="12" cy="7" r="1.2" fill={isChosen?col:"rgba(255,255,255,0.55)"} stroke="none"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>}
+          </div>
+          <div style={{flex:1}}>
+            <div className="anp-simtype-label" style={{fontSize:16,fontWeight:800,color:isChosen?col:"var(--text-primary)",marginBottom:3}}>{isPrepaid?"اعتباری":"دائمی"}</div>
+            <div style={{fontSize:12,color:"var(--text-muted)"}}>{isPrepaid?"بسته‌های مناسب سیم‌کارت اعتباری":"بسته‌های مناسب سیم‌کارت دائمی"}</div>
+          </div>
+          <div className={`anp-simtype-radio${isChosen?" anp-simtype-radio--chosen":""}`} style={{width:22,height:22,borderRadius:11,border:`2px solid ${isChosen?col:"rgba(255,255,255,0.2)"}`,background:isChosen?col:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
+            {isChosen&&<svg width="10" height="10" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+          </div>
+        </button>;
+      })}
+      <StickyActionBtn label="ادامه" onClick={()=>chosen&&onSelect(chosen)} disabled={!chosen}/>
+    </div>
+  </div>;
+}
+function RightelSimTypeScreen({phone,operator,onBack,onSelect}:{phone:string;operator:Operator;onBack:()=>void;onSelect:(t:"postpaid"|"prepaid")=>void}){
+  return <SimTypeScreen phone={phone} operator={operator} onBack={onBack} onSelect={onSelect}/>;
+}
+
+function RightelPrepaidInternetScreen({phone,onBack,onGoToPayment}:{phone:string;user?:UserData;onUpdate?:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onGoToPayment:(d:{phone:string;operator:Operator|null;amount:string;type:"internet"})=>void}){
+  const [durFilter,setDurFilter]=useState<string|null>(null);
+  const [typeFilter,setTypeFilter]=useState<string|null>(null);
+  const [sortBy,setSortBy]=useState<string|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [showSort,setShowSort]=useState(false);
+  const [showType,setShowType]=useState(false);
+  const [selId,setSelId]=useState<string|null>(null);
+  useEffect(()=>{const t=setTimeout(()=>setLoading(false),900);return()=>clearTimeout(t);},[]);
+
+  const filtered=[..._RT_PKGS].filter(p=>{
+    if(durFilter&&p.durFilter!==durFilter)return false;
+    if(typeFilter&&p.type!==typeFilter)return false;
+    return true;
+  }).sort((a,b)=>{
+    if(sortBy==="price-asc"||sortBy==="ارزان‌ترین"){const pa=parseFloat(a.price.replace(/[^0-9]/g,""));const pb=parseFloat(b.price.replace(/[^0-9]/g,""));return pa-pb;}
+    if(sortBy==="price-desc"||sortBy==="گران‌ترین"){const pa=parseFloat(a.price.replace(/[^0-9]/g,""));const pb=parseFloat(b.price.replace(/[^0-9]/g,""));return pb-pa;}
+    if(sortBy==="special"||sortBy==="پیشنهادی")return (b.badge?1:0)-(a.badge?1:0);
+    return 0;
+  });
+  const showSpecial=!durFilter&&!typeFilter;
+  const selPkg=[..._RT_PKGS,..._RT_SPECIAL].find(p=>p.id===selId)??null;
+
+  const RTBadge=({type}:{type:"recent"|"special"})=>type==="recent"?null:<span style={{display:"inline-flex",padding:"2px 9px",borderRadius:8,fontSize:10,fontWeight:700,fontFamily:"Vazirmatn",background:"rgba(0,214,176,0.12)",color:"#00D6B0",border:"1px solid rgba(0,214,176,0.3)"}}>پیشنهاد آن‌پرداز</span>;
+
+  const TypeTag=({t}:{t:RightelPkg["type"]})=>{
+    const cfg:{[k:string]:[string,string]}={internet:["rgba(0,214,176,0.12)","rgba(0,214,176,0.7)"],call:["rgba(160,100,255,0.12)","rgba(180,140,255,0.85)"],sms:["rgba(250,180,50,0.12)","rgba(250,180,50,0.9)"],roaming:["rgba(100,160,255,0.12)","rgba(100,200,255,0.85)"]};
+    const labels:{[k:string]:string}={internet:"اینترنت",call:"مکالمه",sms:"پیامک",roaming:"رومینگ"};
+    const [bg,color]=cfg[t]??["rgba(255,255,255,0.08)","rgba(255,255,255,0.5)"];
+    return <span style={{fontSize:10,background:bg,color,padding:"1px 7px",borderRadius:6,fontFamily:"Vazirmatn"}}>{labels[t]??t}</span>;
+  };
+
+  const RTCard=({p}:{p:RightelPkg})=>{const isSel=selId===p.id;const volMatch=(p.name+" "+(p.desc||"")).match(/[\d.]+\s*(?:گیگ(?:ابایت)?|مگ(?:ابایت)?|GB|MB)/i);const volLabel=volMatch?volMatch[0]:null;return <button onClick={()=>setSelId(isSel?null:p.id)} className={`anp-rt-card${isSel?" anp-rt-card--sel":""}`} style={{display:"flex",alignItems:"center",width:"100%",background:isSel?"rgba(0,214,176,0.1)":"var(--card-bg)",border:`1.5px solid ${isSel?"#00D6B0":"var(--border-light,rgba(255,255,255,0.09))"}`,borderRadius:22,padding:"16px 14px",cursor:"pointer",textAlign:"right",marginBottom:10,transition:"all .15s",fontFamily:"Vazirmatn",boxSizing:"border-box",position:"relative",boxShadow:isSel?"0 0 0 3px rgba(0,214,176,0.1)":"none"}}>
+    <div style={{flex:1,minWidth:0}}>
+      {volLabel&&<div style={{fontSize:20,fontWeight:900,color:"var(--text-primary)",lineHeight:1.2,marginBottom:2,textAlign:"right"}}>{volLabel}</div>}
+      <div style={{fontSize:volLabel?12:15,fontWeight:volLabel?600:800,color:volLabel?"var(--text-secondary)":"var(--text-primary)",marginBottom:4,lineHeight:1.4,textAlign:"right"}}>{p.name}</div>
+      <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+        <span style={{fontSize:11,color:"var(--text-muted)",background:"var(--card-bg2,rgba(255,255,255,0.07))",padding:"2px 8px",borderRadius:5}}>{p.dur}</span>
+        <TypeTag t={p.type}/>
+      </div>
+      {p.desc&&!volLabel&&<div style={{fontSize:11,color:"var(--text-muted)",marginTop:4,lineHeight:1.5}}>{p.desc}</div>}
+      {p.badge&&<div style={{marginTop:4}}><RTBadge type={p.badge}/></div>}
+    </div>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",justifyContent:"center",flexShrink:0,marginRight:12,gap:8}}>
+      <div style={{textAlign:"left"}}>
+        <div style={{fontSize:15,fontWeight:900,color:"#00D6B0",direction:"ltr",whiteSpace:"nowrap"}}>{p.price}</div>
+        <div style={{fontSize:10,color:"rgba(0,214,176,0.5)",textAlign:"left",marginTop:1}}>ریال</div>
+      </div>
+      <div style={{width:24,height:24,borderRadius:"50%",background:isSel?"#00D6B0":"transparent",border:`2px solid ${isSel?"#00D6B0":"var(--border-color,rgba(255,255,255,0.3))"}`,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s",flexShrink:0}}>
+        {isSel&&<svg width="12" height="12" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#071d2c" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+      </div>
+    </div>
+  </button>;};
+
+  return <>
+  <div className="subscreen anp-pkg-screen" dir="rtl" style={{display:"flex",flexDirection:"column",height:"100%",position:"relative",background:"#111"}}>
+    {/* Header */}
+    <div className="anp-pkg-header" style={{display:"flex",alignItems:"center",padding:"0 14px",height:64,borderBottom:"1px solid rgba(255,255,255,0.07)",flexShrink:0,background:"#111"}}>
+      <button onClick={onBack} className="anp-pkg-back" style={{width:36,height:36,borderRadius:10,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l6-6-6-6"/></svg>
+      </button>
+      <h2 className="anp-pkg-title" style={{flex:1,textAlign:"center",fontSize:16,fontWeight:800,color:"#fff",fontFamily:"Vazirmatn",margin:0}}>اینترنت رایتل اعتباری</h2>
+      {/* Sim type badge */}
+      <div className="anp-pkg-simtype-badge" style={{padding:"4px 10px",background:"rgba(156,39,176,0.15)",border:"1px solid rgba(156,39,176,0.35)",borderRadius:10,fontSize:11,fontWeight:700,color:"#ce93d8",fontFamily:"Vazirmatn",flexShrink:0}}>اعتباری</div>
+    </div>
+
+    {/* Filter bar */}
+    <div className="anp-pkg-filters" style={{flexShrink:0,overflowX:"auto",display:"flex",gap:8,padding:"10px 14px",scrollbarWidth:"none",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+      <_PkgChipBtn label="مرتب‌سازی" active={sortBy!==null} onClick={()=>setShowSort(true)}/>
+      <_PkgChipBtn label={typeFilter?{internet:"اینترنت",call:"مکالمه",sms:"پیامک",roaming:"رومینگ"}[typeFilter]??"نوع بسته":"نوع بسته"} active={typeFilter!==null} onClick={()=>setShowType(true)}/>
+      {_RT_DUR_FILTERS.map(f=><_DurChipBtn key={f} label={f} active={durFilter===f} onClick={()=>setDurFilter(durFilter===f?null:f)}/>)}
+    </div>
+
+    {/* List */}
+    <div className="anp-pkg-list" style={{flex:1,overflowY:"auto",padding:"14px 14px 320px",scrollbarWidth:"none",background:"#111"}}>
+      {loading?([1,2,3,4,5].map(i=><div key={i} style={{height:82,borderRadius:22,background:"rgba(255,255,255,0.05)",marginBottom:10,animation:"pulse 1.4s ease-in-out infinite",animationDelay:`${i*0.1}s`}}/>)):(
+        <>
+          {showSpecial&&<>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <span style={{fontSize:14,fontWeight:800,color:"var(--text-primary)",fontFamily:"Vazirmatn"}}>پیشنهادات ویژه</span>
+              <div style={{flex:1,height:1,background:"var(--border-faint,rgba(255,255,255,0.08))"}}/>
+            </div>
+            {_RT_SPECIAL.map(p=><RTCard key={p.id} p={p}/>)}
+            <div style={{display:"flex",alignItems:"center",gap:8,margin:"14px 0 10px"}}>
+              <span style={{fontSize:14,fontWeight:800,color:"var(--text-primary)",fontFamily:"Vazirmatn"}}>همه بسته‌ها</span>
+              <div style={{flex:1,height:1,background:"var(--border-faint,rgba(255,255,255,0.08))"}}/>
+              <span style={{fontSize:11,color:"var(--text-muted)",fontFamily:"Vazirmatn"}}>{_RT_PKGS.length} بسته</span>
+            </div>
+          </>}
+          {filtered.length===0?<div style={{textAlign:"center",padding:"60px 20px",fontFamily:"Vazirmatn"}}><div style={{margin:"0 auto 14px",width:54,height:54,borderRadius:18,background:"rgba(0,214,176,0.07)",border:"1px solid rgba(0,214,176,0.15)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(0,214,176,0.5)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div><div style={{fontSize:15,fontWeight:700,color:"rgba(255,255,255,0.55)",marginBottom:6}}>بسته‌ای موجود نیست</div><div style={{fontSize:12,color:"rgba(255,255,255,0.3)"}}>فیلتر را تغییر دهید</div></div>:filtered.map(p=><RTCard key={p.id} p={p}/>)}
+        </>
+      )}
+    </div>
+
+    {selPkg&&<div className="sab-pkg-preview"><span className="sab-pkg-preview-name">{selPkg.name}</span><span className="sab-pkg-preview-price">{selPkg.price} <span>ریال</span></span></div>}
+    <StickyActionBtn label="همین بسته را می‌خرم" onClick={()=>selPkg&&onGoToPayment({phone,operator:OPERATORS.rightel,amount:`${selPkg.name} — ${selPkg.price} ریال`,type:"internet"})} disabled={!selPkg} noBleed/>
+  </div>
+
+  {/* Sort bottom sheet */}
+  {showSort&&<>
+    <div onClick={()=>setShowSort(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200}}/>
+    <div style={{position:"fixed",bottom:0,right:0,left:0,background:"#1a1a1a",borderRadius:"22px 22px 0 0",padding:"20px 16px 40px",zIndex:201,fontFamily:"Vazirmatn",direction:"rtl"}}>
+      <div style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)",margin:"0 auto 20px"}}/>
+      <div style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:16}}>مرتب‌سازی</div>
+      {_RT_SORT_OPTS.map(([key,label])=><button key={key} onClick={()=>{setSortBy(sortBy===key?null:key);setShowSort(false);}} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:sortBy===key?"rgba(0,214,176,0.1)":"transparent",border:`1px solid ${sortBy===key?"rgba(0,214,176,0.3)":"rgba(255,255,255,0.08)"}`,borderRadius:12,padding:"13px 14px",marginBottom:8,cursor:"pointer",color:sortBy===key?"#00D6B0":"#fff",fontSize:13,fontFamily:"Vazirmatn",textAlign:"right"}}>
+        {label}{sortBy===key&&<svg width="14" height="14" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+      </button>)}
+    </div>
+  </>}
+
+  {/* Type filter bottom sheet */}
+  {showType&&<>
+    <div onClick={()=>setShowType(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:200}}/>
+    <div className="anp-filter-sheet" style={{position:"fixed",bottom:0,right:0,left:0,background:"#1a1a1a",borderRadius:"22px 22px 0 0",padding:"20px 16px 40px",zIndex:201,fontFamily:"Vazirmatn",direction:"rtl"}}>
+      <div className="anp-filter-sheet-handle" style={{width:36,height:4,borderRadius:2,background:"rgba(255,255,255,0.15)",margin:"0 auto 20px"}}/>
+      <div className="anp-filter-sheet-title" style={{fontSize:15,fontWeight:800,color:"#fff",marginBottom:16}}>نوع بسته</div>
+      {_RT_TYPE_OPTS.map(([key,label])=>{const isAct=typeFilter===key;const rtIconPath=(k:string)=>k==="internet"?<><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill={isAct?"#00D6B0":"rgba(255,255,255,0.5)"} stroke="none"/></>:k==="call"?<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.81a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.5 16z"/>:k==="sms"?<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>:<><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></>;return <button key={key} className={`anp-filter-btn${isAct?" anp-filter-btn-active":""}`} onClick={()=>{setTypeFilter(typeFilter===key?null:key);setDurFilter(null);setShowType(false);}} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:isAct?"rgba(0,214,176,0.1)":"transparent",border:`1px solid ${isAct?"rgba(0,214,176,0.3)":"rgba(255,255,255,0.08)"}`,borderRadius:12,padding:"13px 14px",marginBottom:8,cursor:"pointer",color:isAct?"#00D6B0":"#fff",fontSize:13,fontFamily:"Vazirmatn",textAlign:"right"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isAct?"#00D6B0":"rgba(255,255,255,0.5)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{rtIconPath(key)}</svg>
+          <span style={{flex:1}}>{label}</span>
+          {isAct&&<svg width="14" height="14" viewBox="0 0 14 14"><path d="M2.5 7l3 3 6-6" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+        </button>;})}
+    </div>
+  </>}
+  </>;
+}
+
+// ─── Internet Package Router (phone input → operator screen) ──────────────────
+type InternetStep="phone"|"irancell-simtype"|"irancell-postpaid"|"irancell-prepaid"|"mci-simtype"|"mci-postpaid"|"mci-prepaid"|"rightel-simtype"|"rightel-prepaid"|"rightel-postpaid";
+function InternetPackageScreen({user,onUpdate,onBack,onGoToPayment,initialState,onBeforeNavigate}:{user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onGoToPayment:(d:{phone:string;operator:Operator|null;amount:string;type:"internet"})=>void;initialState?:{phone:string;step:InternetStep}|null;onBeforeNavigate?:(state:{phone:string;step:InternetStep})=>void}){
+  const [phone,setPhone]=useState(initialState?.phone??"");
+  const [step,setStep]=useState<InternetStep>(initialState?.step??"phone");
+  const operator=phone.length>=4?detectOperator(phone):null;
+  const wrapGoToPayment=(d:{phone:string;operator:Operator|null;amount:string;type:"internet"})=>{
+    onBeforeNavigate?.({phone,step});
+    onGoToPayment(d);
+  };
+  const proceed=()=>{
+    if(!isIranPhone(phone))return;
+    if(operator?.id==="irancell"){setStep("irancell-simtype");return;}
+    if(operator?.id==="rightel"){setStep("rightel-simtype");return;}
+    setStep("mci-simtype");
+  };
+  if(step==="irancell-simtype"&&operator)return <SimTypeScreen phone={phone} operator={operator} onBack={()=>setStep("phone")} onSelect={t=>setStep(t==="prepaid"?"irancell-prepaid":"irancell-postpaid")}/>;
+  if(step==="irancell-postpaid")return <IrancellPkgView phone={phone} simType="postpaid" onBack={()=>setStep("irancell-simtype")} onGoToPayment={wrapGoToPayment}/>;
+  if(step==="irancell-prepaid")return <IrancellPkgView phone={phone} simType="prepaid" onBack={()=>setStep("irancell-simtype")} onGoToPayment={wrapGoToPayment}/>;
+  if(step==="mci-simtype"&&operator)return <SimTypeScreen phone={phone} operator={operator} onBack={()=>setStep("phone")} onSelect={t=>setStep(t==="prepaid"?"mci-prepaid":"mci-postpaid")}/>;
+  if(step==="mci-postpaid")return <MciPrepaidInternetScreen phone={phone} simType="postpaid" onBack={()=>setStep("mci-simtype")} onGoToPayment={wrapGoToPayment}/>;
+  if(step==="mci-prepaid")return <MciPrepaidInternetScreen phone={phone} simType="prepaid" onBack={()=>setStep("mci-simtype")} onGoToPayment={wrapGoToPayment}/>;
+  if(step==="rightel-simtype"&&operator)return <SimTypeScreen phone={phone} operator={operator} onBack={()=>setStep("phone")} onSelect={t=>setStep(t==="prepaid"?"rightel-prepaid":"rightel-postpaid")}/>;
+  if(step==="rightel-prepaid")return <RightelPrepaidInternetScreen phone={phone} onBack={()=>setStep("rightel-simtype")} onGoToPayment={wrapGoToPayment}/>;
+  if(step==="rightel-postpaid")return <RightelPostpaidInternetScreen phone={phone} onBack={()=>setStep("rightel-simtype")} onGoToPayment={wrapGoToPayment}/>;
+  return <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">خرید بسته اینترنت</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      <div style={{marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}>
+          <button style={{background:"none",border:"none",color:"#00D6B0",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontFamily:"Vazirmatn"}} onClick={async()=>{const p=await pickContactPhone();if(p)setPhone(p)}}><Icon name="contacts" size={14}/> از مخاطبین</button>
+        </div>
+        <FloatInput label="شماره موبایل" value={toFaDigits(phone)} onChange={v=>setPhone(toLatinDigits(v))} inputMode="tel" maxLength={11} dir="ltr"/>
+        {operator&&<div style={{marginTop:8,display:"flex",alignItems:"center",gap:8}}><OperatorBadge op={operator} size="sm"/><span style={{fontSize:12,color:"var(--text-secondary)",fontFamily:"Vazirmatn"}}>{operator.name} — شناسایی شد</span></div>}
+      </div>
+      <StickyActionBtn label="مشاهده بسته‌ها" onClick={proceed} disabled={!isIranPhone(phone)}/>
+    </div>
+  </div>;
+}
+
+// ─── Charge/Internet Screen ───────────────────────────────────────────────────
+function ChargeScreen({type,user,onUpdate,onBack,onGoToPayment}:{type:"charge"|"internet";user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onGoToPayment?:(d:{phone:string;operator:Operator|null;amount:string;type:"charge"|"internet"})=>void}){
+  const [phone,setPhone]=useState("");const [amount,setAmount]=useState("");const [errModal,setErrModal]=useState("");const [processing,setProcessing]=useState(false);const [receipt,setReceipt]=useState<ReceiptData|null>(null);
+  const operator=phone.length>=4?detectOperator(phone):null;
+  const chargeAmt=parseInt(toLatinDigits(amount).replace(/\D/g,""))||0;
+  const packages=type==="internet"?["۱ گیگ — ۷ روز — ۱۵,۰۰۰ ریال","۲ گیگ — ۱۵ روز — ۲۸,۰۰۰ ریال","۳ گیگ — ۳۰ روز — ۳۸,۰۰۰ ریال","۵ گیگ — ۳۰ روز — ۵۵,۰۰۰ ریال","۸ گیگ — ۳۰ روز — ۸۰,۰۰۰ ریال","۱۲ گیگ — ۳۰ روز — ۱۱۰,۰۰۰ ریال","۲۰ گیگ — ۳۰ روز — ۱۵۰,۰۰۰ ریال","۳۰ گیگ — ۳۰ روز — ۲۱۵,۰۰۰ ریال","۵۰ گیگ — ۳۰ روز — ۳۴۰,۰۰۰ ریال","نامحدود — ۳۰ روز — ۳۵۰,۰۰۰ ریال"]:["۱۰,۰۰۰ ریال","۲۰,۰۰۰ ریال","۵۰,۰۰۰ ریال","۱۰۰,۰۰۰ ریال","۲۰۰,۰۰۰ ریال","۵۰۰,۰۰۰ ریال"];
+  const submit=()=>{
+    if(!isIranPhone(phone)){setErrModal("شماره موبایل معتبر وارد کنید.");return}
+    if(!amount){setErrModal(type==="internet"?"لطفاً بسته اینترنت مورد نظر را انتخاب کنید.":"لطفاً مبلغ یا شارژ مورد نظر را انتخاب کنید.");return}
+    if(onGoToPayment){onGoToPayment({phone,operator,amount,type});return}
+    setProcessing(true);
+    setTimeout(()=>{
+      setProcessing(false);
+      const label=type==="charge"?"شارژ مستقیم":"بسته اینترنت";
+      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`${label} · ${operator?.name??""} · ${phone} · ${amount}`,source:"app"});
+      setReceipt({title:type==="charge"?"شارژ سیم کارت موفق بود":"خرید بسته اینترنت موفق بود",amount,destination:`${operator?.name??""}  ${toFaDigits(phone)}`,detail:`${label} با موفقیت ارسال شد.`});
+      setPhone("");setAmount("");
+    },2500);
+  };
+  const overlayText=type==="charge"?`در حال شارژ سیم کارت شماره ${toFaDigits(phone)} ...`:`در حال خرید بسته اینترنت برای شماره ${toFaDigits(phone)} ...`;
+  return <>
+  <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">{type==="charge"?"شارژ مستقیم":"بسته اینترنت"}</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      <div style={{marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}>
+          <button style={{background:"none",border:"none",color:"#00D6B0",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:4,fontFamily:"Vazirmatn"}} onClick={async()=>{const p=await pickContactPhone();if(p)setPhone(p)}}><Icon name="contacts" size={14}/> از مخاطبین</button>
+        </div>
+        <FloatInput label="شماره موبایل" value={toFaDigits(phone)} onChange={v=>setPhone(toLatinDigits(v))} inputMode="tel" maxLength={11} dir="ltr"/>
+        {operator&&<div style={{marginTop:6,display:"flex",alignItems:"center",gap:6}}><OperatorBadge op={operator} size="sm"/><span style={{fontSize:11,color:"var(--text-muted)",fontFamily:"Vazirmatn"}}>شناسایی شد</span></div>}
+      </div>
+      <label className="field-label">انتخاب {type==="charge"?"مبلغ":"بسته"}</label>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
+        {packages.map(p=><button key={p} className={`pkg-btn ${amount===p?"active":""}`} onClick={()=>setAmount(p)}>{p}</button>)}
+      </div>
+      {type==="charge"&&<div style={{marginBottom:chargeAmt>0?6:16}}>
+        <FloatInput label="مبلغ دلخواه" value={chargeAmt?fa(chargeAmt):""} onChange={v=>setAmount(toLatinDigits(v).replace(/[^0-9]/g,""))} inputMode="numeric" dir="ltr" suffix="ریال"/>
+        {chargeAmt>0&&<div className="amount-words">معادل {numToFaWords(Math.floor(chargeAmt/10))} تومان</div>}
+      </div>}
+      <StickyActionBtn label="تأیید" onClick={submit} disabled={processing||!isIranPhone(phone)||!amount} loading={processing} loadingText="در حال پردازش..."/>
+    </div>
+  </div>
+  {processing&&<AnPardazLoadingOverlay text={overlayText} badge={operator&&<OperatorBadge op={operator}/>}/>}
+  {receipt&&<TransactionReceipt data={receipt} onClose={()=>setReceipt(null)}/>}
+  {errModal&&<div style={{margin:"12px 16px",padding:"16px",borderRadius:14,background:"rgba(232,81,42,0.1)",border:"1px solid rgba(232,81,42,0.3)",color:"var(--text-primary)",display:"flex",alignItems:"flex-start",gap:12,direction:"rtl"}}>
+    <span style={{flex:1,fontSize:14,lineHeight:1.7}}>{errModal}</span>
+    <button onClick={()=>setErrModal("")} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",fontSize:18,lineHeight:1}}>✕</button>
+  </div>}
+  </>;
+}
+
+// ─── Bills Screen ─────────────────────────────────────────────────────────────
+function BillsScreen({onBack,onGoToPayment}:{onBack:()=>void;onGoToPayment:(d:{billType:string;billName:string;billIcon:string;amount:string;inputVal:string;ownerName:string})=>void}){
+  const [selected,setSelected]=useState<string>("hamrah");
+  const [inputVal,setInputVal]=useState("");
+  const [titleVal,setTitleVal]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [processing,setProcessing]=useState(false);
+  const [result,setResult]=useState<string|null>(null);
+  const [billErrModal,setBillErrModal]=useState("");
+  const [phoneErr,setPhoneErr]=useState("");
+
+  const types=[
+    {id:"hamrah",name:"همراه اول",usePhone:true,inputLabel:"شماره اشتراک",example:"تلفن همراه خودم",hint:"تنها امکان استعلام قبض‌های همراه اول و خطوط ترابرد شده به همراه اول وجود دارد.",color:"#009870"},
+    {id:"gas",name:"گاز",usePhone:false,inputLabel:"شماره اشتراک",example:"قبض گاز منزل",hint:null,color:"#003087"},
+    {id:"electric",name:"برق",usePhone:false,inputLabel:"شناسه قبض",example:"قبض برق شرکت",hint:null,color:"#f5a500"},
+    {id:"makhab",name:"مخابرات",usePhone:false,inputLabel:"شماره اشتراک",example:"تلفن ثابت منزل",hint:null,color:"#505a64"},
+    {id:"irancell",name:"ایرانسل",usePhone:true,inputLabel:"شماره اشتراک",example:"تلفن همراه خودم",hint:"تنها امکان استعلام قبض‌های ایرانسل و خطوط ترابرد شده به ایرانسل وجود دارد.",color:"#cc9900"},
+    {id:"water",name:"آب",usePhone:false,inputLabel:"شناسه قبض",example:"قبض آب منزل",hint:null,color:"#006aba"},
+  ];
+
+  const sel=types.find(t=>t.id===selected);
+
+  // Normalize raw input: handles 09XX, +989XX, 00989XX, 989XX → 09XX
+  const normalizePhone=(raw:string)=>{
+    const d=toLatinDigits(raw).replace(/\D/g,"");
+    if(d.startsWith("00989"))return "0"+d.slice(4);
+    if(d.startsWith("989"))return "0"+d.slice(2);
+    return d;
+  };
+
+  const handlePhoneChange=(raw:string)=>{
+    const normalized=normalizePhone(raw).slice(0,11);
+    setInputVal(normalized);
+    if(phoneErr&&normalized.length<11)setPhoneErr("");
+  };
+
+  const validatePhone=()=>{
+    if(!inputVal){setPhoneErr("شماره همراه را وارد کنید.");return false;}
+    if(!isIranPhone(inputVal)){setPhoneErr("شماره موبایل معتبر نیست. فرمت صحیح: ۰۹XXXXXXXXX");return false;}
+    setPhoneErr("");return true;
+  };
+
+  const inquire=()=>{
+    if(sel?.usePhone){
+      if(!validatePhone())return;
+    } else {
+      if(!inputVal.trim()){setBillErrModal(`لطفاً ${sel?.inputLabel} را وارد کنید.`);return;}
+    }
+    setProcessing(true);
+    setTimeout(()=>{
+      setProcessing(false);
+      onGoToPayment({billType:selected,billName:sel?.name??"قبض",billIcon:selected,amount:"۱۲۰٬۰۰۰",inputVal,ownerName:titleVal||"مشترک"});
+    },2000);
+  };
+
+  const switchBill=(id:string)=>{
+    setSelected(id);setInputVal("");setTitleVal("");setResult(null);setPhoneErr("");
+  };
+
+  return <>
+  {processing&&<AnPardazLoadingOverlay text="در حال استعلام قبض..."/>}
+  <div className="subscreen" dir="rtl" style={{display:"flex",flexDirection:"column"}}>
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">پرداخت قبض</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body" style={{overflowY:"auto"}}>
+      {/* Bill category grid — 2 rows × 3 columns */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:20}}>
+        {types.map(t=>{
+          const isSel=selected===t.id;
+          return(
+            <button key={t.id} onClick={()=>switchBill(t.id)} style={{
+              display:"flex",flexDirection:"column",alignItems:"center",gap:10,
+              background:isSel?`${t.color}0d`:"rgba(255,255,255,0.03)",
+              border:`1.5px solid ${isSel?t.color:"rgba(255,255,255,0.08)"}`,
+              borderRadius:18,cursor:"pointer",
+              padding:"16px 8px 12px",
+              transition:"border-color .18s,background .18s",
+              boxSizing:"border-box",
+            }}>
+              <BillIcon type={t.id} size={48}/>
+              <span style={{fontSize:12,color:isSel?t.color:"var(--text-secondary)",fontWeight:isSel?700:500,fontFamily:"Vazirmatn",textAlign:"center",lineHeight:1.3,width:"100%"}}>{t.name}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Form — always showing for selected bill */}
+      {sel&&<div style={{animation:"slideUp 0.25s ease"}}>
+        <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)",marginBottom:14,lineHeight:1.6}}>
+          {sel.usePhone
+            ?"شماره موبایل خود را به همراه عنوان قبض مورد نظر وارد کنید"
+            :`${sel.inputLabel} خود را به همراه عنوان قبض مورد نظر وارد کنید`}
+        </div>
+
+        {/* Phone input */}
+        {sel.usePhone?(
+          <div style={{marginBottom:10}}>
+            <div style={{
+              background:"var(--card-bg)",
+              borderRadius:16,
+              border:`1.5px solid ${phoneErr?"#e8512a":inputVal.length===11&&isIranPhone(inputVal)?"rgba(0,214,176,0.55)":"var(--border-color)"}`,
+              overflow:"hidden",
+              transition:"border-color .2s",
+              boxShadow:phoneErr?"0 0 0 3px rgba(232,81,42,0.1)":inputVal.length===11&&isIranPhone(inputVal)?"0 0 0 3px rgba(0,214,176,0.08)":"none",
+            }}>
+              <div style={{display:"flex",alignItems:"center",padding:"4px 10px 4px 10px",gap:8}}>
+                <button onClick={async()=>{const p=await pickContactPhone();if(p){const n=normalizePhone(p).slice(0,11);setInputVal(n);setPhoneErr("");}}} style={{background:"var(--card-bg3)",border:"1.5px solid var(--border-color)",borderRadius:10,padding:"8px 12px",cursor:"pointer",color:"var(--text-muted)",fontSize:11,fontWeight:700,fontFamily:"Vazirmatn",flexShrink:0,display:"flex",alignItems:"center",gap:4,transition:"all .15s"}}><Icon name="contacts" size={13}/> مخاطبین</button>
+                <input
+                  style={{
+                    flex:1,
+                    background:"none",
+                    border:"none",
+                    outline:"none",
+                    color:phoneErr?"#e8512a":inputVal.length===11&&isIranPhone(inputVal)?"#00D6B0":"var(--text-primary)",
+                    fontSize:26,
+                    fontWeight:700,
+                    fontFamily:"Vazirmatn",
+                    padding:"14px 6px",
+                    letterSpacing:"0.06em",
+                    direction:"ltr",
+                    textAlign:"right",
+                    transition:"color .2s",
+                  }}
+                  value={toFaDigits(inputVal)}
+                  onKeyDown={e=>{
+                    const ok=["Backspace","Delete","Tab","ArrowLeft","ArrowRight","Home","End"];
+                    if(ok.includes(e.key)||e.ctrlKey||e.metaKey)return;
+                    if(e.key==="+"&&inputVal.length===0)return;
+                    if(!/^[0-9۰-۹]$/.test(e.key)){e.preventDefault();return;}
+                    if(inputVal.length>=11){e.preventDefault();return;}
+                  }}
+                  onChange={e=>handlePhoneChange(e.target.value)}
+                  onBlur={()=>{if(inputVal.length>0&&inputVal.length<11)setPhoneErr("شماره موبایل ناقص است. ۱۱ رقم وارد کنید.");else if(inputVal.length===11&&!isIranPhone(inputVal))setPhoneErr("شماره موبایل معتبر نیست. فرمت صحیح: ۰۹XXXXXXXXX");}}
+                  placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                  inputMode="tel"
+                  maxLength={14}
+                />
+              </div>
+            </div>
+            {/* Validation row */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6,padding:"0 4px"}}>
+              {phoneErr
+                ?<span style={{fontSize:12,color:"#e8512a",fontWeight:600,display:"flex",alignItems:"center",gap:4}}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    {phoneErr}
+                  </span>
+                :inputVal.length===11&&isIranPhone(inputVal)
+                  ?<span style={{fontSize:12,color:"#00D6B0",fontWeight:600,display:"flex",alignItems:"center",gap:4}}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6"/></svg>
+                      شماره معتبر است
+                    </span>
+                  :<span style={{fontSize:12,color:"var(--text-muted)"}}>فرمت: ۰۹XXXXXXXXX</span>
+              }
+              <span style={{fontSize:12,color:inputVal.length===11?"#00D6B0":"var(--text-muted)",fontWeight:inputVal.length===11?700:400,fontVariantNumeric:"tabular-nums"}}>
+                {toFaDigits(String(inputVal.length))}/۱۱
+              </span>
+            </div>
+          </div>
+        ):(
+          <FloatInput label={sel.inputLabel} value={toFaDigits(inputVal)} onChange={v=>setInputVal(toLatinDigits(v).replace(/\D/g,""))} inputMode="numeric" dir="rtl" style={{marginBottom:10}}/>
+        )}
+
+        {/* Title input */}
+        <div style={{marginBottom:sel.hint?12:16}}>
+          <FloatInput label="عنوان قبض" value={titleVal} onChange={v=>setTitleVal(v)} dir="rtl"/>
+          <div style={{marginTop:4,fontSize:11,color:"var(--text-muted)",paddingRight:4}}>مثال: {sel.example}</div>
+        </div>
+
+        {/* Hint box */}
+        {sel.hint&&<div style={{background:"rgba(0,214,176,0.07)",border:"1px solid rgba(0,214,176,0.2)",borderRadius:12,padding:"10px 14px",marginBottom:16,display:"flex",alignItems:"flex-start",gap:8}}>
+          <button style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",flexShrink:0,padding:0,lineHeight:1}} onClick={()=>{}}>✕</button>
+          <div style={{fontSize:12,color:"var(--text-secondary)",lineHeight:1.6}}>{sel.hint}</div>
+        </div>}
+
+        {result&&<div style={{fontSize:13,color:"#00D6B0",textAlign:"center",padding:"12px",background:"rgba(0,214,176,0.1)",borderRadius:12,marginBottom:16,border:"1px solid rgba(0,214,176,0.2)"}}>{result}</div>}
+      </div>}
+      <StickyActionBtn label="استعلام و پرداخت" onClick={inquire} disabled={processing||!inputVal.trim()} loading={processing} loadingText="در حال استعلام..."/>
+    </div>
+  </div>
+  {billErrModal&&<div style={{margin:"12px 16px",padding:"16px",borderRadius:14,background:"rgba(232,81,42,0.1)",border:"1px solid rgba(232,81,42,0.3)",color:"var(--text-primary)",display:"flex",alignItems:"flex-start",gap:12,direction:"rtl"}}>
+    <span style={{flex:1,fontSize:14,lineHeight:1.7}}>{billErrModal}</span>
+    <button onClick={()=>setBillErrModal("")} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",fontSize:18,lineHeight:1}}>✕</button>
+  </div>}
+  </>;
+}
+
+// ─── Insurance Screen ─────────────────────────────────────────────────────────
+function InsuranceScreen({initialTab,user,onUpdate,onBack}:{initialTab:"third-party"|"body"|"motorcycle";user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void}){
+  const [tab,setTab]=useState<"third-party"|"body"|"motorcycle">(initialTab);
+  const [plateNum,setPlateNum]=useState(["","","",""]);
+  const plateSeg0Ref=useRef<HTMLInputElement>(null);
+  const plateSeg1Ref=useRef<HTMLInputElement>(null);
+  const plateSeg2Ref=useRef<HTMLInputElement>(null);
+  const plateSeg3Ref=useRef<HTMLInputElement>(null);
+  // Focus first plate segment on page mount (after slide-in animation)
+  useEffect(()=>{const t=setTimeout(()=>plateSeg0Ref.current?.focus(),300);return()=>clearTimeout(t);},[]);
+  // Re-focus first plate segment whenever the insurance tab changes (not motorcycle)
+  useEffect(()=>{if(tab==="motorcycle")return;const t=setTimeout(()=>plateSeg0Ref.current?.focus(),80);return()=>clearTimeout(t);},[tab]);
+  const [hasPrev,setHasPrev]=useState<string|null>(null);
+  const [ownership,setOwnership]=useState<string|null>(null);
+  const [motoType,setMotoType]=useState("");
+  const [motoYear,setMotoYear]=useState("");
+  const [motoColor,setMotoColor]=useState("");
+  const [motoPicker,setMotoPicker]=useState<"type"|"year"|"color"|null>(null);
+  const [submitted,setSubmitted]=useState(false);
+  const [showComingSoon,setShowComingSoon]=useState(false);
+  const processing=false;
+  const confirmSubmit=()=>{setShowComingSoon(true)};
+
+  const updatePlate=(i:number,v:string)=>{const p=[...plateNum];p[i]=v;setPlateNum(p)};
+
+  const plateSegmentInput=<div className="plate-input-wrap" style={{marginBottom:16}}>
+    <div className="plate-ir-badge">
+      <span style={{fontSize:14}}>🇮🇷</span>
+      <span>ایران</span>
+    </div>
+    <input ref={plateSeg0Ref} className="plate-segment" value={toFaDigits(plateNum[0])} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,2);updatePlate(0,v);if(v.length===2)plateSeg1Ref.current?.focus()}} placeholder="00" maxLength={2} inputMode="numeric" style={{maxWidth:48}}/>
+    <input ref={plateSeg1Ref} className="plate-segment" value={plateNum[1]} onChange={e=>{const v=e.target.value.slice(0,1);updatePlate(1,v);if(v.length===1)plateSeg2Ref.current?.focus()}} placeholder="ب" maxLength={1} style={{maxWidth:36}}/>
+    <input ref={plateSeg2Ref} className="plate-segment" value={toFaDigits(plateNum[2])} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,3);updatePlate(2,v);if(v.length===3)plateSeg3Ref.current?.focus()}} placeholder="000" maxLength={3} inputMode="numeric" style={{maxWidth:56}}/>
+    <input ref={plateSeg3Ref} className="plate-segment" value={toFaDigits(plateNum[3])} onChange={e=>updatePlate(3,toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,2))} placeholder="00" maxLength={2} inputMode="numeric" style={{maxWidth:48}}/>
+  </div>;
+
+  const tabs=[
+    {id:"third-party",label:"شخص ثالث",icon:"shield"},
+    {id:"body",label:"بیمه بدنه",icon:"car"},
+    {id:"motorcycle",label:"موتورسیکلت",icon:"moto"},
+  ] as const;
+
+  const plateComplete=plateNum[0].length===2&&plateNum[1].length===1&&plateNum[2].length===3&&plateNum[3].length===2;
+  const insDisabled=submitted||(tab==="third-party"?(!plateComplete||!ownership):tab==="body"?(!plateComplete||!hasPrev):(!motoType||!motoYear||!motoColor));
+
+  return <><div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">آسان بیمه</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="ins-tabs">
+      {tabs.map(t=><button key={t.id} className={`ins-tab ${tab===t.id?"active":""}`} onClick={()=>{setTab(t.id);setSubmitted(false)}}>
+        <Icon name={t.icon} size={20}/>
+        {t.label}
+      </button>)}
+    </div>
+    <div className="subscreen-body">
+      {tab==="third-party"&&<>
+        <div style={{color:"#4a9eff",fontWeight:700,fontSize:15,marginBottom:16}}>خرید بیمه شخص ثالث</div>
+        <div style={{fontSize:13,color:"var(--text-muted)",marginBottom:10}}>پلاک خودرو</div>
+        {plateSegmentInput}
+        {!submitted&&<>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)",marginBottom:12}}>
+            خودرو در مدت بیمه‌نامه قبلی تغییر مالکیت (تعویض پلاک) داشته؟
+          </div>
+          <div style={{display:"flex",gap:10,marginBottom:16}}>
+            {([["yes","بله","تغییر مالکیت داشته"],["no","خیر","تغییر مالکیت نداشته"]] as const).map(([v,title,sub])=>
+              <button key={v} onClick={()=>setOwnership(v)} className={`ins-option-btn ${ownership===v?"selected":""}`}>
+                <div style={{fontSize:15,fontWeight:800}}>{title}</div>
+                <div style={{fontSize:11,opacity:0.7,textAlign:"center",lineHeight:1.4}}>{sub}</div>
+                <div style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${ownership===v?"#4a9eff":"var(--border-color)"}`,display:"flex",alignItems:"center",justifyContent:"center",marginTop:4}}>
+                  {ownership===v&&<div style={{width:8,height:8,borderRadius:"50%",background:"#4a9eff"}}/>}
+                </div>
+              </button>
+            )}
+          </div>
+          <div style={{textAlign:"center",fontSize:12,color:"var(--text-muted)",marginBottom:8}}>یا</div>
+          <button style={{width:"100%",background:"none",border:"none",color:"#00D6B0",fontSize:13,cursor:"pointer",fontFamily:"Vazirmatn",padding:"8px 0"}}>انتخاب پلاک از لیست خودروها ←</button>
+        </>}
+        {submitted&&<div style={{textAlign:"center",padding:"24px 0",color:"#00D6B0"}}><Icon name="check" size={56}/><div style={{marginTop:12,fontSize:15,fontWeight:700,color:"var(--text-primary)"}}>درخواست استعلام ارسال شد</div><div style={{fontSize:13,color:"var(--text-muted)",marginTop:8}}>کارشناس بیمه با شما تماس خواهد گرفت</div></div>}
+      </>}
+
+      {tab==="body"&&<>
+        <div style={{color:"#4a9eff",fontWeight:700,fontSize:15,marginBottom:16}}>خرید بیمه بدنه</div>
+        <div style={{fontSize:13,color:"var(--text-muted)",marginBottom:10}}>پلاک خودرو</div>
+        {plateSegmentInput}
+        {!submitted&&<>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)",marginBottom:12}}>آیا خودرو سابقه بیمه بدنه دارد؟</div>
+          {[["yes","بله، دارای سابقه بیمه بدنه است"],["no","خیر، سابقه بیمه بدنه ندارد"],["new","خودرو صفر کیلومتر است"]].map(([v,label])=>
+            <button key={v} onClick={()=>setHasPrev(v)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",background:"var(--card-bg)",border:`1px solid ${hasPrev===v?"#4a9eff":"var(--border-color)"}`,borderRadius:12,padding:"14px 16px",color:hasPrev===v?"#4a9eff":"var(--text-primary)",cursor:"pointer",fontFamily:"Vazirmatn",fontSize:13,marginBottom:8,transition:"all 0.2s"}}>
+              {label}
+              <div style={{width:18,height:18,borderRadius:"50%",border:`2px solid ${hasPrev===v?"#4a9eff":"var(--border-color)"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {hasPrev===v&&<div style={{width:8,height:8,borderRadius:"50%",background:"#4a9eff"}}/>}
+              </div>
+            </button>
+          )}
+          <div style={{textAlign:"center",fontSize:12,color:"var(--text-muted)",marginBottom:8,marginTop:8}}>یا</div>
+          <button style={{width:"100%",background:"none",border:"none",color:"#00D6B0",fontSize:13,cursor:"pointer",fontFamily:"Vazirmatn",padding:"8px 0"}}>انتخاب پلاک از لیست خودروها ←</button>
+        </>}
+        {submitted&&<div style={{textAlign:"center",padding:"24px 0",color:"#00D6B0"}}><Icon name="check" size={56}/><div style={{marginTop:12,fontSize:15,fontWeight:700,color:"var(--text-primary)"}}>درخواست ارسال شد</div></div>}
+      </>}
+
+      {tab==="motorcycle"&&<>
+        <div style={{color:"#4a9eff",fontWeight:700,fontSize:15,marginBottom:4}}>خرید بیمه شخص ثالث موتورسیکلت</div>
+        <div style={{fontSize:12,color:"var(--text-muted)",marginBottom:16}}>خرید بیمه‌نامه برای موتورسیکلت‌های <b style={{color:"var(--text-primary)"}}>شخصی</b> امکان‌پذیر است.</div>
+        {([['type','نوع موتورسیکلت',motoType],['year','سال ساخت',motoYear],['color','رنگ موتورسیکلت',motoColor]] as const).map(([key,label,val])=>
+          <button key={key} className="moto-select" onClick={()=>setMotoPicker(key)}><span style={{color:val?"var(--text-primary)":"var(--text-muted)"}}>{val||label}</span><span>⌄</span></button>
+        )}
+        {motoPicker&&<div className="receipt-page" dir="rtl"><div className="receipt-page-header"><button className="back-btn" onClick={()=>setMotoPicker(null)}><Icon name="arrow" size={20}/></button><h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>{motoPicker==='type'?'نوع موتورسیکلت':motoPicker==='year'?'سال ساخت':'رنگ موتورسیکلت'}</h2><div style={{width:36}}/></div><div className="receipt-page-body"><div className="picker-list">{(motoPicker==='type'?['اسکوتر','موتور شهری','موتور مسابقه‌ای','موتور سنگین']:motoPicker==='year'?Array.from({length:30},(_,i)=>toFaDigits(String(1405-i))):['مشکی','سفید','قرمز','آبی','نقره‌ای','زرد']).map(option=><button key={option} onClick={()=>{if(motoPicker==='type')setMotoType(option);else if(motoPicker==='year')setMotoYear(option);else setMotoColor(option);setMotoPicker(null)}}><span><b>{option}</b></span></button>)}</div></div></div>}
+        {submitted&&<div style={{textAlign:"center",padding:"16px 0",color:"#00D6B0"}}><Icon name="check" size={48}/><div style={{marginTop:8,fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>درخواست ارسال شد</div></div>}
+        <div className="ins-help-bar">
+          <div><div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>درخواست کمک</div><div style={{fontSize:11,color:"var(--text-muted)",marginTop:2}}>سوالات متداول و تماس تلفنی</div></div>
+          <div style={{width:32,height:32,borderRadius:"50%",background:"#4a9eff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="question" size={16}/></div>
+        </div>
+      </>}
+      {!submitted&&<StickyActionBtn label="تایید اطلاعات" onClick={confirmSubmit} disabled={insDisabled}/>}
+    </div>
+  </div>
+  {showComingSoon&&<div className="receipt-page" dir="rtl">
+    <div className="receipt-page-header">
+      <button className="back-btn" onClick={()=>setShowComingSoon(false)}><Icon name="arrow" size={20}/></button>
+      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>به‌زودی</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="receipt-page-body" style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 24px",textAlign:"center"}}>
+      <div style={{width:72,height:72,borderRadius:22,background:"linear-gradient(135deg,rgba(74,158,255,0.15),rgba(74,158,255,0.05))",border:"1px solid rgba(74,158,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:36}}>🛡️</div>
+      <div style={{fontSize:17,fontWeight:800,color:"var(--text-primary)",marginBottom:12}}>به‌زودی</div>
+      <div style={{fontSize:14,color:"var(--text-secondary)",lineHeight:1.8,marginBottom:24}}>
+        سرویس های مربوط به بیمه نامه ها به زودی توسط تیم فنی آن پرداز در دسترس قرار می گیرند.
+      </div>
+      <button className="primary-button" style={{background:"#4a9eff",width:"100%"}} onClick={()=>setShowComingSoon(false)}>متوجه شدم</button>
+    </div>
+  </div>}
+  </>;
+}
+
+// ─── Bills Payment Screen ─────────────────────────────────────────────────────
+function BillsPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{billType:string;billName:string;billIcon:string;amount:string;inputVal:string;ownerName:string};user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onDone:()=>void}){
+  const [selectedCard,setSelectedCard]=useState(user.cards[0]?.id??"");
+  const [cardPickerOpen,setCardPickerOpen]=useState(false);
+  const [otp,setOtp]=useState("");const [cvv2,setCvv2]=useState("");
+  const [expM,setExpM]=useState("");const [expY,setExpY]=useState("");
+  const cvv2Ref=useRef<HTMLInputElement>(null);const expMRef=useRef<HTMLInputElement>(null);const expYRef=useRef<HTMLInputElement>(null);
+  const [processing,setProcessing]=useState(false);
+  const [receipt,setReceipt]=useState<ReceiptData|null>(null);
+  const [err,setErr]=useState("");
+  const selCard=user.cards.find(c=>c.id===selectedCard);
+  const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
+  const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
+  const pay=()=>{
+    if(!otp){setErr("رمز پویا را وارد کنید.");return}
+    if(!cvv2){setErr("CVV2 را وارد کنید.");return}
+    if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
+    setErr("");setProcessing(true);
+    setTimeout(()=>{
+      setProcessing(false);resetSensitive();
+      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`قبض ${data.billName} · ${data.inputVal}`,source:"app"});
+      setReceipt({title:"پرداخت قبض با موفقیت انجام شد",amount:`${data.amount} ریال`,destination:data.billName,status:"success",detail:`مشترک: ${data.ownerName}`});
+    },2500);
+  };
+  return <>
+  {processing&&<AnPardazLoadingOverlay text="در حال پردازش پرداخت..."/>}
+  {receipt&&<TransactionReceipt data={receipt} onClose={()=>{setReceipt(null);onDone();}}/>}
+  <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">پرداخت قبض</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      <div className="charge-summary-card" style={{marginBottom:16}}>
+        <div className="charge-summary-op">
+          <BillIcon type={data.billType} size={56}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:800,color:"var(--text-primary)"}}>{data.billName}</div>
+            <div style={{fontSize:12,color:"var(--text-muted)",marginTop:2}}>{data.ownerName} · {toFaDigits(data.inputVal)}</div>
+          </div>
+        </div>
+        <div className="charge-summary-amount">{toFaDigits(String(data.amount))} ریال</div>
+      </div>
+      <div className="banking-form">
+        <div className="bform-field">
+          <label className="field-label">کارت بانکی</label>
+          <button className="bform-card-select" onClick={()=>setCardPickerOpen(true)}>
+            {selCard?(<div className="bform-card-row"><BankLogo bankName={selCard.bank} size={44} rounded={13}/><div className="bform-card-text"><span className="bform-bank-name">{selCard.bank}</span><span className="bform-card-number" dir="ltr">{toFaDigits(fmtCard(selCard.number))}</span></div></div>):(<div className="bform-card-row"><div className="bform-bank-dot bform-bank-dot--empty"><Icon name="credit" size={16}/></div><span className="bform-card-placeholder">انتخاب کارت بانکی</span></div>)}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div className="fin-otp-row">
+          <FinField label="رمز پویا" value={otp} onChange={setOtp} maxLength={5}
+            onFilled={()=>cvv2Ref.current?.focus()}/>
+          <OtpCooldownBtn key={selCard?.number||"none"} onRequest={()=>setErr("")} cardId={selCard?.number} noCard={!selCard}/>
+        </div>
+        <FinField label="CVV2" value={cvv2} onChange={setCvv2} maxLength={3}
+          inputRef={cvv2Ref} onFilled={()=>expMRef.current?.focus()}/>
+        <div className="fin-exp-row">
+          <FinExpField label="ماه انقضا" value={expM} onChange={setExpM}
+            inputRef={expMRef} maxLength={2} onFilled={()=>expYRef.current?.focus()}/>
+          <div className="fin-exp-sep">/</div>
+          <FinExpField label="سال انقضا" value={expY} onChange={setExpY}
+            inputRef={expYRef} maxLength={2}/>
+        </div>
+        {err&&<p className="field-err">{err}</p>}
+      </div>
+      <StickyActionBtn label="پرداخت" onClick={pay} disabled={processing||!payValid} loading={processing} loadingText="در حال پردازش..."/>
+    </div>
+  </div>
+  {cardPickerOpen&&<div className="receipt-page" dir="rtl">
+    <div className="receipt-page-header">
+      <button className="back-btn" onClick={()=>setCardPickerOpen(false)}><Icon name="arrow" size={20}/></button>
+      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>انتخاب کارت</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="receipt-page-body">
+      {user.cards.length===0&&<p className="bs-empty">کارتی ثبت نشده است.</p>}
+      {user.cards.map(c=>(
+        <button key={c.id} className={`bs-card-item${selectedCard===c.id?" active":""}`} onClick={()=>{setSelectedCard(c.id);setCardPickerOpen(false);if(c.expM)setExpM(toFaDigits(c.expM));if(c.expY)setExpY(toFaDigits(c.expY))}}>
+          <BankLogo bankName={c.bank} size={48} rounded={14}/>
+          <div className="bs-card-info"><span className="bs-card-bank">{c.bank}</span><span className="bs-card-holder">{c.holderName}</span><span className="bs-card-num" dir="ltr">{toFaDigits(fmtCard(c.number))}</span></div>
+          {selectedCard===c.id&&<div className="bs-card-check"><Icon name="check" size={16} stroke={2.5}/></div>}
+        </button>
+      ))}
+    </div>
+  </div>}
+  </>;
+}
+
+// ─── Violations Screen ────────────────────────────────────────────────────────
+const PLATE_LETTERS="الف ب پ ت ث ج چ ح خ د ذ ر ز ژ س ش ص ض ط ظ ع غ ف ق ک گ ل م ن و ه ی".split(" ");
+function ViolationsScreen({onBack,onGoToPayment}:{onBack:()=>void;onGoToPayment?:(d:{plate:string;amount:string;ownerName:string})=>void}){
+  const [part1,setPart1]=useState(""); // 2 digits
+  const [letter,setLetter]=useState("ب"); // 1 letter
+  const [part2,setPart2]=useState(""); // 3 digits
+  const [province,setProvince]=useState(""); // 2 digits
+  const [letterOpen,setLetterOpen]=useState(false);
+  const part1Ref=useRef<HTMLInputElement>(null);
+  const letterBtnRef=useRef<HTMLButtonElement>(null);
+  const part2Ref=useRef<HTMLInputElement>(null);
+  const provinceRef=useRef<HTMLInputElement>(null);
+  // Focus first plate segment on page mount (after slide-in animation)
+  useEffect(()=>{const t=setTimeout(()=>part1Ref.current?.focus(),300);return()=>clearTimeout(t);},[]);
+  const [loading,setLoading]=useState(false);
+  const [processing,setProcessing]=useState(false);
+  const [result,setResult]=useState<string|null>(null);
+  const [errModal,setErrModal]=useState("");
+
+  const inquire=()=>{
+    if(!part1||!part2||!province){setErrModal("لطفاً پلاک خودرو را کامل وارد کنید.");return}
+    setProcessing(true);
+    setTimeout(()=>{
+      setProcessing(false);
+      const plateStr=`${toFaDigits(part1)} ${letter} ${toFaDigits(part2)} | ${toFaDigits(province)}`;
+      onGoToPayment?.({plate:plateStr,amount:"۳۶۰٬۰۰۰",ownerName:"محمد رضایی"});
+    },2000);
+  };
+
+  return <>
+  {processing&&<AnPardazLoadingOverlay text="در حال استعلام خلافی..."/>}
+  <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">خلافی خودرو</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      <div style={{textAlign:"center",marginBottom:20}}>
+        <div style={{width:72,height:72,borderRadius:"50%",background:"rgba(168,85,247,0.15)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontSize:32}}>🚦</div>
+        <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)"}}>پرداخت خلافی خودرو</div>
+        <div style={{fontSize:12,color:"var(--text-muted)",marginTop:4}}>شماره پلاک خودرو را وارد کنید</div>
+      </div>
+
+      {/* Iranian License Plate */}
+      <div className="iran-plate" dir="ltr">
+        <div className="plate-iran-badge">
+          <div style={{fontSize:14}}>🇮🇷</div>
+          <div style={{fontSize:8,fontWeight:900,letterSpacing:1.5}}>I.R.IRAN</div>
+        </div>
+        <div className="plate-main">
+          <input ref={part1Ref} className="plate-input p2" value={toFaDigits(part1)} onKeyDown={e=>{const ok=["Backspace","Delete","Tab","ArrowLeft","ArrowRight"];if(ok.includes(e.key)||e.ctrlKey)return;if(!/^[0-9۰-۹]$/.test(e.key)){e.preventDefault();return}if(part1.length>=2)e.preventDefault()}} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,2);setPart1(v);if(v.length===2)letterBtnRef.current?.focus()}} placeholder="۰۰" inputMode="numeric"/>
+          <button ref={letterBtnRef} type="button" className="plate-letter-btn" onClick={()=>setLetterOpen(!letterOpen)}>{letter}</button>
+          <input ref={part2Ref} className="plate-input p3" value={toFaDigits(part2)} onKeyDown={e=>{const ok=["Backspace","Delete","Tab","ArrowLeft","ArrowRight"];if(ok.includes(e.key)||e.ctrlKey)return;if(!/^[0-9۰-۹]$/.test(e.key)){e.preventDefault();return}if(part2.length>=3)e.preventDefault()}} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,3);setPart2(v);if(v.length===3)provinceRef.current?.focus()}} placeholder="۰۰۰" inputMode="numeric"/>
+        </div>
+        <div className="plate-separator"/>
+        <input ref={provinceRef} className="plate-input p2 plate-province" value={toFaDigits(province)} onKeyDown={e=>{const ok=["Backspace","Delete","Tab","ArrowLeft","ArrowRight"];if(ok.includes(e.key)||e.ctrlKey)return;if(!/^[0-9۰-۹]$/.test(e.key)){e.preventDefault();return}if(province.length>=2)e.preventDefault()}} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,2);setProvince(v)}} placeholder="۰۰" inputMode="numeric"/>
+      </div>
+
+      {/* Letter picker */}
+      {letterOpen&&<div className="plate-letter-picker">
+        {PLATE_LETTERS.map(l=><button key={l} className={letter===l?"active":""} onClick={()=>{setLetter(l);setLetterOpen(false);setTimeout(()=>part2Ref.current?.focus(),50)}}>{l}</button>)}
+      </div>}
+
+      {result&&<div style={{fontSize:13,color:"#00D6B0",textAlign:"center",padding:"12px",background:"rgba(0,214,176,0.1)",borderRadius:12,marginBottom:16,border:"1px solid rgba(0,214,176,0.2)"}}>{result}</div>}
+      <StickyActionBtn label="استعلام خلافی" onClick={inquire} disabled={processing||!part1||!part2||!province} loading={processing} loadingText="در حال استعلام..."/>
+    </div>
+  </div>
+  {errModal&&<div style={{margin:"12px 16px",padding:"16px",borderRadius:14,background:"rgba(232,81,42,0.1)",border:"1px solid rgba(232,81,42,0.3)",color:"var(--text-primary)",display:"flex",alignItems:"flex-start",gap:12,direction:"rtl"}}>
+    <span style={{flex:1,fontSize:14,lineHeight:1.7}}>{errModal}</span>
+    <button onClick={()=>setErrModal("")} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",fontSize:18,lineHeight:1}}>✕</button>
+  </div>}
+  </>;
+}
+
+// ─── Freeway Toll Screen ──────────────────────────────────────────────────────
+function FreewayScreen({onBack}:{onBack:()=>void}){
+  const [autoPayEnabled,setAutoPayEnabled]=useState(true);
+  const [editMode,setEditMode]=useState(false);
+  const [part1,setPart1]=useState("24"); // 2 digits
+  const [letter,setLetter]=useState("م");
+  const [part2,setPart2]=useState("615"); // 3 digits
+  const [province,setProvince]=useState("19"); // 2 digits
+  const [letterOpen,setLetterOpen]=useState(false);
+  const [saved,setSaved]=useState(true);
+  const plateDisplay=`${toFaDigits(part1)} ${letter} ${toFaDigits(part2)} | ${toFaDigits(province)}`;
+  const saveChanges=()=>{setSaved(true);setEditMode(false)};
+  return <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">عوارض آزادراهی</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      <div style={{textAlign:"center",marginBottom:16}}>
+        <div style={{width:72,height:72,borderRadius:"50%",background:"rgba(168,85,247,0.15)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontSize:32}}>🛣️</div>
+        <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)"}}>عوارض آزادراه</div>
+      </div>
+      <div style={{background:"var(--card-bg)",borderRadius:14,padding:"14px 16px",marginBottom:12,border:"1px solid var(--border-color)"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:editMode?12:12}}>
+          <div style={{fontSize:12,color:"var(--text-muted)"}}>خودرو سواری</div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {!editMode&&<>
+              <div style={{background:"#1a4fa0",borderRadius:6,padding:"4px 8px",display:"flex",flexDirection:"column",alignItems:"center",color:"#fff",fontSize:9,fontWeight:700}}><div>🇮🇷</div><div>ایران</div></div>
+              <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)",direction:"ltr"}}>{plateDisplay}</div>
+            </>}
+            <button onClick={()=>setEditMode(!editMode)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--accent)",fontSize:12,fontFamily:"Vazirmatn",fontWeight:700}}>{editMode?"انصراف":"ویرایش پلاک"}</button>
+          </div>
+        </div>
+        {editMode&&<>
+          <div className="iran-plate" dir="ltr" style={{marginBottom:8}}>
+            <div className="plate-iran-badge">
+              <div style={{fontSize:14}}>🇮🇷</div>
+              <div style={{fontSize:8,fontWeight:900,letterSpacing:1.5}}>I.R.IRAN</div>
+            </div>
+            <div className="plate-main">
+              <input className="plate-input p2" value={toFaDigits(part1)} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,2);setPart1(v)}} placeholder="۰۰" inputMode="numeric" maxLength={2}/>
+              <button type="button" className="plate-letter-btn" onClick={()=>setLetterOpen(!letterOpen)}>{letter}</button>
+              <input className="plate-input p3" value={toFaDigits(part2)} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,3);setPart2(v)}} placeholder="۰۰۰" inputMode="numeric" maxLength={3}/>
+            </div>
+            <div className="plate-separator"/>
+            <input className="plate-input p2 plate-province" value={toFaDigits(province)} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,2);setProvince(v)}} placeholder="۰۰" inputMode="numeric" maxLength={2}/>
+          </div>
+          {letterOpen&&<div className="plate-letter-picker" style={{marginBottom:8}}>{PLATE_LETTERS.map(l=><button key={l} className={letter===l?"active":""} onClick={()=>{setLetter(l);setLetterOpen(false)}}>{l}</button>)}</div>}
+          <button className="primary-button" style={{marginTop:4}} onClick={saveChanges}>ذخیره پلاک</button>
+        </>}
+        {!editMode&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginTop:8}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)",marginBottom:4}}>پرداخت خودکار عوارض آزادراه</div>
+            <div style={{fontSize:11,color:"var(--text-muted)",lineHeight:1.6}}>با فعال کردن این گزینه، پرداخت خودکار از کیف پول آن‌پرداز انجام می‌گیرد.</div>
+          </div>
+          <button onClick={()=>setAutoPayEnabled(p=>!p)} style={{background:"none",border:"none",cursor:"pointer",flexShrink:0}}>
+            <div style={{width:44,height:24,borderRadius:12,background:autoPayEnabled?"#00D6B0":"var(--card-bg3)",position:"relative",transition:"background 0.2s"}}>
+              <div style={{position:"absolute",top:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"all 0.2s",left:autoPayEnabled?22:2}}/>
+            </div>
+          </button>
+        </div>}
+      </div>
+      {!editMode&&<div style={{background:"var(--card-bg)",borderRadius:14,padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",border:"1px solid var(--border-color)"}}>
+        <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>مبلغ قابل پرداخت</div>
+        <div style={{fontSize:14,fontWeight:800,color:"#00D6B0"}}>بدون بدهی</div>
+      </div>}
+    </div>
+  </div>;
+}
+
+// ─── Tehran Traffic Screen ────────────────────────────────────────────────────
+function TrafficScreen({onBack}:{onBack:()=>void}){
+  const [autoPayEnabled,setAutoPayEnabled]=useState(false);
+  const [editMode,setEditMode]=useState(false);
+  const [part1,setPart1]=useState("24");
+  const [letter,setLetter]=useState("م");
+  const [part2,setPart2]=useState("615");
+  const [province,setProvince]=useState("19");
+  const [letterOpen,setLetterOpen]=useState(false);
+  const plateDisplay=`${toFaDigits(part1)} ${letter} ${toFaDigits(part2)} | ${toFaDigits(province)}`;
+  const saveChanges=()=>setEditMode(false);
+  return <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">طرح ترافیک</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      <div style={{textAlign:"center",marginBottom:16}}>
+        <div style={{width:72,height:72,borderRadius:"50%",background:"rgba(168,85,247,0.15)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px",fontSize:32}}>📷</div>
+        <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",marginBottom:4}}>پرداخت بدهی طرح ترافیک</div>
+        <div style={{fontSize:13,color:"var(--text-muted)"}}>مجموع بدهی: <span style={{color:"#00D6B0",fontWeight:700}}>بدون بدهی</span></div>
+      </div>
+      <div style={{background:"var(--card-bg)",borderRadius:14,padding:"14px 16px",marginBottom:12,border:"1px solid var(--border-color)"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:editMode?12:0}}>
+          <div style={{fontSize:12,color:"var(--text-muted)"}}>خودرو سواری</div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {!editMode&&<>
+              <div style={{background:"#1a4fa0",borderRadius:6,padding:"4px 8px",display:"flex",flexDirection:"column",alignItems:"center",color:"#fff",fontSize:9,fontWeight:700}}><div>🇮🇷</div><div>ایران</div></div>
+              <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)",direction:"ltr"}}>{plateDisplay}</div>
+            </>}
+            <button onClick={()=>setEditMode(!editMode)} style={{background:"none",border:"none",cursor:"pointer",color:"var(--accent)",fontSize:12,fontFamily:"Vazirmatn",fontWeight:700}}>{editMode?"انصراف":"ویرایش پلاک"}</button>
+          </div>
+        </div>
+        {editMode&&<>
+          <div className="iran-plate" dir="ltr" style={{marginBottom:8}}>
+            <div className="plate-iran-badge">
+              <div style={{fontSize:14}}>🇮🇷</div>
+              <div style={{fontSize:8,fontWeight:900,letterSpacing:1.5}}>I.R.IRAN</div>
+            </div>
+            <div className="plate-main">
+              <input className="plate-input p2" value={toFaDigits(part1)} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,2);setPart1(v)}} placeholder="۰۰" inputMode="numeric" maxLength={2}/>
+              <button type="button" className="plate-letter-btn" onClick={()=>setLetterOpen(!letterOpen)}>{letter}</button>
+              <input className="plate-input p3" value={toFaDigits(part2)} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,3);setPart2(v)}} placeholder="۰۰۰" inputMode="numeric" maxLength={3}/>
+            </div>
+            <div className="plate-separator"/>
+            <input className="plate-input p2 plate-province" value={toFaDigits(province)} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,2);setProvince(v)}} placeholder="۰۰" inputMode="numeric" maxLength={2}/>
+          </div>
+          {letterOpen&&<div className="plate-letter-picker" style={{marginBottom:8}}>{PLATE_LETTERS.map(l=><button key={l} className={letter===l?"active":""} onClick={()=>{setLetter(l);setLetterOpen(false)}}>{l}</button>)}</div>}
+          <button className="primary-button" style={{marginTop:4}} onClick={saveChanges}>ذخیره پلاک</button>
+        </>}
+        {!editMode&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginTop:8}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)",marginBottom:4}}>پرداخت خودکار طرح ترافیک</div>
+            <div style={{fontSize:11,color:"var(--text-muted)",lineHeight:1.6}}>با فعال کردن این گزینه، پرداخت طرح ترافیک به‌صورت خودکار از کیف پول آن‌پرداز انجام می‌گیرد.</div>
+          </div>
+          <button onClick={()=>setAutoPayEnabled(p=>!p)} style={{background:"none",border:"none",cursor:"pointer",flexShrink:0}}>
+            <div style={{width:44,height:24,borderRadius:12,background:autoPayEnabled?"#00D6B0":"var(--card-bg3)",position:"relative",transition:"background 0.2s"}}>
+              <div style={{position:"absolute",top:2,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"all 0.2s",left:autoPayEnabled?22:2}}/>
+            </div>
+          </button>
+        </div>}
+      </div>
+    </div>
+  </div>;
+}
+
+// ─── Violations Payment Screen ────────────────────────────────────────────────
+function ViolationsPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{plate:string;amount:string;ownerName:string};user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onDone:()=>void}){
+  const [selectedCard,setSelectedCard]=useState(user.cards[0]?.id??"");
+  const [cardPickerOpen,setCardPickerOpen]=useState(false);
+  const [otp,setOtp]=useState("");const [cvv2,setCvv2]=useState("");
+  const [expM,setExpM]=useState("");const [expY,setExpY]=useState("");
+  const cvv2Ref=useRef<HTMLInputElement>(null);const expMRef=useRef<HTMLInputElement>(null);const expYRef=useRef<HTMLInputElement>(null);
+  const [processing,setProcessing]=useState(false);
+  const [receipt,setReceipt]=useState<ReceiptData|null>(null);
+  const [err,setErr]=useState("");
+  const selCard=user.cards.find(c=>c.id===selectedCard);
+  const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
+  const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
+  const pay=()=>{
+    if(!otp){setErr("رمز پویا را وارد کنید.");return}
+    if(!cvv2){setErr("CVV2 را وارد کنید.");return}
+    if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
+    setErr("");setProcessing(true);
+    setTimeout(()=>{
+      setProcessing(false);resetSensitive();
+      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`خلافی خودرو · ${data.plate}`,source:"app"});
+      setReceipt({title:"پرداخت خلافی با موفقیت انجام شد",amount:`${data.amount} ریال`,destination:`پلاک ${data.plate}`,status:"success",detail:`مالک: ${data.ownerName}`});
+    },2500);
+  };
+  return <>
+  {processing&&<AnPardazLoadingOverlay text="در حال پردازش پرداخت..."/>}
+  {receipt&&<TransactionReceipt data={receipt} onClose={()=>{setReceipt(null);onDone();}}/>}
+  <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">پرداخت خلافی</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      <div className="charge-summary-card" style={{marginBottom:16}}>
+        <div className="charge-summary-op">
+          <div style={{width:44,height:44,borderRadius:12,background:"rgba(168,85,247,0.15)",border:"1px solid rgba(168,85,247,0.25)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:24}}>🚦</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:800,color:"var(--text-primary)"}}>خلافی خودرو</div>
+            <div style={{fontSize:12,color:"var(--text-muted)",marginTop:2,direction:"ltr",textAlign:"right"}}>{data.plate}</div>
+            <div style={{fontSize:12,color:"var(--text-muted)"}}>{data.ownerName}</div>
+          </div>
+        </div>
+        <div className="charge-summary-amount">{toFaDigits(String(data.amount))} ریال</div>
+      </div>
+      <div className="banking-form">
+        <div className="bform-field">
+          <label className="field-label">کارت بانکی</label>
+          <button className="bform-card-select" onClick={()=>setCardPickerOpen(true)}>
+            {selCard?(<div className="bform-card-row"><BankLogo bankName={selCard.bank} size={44} rounded={13}/><div className="bform-card-text"><span className="bform-bank-name">{selCard.bank}</span><span className="bform-card-number" dir="ltr">{toFaDigits(fmtCard(selCard.number))}</span></div></div>):(<div className="bform-card-row"><div className="bform-bank-dot bform-bank-dot--empty"><Icon name="credit" size={16}/></div><span className="bform-card-placeholder">انتخاب کارت بانکی</span></div>)}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div className="fin-otp-row">
+          <FinField label="رمز پویا" value={otp} onChange={setOtp} maxLength={5}
+            onFilled={()=>cvv2Ref.current?.focus()}/>
+          <OtpCooldownBtn key={selCard?.number||"none"} onRequest={()=>setErr("")} cardId={selCard?.number} noCard={!selCard}/>
+        </div>
+        <FinField label="CVV2" value={cvv2} onChange={setCvv2} maxLength={3}
+          inputRef={cvv2Ref} onFilled={()=>expMRef.current?.focus()}/>
+        <div className="fin-exp-row">
+          <FinExpField label="ماه انقضا" value={expM} onChange={setExpM}
+            inputRef={expMRef} maxLength={2} onFilled={()=>expYRef.current?.focus()}/>
+          <div className="fin-exp-sep">/</div>
+          <FinExpField label="سال انقضا" value={expY} onChange={setExpY}
+            inputRef={expYRef} maxLength={2}/>
+        </div>
+        {err&&<p className="field-err">{err}</p>}
+      </div>
+      <StickyActionBtn label="پرداخت" onClick={pay} disabled={processing||!payValid} loading={processing} loadingText="در حال پردازش..."/>
+    </div>
+  </div>
+  {cardPickerOpen&&<div className="receipt-page" dir="rtl">
+    <div className="receipt-page-header">
+      <button className="back-btn" onClick={()=>setCardPickerOpen(false)}><Icon name="arrow" size={20}/></button>
+      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>انتخاب کارت</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="receipt-page-body">
+      {user.cards.length===0&&<p className="bs-empty">کارتی ثبت نشده است.</p>}
+      {user.cards.map(c=>(
+        <button key={c.id} className={`bs-card-item${selectedCard===c.id?" active":""}`} onClick={()=>{setSelectedCard(c.id);setCardPickerOpen(false);if(c.expM)setExpM(toFaDigits(c.expM));if(c.expY)setExpY(toFaDigits(c.expY))}}>
+          <BankLogo bankName={c.bank} size={48} rounded={14}/>
+          <div className="bs-card-info"><span className="bs-card-bank">{c.bank}</span><span className="bs-card-holder">{c.holderName}</span><span className="bs-card-num" dir="ltr">{toFaDigits(fmtCard(c.number))}</span></div>
+          {selectedCard===c.id&&<div className="bs-card-check"><Icon name="check" size={16} stroke={2.5}/></div>}
+        </button>
+      ))}
+    </div>
+  </div>}
+  </>;
+}
+
+// ─── Car Services Hub ─────────────────────────────────────────────────────────
+function CarServicesScreen({onBack}:{onBack:()=>void}){
+  const [inner,setInner]=useState<null|"violations"|"freeway"|"traffic">(null);
+  if(inner==="violations")return <ViolationsScreen onBack={()=>setInner(null)}/>;
+  if(inner==="freeway")return <FreewayScreen onBack={()=>setInner(null)}/>;
+  if(inner==="traffic")return <TrafficScreen onBack={()=>setInner(null)}/>;
+  const plate="۲۴ | ۶۱۵ م ۱۹";
+  const services=[
+    {label:"عوارض آزادراهی",sub:"",status:"بدون بدهی",statusColor:"#00D6B0",icon:"🛣️",action:"freeway" as const},
+    {label:"خلافی خودرو",sub:"",status:"استعلام",statusColor:"#f5c23d",icon:"🚦",action:"violations" as const},
+    {label:"طرح ترافیک تهران",sub:"ویژه تهران",status:"بدون بدهی",statusColor:"#00D6B0",icon:"📷",action:"traffic" as const},
+  ];
+  return <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">خدمات خودرویی</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>وسیله‌های نقلیه</div>
+        <button style={{background:"none",border:"none",color:"#00D6B0",fontSize:13,cursor:"pointer",fontFamily:"Vazirmatn",display:"flex",alignItems:"center",gap:4}}><Icon name="plus" size={14}/> افزودن</button>
+      </div>
+      <div style={{background:"var(--card-bg)",borderRadius:14,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12,border:"1px solid var(--border-color)"}}>
+        <div style={{background:"#1a4fa0",borderRadius:8,padding:"8px 12px",display:"flex",flexDirection:"column",alignItems:"center",color:"#fff",fontSize:10,fontWeight:700,flexShrink:0}}>
+          <div>🇮🇷</div><div>ایران</div>
+        </div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",direction:"ltr"}}>{plate}</div>
+          <div style={{fontSize:12,color:"var(--text-muted)",marginTop:2}}>خودرو سواری</div>
+        </div>
+      </div>
+      <div style={{fontSize:12,color:"var(--text-muted)",textAlign:"center",padding:"8px 0",marginBottom:12,borderTop:"1px solid var(--border-lighter)",borderBottom:"1px solid var(--border-lighter)"}}>خدمات پرطرفدار</div>
+      {services.map(s=><button key={s.label} onClick={()=>setInner(s.action)} style={{display:"flex",alignItems:"center",width:"100%",background:"var(--card-bg)",border:"1px solid var(--border-light)",borderRadius:14,padding:"14px 16px",marginBottom:10,cursor:"pointer",color:"var(--text-primary)",textAlign:"right",transition:"background 0.15s"}}>
+        <div style={{fontSize:24,width:44,height:44,borderRadius:12,background:"rgba(167,85,247,0.15)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginLeft:12}}>{s.icon}</div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>{s.label}</div>
+          {s.sub&&<div style={{fontSize:11,color:"var(--text-muted)",marginTop:2}}>{s.sub}</div>}
+        </div>
+        <div style={{background:`${s.statusColor}25`,borderRadius:8,padding:"4px 10px",fontSize:11,color:s.statusColor,marginLeft:8,flexShrink:0}}>{s.status}</div>
+        <Icon name="arrow" size={16}/>
+      </button>)}
+      <div style={{marginTop:8}}>
+        <div style={{textAlign:"center"}}><button style={{background:"none",border:"none",color:"#00D6B0",fontSize:12,cursor:"pointer",fontFamily:"Vazirmatn"}}>مدیریت پلاک‌ها ←</button></div>
+      </div>
+    </div>
+  </div>;
+}
+
+// ─── Sana Registration Screen ─────────────────────────────────────────────────
+function SanaScreen({onBack}:{onBack:()=>void}){
+  const [nationalId,setNationalId]=useState("");const [phone,setPhone]=useState("");const [done,setDone]=useState(false);const [processing,setProcessing]=useState(false);const [errModal,setErrModal]=useState("");
+  const submit=()=>{if(!nationalId||!phone){setErrModal("تمام فیلدها الزامی است.");return}setProcessing(true);setTimeout(()=>{setProcessing(false);setDone(true)},3000)};
+  return <>
+  {processing&&<AnPardazLoadingOverlay text="در حال ثبت اطلاعات..."/>}
+  <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">ثبت ثنا</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      {done?<div style={{textAlign:"center",padding:"32px 16px",display:"flex",flexDirection:"column",alignItems:"center"}}>
+        <div style={{width:88,height:88,borderRadius:"50%",background:"linear-gradient(135deg,rgba(0,214,176,0.15),rgba(0,214,176,0.05))",border:"2px solid rgba(0,214,176,0.4)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:20,animation:"successPop 0.5s cubic-bezier(0.175,0.885,0.32,1.275) both"}}>
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none" stroke="#00D6B0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{animation:"checkDraw 0.6s ease 0.2s both"} as React.CSSProperties}><path d="M8 22l10 10 18-18"/></svg>
+        </div>
+        <div style={{fontSize:18,fontWeight:900,color:"var(--text-primary)",marginBottom:12}}>درخواست ثبت شد</div>
+        <div style={{fontSize:14,color:"var(--text-secondary)",lineHeight:1.85,textAlign:"center",background:"var(--card-bg)",border:"1px solid var(--border-color)",borderRadius:16,padding:"16px 20px"}}>
+          جهت تکمیل ثبت نام ثنای خود، در کمتر از یکساعت، همکاران دفاتر خدمات قضایی با شما تماس خواهند گرفت.
+        </div>
+        <button className="outline-button" style={{marginTop:24,width:"100%"}} onClick={()=>setDone(false)}>بازگشت</button>
+      </div>:<>
+        <div style={{background:"var(--card-bg)",borderRadius:14,padding:"14px 16px",marginBottom:20,borderRight:"3px solid #64748b",border:"1px solid var(--border-color)"}}>
+          <div style={{fontSize:13,color:"#94a3b8",fontWeight:700,marginBottom:2}}>سامانه ثنا</div>
+          <div style={{fontSize:11,color:"var(--text-muted)"}}>ثبت‌نام در سامانه خدمات قضایی الکترونیک ایران</div>
+        </div>
+        <div style={{marginBottom:16}}>
+          <FloatInput label="کد ملی" value={toFaDigits(nationalId)} onChange={v=>setNationalId(toLatinDigits(v).replace(/\D/g,"").slice(0,10))} inputMode="numeric" dir="rtl" maxLength={10}/>
+        </div>
+        <div style={{marginBottom:20}}>
+          <FloatInput label="شماره موبایل" value={toFaDigits(phone)} onChange={v=>setPhone(toLatinDigits(v))} inputMode="tel" dir="rtl" maxLength={11}/>
+        </div>
+        <StickyActionBtn label="ثبت‌نام" onClick={submit} disabled={!nationalId||!phone||processing} loading={processing} loadingText="در حال ثبت..."/>
+      </>}
+    </div>
+  </div>
+  {errModal&&createPortal(<div className="modal-overlay"><div className="modal-card" dir="rtl"><div className="modal-page-header"><button className="back-btn" onClick={()=>setErrModal("")}><Icon name="arrow" size={18}/></button><span>خطا</span><div style={{width:36}}/></div><div className="modal-page-body"><div style={{width:64,height:64,borderRadius:18,background:"rgba(232,81,42,0.12)",border:"2px solid rgba(232,81,42,0.3)",display:"flex",alignItems:"center",justifyContent:"center",color:"#e8512a",fontSize:28}}>!</div><div style={{fontSize:14,color:"var(--text-secondary)",lineHeight:1.7,maxWidth:360}}>{errModal}</div><button className="primary-button" style={{background:"#e8512a",width:"100%",maxWidth:360}} onClick={()=>setErrModal("")}>متوجه شدم</button></div></div></div>, document.body)}
+  </>;
+}
+
+// ─── Judiciary Bill Screen ────────────────────────────────────────────────────
+function JudiciaryBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onDone:()=>void}){
+  const [billId,setBillId]=useState("");
+  const [inquiryDone,setInquiryDone]=useState(false);
+  const [inquiryAmount]=useState("۴۵۰٬۰۰۰");
+  const [processing,setProcessing]=useState(false);
+  const [errModal,setErrModal]=useState("");
+  // payment fields
+  const [selectedCard,setSelectedCard]=useState(user.cards[0]?.id??"");
+  const [cardPickerOpen,setCardPickerOpen]=useState(false);
+  const [otp,setOtp]=useState("");const [cvv2,setCvv2]=useState("");
+  const [expM,setExpM]=useState("");const [expY,setExpY]=useState("");
+  const cvv2Ref=useRef<HTMLInputElement>(null);const expMRef=useRef<HTMLInputElement>(null);const expYRef=useRef<HTMLInputElement>(null);
+  const [payErr,setPayErr]=useState("");
+  const [receipt,setReceipt]=useState<ReceiptData|null>(null);
+  const selCard=user.cards.find(c=>c.id===selectedCard);
+  const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
+  const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
+
+  const inquire=()=>{
+    if(!billId.trim()){setErrModal("شناسه دریافت وجه را وارد کنید.");return}
+    setProcessing(true);
+    setTimeout(()=>{setProcessing(false);setInquiryDone(true)},2000);
+  };
+
+  const pay=()=>{
+    if(!otp){setPayErr("رمز پویا را وارد کنید.");return}
+    if(!cvv2){setPayErr("CVV2 را وارد کنید.");return}
+    if(!expM||!expY){setPayErr("تاریخ انقضا را وارد کنید.");return}
+    setPayErr("");setProcessing(true);
+    setTimeout(()=>{
+      setProcessing(false);resetSensitive();
+      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`قبض قضائیه · ${billId}`,source:"app"});
+      setReceipt({title:"پرداخت قبض با موفقیت انجام شد",amount:`${inquiryAmount} ریال`,destination:"قوه قضائیه",status:"success"});
+    },2500);
+  };
+
+  return <>
+  {processing&&<AnPardazLoadingOverlay text={inquiryDone?"در حال پردازش پرداخت...":"در حال استعلام..."}/>}
+  <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={()=>{if(inquiryDone)setInquiryDone(false);else onBack();}}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">قبض قوه قضائیه</h2>
+      <div style={{width:36}}/>
+    </div>
+    {!inquiryDone&&<div className="subscreen-body">
+      <div style={{background:"var(--card-bg)",borderRadius:14,padding:"14px 16px",marginBottom:16,border:"1px solid var(--border-color)",borderRight:"3px solid #f5c23d"}}>
+        <div style={{fontSize:13,color:"#f5c23d",fontWeight:700,marginBottom:4}}>قوه قضائیه</div>
+        <div style={{fontSize:12,color:"var(--text-muted)"}}>کد تله‌پرداز: ۲۰۰۰۰۰۱</div>
+      </div>
+      <p style={{fontSize:13,color:"var(--text-secondary)",marginBottom:12}}>شناسه دریافت وجه خود را وارد نمایید.</p>
+      <FloatInput label="شناسه دریافت وجه" value={toFaDigits(billId)} onChange={v=>setBillId(toLatinDigits(v).replace(/\D/g,""))} inputMode="numeric" style={{marginBottom:16}}/>
+      <StickyActionBtn label="استعلام" onClick={inquire} disabled={toLatinDigits(billId).length<5} loading={processing} loadingText="در حال استعلام..."/>
+    </div>}
+    {inquiryDone&&<div className="subscreen-body">
+      <div className="charge-summary-card" style={{marginBottom:16}}>
+        <div className="charge-summary-op">
+          <div style={{width:44,height:44,borderRadius:12,background:"rgba(245,194,61,0.15)",border:"1px solid rgba(245,194,61,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:22}}>⚖️</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:800,color:"var(--text-primary)"}}>قوه قضائیه</div>
+            <div style={{fontSize:12,color:"var(--text-muted)",marginTop:2}}>شناسه: {toFaDigits(billId)}</div>
+          </div>
+        </div>
+        <div className="charge-summary-amount">{inquiryAmount} ریال</div>
+      </div>
+      <div className="banking-form">
+        <div className="bform-field">
+          <label className="field-label">کارت بانکی</label>
+          <button className="bform-card-select" onClick={()=>setCardPickerOpen(true)}>
+            {selCard?(<div className="bform-card-row"><BankLogo bankName={selCard.bank} size={44} rounded={13}/><div className="bform-card-text"><span className="bform-bank-name">{selCard.bank}</span><span className="bform-card-number" dir="ltr">{toFaDigits(fmtCard(selCard.number))}</span></div></div>):(<div className="bform-card-row"><div className="bform-bank-dot bform-bank-dot--empty"><Icon name="credit" size={16}/></div><span className="bform-card-placeholder">انتخاب کارت بانکی</span></div>)}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div className="fin-otp-row">
+          <FinField label="رمز پویا" value={otp} onChange={setOtp} maxLength={5}
+            onFilled={()=>cvv2Ref.current?.focus()}/>
+          <OtpCooldownBtn key={selCard?.number||"none"} onRequest={()=>setPayErr("")} cardId={selCard?.number} noCard={!selCard}/>
+        </div>
+        <FinField label="CVV2" value={cvv2} onChange={setCvv2} maxLength={3}
+          inputRef={cvv2Ref} onFilled={()=>expMRef.current?.focus()}/>
+        <div className="fin-exp-row">
+          <FinExpField label="ماه انقضا" value={expM} onChange={setExpM}
+            inputRef={expMRef} maxLength={2} onFilled={()=>expYRef.current?.focus()}/>
+          <div className="fin-exp-sep">/</div>
+          <FinExpField label="سال انقضا" value={expY} onChange={setExpY}
+            inputRef={expYRef} maxLength={2}/>
+        </div>
+        {payErr&&<p className="field-err">{payErr}</p>}
+      </div>
+      <StickyActionBtn label="پرداخت" onClick={pay} disabled={processing||!payValid} loading={processing} loadingText="در حال پردازش..."/>
+    </div>}
+  </div>
+  {receipt&&<TransactionReceipt data={receipt} onClose={()=>{setReceipt(null);onDone();}}/>}
+  {cardPickerOpen&&<div className="receipt-page" dir="rtl">
+    <div className="receipt-page-header">
+      <button className="back-btn" onClick={()=>setCardPickerOpen(false)}><Icon name="arrow" size={20}/></button>
+      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>انتخاب کارت</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="receipt-page-body">
+      {user.cards.length===0&&<p className="bs-empty">کارتی ثبت نشده است.</p>}
+      {user.cards.map(c=>(
+        <button key={c.id} className={`bs-card-item${selectedCard===c.id?" active":""}`} onClick={()=>{setSelectedCard(c.id);setCardPickerOpen(false);if(c.expM)setExpM(toFaDigits(c.expM));if(c.expY)setExpY(toFaDigits(c.expY))}}>
+          <BankLogo bankName={c.bank} size={48} rounded={14}/>
+          <div className="bs-card-info"><span className="bs-card-bank">{c.bank}</span><span className="bs-card-holder">{c.holderName}</span><span className="bs-card-num" dir="ltr">{toFaDigits(fmtCard(c.number))}</span></div>
+          {selectedCard===c.id&&<div className="bs-card-check"><Icon name="check" size={16} stroke={2.5}/></div>}
+        </button>
+      ))}
+    </div>
+  </div>}
+  {errModal&&<div style={{margin:"12px 16px",padding:"16px",borderRadius:14,background:"rgba(232,81,42,0.1)",border:"1px solid rgba(232,81,42,0.3)",color:"var(--text-primary)",display:"flex",alignItems:"flex-start",gap:12,direction:"rtl"}}>
+    <span style={{flex:1,fontSize:14,lineHeight:1.7}}>{errModal}</span>
+    <button onClick={()=>setErrModal("")} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",fontSize:18,lineHeight:1}}>✕</button>
+  </div>}
+  </>;
+}
+
+// ─── Property Registration Bill Screen ────────────────────────────────────────
+function PropertyRegBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onDone:()=>void}){
+  const [billId,setBillId]=useState("");
+  const [inquiryDone,setInquiryDone]=useState(false);
+  const [inquiryAmount]=useState("۳۸۰٬۰۰۰");
+  const [processing,setProcessing]=useState(false);
+  const [errModal,setErrModal]=useState("");
+  const [selectedCard,setSelectedCard]=useState(user.cards[0]?.id??"");
+  const [cardPickerOpen,setCardPickerOpen]=useState(false);
+  const [otp,setOtp]=useState("");const [cvv2,setCvv2]=useState("");
+  const [expM,setExpM]=useState("");const [expY,setExpY]=useState("");
+  const cvv2Ref=useRef<HTMLInputElement>(null);const expMRef=useRef<HTMLInputElement>(null);const expYRef=useRef<HTMLInputElement>(null);
+  const [payErr,setPayErr]=useState("");
+  const [receipt,setReceipt]=useState<ReceiptData|null>(null);
+  const selCard=user.cards.find(c=>c.id===selectedCard);
+  const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
+  const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
+
+  const inquire=()=>{
+    if(!billId.trim()){setErrModal("شناسه دریافت وجه را وارد کنید.");return}
+    setProcessing(true);
+    setTimeout(()=>{setProcessing(false);setInquiryDone(true)},2000);
+  };
+
+  const pay=()=>{
+    if(!otp){setPayErr("رمز پویا را وارد کنید.");return}
+    if(!cvv2){setPayErr("CVV2 را وارد کنید.");return}
+    if(!expM||!expY){setPayErr("تاریخ انقضا را وارد کنید.");return}
+    setPayErr("");setProcessing(true);
+    setTimeout(()=>{
+      setProcessing(false);resetSensitive();
+      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`قبض ثبت اسناد · ${billId}`,source:"app"});
+      setReceipt({title:"پرداخت قبض با موفقیت انجام شد",amount:`${inquiryAmount} ریال`,destination:"ثبت اسناد و املاک",status:"success"});
+    },2500);
+  };
+
+  return <>
+  {processing&&<AnPardazLoadingOverlay text={inquiryDone?"در حال پردازش پرداخت...":"در حال استعلام..."}/>}
+  <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={()=>{if(inquiryDone)setInquiryDone(false);else onBack();}}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">قبض ثبت اسناد و املاک</h2>
+      <div style={{width:36}}/>
+    </div>
+    {!inquiryDone&&<div className="subscreen-body">
+      <div style={{background:"var(--card-bg)",borderRadius:14,padding:"14px 16px",marginBottom:16,border:"1px solid var(--border-color)",borderRight:"3px solid #94a3b8"}}>
+        <div style={{fontSize:13,color:"#94a3b8",fontWeight:700,marginBottom:4}}>ثبت اسناد و املاک</div>
+        <div style={{fontSize:12,color:"var(--text-muted)"}}>کد تله‌پرداز: ۲۰۰۰۰۱۲</div>
+      </div>
+      <p style={{fontSize:13,color:"var(--text-secondary)",marginBottom:12}}>شناسه دریافت وجه خود را وارد نمایید.</p>
+      <FloatInput label="شناسه دریافت وجه" value={toFaDigits(billId)} onChange={v=>setBillId(toLatinDigits(v).replace(/\D/g,""))} inputMode="numeric" style={{marginBottom:16}}/>
+      <StickyActionBtn label="استعلام" onClick={inquire} disabled={toLatinDigits(billId).length<5} loading={processing} loadingText="در حال استعلام..."/>
+    </div>}
+    {inquiryDone&&<div className="subscreen-body">
+      <div className="charge-summary-card" style={{marginBottom:16}}>
+        <div className="charge-summary-op">
+          <div style={{width:44,height:44,borderRadius:12,background:"rgba(148,163,184,0.15)",border:"1px solid rgba(148,163,184,0.3)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:22}}>📄</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:800,color:"var(--text-primary)"}}>ثبت اسناد و املاک</div>
+            <div style={{fontSize:12,color:"var(--text-muted)",marginTop:2}}>شناسه: {toFaDigits(billId)}</div>
+          </div>
+        </div>
+        <div className="charge-summary-amount">{inquiryAmount} ریال</div>
+      </div>
+      <div className="banking-form">
+        <div className="bform-field">
+          <label className="field-label">کارت بانکی</label>
+          <button className="bform-card-select" onClick={()=>setCardPickerOpen(true)}>
+            {selCard?(<div className="bform-card-row"><BankLogo bankName={selCard.bank} size={44} rounded={13}/><div className="bform-card-text"><span className="bform-bank-name">{selCard.bank}</span><span className="bform-card-number" dir="ltr">{toFaDigits(fmtCard(selCard.number))}</span></div></div>):(<div className="bform-card-row"><div className="bform-bank-dot bform-bank-dot--empty"><Icon name="credit" size={16}/></div><span className="bform-card-placeholder">انتخاب کارت بانکی</span></div>)}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+        <div className="fin-otp-row">
+          <FinField label="رمز پویا" value={otp} onChange={setOtp} maxLength={5}
+            onFilled={()=>cvv2Ref.current?.focus()}/>
+          <OtpCooldownBtn key={selCard?.number||"none"} onRequest={()=>setPayErr("")} cardId={selCard?.number} noCard={!selCard}/>
+        </div>
+        <FinField label="CVV2" value={cvv2} onChange={setCvv2} maxLength={3}
+          inputRef={cvv2Ref} onFilled={()=>expMRef.current?.focus()}/>
+        <div className="fin-exp-row">
+          <FinExpField label="ماه انقضا" value={expM} onChange={setExpM}
+            inputRef={expMRef} maxLength={2} onFilled={()=>expYRef.current?.focus()}/>
+          <div className="fin-exp-sep">/</div>
+          <FinExpField label="سال انقضا" value={expY} onChange={setExpY}
+            inputRef={expYRef} maxLength={2}/>
+        </div>
+        {payErr&&<p className="field-err">{payErr}</p>}
+      </div>
+      <StickyActionBtn label="پرداخت" onClick={pay} disabled={processing||!payValid} loading={processing} loadingText="در حال پردازش..."/>
+    </div>}
+  </div>
+  {receipt&&<TransactionReceipt data={receipt} onClose={()=>{setReceipt(null);onDone();}}/>}
+  {cardPickerOpen&&<div className="receipt-page" dir="rtl">
+    <div className="receipt-page-header">
+      <button className="back-btn" onClick={()=>setCardPickerOpen(false)}><Icon name="arrow" size={20}/></button>
+      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>انتخاب کارت</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="receipt-page-body">
+      {user.cards.length===0&&<p className="bs-empty">کارتی ثبت نشده است.</p>}
+      {user.cards.map(c=>(
+        <button key={c.id} className={`bs-card-item${selectedCard===c.id?" active":""}`} onClick={()=>{setSelectedCard(c.id);setCardPickerOpen(false);if(c.expM)setExpM(toFaDigits(c.expM));if(c.expY)setExpY(toFaDigits(c.expY))}}>
+          <BankLogo bankName={c.bank} size={48} rounded={14}/>
+          <div className="bs-card-info"><span className="bs-card-bank">{c.bank}</span><span className="bs-card-holder">{c.holderName}</span><span className="bs-card-num" dir="ltr">{toFaDigits(fmtCard(c.number))}</span></div>
+          {selectedCard===c.id&&<div className="bs-card-check"><Icon name="check" size={16} stroke={2.5}/></div>}
+        </button>
+      ))}
+    </div>
+  </div>}
+  {errModal&&<div style={{margin:"12px 16px",padding:"16px",borderRadius:14,background:"rgba(232,81,42,0.1)",border:"1px solid rgba(232,81,42,0.3)",color:"var(--text-primary)",display:"flex",alignItems:"flex-start",gap:12,direction:"rtl"}}>
+    <span style={{flex:1,fontSize:14,lineHeight:1.7}}>{errModal}</span>
+    <button onClick={()=>setErrModal("")} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",fontSize:18,lineHeight:1}}>✕</button>
+  </div>}
+  </>;
+}
+
+// ─── Charity Org Logo ─────────────────────────────────────────────────────────
+const _CHARITY_LOGOS:{[id:string]:string}={
+  "red-crescent":charityLogoRedCrescent,
+  "komite":charityLogoKomite,
+  "children":charityLogoChildren,
+  "environment":charityLogoEnvironment,
+  "barekat":charityLogoBarekat,
+};
+function CharityLogo({id}:{id:string}){
+  const src=_CHARITY_LOGOS[id];
+  if(src)return <img src={src} alt={id} width="48" height="48" decoding="sync" style={{objectFit:"contain",width:"100%",height:"100%"}}/>;
+  return <svg width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#555"/><text x="24" y="30" textAnchor="middle" fill="white" fontSize="18">؟</text></svg>;
+}
+
+// ─── Charity Screen ───────────────────────────────────────────────────────────
+function CharityScreen({onBack,onGoToPayment}:{onBack:()=>void;onGoToPayment:(data:{orgId:string;orgName:string;amount:string})=>void}){
+  const [selected,setSelected]=useState<string|null>(null);const [amount,setAmount]=useState("");const [errModal,setErrModal]=useState("");
+  const charityAmt=parseInt(toLatinDigits(amount).replace(/\D/g,""))||0;
+  const orgs=[
+    {id:"red-crescent",name:"هلال احمر",desc:"کمک به آسیب‌دیدگان حوادث"},
+    {id:"komite",name:"کمیته امداد امام خمینی",desc:"حمایت از نیازمندان"},
+    {id:"children",name:"انجمن حمایت از کودکان",desc:"کمک به کودکان بی‌سرپرست"},
+    {id:"environment",name:"سازمان محیط زیست",desc:"کمک به حفظ طبیعت"},
+    {id:"barekat",name:"بنیاد برکت",desc:"توانمندسازی محرومان"},
+  ];
+  const presets=["۱۰,۰۰۰ ریال","۵۰,۰۰۰ ریال","۱۰۰,۰۰۰ ریال","۵۰۰,۰۰۰ ریال"];
+  const donate=()=>{if(!selected){setErrModal("لطفاً یک سازمان خیریه انتخاب کنید.");return}if(!amount){setErrModal("مبلغ کمک را انتخاب یا وارد کنید.");return}onGoToPayment({orgId:selected!,orgName:orgs.find(o=>o.id===selected)!.name,amount})};
+  return <>
+  <div className="subscreen" dir="rtl">
+    <div className="subscreen-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">نیکوکاری</h2><div style={{width:36}}/></div>
+    <div className="subscreen-body" style={{overflowY:"auto"}}>
+      <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)",marginBottom:12}}>انتخاب سازمان خیریه</div>
+      {orgs.map(org=><button key={org.id} onClick={()=>setSelected(selected===org.id?null:org.id)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:selected===org.id?"rgba(0,214,176,0.08)":"var(--card-bg)",border:`1px solid ${selected===org.id?"#00D6B0":"var(--border-color)"}`,borderRadius:14,padding:"12px 14px",marginBottom:8,cursor:"pointer",color:"var(--text-primary)",textAlign:"right",transition:"all 0.2s",boxShadow:selected===org.id?"0 0 16px rgba(0,214,176,0.2)":"none"}}>
+        <div style={{flexShrink:0,borderRadius:12,overflow:"hidden",width:48,height:48}}><CharityLogo id={org.id}/></div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>{org.name}</div>
+          <div style={{fontSize:11,color:"var(--text-muted)",marginTop:2}}>{org.desc}</div>
+        </div>
+        {selected===org.id&&<div style={{color:"#00D6B0",flexShrink:0}}><Icon name="check" size={18}/></div>}
+      </button>)}
+      <div style={{marginTop:8}}>
+        <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)",marginBottom:12}}>مبلغ کمک</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+          {presets.map(p=><button key={p} onClick={()=>setAmount(p)} className={`pkg-btn ${amount===p?"active":""}`}>{p}</button>)}
+        </div>
+        <FloatInput label="یا مبلغ دلخواه را وارد کنید" value={charityAmt?fa(charityAmt):""} onChange={v=>setAmount(toLatinDigits(v).replace(/[^0-9]/g,""))} inputMode="numeric" dir="ltr" suffix="ریال" style={{marginBottom:charityAmt>0?4:16}}/>
+        {charityAmt>0&&<div className="amount-words" style={{marginBottom:16}}>معادل {numToFaWords(Math.floor(charityAmt/10))} تومان</div>}
+        <StickyActionBtn label="اهدای کمک 🤲" onClick={donate} disabled={!selected||!amount}/>
+      </div>
+    </div>
+  </div>
+  {errModal&&<div style={{margin:"12px 16px",padding:"16px",borderRadius:14,background:"rgba(232,81,42,0.1)",border:"1px solid rgba(232,81,42,0.3)",color:"var(--text-primary)",display:"flex",alignItems:"flex-start",gap:12,direction:"rtl"}}>
+    <span style={{flex:1,fontSize:14,lineHeight:1.7}}>{errModal}</span>
+    <button onClick={()=>setErrModal("")} style={{background:"none",border:"none",cursor:"pointer",color:"var(--text-muted)",fontSize:18,lineHeight:1}}>✕</button>
+  </div>}
+  </>;
+}
+
+// ─── Charity Payment Screen ────────────────────────────────────────────────────
+function CharityPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{orgId:string;orgName:string;amount:string};user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onDone:()=>void}){
+  const [selectedCard,setSelectedCard]=useState(user.cards[0]?.id??"");
+  const [cardPickerOpen,setCardPickerOpen]=useState(false);
+  const [otp,setOtp]=useState("");const [cvv2,setCvv2]=useState("");
+  const [expM,setExpM]=useState("");const [expY,setExpY]=useState("");
+  const cvv2Ref=useRef<HTMLInputElement>(null);const expMRef=useRef<HTMLInputElement>(null);const expYRef=useRef<HTMLInputElement>(null);
+  const [processing,setProcessing]=useState(false);
+  const [receipt,setReceipt]=useState<ReceiptData|null>(null);
+  const [err,setErr]=useState("");
+  const selCard=user.cards.find(c=>c.id===selectedCard);
+  const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
+  const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
+  const pay=()=>{
+    if(!otp){setErr("رمز پویا را وارد کنید.");return}
+    if(!cvv2){setErr("CVV2 را وارد کنید.");return}
+    if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
+    setErr("");setProcessing(true);
+    setTimeout(()=>{
+      setProcessing(false);
+      resetSensitive();
+      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`نیکوکاری · ${data.orgName} · ${data.amount}`,source:"app"});
+      setReceipt({title:"کمک شما با موفقیت ثبت شد",amount:data.amount,destination:data.orgName,status:"success",detail:"با سپاس از نیکوکاری شما. کمک شما به دست نیازمندان می‌رسد."});
+    },2500);
+  };
+  return <>
+  <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">پرداخت کمک</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body">
+      {/* Charity info box */}
+      <div className="charge-summary-card charity-summary-card">
+        <div className="charge-summary-op">
+          <div style={{width:48,height:48,borderRadius:14,overflow:"hidden",flexShrink:0}}><CharityLogo id={data.orgId}/></div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:800,color:"var(--text-primary)",whiteSpace:"normal",lineHeight:1.4}}>{data.orgName}</div>
+            <div style={{fontSize:12,color:"var(--text-muted)",marginTop:3}}>کمک داوطلبانه</div>
+          </div>
+        </div>
+        <div className="charge-summary-amount">{toFaDigits(data.amount.replace(/[^0-9]/g,""))&&`${toFaDigits(data.amount.replace(/[^0-9]/g,""))} ریال`||data.amount}</div>
+      </div>
+
+      <div className="banking-form">
+        {/* Card selector */}
+        <div className="bform-field">
+          <label className="field-label">کارت بانکی</label>
+          <button className="bform-card-select" onClick={()=>setCardPickerOpen(true)}>
+            {selCard?(
+              <div className="bform-card-row">
+                <BankLogo bankName={selCard.bank} size={44} rounded={13}/>
+                <div className="bform-card-text">
+                  <span className="bform-bank-name">{selCard.bank}</span>
+                  <span className="bform-card-number" dir="ltr">{toFaDigits(fmtCard(selCard.number))}</span>
+                </div>
+              </div>
+            ):(
+              <div className="bform-card-row">
+                <div className="bform-bank-dot bform-bank-dot--empty"><Icon name="credit" size={16}/></div>
+                <span className="bform-card-placeholder">انتخاب کارت بانکی</span>
+              </div>
+            )}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </div>
+
+        <div className="fin-otp-row">
+          <FinField label="رمز پویا" value={otp} onChange={setOtp} maxLength={5}
+            onFilled={()=>cvv2Ref.current?.focus()}/>
+          <OtpCooldownBtn key={selCard?.number||"none"} onRequest={()=>setErr("")} cardId={selCard?.number} noCard={!selCard}/>
+        </div>
+        <FinField label="CVV2" value={cvv2} onChange={setCvv2} maxLength={3}
+          inputRef={cvv2Ref} onFilled={()=>expMRef.current?.focus()}/>
+        <div className="fin-exp-row">
+          <FinExpField label="ماه انقضا" value={expM} onChange={setExpM}
+            inputRef={expMRef} maxLength={2} onFilled={()=>expYRef.current?.focus()}/>
+          <div className="fin-exp-sep">/</div>
+          <FinExpField label="سال انقضا" value={expY} onChange={setExpY}
+            inputRef={expYRef} maxLength={2}/>
+        </div>
+        {err&&<p className="field-err">{err}</p>}
+      </div>
+      <StickyActionBtn label="پرداخت" onClick={pay} disabled={processing||!payValid} loading={processing} loadingText="در حال پردازش..."/>
+    </div>
+  </div>
+  {processing&&<AnPardazLoadingOverlay text="در حال پردازش پرداخت..."/>}
+  {receipt&&<TransactionReceipt data={receipt} onClose={()=>{setReceipt(null);onDone();}}/>}
+  {cardPickerOpen&&<div className="receipt-page" dir="rtl">
+    <div className="receipt-page-header">
+      <button className="back-btn" onClick={()=>setCardPickerOpen(false)}><Icon name="arrow" size={20}/></button>
+      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>انتخاب کارت</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="receipt-page-body">
+      {user.cards.length===0&&<p className="bs-empty">کارتی ثبت نشده است. ابتدا از پروفایل کارت اضافه کنید.</p>}
+      {user.cards.map(c=>(
+        <button key={c.id} className={`bs-card-item${selectedCard===c.id?" active":""}`}
+          onClick={()=>{setSelectedCard(c.id);setCardPickerOpen(false);if(c.expM)setExpM(toFaDigits(c.expM));if(c.expY)setExpY(toFaDigits(c.expY))}}>
+          <BankLogo bankName={c.bank} size={48} rounded={14}/>
+          <div className="bs-card-info">
+            <span className="bs-card-bank">{c.bank}</span>
+            <span className="bs-card-holder">{c.holderName}</span>
+            <span className="bs-card-num" dir="ltr">{toFaDigits(fmtCard(c.number))}</span>
+          </div>
+          {selectedCard===c.id&&<div className="bs-card-check"><Icon name="check" size={16} stroke={2.5}/></div>}
+        </button>
+      ))}
+    </div>
+  </div>}
+  </>;
+}
+
+// ─── Service Placeholder Screen ───────────────────────────────────────────────
+function ServiceScreen({name,onBack}:{name:string;onBack:()=>void}){
+  return <div className="subscreen" dir="rtl">
+    <div className="subscreen-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">{name}</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="subscreen-body" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:300}}>
+      <div style={{color:"var(--text-muted)",marginBottom:16}}><Icon name="clock" size={56}/></div>
+      <div style={{fontSize:18,fontWeight:700,color:"var(--text-muted)",marginBottom:8}}>به‌زودی</div>
+      <div style={{fontSize:13,color:"var(--text-faint)",textAlign:"center"}}>{name} در حال توسعه است.</div>
+    </div>
+  </div>;
+}
+
+type SupportTicket={id:string;subject:string;category:string;priority:string;body:string;status:string;createdAt:string;updatedAt:string;unread?:boolean;messages:{from:"user"|"agent";text:string;at:string;attachment?:string}[]};
+function ExchangePopup({children,onClose,onBack}:{children:ReactNode;onClose:()=>void;onBack?:()=>void}){useBackHandler(onBack||onClose);return <div className="exchange-page-view" dir="rtl"><div className="exchange-page-view-header"><button className="exchange-page-back-btn" onClick={onBack||onClose} aria-label="بازگشت"><Icon name="arrow" size={18}/></button><img src={anPardazLogo} alt="لوگوی صرافی آن‌پرداز" style={{height:30,objectFit:"contain",borderRadius:9}}/><button className="exchange-popup-close" onClick={onClose}>بستن</button></div><div className="exchange-page-view-body">{children}</div></div>}
+function ExchangeSupportCenter({onBack}:{onBack:()=>void}){
+  const storage="anp_exchange_tickets"; const [tickets,setTickets]=useState<SupportTicket[]>(()=>{try{return JSON.parse(localStorage.getItem(storage)??"[]")}catch{return[]}}),[tab,setTab]=useState<"new"|"list">("new"),[subject,setSubject]=useState(""),[category,setCategory]=useState(""),[priority,setPriority]=useState("متوسط"),[body,setBody]=useState(""),[attachment,setAttachment]=useState(""),[query,setQuery]=useState(""),[filter,setFilter]=useState("همه تیکت‌ها"),[selected,setSelected]=useState<SupportTicket|null>(null),[reply,setReply]=useState(""),[popup,setPopup]=useState<ReactNode|null>(null),[closeConfirm,setCloseConfirm]=useState(false),[selector,setSelector]=useState<"category"|"priority"|"filter"|null>(null);
+  const save=(next:SupportTicket[])=>{setTickets(next);localStorage.setItem(storage,JSON.stringify(next))}; const fmt=(d:string)=>new Date(d).toLocaleString("fa-IR",{dateStyle:"short",timeStyle:"short"});
+  const submit=()=>{if(!subject.trim()||!category||!body.trim()){setPopup(<><h3>اطلاعات ناقص است</h3><p>موضوع، دسته‌بندی و متن پیام را کامل کنید.</p></>);return}const now=new Date().toISOString(),t:SupportTicket={id:toFaDigits(String(Date.now()).slice(-7)),subject,category,priority,body,status:"باز",createdAt:now,updatedAt:now,messages:[{from:"user",text:body,at:now,attachment}]};save([t,...tickets]);setSubject("");setCategory("");setBody("");setAttachment("");setTab("list");setPopup(<><h3>تیکت شما با موفقیت ثبت شد.</h3><p>شماره تیکت: <b>{t.id}</b></p></>)};
+  const visible=tickets.filter(t=>(filter==="همه تیکت‌ها"||t.status===filter)&&(`${t.id} ${t.subject}`).includes(query)); const statusClass=(v:string)=>v==="باز"?"open":v==="پاسخ داده شده"?"answered":v==="بسته شده"?"closed":"review";
+  if(selected)return <div className="exchange-support-page"><div className="exchange-support-head"><button className="back-btn" onClick={()=>setSelected(null)}><Icon name="arrow" size={18}/></button><div><b>{selected.subject}</b><small>تیکت #{selected.id} · {selected.status}</small></div></div><div className="ticket-thread">{selected.messages.map((m,i)=><div className={`ticket-message ${m.from}`} key={i}><span>{m.text}</span>{m.attachment&&<em>📎 {m.attachment}</em>}<small>{fmt(m.at)} {m.from==="user"?"· مشاهده شد":""}</small></div>)}</div>{selected.status!=="بسته شده"&&<div className="ticket-reply"><input value={reply} onChange={e=>setReply(e.target.value)} placeholder="پاسخ خود را بنویسید"/><input type="file" onChange={e=>setAttachment(e.target.files?.[0]?.name??"")}/><button className="primary-button" onClick={()=>{if(!reply.trim())return;const now=new Date().toISOString();const updated={...selected,updatedAt:now,status:"در حال بررسی",messages:[...selected.messages,{from:"user" as const,text:reply,at:now,attachment}]};save(tickets.map(t=>t.id===updated.id?updated:t));setSelected(updated);setReply("");setAttachment("")}}>ارسال پاسخ</button></div>}<button className="outline-button ticket-close" onClick={()=>setCloseConfirm(true)} disabled={selected.status==="بسته شده"}>بستن تیکت</button>{closeConfirm&&<div style={{marginTop:12,padding:"16px",borderRadius:14,background:"rgba(232,92,92,0.07)",border:"1px solid rgba(232,92,92,0.25)",direction:"rtl"}}><div style={{fontSize:14,fontWeight:700,color:"#e85c5c",marginBottom:12}}>آیا از بستن این تیکت اطمینان دارید؟</div><div className="confirm-actions"><button className="outline-button" onClick={()=>setCloseConfirm(false)}>انصراف</button><button className="primary-button" style={{background:"#e8512a"}} onClick={()=>{const updated={...selected,status:"بسته شده",updatedAt:new Date().toISOString()};save(tickets.map(t=>t.id===updated.id?updated:t));setSelected(updated);setCloseConfirm(false)}}>بستن تیکت</button></div></div>}</div>;
+  const CATS=["مشکل واریز تومان","مشکل برداشت تومان","مشکل واریز تتر","مشکل برداشت تتر","مشکل احراز هویت","مشکل حساب کاربری","گزارش خطا","پیشنهادات و انتقادات","سایر موارد"];
+  const PRIS=["کم","متوسط","زیاد","فوری"];
+  if(selector==="category"||selector==="priority"){const items=selector==="category"?CATS:PRIS;const current=selector==="category"?category:priority;return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={()=>setSelector(null)}><Icon name="arrow" size={18}/></button><h2 className="expage-title">{selector==="category"?"انتخاب دسته‌بندی":"انتخاب اولویت"}</h2><div style={{width:36}}/></div><div className="expage-body"><div style={{display:"grid",gap:8,paddingBottom:24}}>{items.map(x=>{const chosen=current===x;return <button key={x} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 18px",borderRadius:14,background:chosen?"rgba(0,214,176,0.10)":"var(--card-bg)",border:chosen?"1.5px solid rgba(0,214,176,0.4)":"1px solid var(--border-color)",color:chosen?"var(--accent)":"var(--text-primary)",fontFamily:"Vazirmatn",fontSize:14,fontWeight:chosen?700:500,cursor:"pointer",textAlign:"right",boxSizing:"border-box",width:"100%",transition:"all .15s"}} onClick={()=>{if(selector==="category")setCategory(x);else setPriority(x);setSelector(null);}}><span>{x}</span>{chosen&&<Icon name="check" size={18}/>}</button>;})}</div></div></div>;}
+  return <div className="exchange-support-page" style={{position:"relative",overflow:"hidden"}}><div className="exchange-support-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><b>مرکز پشتیبانی صرافی</b><small>پاسخ‌گویی امن و سریع</small></div><img src={anPardazLogo} alt="آن‌پرداز"/></div><div className="support-tabs"><button className={tab==="new"?"active":""} onClick={()=>setTab("new")}>ارسال تیکت جدید</button><button className={tab==="list"?"active":""} onClick={()=>setTab("list")}>تیکت‌های من {tickets.some(t=>t.unread)&&<i>پیام جدید</i>}</button></div>{tab==="new"?<div className="ticket-form"><label>موضوع تیکت<input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع را وارد کنید"/></label><label>دسته‌بندی<button type="button" className="ticket-select-btn" onClick={()=>setSelector("category")}>{category||"انتخاب دسته‌بندی"}<span>⌄</span></button></label><label>اولویت<button type="button" className="ticket-select-btn" onClick={()=>setSelector("priority")}>{priority}<span>⌄</span></button></label><label>متن پیام<textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="شرح کامل درخواست خود را وارد کنید"/></label><label>پیوست فایل (اختیاری)<input type="file" onChange={e=>setAttachment(e.target.files?.[0]?.name??"")}/></label>{attachment&&<small>فایل انتخاب‌شده: {attachment}</small>}<button className="primary-button" onClick={submit}>ثبت تیکت</button></div>:<><div className="ticket-filter"><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="جستجو با شماره یا موضوع"/><button className="ticket-filter-button" onClick={()=>setSelector("filter")}>{filter} ⌄</button></div>{visible.length?visible.map(t=><button className="ticket-card" key={t.id} onClick={()=>setSelected(t)}><div><b>{t.subject}</b><small>#{t.id} · {fmt(t.updatedAt)}</small></div><span className={`ticket-status ${statusClass(t.status)}`}>{t.status}</span><em>{t.priority}</em></button>):<div className="exchange-empty"><b>هنوز هیچ تیکتی ثبت نکرده‌اید.</b><button className="primary-button" onClick={()=>setTab("new")}>ارسال تیکت جدید</button></div>}</>}{selector==="filter"&&<div style={{marginTop:8,padding:"16px",borderRadius:14,background:"var(--card-bg)",border:"1px solid var(--border-color)",direction:"rtl"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><h3 style={{margin:0,fontSize:15,fontWeight:800,color:"var(--text-primary)"}}>فیلتر تیکت‌ها</h3><button onClick={()=>setSelector(null)} style={{width:28,height:28,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border-color)",color:"var(--text-muted)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>✕</button></div><div className="exchange-choice-list">{["همه تیکت‌ها","باز","در حال بررسی","پاسخ داده شده","بسته شده"].map(x=>{const chosen=filter===x;return <button className={chosen?"selected":""} key={x} onClick={()=>{setFilter(x);setSelector(null)}}><span>{x}</span>{chosen&&<Icon name="check" size={17}/>}</button>})}</div></div>}{popup&&<div style={{marginTop:12,padding:"18px 20px",borderRadius:14,background:"var(--card-bg)",border:"1px solid var(--border-color)",direction:"rtl"}}><div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}><button onClick={()=>setPopup(null)} style={{width:28,height:28,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border-color)",color:"var(--text-muted)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>✕</button></div>{popup}</div>}</div>;
+}
+function ExchangeChat({onBack}:{onBack:()=>void}){const key="anp_exchange_chat";const [messages,setMessages]=useState<{from:"user"|"agent";text:string;at:string;attachment?:string}[]>(()=>{try{return JSON.parse(localStorage.getItem(key)??"[]")}catch{return[]}}),[started,setStarted]=useState(false),[text,setText]=useState(""),[typing,setTyping]=useState(false),[file,setFile]=useState("");const send=(value=text)=>{if(!value.trim()&&!file)return;const mine={from:"user" as const,text:value||"فایل پیوست شد",at:new Date().toISOString(),attachment:file};const next=[...messages,mine];setMessages(next);localStorage.setItem(key,JSON.stringify(next));setText("");setFile("");setTyping(true);setTimeout(()=>setTyping(false),1500)};return <div className="exchange-chat"><div className="exchange-support-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><b>چت با پشتیبان</b><small className="online">● پشتیبان آنلاین · محمد رضایی</small></div><img src={anPardazLogo} alt="آن‌پرداز"/></div>{!started?<div className="chat-welcome"><h2>سلام 👋</h2><p>به پشتیبانی صرافی خوش آمدید. لطفاً پیام خود را ارسال کنید تا کارشناسان در سریع‌ترین زمان ممکن پاسخ دهند.</p><button className="primary-button" onClick={()=>setStarted(true)}>شروع گفتگو</button></div>:<><div className="chat-shortcuts">{["مشکل واریز تومان","مشکل برداشت تومان","مشکل واریز تتر","مشکل برداشت تتر","مشکل احراز هویت","پیگیری تراکنش","سایر موارد"].map(x=><button key={x} onClick={()=>setText(x)}>{x}</button>)}</div><div className="chat-messages">{messages.map((m,i)=><div key={i} className={`chat-bubble ${m.from}`}><span>{m.text}</span>{m.attachment&&<em>📎 {m.attachment}</em>}<small>{new Date(m.at).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"})} · {m.from==="user"?"مشاهده شد":""}</small></div>)}{typing&&<div className="typing">پشتیبان در حال تایپ است... <i/><i/><i/></div>}</div><div className="chat-safety">لطفاً اطلاعات محرمانه مانند رمز کارت، CVV2 یا رمز پویا را برای پشتیبانی ارسال نکنید.</div><div className="chat-compose"><input value={text} onChange={e=>setText(e.target.value)} placeholder="پیام خود را بنویسید"/><label>📎<input type="file" hidden onChange={e=>setFile(e.target.files?.[0]?.name??"")}/></label><button onClick={()=>send()}>ارسال</button></div><button className="chat-receipt" onClick={()=>setText("رسید تراکنش را برای بررسی ارسال می‌کنم.")}>ارسال رسید تراکنش</button></>}</div>}
+
+function ExchangeFeesPage({onBack}:{onBack:()=>void}){const [kind,setKind]=useState("خرید سریع"),[amount,setAmount]=useState(""),[calculated,setCalculated]=useState<number|null>(null),[faq,setFaq]=useState<string|null>(null),[showKindPicker,setShowKindPicker]=useState(false);const feeRate=kind==="انتقال داخلی"||kind.includes("واریز")?0:((kind==="خرید سریع"||kind==="فروش سریع") ? .004 : .003);const calc=()=>setCalculated((Number(toLatinDigits(amount))||0)*feeRate);const FeeTable=({headers,rows}:{headers:string[];rows:string[][]})=><div className="fee-table"><div className="fee-tr">{headers.map(h=><b key={h}>{h}</b>)}</div>{rows.map((r,i)=><div className="fee-tr" key={i}>{r.map((c,j)=><span key={j}>{c}</span>)}</div>)}</div>;return <div className="exchange-content-page"><header className="exchange-content-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><h1>کارمزدها</h1><p>تمامی کارمزدهای صرافی به صورت شفاف در این صفحه نمایش داده می‌شوند.</p></div><img src={anPardazLogo} alt="صرافی آن‌پرداز"/></header><section className="exchange-section"><h2>کارمزد معاملات</h2><FeeTable headers={["حجم معاملات ۳۰ روز اخیر","کارمزد سفارش‌گذار (Maker)","کارمزد سفارش‌بردار (Taker)"]} rows={[["کمتر از ۵۰ میلیون تومان","0.35%","0.40%"],["۵۰ تا ۲۰۰ میلیون تومان","0.30%","0.35%"],["۲۰۰ تا ۵۰۰ میلیون تومان","0.25%","0.30%"],["۵۰۰ میلیون تا ۱ میلیارد تومان","0.20%","0.25%"],["بیشتر از ۱ میلیارد تومان","0.15%","0.20%"]]}/><p className="fee-note">با افزایش حجم معاملات، کارمزد شما کاهش خواهد یافت.</p></section><section className="fee-split"><div className="exchange-section"><h2>کارمزد واریز تومان</h2><p>واریز تومان به صرافی کاملاً رایگان است.</p><span className="free-badge">بدون کارمزد</span></div><div className="exchange-section"><h2>کارمزد واریز تتر</h2><p>واریز تتر به صرافی بدون کارمزد است.</p><span className="free-badge">بدون کارمزد</span></div><div className="exchange-section"><h2>انتقال داخلی</h2><p>انتقال دارایی بین کاربران آن‌پرداز کاملاً رایگان است.</p><span className="free-badge">رایگان</span></div></section><section className="exchange-section"><h2>کارمزد برداشت تومان</h2><p>کارمزد برداشت تومان مطابق قوانین شبکه بانکی محاسبه می‌شود.</p><FeeTable headers={["مبلغ برداشت","کارمزد"]} rows={[["تا ۶۰۰ هزار تومان","1٪"],["۶۰۰ هزار تا ۲۰ میلیون تومان","۶,۰۰۰ تومان"],["بیش از ۲۰ میلیون تومان","۰.۰۱٪ مبلغ تراکنش (حداکثر ۷,۵۰۰ تومان)"]]}/></section><section className="exchange-section"><h2>کارمزد برداشت تتر</h2><FeeTable headers={["شبکه","کارمزد برداشت","حداقل برداشت"]} rows={[["TRC20","1 USDT","10 USDT"],["BEP20","0.5 USDT","10 USDT"],["ERC20","5 USDT","20 USDT"]]}/></section><section className="exchange-section"><h2>کارمزد خرید و فروش سریع</h2><div className="fee-line"><span>کارمزد خرید سریع: <b>0.40٪</b></span><span>کارمزد فروش سریع: <b>0.40٪</b></span></div><p className="fee-note">کارمزد قبل از ثبت نهایی سفارش به شما نمایش داده خواهد شد.</p></section><section className="exchange-section calculator"><h2>محاسبه‌گر کارمزد</h2><div style={{marginBottom:4}}><div className="fee-kind-label" style={{fontSize:12,marginBottom:6,fontWeight:600}}>نوع معامله</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{["خرید سریع","فروش سریع","معامله اسپات","واریز تومان","انتقال داخلی"].map(x=><button key={x} className={kind===x?"fee-kind-btn selected":"fee-kind-btn"} onClick={()=>{setKind(x);setCalculated(null);}} style={{padding:"8px 14px",borderRadius:10,cursor:"pointer",fontFamily:"Vazirmatn",fontSize:13,fontWeight:kind===x?700:500}}>{x}</button>)}</div></div><input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} inputMode="decimal" placeholder="مبلغ معامله (تومان)"/><button className="primary-button" onClick={calc}>محاسبه کارمزد</button>{calculated!==null&&<div className="calculator-result"><div><span>کارمزد</span><b>{fa(Math.round(calculated))} تومان</b></div><div><span>مبلغ نهایی پرداختی</span><b>{fa(Math.round((Number(amount)||0)+calculated))} تومان</b></div><div><span>مبلغ نهایی دریافتی</span><b>{fa(Math.round((Number(amount)||0)-calculated))} تومان</b></div></div>}</section><section className="exchange-section faq"><h2>سؤالات متداول</h2>{[["کارمزد معاملات چگونه محاسبه می‌شود؟","کارمزد هر سفارش براساس حجم معاملات ۳۰ روز اخیر و نوع سفارش محاسبه می‌شود."],["چگونه می‌توانم کارمزد کمتری پرداخت کنم؟","با افزایش حجم معاملات ماهانه، سطح کارمزدی شما به‌صورت خودکار کاهش می‌یابد."],["کارمزد برداشت تتر چقدر است؟","کارمزد برداشت به شبکه انتخابی بستگی دارد و پیش از تأیید نمایش داده می‌شود."],["آیا واریز تومان کارمزد دارد؟","خیر، واریز تومان به صرافی آن‌پرداز رایگان است."]].map(([q,a])=><button key={q} onClick={()=>setFaq(faq===q?null:q)}><b>{q}</b><span>{faq===q?"−":"+"}</span>{faq===q&&<p>{a}</p>}</button>)}</section></div>}
+function ExchangeVideoGuide({onBack}:{onBack:()=>void}){const videoRef=useRef<HTMLVideoElement>(null),[playing,setPlaying]=useState(false),[position,setPosition]=useState(()=>Number(localStorage.getItem("anp_exchange_video_position")||0)),[duration,setDuration]=useState(0),[volume,setVolume]=useState(.8),[muted,setMuted]=useState(false),[error,setError]=useState(false),[askResume,setAskResume]=useState(Number(localStorage.getItem("anp_exchange_video_position")||0)>0);const source="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";const fmt=(n:number)=>`${String(Math.floor(n/60)).padStart(2,"0")}:${String(Math.floor(n%60)).padStart(2,"0")}`;const seek=(v:number)=>{const el=videoRef.current;if(el){el.currentTime=Math.max(0,Math.min(duration,v));setPosition(el.currentTime)}};const toggle=()=>{const el=videoRef.current;if(!el)return;if(el.paused){el.play().then(()=>setPlaying(true)).catch(()=>setError(true))}else{el.pause();setPlaying(false)}};return <div className="exchange-content-page video-guide"><header className="exchange-content-head"><button className="back-btn" onClick={()=>{localStorage.setItem("anp_exchange_video_position",String(position));onBack()}}><Icon name="arrow" size={18}/></button><div><h1>راهنمای استفاده</h1><p>برای آشنایی با امکانات صرافی، ویدئوی آموزشی زیر را مشاهده کنید.</p></div><img src={anPardazLogo} alt="صرافی آن‌پرداز"/></header>{askResume&&<div style={{margin:"0 0 14px",padding:"16px",borderRadius:14,background:"rgba(0,214,176,0.07)",border:"1px solid rgba(0,214,176,0.2)",direction:"rtl"}}><div style={{fontSize:14,fontWeight:700,color:"#00D6B0",marginBottom:12}}>ادامه مشاهده از آخرین موقعیت؟</div><div className="confirm-actions"><button className="outline-button" onClick={()=>{seek(0);setAskResume(false)}}>شروع از ابتدا</button><button className="primary-button" onClick={()=>setAskResume(false)}>ادامه</button></div></div>}<section className="video-shell">{source?<video ref={videoRef} src={source} onLoadedMetadata={e=>{setDuration(e.currentTarget.duration);seek(position)}} onTimeUpdate={e=>{setPosition(e.currentTarget.currentTime);localStorage.setItem("anp_exchange_video_position",String(e.currentTarget.currentTime))}} onEnded={()=>setPlaying(false)} onError={()=>setError(true)}/>:<div className="video-placeholder"><Icon name="chart" size={48}/><b>ویدئوی آموزشی به‌زودی بارگذاری می‌شود</b><small>این بخش برای جایگزینی آسان فایل ویدئو آماده است.</small></div>}{error&&<div className="video-error">خطا در بارگذاری ویدئو <button onClick={()=>{setError(false);videoRef.current?.load()}}>تلاش مجدد</button></div>}<div className="video-controls"><button onClick={()=>seek(position-10)}>−۱۰</button><button className="video-play" onClick={toggle}>{playing?"Pause":"Play"}</button><button onClick={()=>seek(position+10)}>+۱۰</button><input type="range" min="0" max={duration||1} value={position} onChange={e=>seek(Number(e.target.value))}/><span>{fmt(position)} / {fmt(duration)}</span><button onClick={()=>{setMuted(!muted);if(videoRef.current)videoRef.current.muted=!muted}}>{muted?"🔇":"🔊"}</button><input className="volume" type="range" min="0" max="1" step=".05" value={volume} onChange={e=>{const v=Number(e.target.value);setVolume(v);if(videoRef.current)videoRef.current.volume=v}}/><button onClick={()=>videoRef.current?.requestFullscreen?.()}>⛶</button></div></section><button className="outline-button video-close" onClick={onBack}>بستن</button></div>}
+
+const TMN_FLAG_LOGO=(()=>{const s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><defs><clipPath id="tc"><circle cx="15" cy="15" r="15"/></clipPath></defs><g clip-path="url(#tc)"><rect y="0" width="30" height="10" fill="#1a7f3c"/><rect y="10" width="30" height="10" fill="#f5f5f5"/><rect y="20" width="30" height="11" fill="#c0392b"/></g></svg>';return`data:image/svg+xml;base64,${btoa(s)}`;})();
+function ExchangeInstantTrade({initialAsset,user,coins,onBack,onUpdate}:{initialAsset:string;user:UserData;coins:typeof EX_COINS;onBack:()=>void;onUpdate:(u:UserData,tx:TxRecord)=>void}){
+  const [side,setSide]=useState<"buy"|"sell">("buy");
+  const [asset,setAsset]=useState(initialAsset);
+  const [quote,setQuote]=useState<"TMN"|"USDT">("TMN");
+  const [amount,setAmount]=useState("");
+  const [instView,setInstView]=useState<"main"|"coin-picker"|"confirm"|"receipt">("main");
+  const [picker,setPicker]=useState(false);
+  const [pickerSearch,setPickerSearch]=useState("");
+  const [processing,setProcessing]=useState(false);
+  const [result,setResult]=useState<ReceiptData|null>(null);
+  const [error,setError]=useState(""); const [liveWallets,setLiveWallets]=useState<Record<string,number>>({}); useEffect(()=>{let active=true;const load=async()=>{try{const w=await sarrafWalletMap();if(active)setLiveWallets(w);}catch{}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;clearInterval(id)}},[]);
+
+  const selected=coins.find(c=>c.symbol===asset)??coins[0];
+  // In buy mode: amount = quote currency (TMN or USDT). In sell mode: amount = base coin.
+  const rawAmt=Number(amount)||0;
+  const liveUsdtToman=Number(coins.find(c=>c.symbol==="USDT")?.price??0); const priceInQuote=quote==="USDT"?(liveUsdtToman>0?selected.price/liveUsdtToman:0):selected.price;
+  const quoteSpent=side==="buy"?rawAmt:rawAmt*priceInQuote;
+  const baseUnits=side==="buy"?rawAmt/Math.max(priceInQuote,1e-12):rawAmt;
+  const feeRate=.003;
+  const fee=quoteSpent*feeRate;
+  const quoteBalance=quote==="TMN"?Number(liveWallets.TMN??0):Number(liveWallets.USDT??0);
+  const baseBalance=Number(liveWallets[String(asset).toUpperCase()]??0);
+  const instantTomanNum=side==="buy"&&quote==="TMN"?Math.floor(rawAmt):0;
+  const quoteLabel=quote==="TMN"?"تومان":"USDT";
+  const fmtQ=(v:number)=>quote==="TMN"?fa(Math.round(v)):faFixed(v,4);
+  const avStr=side==="buy"?(quote==="TMN"?`${fa(quoteBalance)} تومان`:`${faFixed(quoteBalance,4)} USDT`):`${faFixed(baseBalance,6)} ${asset}`;
+
+  const switchQuote=(q:"TMN"|"USDT")=>{if(asset==="USDT"&&q==="USDT")return;setQuote(q);setAmount("");};
+  const usePercent=(p:number)=>{if(side==="buy")setAmount(String(Math.floor(quoteBalance*p/100*1e4)/1e4));else setAmount(String(Math.floor(baseBalance*p/100*1e8)/1e8));};
+  const place=()=>{if(!rawAmt){setError("مقدار معامله را وارد کنید.");return}if(side==="buy"&&quoteSpent+fee>quoteBalance){setError(`موجودی ${quoteLabel} کافی نیست.`);return}if(side==="sell"&&baseUnits>baseBalance){setError(`موجودی ${asset} کافی نیست.`);return}setInstView("confirm");};
+  const execute=async()=>{setInstView("main");setProcessing(true);setError("");try{const buying=side==="buy";const result=await sarrafPlaceOrder(asset,quote==="TMN"?"TMN":"USDT",buying?"buy":"sell","market",baseUnits,undefined,quoteSpent);setProcessing(false);setResult({title:"سفارش آنی در آن صراف ثبت شد",amount:`${buying?faFixed(baseUnits,4):fmtQ(quoteSpent)} ${buying?asset:quoteLabel}`,destination:`شناسه سفارش: ${String(result?.order?.id??result?.orderId??"—")}`,detail:"موجودی و کارمزد از حساب واقعی آن صراف محاسبه می‌شوند."});setAmount("");}catch(e){setProcessing(false);setError(e instanceof Error?e.message:"ثبت سفارش انجام نشد.");}};
+
+  if(instView==="coin-picker") return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={()=>{setInstView("main");setPickerSearch("")}}><Icon name="arrow" size={20}/></button><h2 className="expage-title">انتخاب ارز</h2><div style={{width:36}}/></div><div className="expage-body"><div className="exchange-asset-search" style={{marginBottom:12}}><Icon name="search" size={17}/><input autoFocus value={pickerSearch} onChange={e=>setPickerSearch(e.target.value)} placeholder="جستجوی نام یا نماد ارز" style={{fontSize:14,padding:"13px 8px"}}/></div><div className="exchange-asset-list" style={{gap:3}}>{coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(pickerSearch.toLowerCase())).map(c=>{const isSel=asset===c.symbol;return <button key={c.symbol} onClick={()=>{setAsset(c.symbol);if(c.symbol==="USDT")setQuote("TMN");setInstView("main");setAmount("");}} style={{padding:"13px 10px",borderRadius:13,background:isSel?"rgba(0,214,176,0.1)":"transparent",border:`1px solid ${isSel?"rgba(0,214,176,0.3)":"rgba(120,190,210,0.08)"}`,marginBottom:2}}><CoinLogo symbol={c.symbol} size={42}/><span style={{display:"grid",gap:4,flex:1}}><b style={{fontSize:15,fontWeight:700,color:isSel?"#00D6B0":"var(--text-primary)"}}>{c.fa}</b><small style={{fontSize:12,fontWeight:700,color:isSel?"rgba(0,214,176,0.75)":"var(--text-muted)",letterSpacing:"0.04em"}}>{c.symbol}</small></span>{isSel&&<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00D6B0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" strokeOpacity=".25"/><polyline points="8 12 11 15 16 9"/></svg>}</button>;})}</div></div></div>;
+
+  if(instView==="confirm") return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={()=>setInstView("main")}><Icon name="arrow" size={20}/></button><h2 className="expage-title">تأیید سفارش</h2><div style={{width:36}}/></div><div className="expage-body"><div className="exchange-confirm-lines" style={{marginBottom:24}}><div><span>جفت‌ارز</span><b>{asset} / {quote}</b></div><div><span>نوع عملیات</span><b>{side==="buy"?"خرید":"فروش"}</b></div><div><span>مقدار {asset}</span><b>{faFixed(baseUnits,6)}</b></div><div><span>قیمت لحظه‌ای</span><b>{fmtQ(priceInQuote)} {quoteLabel}</b></div><div><span>کارمزد</span><b>{fmtQ(fee)} {quoteLabel}</b></div><div><span>مبلغ {side==="buy"?"پرداختی":"دریافتی"}</span><b>{fmtQ(side==="buy"?quoteSpent+fee:quoteSpent-fee)} {quoteLabel}</b></div></div><div className="confirm-actions"><button className="outline-button" onClick={()=>setInstView("main")}>انصراف</button><button className="primary-button" onClick={execute}>تأیید و ثبت سفارش</button></div></div>{processing&&<AnPardazLoadingOverlay text="در حال انجام معامله آنی..."/>}</div>;
+
+  return <div className="instant-page">
+    <header className="instant-head">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button>
+      <h1>خرید و فروش آنی</h1>
+      <button className="instant-help" onClick={()=>{setError("در خرید و فروش آنی، سفارش شما با قیمت لحظه‌ای بازار و در سریع‌ترین زمان ممکن انجام می‌شود.")}}>؟</button>
+    </header>
+
+    {/* Pair selector bar */}
+    <div className="instant-pair-bar">
+      <button className="instant-asset-pill" onClick={()=>{setPickerSearch("");setInstView("coin-picker")}}>
+        <CoinLogo symbol={asset} size={20}/>
+        <span>{selected.fa}</span>
+        <small>{asset}</small>
+        <em>⌄</em>
+      </button>
+      <span className="pair-sep">/</span>
+      <div className="instant-quote-tabs">
+        <button className={quote==="TMN"?"active":""} onClick={()=>switchQuote("TMN")}>تومان</button>
+        <button className={quote==="USDT"&&asset!=="USDT"?"active":""} disabled={asset==="USDT"} onClick={()=>switchQuote("USDT")}>USDT</button>
+      </div>
+    </div>
+
+    <div className="instant-tabs">
+      <button className={side==="buy"?"active buy":""} onClick={()=>{setSide("buy");setAmount("")}}>خرید</button>
+      <button className={side==="sell"?"active sell":""} onClick={()=>{setSide("sell");setAmount("")}}>فروش</button>
+    </div>
+
+    {/* Payment card */}
+    <section className="instant-card">
+      <span className="instant-label">{side==="buy"?"پرداخت می‌کنم":"می‌فروشم"}</span>
+      {side==="buy"
+        ? <><div className="instant-input">{quote==="TMN"?<img src={TMN_FLAG_LOGO} width={31} height={31} style={{borderRadius:"50%",flexShrink:0}} alt="تومان"/>:<CoinLogo symbol="USDT" size={20}/>}<input value={quote==="TMN"?(instantTomanNum?fa(instantTomanNum):""):toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder="مبلغ را وارد کنید" inputMode="decimal" dir="ltr"/><b>{quoteLabel}</b></div>{instantTomanNum>0&&<div className="amount-words" style={{marginTop:4,marginRight:2}}>{numToFaWords(instantTomanNum)} تومان</div>}</>
+        : <div className="instant-input"><CoinLogo symbol={asset} size={22}/><input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder={`مقدار ${asset} را وارد کنید`} inputMode="decimal" dir="ltr"/><b>{asset}</b></div>}
+      {side==="sell"&&rawAmt>0&&<div style={{fontSize:12,color:"#8facba",textAlign:"right",marginTop:2,paddingRight:4}}>{fmtQ(quoteSpent)} {quoteLabel}</div>}
+      <small>موجودی قابل استفاده: {avStr}</small>
+      <div className="percent-row">{[25,50,75,100].map(p=><button key={p} onClick={()=>usePercent(p)}>{toFaDigits(String(p))}٪</button>)}</div>
+    </section>
+
+    {/* Receive card */}
+    <section className="instant-card receive">
+      <span className="instant-label">دریافت می‌کنم</span>
+      {side==="buy"
+        ? <><button className="asset-select" onClick={()=>{setPickerSearch("");setInstView("coin-picker")}}><span><CoinLogo symbol={asset} size={26}/><b>{selected.fa}</b><small>{asset}</small></span><span>⌄</span></button><output>{faFixed(baseUnits,6)} {asset}</output></>
+        : <><div className="instant-input readonly">{quote==="TMN"?<img src={TMN_FLAG_LOGO} width={31} height={31} style={{borderRadius:"50%",flexShrink:0}} alt="تومان"/>:<CoinLogo symbol="USDT" size={20}/>}<b>{fmtQ(quoteSpent-fee||0)}</b><span>{quoteLabel}</span></div></>}
+    </section>
+
+    <section className="instant-market">
+      <div><span>قیمت لحظه‌ای</span><b>{fmtQ(priceInQuote)} {quoteLabel}</b></div>
+      <span className="pair-label">{asset} / {quote}</span>
+    </section>
+    <section className="instant-fee"><span>کارمزد <b>۰٫۳۰٪</b></span><b>{fmtQ(fee)} {quoteLabel}</b></section>
+
+    {error&&<div style={{margin:"0 0 12px",padding:"14px 16px",borderRadius:12,background:"rgba(232,92,92,0.1)",border:"1px solid rgba(232,92,92,0.3)",display:"flex",alignItems:"center",gap:10,direction:"rtl"}}><span style={{flex:1,fontSize:13,color:"#e85c5c",fontWeight:600}}>{error}</span><button onClick={()=>setError("")} style={{width:24,height:24,borderRadius:8,background:"rgba(232,92,92,0.15)",border:"none",color:"#e85c5c",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:12}}>✕</button></div>}
+    <button className={`instant-submit ${side}`} onClick={place}>{side==="buy"?"خرید":"فروش"} {asset}</button>
+
+    {processing&&<AnPardazLoadingOverlay text="در حال انجام معامله آنی..."/>}
+    {result&&<TransactionReceipt data={result} onClose={()=>setResult(null)}/>}
+  </div>;
+}
+
+function ExchangeChartPage({asset,coin,coins,user,favorites,onToggleFavorite,onBack,onInstant,onUpdate,onPairSelect}:{asset:string;coin:(typeof EX_COINS)[number];coins:typeof EX_COINS;user:UserData;favorites:string[];onToggleFavorite:(symbol:string)=>void;onBack:()=>void;onInstant:(asset:string)=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onPairSelect:(asset:string)=>void}){const tvTheme=localStorage.getItem("anp_theme")==="light"?"light":"dark";return <div className="chart-trade-page"><header className="protrade-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div className="ps-info"><div className="ps-pair-row"><b>{asset} / TMN</b></div><div className="ps-price-row"><span className="ps-price">{coin.price>0?fa(Math.round(coin.price)):"—"} <small>تومان</small></span><em>{Number.isFinite(coin.change)?(coin.change>=0?"+":"")+faFixed(coin.change,2)+"٪":"—"}</em></div></div><button className={favorites.includes(asset)?"pair-favorite active":"pair-favorite"} onClick={()=>onToggleFavorite(asset)}>{favorites.includes(asset)?"★":"☆"}</button></header><div className="tv-chart-frame"><iframe title={asset+" chart"} src={"https://www.tradingview.com/widgetembed/?symbol=BINANCE%3A"+asset+"USDT&interval=60&hidesidetoolbar=0&theme="+tvTheme+"&style=1&timezone=Asia%2FTehran&withdateranges=1"}/></div><div className="chart-about"><b>{coin.fa}</b><p>قیمت بازار از Backend آن صراف دریافت می‌شود؛ نمودار خارجی فقط نمایش تصویری بازار است.</p><p>دفتر سفارش و سفارش‌گذاری این صفحه داده ساختگی ندارد و از بخش معامله واقعی استفاده می‌کند.</p></div><button className="primary-button" onClick={()=>onInstant(asset)}>خرید و فروش آنی</button></div>}
+function MarginChartPage({asset,coin,onBack,coins,user,favorites,onToggleFavorite,onUpdate,onAssetChange}:{asset:string;coin:(typeof EX_COINS)[number];onBack:()=>void;coins?:typeof EX_COINS;user?:UserData;favorites?:string[];onToggleFavorite?:(s:string)=>void;onUpdate?:(u:UserData,tx:TxRecord)=>void;onAssetChange?:(s:string)=>void}){return <div className="chart-trade-page"><header className="protrade-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div className="ps-info"><b>{asset} / TMN</b><div className="ps-price-row"><span className="ps-price">{coin.price>0?fa(Math.round(coin.price)):"—"} <small>تومان</small></span></div></div></header><div className="warning-box" style={{margin:16}}>داده و اجرای معامله تعهدی تا اتصال کامل موتور واقعی Backend غیرفعال است. هیچ دفتر سفارش، قیمت، P&amp;L یا موقعیت ساختگی نمایش داده نمی‌شود.</div></div>}
 function ExchangeProTrade({mode,initialAsset,user,coins,onBack,onUpdate,onNavigate,onAssetChange,favorites,onToggleFavorite}:{mode:"spot"|"margin";initialAsset:string;user:UserData;coins:typeof EX_COINS;onBack:()=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onNavigate:(target:"instant",asset:string)=>void;onAssetChange:(asset:string)=>void;favorites:string[];onToggleFavorite:(symbol:string)=>void}){
   const [asset,setAsset]=useState(initialAsset),[side,setSide]=useState<"buy"|"sell">("buy"),[orderType,setOrderType]=useState<"بازار"|"قیمت ثابت">("بازار"),[amount,setAmount]=useState(""),[priceInput,setPriceInput]=useState(""),[processing,setProcessing]=useState(false),[message,setMessage]=useState(""),[bids,setBids]=useState<any[]>([]),[asks,setAsks]=useState<any[]>([]),[liveWallets,setLiveWallets]=useState<Record<string,number>>({});
-  const coin=coins.find(c=>c.symbol===asset)??coins[0];
-  const livePrice=Number(coin?.price??0), limitPrice=Number(priceInput)||0, executionPrice=orderType==="قیمت ثابت"?limitPrice:livePrice, qty=Number(amount)||0, total=qty*executionPrice, fee=total*0.003;
-  const baseBalance=Number(liveWallets[String(asset).toUpperCase()]??0), tomanBalance=Number(liveWallets.TMN??0), favorite=favorites.includes(asset);
+  const coin=coins.find(c=>c.symbol===asset)??coins[0]; const livePrice=Number(coin?.price??0),limitPrice=Number(priceInput)||0,executionPrice=orderType==="قیمت ثابت"?limitPrice:livePrice,qty=Number(amount)||0,total=qty*executionPrice,fee=total*0.003; const baseBalance=Number(liveWallets[String(asset).toUpperCase()]??0),tomanBalance=Number(liveWallets.TMN??0),favorite=favorites.includes(asset);
   useEffect(()=>{let active=true;const load=async()=>{try{const [w,b]=await Promise.all([sarrafWalletMap(),sarrafOrderBook(asset+"/TMN")]);if(!active)return;setLiveWallets(w);setBids(b.bids.map((x:any)=>Array.isArray(x)?{price:Number(x[0]),amount:Number(x[1])}:{price:Number(x.price),amount:Number(x.amount)}).filter((x:any)=>x.price>0&&x.amount>0));setAsks(b.asks.map((x:any)=>Array.isArray(x)?{price:Number(x[0]),amount:Number(x[1])}:{price:Number(x.price),amount:Number(x.amount)}).filter((x:any)=>x.price>0&&x.amount>0));}catch{if(active){setBids([]);setAsks([]);setLiveWallets({});}}};void load();const id=window.setInterval(()=>void load(),3000);return()=>{active=false;clearInterval(id)}},[asset]);
   const submit=async()=>{setMessage("");if(mode==="margin"){setMessage("معامله تعهدی هنوز API اجرایی واقعی در Backend ندارد؛ برای جلوگیری از نمایش یا ثبت داده ساختگی غیرفعال است.");return;}if(!qty||qty<=0){setMessage("مقدار سفارش را وارد کنید.");return;}if(orderType==="قیمت ثابت"&&(!limitPrice||limitPrice<=0)){setMessage("قیمت سفارش را وارد کنید.");return;}if(!livePrice||livePrice<=0){setMessage("قیمت لحظه‌ای این بازار در دسترس نیست.");return;}if(side==="buy"&&orderType==="بازار"&&total+fee>tomanBalance){setMessage("موجودی تومان کافی نیست.");return;}if(side==="sell"&&qty>baseBalance){setMessage("موجودی "+asset+" کافی نیست.");return;}setProcessing(true);try{const result=await sarrafPlaceOrder(asset,"TMN",side,orderType==="بازار"?"market":"limit",qty,orderType==="قیمت ثابت"?limitPrice:undefined,side==="buy"?total:undefined);setMessage("سفارش واقعی ثبت شد؛ شناسه: "+String(result?.order?.id??result?.orderId??"—"));setAmount("");setPriceInput("");setLiveWallets(await sarrafWalletMap());}catch(e){setMessage(e instanceof Error?e.message:"ثبت سفارش انجام نشد.");}finally{setProcessing(false);}};
   const fmtBook=(v:number)=>v>0?fa(Math.round(v)):"—";
-  return <div className="terminal-page"><header className="terminal-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={17}/></button><button className="pair-selector" onClick={()=>onAssetChange(asset)}><PairLogos base={asset} quote="TMN" baseSize={26} quoteSize={15}/><div className="ps-info"><div className="ps-pair-row"><b>{asset} / TMN</b></div><div className="ps-price-row"><span className="ps-price">{livePrice>0?fmtBook(livePrice):"—"} <small>تومان</small></span><em className={Number.isFinite(coin.change)&&coin.change>=0?"ps-change positive":"ps-change negative"}>{Number.isFinite(coin.change)?(coin.change>=0?"+":"")+faFixed(coin.change,2)+"٪":"—"}</em></div></div></button><button className={favorite?"pair-favorite active":"pair-favorite"} onClick={()=>onToggleFavorite(asset)}>{favorite?"★":"☆"}</button></header>
-    <div className="terminal-status"><span>قیمت زنده: {livePrice>0?fmtBook(livePrice)+" تومان":"—"}</span><span>دفتر سفارش: {bids.length||asks.length?"زنده":"در دسترس نیست"}</span><b>{mode==="margin"?"● تعهدی غیرفعال":"● اتصال Backend"}</b></div>
-    <main className="terminal-grid"><section className="terminal-book"><h2>دفتر سفارش</h2><div className="book-head"><span>قیمت</span><span>مقدار</span><span>مجموع</span></div>{asks.length?<div className="book-sells"><b>فروشندگان</b>{asks.slice(0,7).map((l:any,i:number)=><p key={i}><span>{fmtBook(l.price)}</span><span>{faFixed(l.amount,6)}</span><span>{fmtBook(l.price*l.amount)}</span></p>)}</div>:<div className="empty-orders">داده واقعی فروشندگان در دسترس نیست.</div>}<div className="book-mid"><b>{livePrice>0?fmtBook(livePrice):"—"}</b></div>{bids.length?<div className="book-buys"><b>خریداران</b>{bids.slice(0,7).map((l:any,i:number)=><p key={i}><span>{fmtBook(l.price)}</span><span>{faFixed(l.amount,6)}</span><span>{fmtBook(l.price*l.amount)}</span></p>)}</div>:<div className="empty-orders">داده واقعی خریداران در دسترس نیست.</div>}</section>
-    <section className="terminal-form"><div className="terminal-tabs"><button className={side==="buy"?"active buy":""} onClick={()=>setSide("buy")}>خرید</button><button className={side==="sell"?"active sell":""} onClick={()=>setSide("sell")}>فروش</button></div>{mode==="margin"&&<div className="warning-box">معامله تعهدی تا ایجاد API اجرایی واقعی Backend غیرفعال است.</div>}<div className="terminal-order-types"><button className={orderType==="قیمت ثابت"?"active":""} onClick={()=>setOrderType("قیمت ثابت")}>قیمت ثابت</button><button className={orderType==="بازار"?"active":""} onClick={()=>setOrderType("بازار")}>بازار</button></div>{orderType==="قیمت ثابت"&&<label>قیمت سفارش<input value={toFaDigits(priceInput)} onChange={e=>setPriceInput(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder={livePrice>0?fa(Math.round(livePrice)):"—"}/></label>}<label>مقدار {asset}<input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder="مقدار واقعی سفارش"/></label><label>مجموع<input readOnly value={executionPrice>0&&qty>0?fa(Math.round(total)):"—"}/></label><small>موجودی واقعی: {side==="buy"?fa(tomanBalance)+" تومان":faFixed(baseBalance,8)+" "+asset}</small>{message&&<div className="warning-box">{message}</div>}<button className={"terminal-submit "+(side==="buy"?"buy":"sell")} onClick={submit} disabled={processing||mode==="margin"}>{processing?"در حال ثبت…":mode==="margin"?"تعهدی فعلاً غیرفعال":"ثبت سفارش واقعی"}</button></section></main>
-    <section className="recent-trades"><h2>آخرین معاملات</h2><div className="empty-orders">تا اتصال feed معاملات واقعی، معامله ساختگی نمایش داده نمی‌شود.</div></section></div>;
+  return <div className="terminal-page"><header className="terminal-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={17}/></button><button className="pair-selector" onClick={()=>onAssetChange(asset)}><PairLogos base={asset} quote="TMN" baseSize={26} quoteSize={15}/><div className="ps-info"><div className="ps-pair-row"><b>{asset} / TMN</b></div><div className="ps-price-row"><span className="ps-price">{livePrice>0?fmtBook(livePrice):"—"} <small>تومان</small></span><em>{Number.isFinite(coin.change)?(coin.change>=0?"+":"")+faFixed(coin.change,2)+"٪":"—"}</em></div></div></button><button className={favorite?"pair-favorite active":"pair-favorite"} onClick={()=>onToggleFavorite(asset)}>{favorite?"★":"☆"}</button></header><div className="terminal-status"><span>قیمت زنده: {livePrice>0?fmtBook(livePrice)+" تومان":"—"}</span><span>دفتر سفارش: {bids.length||asks.length?"زنده":"در دسترس نیست"}</span><b>{mode==="margin"?"● تعهدی غیرفعال":"● اتصال Backend"}</b></div><main className="terminal-grid"><section className="terminal-book"><h2>دفتر سفارش</h2><div className="book-head"><span>قیمت</span><span>مقدار</span><span>مجموع</span></div>{asks.length?<div className="book-sells"><b>فروشندگان</b>{asks.slice(0,7).map((l:any,i:number)=><p key={i}><span>{fmtBook(l.price)}</span><span>{faFixed(l.amount,6)}</span><span>{fmtBook(l.price*l.amount)}</span></p>)}</div>:<div className="empty-orders">داده واقعی فروشندگان در دسترس نیست.</div>}<div className="book-mid"><b>{livePrice>0?fmtBook(livePrice):"—"}</b></div>{bids.length?<div className="book-buys"><b>خریداران</b>{bids.slice(0,7).map((l:any,i:number)=><p key={i}><span>{fmtBook(l.price)}</span><span>{faFixed(l.amount,6)}</span><span>{fmtBook(l.price*l.amount)}</span></p>)}</div>:<div className="empty-orders">داده واقعی خریداران در دسترس نیست.</div>}</section><section className="terminal-form"><div className="terminal-tabs"><button className={side==="buy"?"active buy":""} onClick={()=>setSide("buy")}>خرید</button><button className={side==="sell"?"active sell":""} onClick={()=>setSide("sell")}>فروش</button></div>{mode==="margin"&&<div className="warning-box">معامله تعهدی تا ایجاد API اجرایی واقعی Backend غیرفعال است.</div>}<div className="terminal-order-types"><button className={orderType==="قیمت ثابت"?"active":""} onClick={()=>setOrderType("قیمت ثابت")}>قیمت ثابت</button><button className={orderType==="بازار"?"active":""} onClick={()=>setOrderType("بازار")}>بازار</button></div>{orderType==="قیمت ثابت"&&<label>قیمت سفارش<input value={toFaDigits(priceInput)} onChange={e=>setPriceInput(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder={livePrice>0?fa(Math.round(livePrice)):"—"}/></label>}<label>مقدار {asset}<input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder="مقدار واقعی سفارش"/></label><label>مجموع<input readOnly value={executionPrice>0&&qty>0?fa(Math.round(total)):"—"}/></label><small>موجودی واقعی: {side==="buy"?fa(tomanBalance)+" تومان":faFixed(baseBalance,8)+" "+asset}</small>{message&&<div className="warning-box">{message}</div>}<button className={"terminal-submit "+(side==="buy"?"buy":"sell")} onClick={submit} disabled={processing||mode==="margin"}>{processing?"در حال ثبت…":mode==="margin"?"تعهدی فعلاً غیرفعال":"ثبت سفارش واقعی"}</button></section></main><section className="recent-trades"><h2>آخرین معاملات</h2><div className="empty-orders">تا اتصال feed معاملات واقعی، معامله ساختگی نمایش داده نمی‌شود.</div></section></div>;
 }
-function ExchangeChartPage({asset,coin,coins,user,favorites,onToggleFavorite,onBack,onInstant,onUpdate,onPairSelect}:{asset:string;coin:(typeof EX_COINS)[number];coins:typeof EX_COINS;user:UserData;favorites:string[];onToggleFavorite:(symbol:string)=>void;onBack:()=>void;onInstant:(asset:string)=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onPairSelect:(asset:string)=>void}){const tvTheme=localStorage.getItem("anp_theme")==="light"?"light":"dark";return <div className="chart-trade-page"><header className="protrade-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div className="ps-info"><div className="ps-pair-row"><b>{asset} / USDT</b></div><div className="ps-price-row"><span className="ps-price">{coin.price>0?fa(Math.round(coin.price)):"—"} <small>تومان</small></span><em>{Number.isFinite(coin.change)?(coin.change>=0?"+":"")+faFixed(coin.change,2)+"٪":"—"}</em></div></div><button className={favorites.includes(asset)?"pair-favorite active":"pair-favorite"} onClick={()=>onToggleFavorite(asset)}>{favorites.includes(asset)?"★":"☆"}</button></header><div className="tv-chart-frame"><iframe title={asset+" chart"} src={"https://www.tradingview.com/widgetembed/?symbol=BINANCE%3A"+asset+"USDT&interval=60&hidesidetoolbar=0&theme="+tvTheme+"&style=1&timezone=Asia%2FTehran&withdateranges=1"}/></div><div className="chart-about"><b>{coin.fa}</b><p>قیمت و بازار از Backend آن صراف دریافت می‌شود؛ نمودار خارجی فقط برای نمایش تصویری بازار است.</p><p>سفارش‌گذاری از این نمودار تا اتصال مستقیم به feed سفارش همان بازار انجام نمی‌شود.</p></div><button className="primary-button" onClick={()=>onInstant(asset)}>خرید و فروش آنی</button></div>}
-function MarginChartPage({asset,coin,onBack}:{asset:string;coin:(typeof EX_COINS)[number];coins?:typeof EX_COINS;user?:UserData;favorites?:string[];onToggleFavorite?:(s:string)=>void;onUpdate?:(u:UserData,tx:TxRecord)=>void;onAssetChange?:(s:string)=>void}){return <div className="chart-trade-page"><header className="protrade-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div className="ps-info"><b>{asset} / TMN</b><div className="ps-price-row"><span className="ps-price">{coin.price>0?fa(Math.round(coin.price)):"—"} <small>تومان</small></span></div></div></header><div className="warning-box" style={{margin:16}}>داده و اجرای معامله تعهدی تا اتصال کامل موتور واقعی Backend غیرفعال است. هیچ دفتر سفارش، قیمت، P&amp;L یا موقعیت ساختگی نمایش داده نمی‌شود.</div></div>}
 function CandleChart({price}:{price:number}){return <div className="candle-chart" dir="rtl"><div className="chart-mode"><b>کندل</b><span>{Number.isFinite(price)&&price>0?<>قیمت زنده: {fa(Math.round(price))} تومان</>:<>قیمت زنده در دسترس نیست</>}</span></div><div style={{minHeight:122,display:"grid",placeItems:"center",color:"var(--text-muted)",fontSize:12,padding:20,textAlign:"center"}}>داده کندل تاریخی/زنده هنوز از Backend دریافت نشده است.<br/>هیچ کندل ساختگی نمایش داده نمی‌شود.</div></div>}
-
 function ExchangeDepositFlow({coins,onClose,onToman}:{coins:typeof EX_COINS;onClose:()=>void;onToman:()=>void}){const [asset,setAsset]=useState<string|null>(null),[search,setSearch]=useState("");const coin=coins.find(c=>c.symbol===asset);if(!asset)return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={onClose}><Icon name="arrow" size={20}/></button><h2 className="expage-title">انتخاب دارایی برای واریز</h2><div style={{width:36}}/></div><div className="expage-body"><button onClick={onToman} style={{display:"flex",alignItems:"center",gap:14,padding:"16px 18px",borderRadius:16,background:"rgba(0,214,176,0.08)",border:"1.5px solid rgba(0,214,176,0.25)",cursor:"pointer",textAlign:"right",fontFamily:"Vazirmatn",color:"var(--text-primary)",width:"100%",boxSizing:"border-box"}}><img src={TMN_FLAG_LOGO} width={42} height={42} style={{borderRadius:"50%",flexShrink:0}} alt="تومان"/><div style={{flex:1}}><div style={{fontWeight:800,fontSize:16}}>تومان</div><div style={{fontSize:12,color:"var(--text-muted)",marginTop:3}}>TMN · واریز بانکی</div></div></button><div style={{fontSize:13,color:"var(--text-muted)",margin:"18px 0 10px",fontWeight:700}}>ارزهای دیجیتال</div><div className="exchange-asset-search"><Icon name="search" size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="جستجوی ارز..."/></div><div style={{display:"flex",flexDirection:"column",gap:7,marginTop:12}}>{coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(search.toLowerCase())).map(c=><button key={c.symbol} onClick={()=>setAsset(c.symbol)} className="asset-row"><CoinLogo symbol={c.symbol} size={38}/><div style={{flex:1,textAlign:"right"}}><div style={{fontWeight:700,fontSize:15}}>{c.fa}</div><div style={{fontSize:12,color:"var(--text-muted)",marginTop:3}}>{c.symbol}</div></div><Icon name="arrow" size={16}/></button>)}</div></div></div>;return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={()=>setAsset(null)}><Icon name="arrow" size={20}/></button><h2 className="expage-title">واریز ${coin?.fa??""}</h2><div style={{width:36}}/></div><div className="expage-body"><div className="warning-box"><b>آدرس واریز واقعی در دسترس نیست</b><p>برای جلوگیری از نمایش داده ساختگی، تا زمانی که سرویس کیف پول Backend آدرس واقعی این دارایی و شبکه را صادر نکند، هیچ آدرس، QR، حداقل واریز یا کارمزد ساختگی نمایش داده نمی‌شود.</p></div></div></div>}
 
 // ─── Exchange Screen ──────────────────────────────────────────────────────────
