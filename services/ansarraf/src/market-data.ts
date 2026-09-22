@@ -8,6 +8,10 @@ export type MarketQuote = {
   askPrice: string | null;
   fetchedAt: string;
   stale: boolean;
+  change24h: number | null;
+  volume24h: string | null;
+  high24h: string | null;
+  low24h: string | null;
 };
 
 type Normalized = Omit<MarketQuote, 'stale' | 'fetchedAt'>;
@@ -84,6 +88,10 @@ async function fetchWallex(): Promise<Normalized[]> {
       lastPrice: String(firstValue(stats?.lastPrice, stats?.last, stats?.close, market?.lastPrice) ?? ''),
       bidPrice: firstValue(stats?.bidPrice, stats?.bestBid, stats?.bid, market?.bidPrice) == null ? null : String(firstValue(stats?.bidPrice, stats?.bestBid, stats?.bid, market?.bidPrice)),
       askPrice: firstValue(stats?.askPrice, stats?.bestAsk, stats?.ask, market?.askPrice) == null ? null : String(firstValue(stats?.askPrice, stats?.bestAsk, stats?.ask, market?.askPrice)),
+      change24h: typeof stats?.['24h_ch'] === 'number' ? stats['24h_ch'] : Number.isFinite(Number(stats?.['24h_ch'])) ? Number(stats['24h_ch']) : null,
+      volume24h: firstValue(stats?.['24h_volume'], stats?.volume24h) == null ? null : String(firstValue(stats?.['24h_volume'], stats?.volume24h)),
+      high24h: firstValue(stats?.['24h_highPrice'], stats?.high24h) == null ? null : String(firstValue(stats?.['24h_highPrice'], stats?.high24h)),
+      low24h: firstValue(stats?.['24h_lowPrice'], stats?.low24h) == null ? null : String(firstValue(stats?.['24h_lowPrice'], stats?.low24h)),
     });
     if (q) result.push(q);
   }
@@ -186,7 +194,33 @@ export class MarketDataService {
 
   async getQuotes(symbol?: string) {
     const rows = await this.pool.query(`SELECT provider,symbol,last_price,bid_price,ask_price,fetched_at,(EXTRACT(EPOCH FROM (NOW()-fetched_at))*1000 > $1) AS stale FROM market_quotes WHERE ($2::text IS NULL OR symbol=$2) ORDER BY symbol,provider`, [STALE_AFTER_MS, symbol ?? null]);
-    return rows.rows.map(row => ({ provider: row.provider, symbol: row.symbol, lastPrice: String(row.last_price), bidPrice: row.bid_price == null ? null : String(row.bid_price), askPrice: row.ask_price == null ? null : String(row.ask_price), fetchedAt: new Date(row.fetched_at).toISOString(), stale: Boolean(row.stale) }));
+    const dbRows = new Map<string, any>();
+    for (const row of rows.rows) dbRows.set(`${row.provider}:${row.symbol}`, row);
+    const keys = new Set<string>(dbRows.keys());
+    for (const key of this.cache.keys()) {
+      if (!symbol || key.endsWith(`:${symbol}`)) keys.add(key);
+    }
+    return [...keys].sort().map((key) => {
+      const cached = this.cache.get(key);
+      const row = dbRows.get(key);
+      if (cached) {
+        const age = Date.now() - new Date(cached.fetchedAt).getTime();
+        return { ...cached, stale: age > STALE_AFTER_MS };
+      }
+      return {
+        provider: row.provider,
+        symbol: row.symbol,
+        lastPrice: String(row.last_price),
+        bidPrice: row.bid_price == null ? null : String(row.bid_price),
+        askPrice: row.ask_price == null ? null : String(row.ask_price),
+        fetchedAt: new Date(row.fetched_at).toISOString(),
+        stale: Boolean(row.stale),
+        change24h: null,
+        volume24h: null,
+        high24h: null,
+        low24h: null,
+      };
+    });
   }
 
   health() { return Object.fromEntries(this.providerHealth.entries()); }
