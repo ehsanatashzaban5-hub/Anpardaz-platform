@@ -4371,6 +4371,8 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
   const [showHelp,setShowHelp]=useState(false);
   const [helpOpen,setHelpOpen]=useState<number|null>(null);
   const [showPdfPopup,setShowPdfPopup]=useState(false);
+  const [liveForexWallet,setLiveForexWallet]=useState(0);
+  useEffect(()=>{let active=true;const load=async()=>{try{const w=await sarrafWalletMap();if(active)setLiveForexWallet(Number(w.USDT??0));}catch{if(active)setLiveForexWallet(0);}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;window.clearInterval(id)}},[user.uid]);
 
   useEffect(()=>{const id=setInterval(()=>setTick(t=>t+1),400);return()=>clearInterval(id);},[]);
 
@@ -4383,7 +4385,7 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
     }
   },[bs]);
 
-  const displayUsdt = user.usdtBalance;
+  const displayUsdt = liveForexWallet;
   const maxAlloc=Math.max(0,displayUsdt-3);
   const allocNum=Number(toLatinDigits(amount))||0;
 
