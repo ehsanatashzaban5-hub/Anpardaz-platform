@@ -1042,7 +1042,7 @@ function WithdrawCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatu
   if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>;
   const NETS: Record<string,string[]> = { BTC:["BTC"], ETH:["ERC20"], BNB:["BEP20"], SOL:["SOL"], USDT:["TRC20","ERC20","BEP20"], default:["TRC20","ERC20","BEP20"] };
   const nets = NETS[selAsset.symbol] || NETS.default;
-  const feeMap: Record<string,string> = { TRC20:"1 USDT", ERC20:"5 USDT", BEP20:"0.5 USDT", BTC:"0.0001 BTC", SOL:"0.01 SOL" };
+  const feeMap: Record<string,string> = {};
   const filtered = assets.filter(a => a.symbol.includes(searchCoin.toUpperCase()) || a.nameFa.includes(searchCoin)).slice(0,30);
   if (step === "done") return (
     <div style={{ textAlign:"center", padding:"60px 24px" }}>
