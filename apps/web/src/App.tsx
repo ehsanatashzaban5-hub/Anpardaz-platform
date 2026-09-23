@@ -45,6 +45,7 @@ import logoMellat from "@/imports/bank-mellat.png";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const FALLBACK_RATE = 87500;
+const ANPARDAZ_API_BASE = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
 const KAVENEGAR_KEY = "";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -138,10 +139,6 @@ const DB = {
       const raw=JSON.parse(localStorage.getItem(`anp_user_${p}`)??"null");
       if(!raw)return null;
       const u:UserData={uid:"",cryptoBalances:{},...raw};
-      if(!u.cards?.length)u.cards=[{id:"card-melat-1",number:"6104338761369582",bank:"بانک ملت",holderName:(u.name||"")+" "+(u.family||"")}];
-      /* DEMO: ensure test balances for prototype */
-      if(!u.tomanBalance||u.tomanBalance===0)u.tomanBalance=10000000;
-      if(!u.usdtBalance||u.usdtBalance===0)u.usdtBalance=100;
       // Backfill uid for users registered before this field existed
       if(!u.uid){u.uid="uid_"+p.replace(/[^0-9]/g,"");localStorage.setItem(`anp_user_${p}`,JSON.stringify(u));}
       return u;
@@ -209,6 +206,9 @@ function BankLogo({bankName,size=42,rounded=12}:{bankName:string;size?:number;ro
 async function fetchUSDTRate():Promise<number>{
   try{const r=await fetch("https://api.wallex.ir/v1/markets",{signal:AbortSignal.timeout(7000)});const d=await r.json();const p=d?.result?.symbols?.USDTTMN?.stats?.lastPrice??d?.result?.symbols?.USDTTMN?.stats?.bidPrice;if(p)return parseFloat(p);return FALLBACK_RATE;}catch{return FALLBACK_RATE}
 }
+async function anpardazRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const res=await fetch(`${ANPARDAZ_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(data?.error??"anpardaz_request_failed"));return data;}
+async function anpardazCardBalance(cardNumber:string,otp:string,cvv2:string,expiryMonth:string,expiryYear:string){return anpardazRequest("/api/v1/cards/balance",{method:"POST",body:JSON.stringify({cardNumber,otp,cvv2,expiryMonth,expiryYear,idempotencyKey:crypto.randomUUID()})});}
+async function anpardazTransfer(destinationExternal:string,amount:number,currency:string,description:string){return anpardazRequest("/api/v1/transfers",{method:"POST",body:JSON.stringify({destinationExternal,amount:String(amount),currency,description,idempotencyKey:crypto.randomUUID()})});}
 async function sendOTP(phone:string,code:string):Promise<{ok:boolean;devCode?:string}>{
   if(!KAVENEGAR_KEY)return{ok:false,devCode:code};
   try{const url=`https://api.kavenegar.com/v1/${KAVENEGAR_KEY}/sms/send.json`;const body=new URLSearchParams({receptor:phone,message:`کد تأیید آن‌پرداز: ${code}`,sender:"10004346"});const r=await fetch(url,{method:"POST",body});const d=await r.json();return{ok:d.return?.status===200}}catch{return{ok:false,devCode:code}}
@@ -1610,14 +1610,14 @@ function TransferScreen({user,onUpdate,transactions,onBack,onDone}:{user:UserDat
     if(!otp){setStep2Err("رمز پویا را وارد کنید.");return}
     if(!cvv2){setStep2Err("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setStep2Err("تاریخ انقضا را وارد کنید.");return}
+    if(!srcCard){setStep2Err("کارت مبدا در آن پرداز ثبت نشده است.");return}
     setStep2Err("");setProcessing(true);
-    setTimeout(()=>{
-      const now=new Date();
-      const tx:TxRecord={id:genId(),userId:user.phone,type:"transfer",fromAsset:"toman",toAsset:"toman",amount:amountNum,fee:0,status:"done",createdAt:now.toISOString(),toAddress:destClean,fromCard:srcCard?.id,note:`${srcCard?.bank||""} · ${note||"کارت به کارت"} · ${srcCard?.number?.slice(-4)||""}`,source:"app"};
-      onUpdate(user,tx);
-      playChime();setProcessing(false);
-      setReceipt({title:"انتقال با موفقیت انجام شد",amount:`${fa(amountNum)} ریال`,destination:toFaDigits(fmtCard(destClean)),status:"success",detail:`کارت مبدا: ${toFaDigits(fmtCard(srcCard?.number??""))}`});
-    },3000);
+    anpardazTransfer(destClean,amountNum,"IRR",note).then((result)=>{
+      const tr=result?.transfer;const status=String(tr?.status??"processing");
+      const tx:TxRecord={id:String(tr?.id??tr?.operation_id??genId()),userId:user.phone,type:"transfer",fromAsset:"toman",toAsset:"toman",amount:amountNum,fee:0,status:status==="completed"?"done":status==="failed"?"failed":"pending",createdAt:String(tr?.created_at??new Date().toISOString()),toAddress:destClean,fromCard:srcCard.id,note:`${srcCard.bank||""} · ${note||"انتقال وجه"} · ${srcCard.number.slice(-4)}`,source:"app"};
+      onUpdate(user,tx);playChime();setProcessing(false);
+      setReceipt({title:status==="completed"?"انتقال با موفقیت انجام شد":status==="failed"?"انتقال ناموفق بود":"انتقال در حال پردازش است",amount:`${fa(amountNum)} ریال`,destination:toFaDigits(fmtCard(destClean)),status:status==="completed"?"success":status==="failed"?"failed":"pending",detail:`کد عملیات: ${String(tr?.operation_id??result?.operationId??"—")}`});
+    }).catch((e)=>{setProcessing(false);setStep2Err(e instanceof Error?e.message:"انتقال وجه انجام نشد")});
   };
 
   // ── Destination Card Picker — true full-page replacement ──
@@ -6636,12 +6636,11 @@ function CardBalanceScreen({user,onBack,onDone}:{user:UserData;onBack:()=>void;o
     const month=Number(toLatinDigits(expM));
     if(month<1||month>12){setErr("ماه انقضا باید بین ۱ تا ۱۲ باشد.");return}
     setErr("");setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);
-      const fake=Math.floor(Math.random()*50000000+5000000);
-      resetSensitive();
-      setReceipt({title:"موجودی کارت",amount:`${fa(fake)} ریال`,destination:toFaDigits(fmtCard(activeRaw)),status:"success",detail:"موجودی لحظه‌ای با موفقیت دریافت شد."});
-    },2500);
+    anpardazCardBalance(activeRaw,toLatinDigits(otp),toLatinDigits(cvv2),toLatinDigits(expM),toLatinDigits(expY)).then((result)=>{
+      const check=result?.check;const status=String(check?.status??"processing");const balance=check?.balance;
+      resetSensitive();setProcessing(false);
+      setReceipt({title:status==="completed"?"موجودی کارت":status==="failed"?"استعلام موجودی ناموفق بود":"استعلام موجودی در حال پردازش است",amount:balance!=null?`${fa(balance)} ریال`:undefined,destination:toFaDigits(fmtCard(activeRaw)),status:status==="completed"?"success":status==="failed"?"failed":"pending",detail:balance!=null?"موجودی واقعی از سرویس بانکی دریافت شد.":"وضعیت استعلام از سرویس بانکی ثبت شد."});
+    }).catch((e)=>{setProcessing(false);setErr(e instanceof Error?e.message:"استعلام موجودی انجام نشد")});
   };
 
   return <>
@@ -11015,7 +11014,7 @@ export default function App() {
   if(appState==="onboard-profile")return <OnboardProfile onDone={d=>{setObProfile(d);setAppState("onboard-pin")}} onBack={()=>setAppState("onboard-photo")} initialData={obProfile}/>;
   if(appState==="unlock-pin"&&user)return <PinUnlock user={user} onVerified={()=>setAppState("ready")}/>;
   if(appState==="onboard-pin")return <OnboardPin onDone={pin=>{setPendingPin(pin);setAppState("verify-anim")}} onSkip={()=>{setPendingPin("");setAppState("verify-anim")}} onBack={()=>setAppState("onboard-profile")}/>;
-  if(appState==="verify-anim")return <VerificationAnimation onSuccess={()=>{const u:UserData={uid:_genUid(),...obProfile,phone:pendingPhone,photo:obPhoto,pin:pendingPin,tomanBalance:10000000,usdtBalance:100,cryptoBalances:{},cards:[{id:"card-melat-1",number:"6104338761369582",bank:"بانک ملت",holderName:obProfile.name+" "+obProfile.family}],registeredAt:new Date().toISOString()};DB.saveUser(u);DB.setCurrentPhone(u.phone);setUser(u);setTransactions([]);setHomeServices(SERVICES.slice(0,8).map(s=>s.id));setHomeSkeleton(false);setAppState("ready");setPendingTour(true);}} onFail={()=>{setPendingPin("");setAppState("onboard-pin")}}/>;
+  if(appState==="verify-anim")return <VerificationAnimation onSuccess={()=>{const u:UserData={uid:_genUid(),...obProfile,phone:pendingPhone,photo:obPhoto,pin:pendingPin,tomanBalance:10000000,usdtBalance:100,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(u);DB.setCurrentPhone(u.phone);setUser(u);setTransactions([]);setHomeServices(SERVICES.slice(0,8).map(s=>s.id));setHomeSkeleton(false);setAppState("ready");setPendingTour(true);}} onFail={()=>{setPendingPin("");setAppState("onboard-pin")}}/>;
   if(!user)return null;
 
   const initials=(user.name?.[0]??"")+(user.family?.[0]??"")||"؟";
