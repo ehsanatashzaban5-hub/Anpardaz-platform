@@ -1,4 +1,4 @@
-import {createCipheriv,createDecipheriv,createHash,randomBytes,randomUUID} from 'node:crypto';
+import {createCipheriv,createDecipheriv,randomBytes,randomUUID} from 'node:crypto';
 
 type Json=Record<string,unknown>;
 
@@ -36,8 +36,8 @@ export function decryptSecret(value:string){
   return Buffer.concat([decipher.update(Buffer.from(dataB64,'base64')),decipher.final()]).toString('utf8');
 }
 
-export function oauthState(customerId:number,redirectUri:string){
-  return createHash('sha256').update(`${customerId}:${redirectUri}:${randomUUID()}`).digest('hex');
+export function oauthState(){
+  return randomBytes(32).toString('base64url');
 }
 
 export class FinnotechClient {
