@@ -8,7 +8,7 @@ type R=FastifyRequest&{auth:AuthClaims};
 const asR=(r:FastifyRequest)=>r as R;
 const idem=(v:unknown)=>typeof v==='string'&&v.length>=8&&v.length<=200;
 const nonEmpty=(v:unknown)=>typeof v==='string'&&v.trim().length>0&&v.length<=200;
-const path=(name:string,fallback:string)=>process.env[name]?.trim()||fallback;
+const path=(name:string)=>{const value=process.env[name]?.trim();if(!value)throw new Error(`${name}_not_configured`);return value;};
 
 function configured(reply:FastifyReply){
   try{return new FinnotechClient();}catch{return void reply.code(503).send({error:'finnotech_not_configured'});}
@@ -54,12 +54,12 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
     const refresh=String((tokenResponse.access_token as any)?.refreshToken??tokenResponse.refresh_token??'');
     if(!access)return reply.code(502).send({error:'finnotech_access_token_missing'});
     const expires=Number((tokenResponse.access_token as any)?.expiresIn??tokenResponse.expires_in??3600);
-    await pool.query(
-      `INSERT INTO finnotech_connections(customer_id,client_id,access_token_enc,refresh_token_enc,access_token_expires_at,scope,status)
-       VALUES($1,$2,$3,$4,NOW()+($5::text || ' seconds')::interval,$6,'active')
-       ON CONFLICT(customer_id,provider,bank_code) DO UPDATE SET client_id=EXCLUDED.client_id,access_token_enc=EXCLUDED.access_token_enc,refresh_token_enc=EXCLUDED.refresh_token_enc,access_token_expires_at=EXCLUDED.access_token_expires_at,scope=EXCLUDED.scope,status='active',last_error=NULL,updated_at=NOW()`,
-      [s.customer_id,process.env.FINNOTECH_CLIENT_ID,encryptSecret(access),refresh?encryptSecret(refresh):null,expires,typeof tokenResponse.scope==='string'?tokenResponse.scope:null]
-    );
+    const existing=(await pool.query('SELECT id FROM finnotech_connections WHERE customer_id=$1 AND provider=\'FINNOTECH\' AND bank_code IS NULL ORDER BY id DESC LIMIT 1',[s.customer_id])).rows[0];
+    if(existing){
+      await pool.query(`UPDATE finnotech_connections SET client_id=$1,access_token_enc=$2,refresh_token_enc=$3,access_token_expires_at=NOW()+($4::text || ' seconds')::interval,scope=$5,status='active',last_error=NULL,updated_at=NOW() WHERE id=$6`,[process.env.FINNOTECH_CLIENT_ID,encryptSecret(access),refresh?encryptSecret(refresh):null,expires,typeof tokenResponse.scope==='string'?tokenResponse.scope:null,existing.id]);
+    }else{
+      await pool.query(`INSERT INTO finnotech_connections(customer_id,client_id,access_token_enc,refresh_token_enc,access_token_expires_at,scope,status) VALUES($1,$2,$3,$4,NOW()+($5::text || ' seconds')::interval,$6,'active')`,[s.customer_id,process.env.FINNOTECH_CLIENT_ID,encryptSecret(access),refresh?encryptSecret(refresh):null,expires,typeof tokenResponse.scope==='string'?tokenResponse.scope:null]);
+    }
     return reply.redirect(process.env.FINNOTECH_POST_AUTH_REDIRECT??'/');
   });
 
@@ -71,7 +71,48 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
     const conn=await connection(pool,customerId);if(!conn)return reply.code(409).send({error:'finnotech_account_not_connected'});
     const client=configured(reply);if(!client)return;
     const access=await token(pool,conn,client);
-    const result=await client.call(path('FINNOTECH_BALANCE_PATH','/oak/v1/clients/{clientId}/deposits/{deposit}/balance').replace('{clientId}',encodeURIComponent(conn.client_id??process.env.FINNOTECH_CLIENT_ID??'')).replace('{deposit}',encodeURIComponent(account.provider_account_id??'')),access,undefined,'GET');
+    if(!conn.provider_account_id && !account.provider_account_id)return reply.code(409).send({error:'provider_account_not_linked'});
+    const template=path('FINNOTECH_BALANCE_PATH');
+    const endpoint=template.replace('{clientId}',encodeURIComponent(conn.client_id??process.env.FINNOTECH_CLIENT_ID??'')).replace('{deposit}',encodeURIComponent(account.provider_account_id??conn.provider_account_id??''));
+    const result=await client.call(endpoint,access,undefined,'GET');
     return {provider:'FINNOTECH',accountId,bankBalance:result};
+  });
+
+  app.get('/api/v1/banking/accounts/:accountId/statement',{preHandler:requireAuth},async(req,reply)=>{
+    const customerId=await ensureCustomer(pool,asR(req).auth); const accountId=Number((req.params as any).accountId);
+    const account=(await pool.query('SELECT * FROM accounts WHERE id=$1 AND customer_id=$2 AND status=\'active\'',[accountId,customerId])).rows[0];
+    if(!account)return reply.code(404).send({error:'account_not_found'});
+    const conn=await connection(pool,customerId); if(!conn)return reply.code(409).send({error:'finnotech_account_not_connected'});
+    if(!conn.provider_account_id && !account.provider_account_id)return reply.code(409).send({error:'provider_account_not_linked'});
+    const client=configured(reply);if(!client)return;
+    const access=await token(pool,conn,client); const endpoint=path('FINNOTECH_STATEMENT_PATH').replace('{clientId}',encodeURIComponent(conn.client_id??'')).replace('{deposit}',encodeURIComponent(account.provider_account_id??conn.provider_account_id??''));
+    return {provider:'FINNOTECH',accountId,statement:await client.call(endpoint,access,undefined,'GET')};
+  });
+
+  app.post('/api/v1/banking/transfers',{preHandler:requireAuth},async(req,reply)=>{
+    const customerId=await ensureCustomer(pool,asR(req).auth); const b=(req.body??{}) as any;
+    if(!Number.isSafeInteger(Number(b.sourceAccountId))||!idem(b.idempotencyKey)||typeof b.amount!=='string'||typeof b.destination!=='string')return reply.code(400).send({error:'invalid_transfer'});
+    const source=(await pool.query('SELECT * FROM accounts WHERE id=$1 AND customer_id=$2 AND status=\'active\'',[Number(b.sourceAccountId),customerId])).rows[0];
+    if(!source)return reply.code(404).send({error:'source_account_not_found'});
+    const existing=(await pool.query('SELECT * FROM transfer_requests WHERE customer_id=$1 AND idempotency_key=$2',[customerId,b.idempotencyKey])).rows[0];
+    if(existing)return {transfer:existing,idempotent:true};
+    const operationId=`ANPARDAZ-BANK-${randomUUID()}`;
+    const inserted=(await pool.query(`INSERT INTO transfer_requests(customer_id,source_account_id,destination_external,amount,currency,idempotency_key,operation_id,provider_code,status) VALUES($1,$2,$3,$4,$5,$6,$7,'FINNOTECH','processing') RETURNING *`,[customerId,source.id,b.destination,b.amount,source.currency,b.idempotencyKey,operationId])).rows[0];
+    const conn=await connection(pool,customerId);if(!conn)return reply.code(409).send({error:'finnotech_account_not_connected'});
+    if(!conn.provider_account_id && !source.provider_account_id)return reply.code(409).send({error:'provider_account_not_linked'});
+    const client=configured(reply);if(!client)return;
+    try{
+      const access=await token(pool,conn,client); const endpoint=path('FINNOTECH_TRANSFER_PATH').replace('{clientId}',encodeURIComponent(conn.client_id??'')).replace('{deposit}',encodeURIComponent(source.provider_account_id??conn.provider_account_id??''));
+      const result=await client.call(endpoint,access,{amount:b.amount,destination:b.destination,description:typeof b.description==='string'?b.description:null,operationId},'POST');
+      const providerOperationId=String((result.providerOperationId as any)??(result.operationId as any)??(result.trackId as any)??'');
+      const externalReference=String((result.reference as any)??(result.externalReference as any)??(result.traceId as any)??'')||null;
+      const status=String((result.status as any)??'processing').toLowerCase();
+      const finalStatus=['completed','success','successful'].includes(status)?'completed':['failed','error','rejected'].includes(status)?'failed':'processing';
+      const updated=(await pool.query(`UPDATE transfer_requests SET status=$1,provider_operation_id=$2,external_reference=$3,provider_status=$4,updated_at=NOW() WHERE id=$5 RETURNING *`,[finalStatus,providerOperationId||null,externalReference,status,inserted.id])).rows[0];
+      return {transfer:updated,providerResponse:result};
+    }catch(e){
+      await pool.query(`UPDATE transfer_requests SET status='failed',provider_status='error',updated_at=NOW() WHERE id=$1`,[inserted.id]);
+      throw e;
+    }
   });
 }
