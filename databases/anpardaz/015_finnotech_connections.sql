@@ -35,6 +35,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_finnotech_customer_provider_bank
 CREATE INDEX IF NOT EXISTS idx_finnotech_connections_customer
   ON finnotech_connections(customer_id, status);
 
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS provider_account_id TEXT;
+
 ALTER TABLE transfer_requests
   ADD COLUMN IF NOT EXISTS provider_code TEXT,
   ADD COLUMN IF NOT EXISTS provider_operation_id TEXT,
