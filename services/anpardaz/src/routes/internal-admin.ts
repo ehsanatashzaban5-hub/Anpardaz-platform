@@ -32,14 +32,23 @@ export function registerInternalAdminRoutes(app:FastifyInstance,pool:Pool){
     )).rows[0];
     if(!customer)return reply.code(404).send({error:'customer_not_found'});
     const customerId=customer.id;
-    const [accounts,cards,transfers,topups,cardBalanceChecks]=await Promise.all([
+    const [accounts,cards,transfers,topups,cardBalanceChecks,sayadOperations]=await Promise.all([
       pool.query('SELECT id,account_type,currency,status,created_at FROM accounts WHERE customer_id=$1 ORDER BY id',[customerId]),
       pool.query('SELECT id,account_id,last4,status,created_at FROM cards WHERE customer_id=$1 ORDER BY id',[customerId]),
       pool.query('SELECT id,source_account_id,destination_account_id,destination_external,amount,currency,description,status,idempotency_key,operation_id,provider_code,provider_operation_id,provider_reference,provider_status,provider_error_code,provider_error_message,created_at,updated_at FROM transfer_requests WHERE customer_id=$1 ORDER BY created_at DESC LIMIT 200',[customerId]),
       pool.query('SELECT id,account_id,amount,currency,provider,external_reference,status,idempotency_key,operation_id,provider_operation_id,provider_reference,provider_status,provider_error_code,provider_error_message,created_at,updated_at FROM topup_requests WHERE customer_id=$1 ORDER BY created_at DESC LIMIT 200',[customerId]),
       pool.query('SELECT id,operation_id,card_last4,status,balance,currency,provider_reference,created_at,completed_at FROM card_balance_checks WHERE customer_id=$1 ORDER BY created_at DESC LIMIT 200',[customerId]),
+      pool.query("SELECT operation_id,service_code,status,provider_code,provider_operation_id,external_reference,failure_code,failure_message,request_metadata,response_metadata,created_at,updated_at,completed_at FROM fintech_service_operations WHERE customer_id=$1 AND service_code LIKE 'sayad_%' ORDER BY created_at DESC LIMIT 200",[customerId]),
     ]);
-    return {customer,accounts:accounts.rows,cards:cards.rows,transfers:transfers.rows,topups:topups.rows,cardBalanceChecks:cardBalanceChecks.rows};
+    return {customer,accounts:accounts.rows,cards:cards.rows,transfers:transfers.rows,topups:topups.rows,cardBalanceChecks:cardBalanceChecks.rows,sayadOperations:sayadOperations.rows};
+  });
+
+  app.get('/internal/v1/admin/sayad/operations',async(request,reply)=>{
+    if(!authorized(request))return reply.code(401).send({error:'unauthorized'});
+    const q=request.query as {status?:string;limit?:string};
+    const limit=Math.min(Math.max(Number(q.limit??500)||500,1),2000);
+    const rows=await pool.query("SELECT s.*,c.identity_id,c.email FROM fintech_service_operations s JOIN customers c ON c.id=s.customer_id WHERE s.service_code LIKE 'sayad_%' AND ($1::text IS NULL OR s.status=$1) ORDER BY s.created_at DESC LIMIT $2",[q.status?.trim()||null,limit]);
+    return {operations:rows.rows};
   });
 
   app.get('/internal/v1/admin/banking/operations',async(request,reply)=>{
