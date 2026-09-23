@@ -126,13 +126,16 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
 
   app.post('/api/v1/transfers',{preHandler:requireAuth},async(req,reply)=>{
     const c=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;
-    if(!sid(b.sourceAccountId)||!valid(b.amount)||typeof b.currency!=='string'||!/^[A-Z]{3}$/.test(b.currency)||!idem(b.idempotencyKey))
+    if((b.sourceAccountId!==undefined&&!sid(b.sourceAccountId))||!valid(b.amount)||typeof b.currency!=='string'||!/^[A-Z]{3}$/.test(b.currency)||!idem(b.idempotencyKey))
       return reply.code(400).send({error:'invalid_transfer'});
     const hasInternal=sid(b.destinationAccountId);
     const hasExternal=typeof b.destinationExternal==='string'&&b.destinationExternal.trim().length>0;
     if(hasInternal===hasExternal)return reply.code(400).send({error:'exactly_one_destination_required'});
 
-    const own=await pool.query('SELECT id,currency FROM accounts WHERE id=$1 AND customer_id=$2 AND status=\'active\'',[b.sourceAccountId,c]);
+    let sourceAccountId=Number(b.sourceAccountId??0);
+    let own;
+    if(sourceAccountId){own=await pool.query('SELECT id,currency FROM accounts WHERE id=$1 AND customer_id=$2 AND status=\'active\'',[sourceAccountId,c]);}
+    else {own=await pool.query("SELECT id,currency FROM accounts WHERE customer_id=$1 AND account_type='bank' AND status='active' AND currency=$2 ORDER BY id LIMIT 2",[c,b.currency]);if(own.rows.length!==1)return reply.code(400).send({error:'source_account_required'});sourceAccountId=Number(own.rows[0].id);}
     if(!own.rows[0]||own.rows[0].currency!==b.currency)return reply.code(400).send({error:'invalid_source_account'});
     if(hasInternal){
       if(b.destinationAccountId===b.sourceAccountId)return reply.code(400).send({error:'source_destination_same'});
@@ -141,7 +144,7 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
     }
 
     const requestFingerprint=fp({
-      sourceAccountId:b.sourceAccountId,destinationAccountId:hasInternal?b.destinationAccountId:null,
+      sourceAccountId,destinationAccountId:hasInternal?b.destinationAccountId:null,
       destinationExternal:hasExternal?b.destinationExternal.trim():null,amount:b.amount,currency:b.currency,description:b.description?.trim()??null
     });
     const existing=(await pool.query(
@@ -160,7 +163,7 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
     const x=(await pool.query(
       `INSERT INTO transfer_requests(customer_id,source_account_id,destination_account_id,destination_external,amount,currency,description,idempotency_key,operation_id,provider_code,status)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'FINNOTECH','pending') RETURNING *`,
-      [c,b.sourceAccountId,hasInternal?b.destinationAccountId:null,hasExternal?b.destinationExternal.trim():null,b.amount,b.currency,b.description?.trim()??null,b.idempotencyKey,operationId]
+      [c,sourceAccountId,hasInternal?b.destinationAccountId:null,hasExternal?b.destinationExternal.trim():null,b.amount,b.currency,b.description?.trim()??null,b.idempotencyKey,operationId]
     )).rows[0];
     await pool.query(`INSERT INTO banking_provider_outbox(operation_id,operation_type) VALUES($1,'transfer')`,[operationId]);
 
@@ -174,7 +177,7 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
           destinationAccountId:hasInternal?String(b.destinationAccountId):undefined,
           destinationExternal:hasExternal?b.destinationExternal.trim():undefined,
           description:b.description?.trim()??undefined,
-          sourceAccountId:String(b.sourceAccountId),
+          sourceAccountId:String(sourceAccountId),
           ...(b.clientId?{clientId:String(b.clientId)}:{}),
           ...(b.nid?{nid:String(b.nid)}:{})
         }
