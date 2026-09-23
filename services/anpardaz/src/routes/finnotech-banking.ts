@@ -80,8 +80,33 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
     if(!conn.provider_account_id && !account.provider_account_id)return reply.code(409).send({error:'provider_account_not_linked'});
     const template=path('FINNOTECH_BALANCE_PATH');
     const endpoint=template.replace('{clientId}',encodeURIComponent(conn.client_id??process.env.FINNOTECH_CLIENT_ID??'')).replace('{deposit}',encodeURIComponent(account.provider_account_id??conn.provider_account_id??''));
-    const result=await client.call(endpoint,access,undefined,'GET');
-    return {provider:'FINNOTECH',accountId,bankBalance:result};
+    const card=(await pool.query('SELECT id,last4 FROM cards WHERE account_id=$1 AND customer_id=$2 ORDER BY id DESC LIMIT 1',[accountId,customerId])).rows[0];
+    const operationId=`ANPARDAZ-BAL-${randomUUID()}`;
+    await pool.query(
+      `INSERT INTO card_balance_checks(customer_id,card_id,operation_id,card_last4,provider_code,status) VALUES($1,$2,$3,$4,'FINNOTECH','processing')`,
+      [customerId,card?.id??null,operationId,card?.last4??'0000'],
+    );
+    await pool.query(`INSERT INTO banking_provider_outbox(operation_id,operation_type,status) VALUES($1,'card_balance','processing')`,[operationId]);
+    try {
+      const result=await client.call(endpoint,access,undefined,'GET');
+      await pool.query(
+        `UPDATE card_balance_checks SET status='completed',response_metadata=$1,completed_at=NOW() WHERE operation_id=$2`,
+        [JSON.stringify(result),operationId],
+      );
+      await pool.query(`UPDATE banking_provider_outbox SET status='completed',updated_at=NOW() WHERE operation_id=$1 AND operation_type='card_balance'`,[operationId]);
+      return {provider:'FINNOTECH',accountId,operationId,bankBalance:result};
+    } catch(e) {
+      const error=e as Error&{code?:string};
+      await pool.query(
+        `UPDATE card_balance_checks SET status='manual_review',error_code=$1,error_message=$2 WHERE operation_id=$3`,
+        [error.code??'PROVIDER_UNCERTAIN',error.message.slice(0,500),operationId],
+      );
+      await pool.query(
+        `UPDATE banking_provider_outbox SET status='manual_review',attempts=attempts+1,last_error=$1,updated_at=NOW() WHERE operation_id=$2 AND operation_type='card_balance'`,
+        [error.message.slice(0,500),operationId],
+      );
+      return reply.code(503).send({error:'finnotech_balance_outcome_uncertain',operationId});
+    }
   });
 
   app.get('/api/v1/banking/accounts/:accountId/statement',{preHandler:requireAuth},async(req,reply)=>{
