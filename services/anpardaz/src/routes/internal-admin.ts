@@ -7,6 +7,22 @@ function authorized(request:FastifyRequest){
 }
 
 export function registerInternalAdminRoutes(app:FastifyInstance,pool:Pool){
+  app.get('/internal/v1/admin/operations',async(request,reply)=>{
+    if(!authorized(request))return reply.code(401).send({error:'unauthorized'});
+    const q=request.query as {limit?:string;status?:string};
+    const limit=Math.min(500,Math.max(1,Number.parseInt(q.limit??'200',10)||200));
+    const status=q.status?.trim();
+    const rows=await pool.query(
+      `SELECT operation_id,service_code,status,provider_code,provider_operation_id,external_reference,
+              failure_code,failure_message,created_at,updated_at,completed_at
+       FROM fintech_service_operations
+       WHERE ($1::text IS NULL OR status=$1)
+       ORDER BY created_at DESC LIMIT $2`,
+      [status||null,limit],
+    );
+    return {operations:rows.rows};
+  });
+
   app.get('/internal/v1/admin/users/:identityId/summary',async(request,reply)=>{
     if(!authorized(request))return reply.code(401).send({error:'unauthorized'});
     const identityId=(request.params as {identityId:string}).identityId?.trim();
