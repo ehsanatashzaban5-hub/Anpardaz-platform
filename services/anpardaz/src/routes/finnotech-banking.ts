@@ -14,7 +14,7 @@ function configured(reply:FastifyReply){
   try{return new FinnotechClient();}catch{return void reply.code(503).send({error:'finnotech_not_configured'});}
 }
 
-async function connection(pool:Pool,customerId:number,bankCode?:string){
+async function connection(pool:Pool,customerId:string,bankCode?:string){
   const r=await pool.query('SELECT * FROM finnotech_connections WHERE customer_id=$1 AND status=\'active\' AND ($2::text IS NULL OR bank_code=$2) ORDER BY id DESC LIMIT 1',[customerId,bankCode??null]);
   return r.rows[0];
 }
