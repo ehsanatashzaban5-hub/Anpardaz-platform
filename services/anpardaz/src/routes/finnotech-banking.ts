@@ -127,7 +127,14 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
     const source=(await pool.query('SELECT * FROM accounts WHERE id=$1 AND customer_id=$2 AND status=\'active\'',[Number(b.sourceAccountId),customerId])).rows[0];
     if(!source)return reply.code(404).send({error:'source_account_not_found'});
     const existing=(await pool.query('SELECT * FROM transfer_requests WHERE customer_id=$1 AND idempotency_key=$2',[customerId,b.idempotencyKey])).rows[0];
-    if(existing)return {transfer:existing,idempotent:true};
+    if(existing){
+      const sameSource=Number(existing.source_account_id)===Number(b.sourceAccountId);
+      const sameDestination=String(existing.destination_external??'')===String(b.destination);
+      const sameAmount=String(existing.amount)===String(b.amount);
+      const sameCurrency=String(existing.currency)===String((await pool.query('SELECT currency FROM accounts WHERE id=$1',[Number(b.sourceAccountId)])).rows[0]?.currency??'');
+      if(!sameSource||!sameDestination||!sameAmount||!sameCurrency)return reply.code(409).send({error:'idempotency_key_reused'});
+      return {transfer:existing,idempotent:true};
+    }
     const conn=await connection(pool,customerId);if(!conn)return reply.code(409).send({error:'finnotech_account_not_connected'});
     if(!conn.provider_account_id && !source.provider_account_id)return reply.code(409).send({error:'provider_account_not_linked'});
     const client=configured(reply);if(!client)return;
