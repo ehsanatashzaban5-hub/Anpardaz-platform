@@ -104,6 +104,7 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
     if(existing)return {transfer:existing,idempotent:true};
     const conn=await connection(pool,customerId);if(!conn)return reply.code(409).send({error:'finnotech_account_not_connected'});
     if(!conn.provider_account_id && !source.provider_account_id)return reply.code(409).send({error:'provider_account_not_linked'});
+    const client=configured(reply);if(!client)return;
     const operationId=`ANPARDAZ-BANK-${randomUUID()}`;
     let inserted;
     try{
@@ -116,7 +117,6 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
       throw e;
     }
     await pool.query(`INSERT INTO banking_provider_outbox(operation_id,operation_type) VALUES($1,'transfer')`,[operationId]);
-    const client=configured(reply);if(!client)return; 
     try{
       const access=await token(pool,conn,client); const endpoint=path('FINNOTECH_TRANSFER_PATH').replace('{clientId}',encodeURIComponent(conn.client_id??'')).replace('{deposit}',encodeURIComponent(source.provider_account_id??conn.provider_account_id??''));
       const result=await client.call(endpoint,access,{amount:b.amount,destination:b.destination,description:typeof b.description==='string'?b.description:null,operationId},'POST');
