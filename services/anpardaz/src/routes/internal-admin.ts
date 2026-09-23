@@ -26,6 +26,13 @@ export function registerInternalAdminRoutes(app:FastifyInstance,pool:Pool){
     return {customer,accounts:accounts.rows,cards:cards.rows,transfers:transfers.rows,topups:topups.rows};
   });
 
+  app.get('/internal/v1/admin/banking/operations',async(request,reply)=>{
+    if(!authorized(request))return reply.code(401).send({error:'unauthorized'});
+    const q=request.query as {status?:string;limit?:string}; const limit=Math.min(Math.max(Number(q.limit??500)||500,1),2000);
+    const rows=await pool.query(`SELECT t.*,c.identity_id,c.email FROM transfer_requests t JOIN customers c ON c.id=t.customer_id WHERE ($1::text IS NULL OR t.status=$1) ORDER BY t.created_at DESC LIMIT $2`,[q.status?.trim()||null,limit]);
+    return {operations:rows.rows};
+  });
+
   app.get('/internal/v1/admin/operations/:operationId/trace',async(request,reply)=>{
     if(!authorized(request))return reply.code(401).send({error:'unauthorized'});
     const operationId=(request.params as {operationId:string}).operationId?.trim();
