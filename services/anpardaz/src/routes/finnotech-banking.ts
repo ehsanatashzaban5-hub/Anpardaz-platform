@@ -35,10 +35,10 @@ async function token(pool:Pool,row:any,client:FinnotechClient){
 export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
   app.get('/api/v1/banking/finnotech/authorize',{preHandler:requireAuth},async(req,reply)=>{
     const customerId=await ensureCustomer(pool,asR(req).auth);
-    const redirectUri=String((req.query as any)?.redirectUri??process.env.FINNOTECH_REDIRECT_URI??'').trim();
-    if(!redirectUri)return reply.code(400).send({error:'finnotech_redirect_uri_required'});
+    const redirectUri=String(process.env.FINNOTECH_REDIRECT_URI??'').trim();
+    if(!redirectUri)return reply.code(503).send({error:'finnotech_redirect_uri_not_configured'});
     const client=configured(reply);if(!client)return;
-    const state=oauthState(customerId,redirectUri);
+    const state=oauthState();
     await pool.query('INSERT INTO finnotech_oauth_states(state,customer_id,redirect_uri,expires_at) VALUES($1,$2,$3,NOW()+INTERVAL \'10 minutes\')',[state,customerId,redirectUri]);
     return {authorizationUrl:client.authorizationUrl(state,redirectUri),state};
   });
@@ -46,10 +46,16 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
   app.get('/api/v1/banking/finnotech/callback',async(req,reply)=>{
     const q=req.query as any;const state=String(q?.state??'').trim();const code=String(q?.code??'').trim();
     if(!state||!code)return reply.code(400).send({error:'finnotech_callback_invalid'});
-    const s=(await pool.query('DELETE FROM finnotech_oauth_states WHERE state=$1 AND expires_at>NOW() RETURNING *',[state])).rows[0];
+    const s=(await pool.query('SELECT * FROM finnotech_oauth_states WHERE state=$1 AND expires_at>NOW()',[state])).rows[0];
     if(!s)return reply.code(400).send({error:'finnotech_oauth_state_invalid_or_expired'});
     const client=configured(reply);if(!client)return;
-    const tokenResponse=await client.exchangeCode(code,s.redirect_uri);
+    let tokenResponse;
+    try{
+      tokenResponse=await client.exchangeCode(code,s.redirect_uri);
+    }catch{
+      return reply.code(502).send({error:'finnotech_token_exchange_failed'});
+    }
+    await pool.query('DELETE FROM finnotech_oauth_states WHERE state=$1',[state]);
     const access=String((tokenResponse.access_token as any)?.value??tokenResponse.access_token??'');
     const refresh=String((tokenResponse.access_token as any)?.refreshToken??tokenResponse.refresh_token??'');
     if(!access)return reply.code(502).send({error:'finnotech_access_token_missing'});
