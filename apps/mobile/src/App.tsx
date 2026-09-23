@@ -1533,6 +1533,57 @@ function TetherSwapScreen({user,rate,onUpdate,onBack}:{user:UserData;rate:number
     </div></div>{processing&&<AnPardazLoadingOverlay text="در حال تبدیل دارایی..."/>}{receipt&&<TransactionReceipt data={receipt} onClose={()=>setReceipt(null)}/>}</>;
 }
 
+
+function SayadScreen({onBack}:{onBack:()=>void}){
+  const [mode,setMode]=useState<"inquiry"|"register"|"accept"|"reject"|"transfer"|"cancel">("inquiry");
+  const [sayadId,setSayadId]=useState("");
+  const [amount,setAmount]=useState("");
+  const [dueDate,setDueDate]=useState("");
+  const [recipientNationalId,setRecipientNationalId]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [result,setResult]=useState<any>(null);
+  const labels={inquiry:"استعلام چک",register:"ثبت چک",accept:"تأیید دریافت",reject:"رد چک",transfer:"انتقال چک",cancel:"لغو چک"};
+  const submit=async()=>{
+    const id=toLatinDigits(sayadId).replace(/\D/g,"");
+    const nid=toLatinDigits(recipientNationalId).replace(/\D/g,"");
+    if(id.length!==16){setError("شناسه صیادی باید ۱۶ رقم باشد.");return}
+    if(mode==="register"&&(!amount||!/^[0-9]+(\\.[0-9]+)?$/.test(toLatinDigits(amount))||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dueDate))){setError("مبلغ و تاریخ سررسید را کامل و صحیح وارد کنید.");return}
+    if(mode==="transfer"&&nid.length!==10){setError("کد ملی گیرنده باید ۱۰ رقم باشد.");return}
+    setBusy(true);setError("");setResult(null);
+    try{
+      const body:any={sayadId:id,idempotencyKey:crypto.randomUUID()};
+      if(mode==="register"){body.amount=toLatinDigits(amount);body.dueDate=dueDate}
+      if(mode==="transfer")body.recipientNationalId=nid;
+      const data=await anpardazRequest("/api/v1/banking/sayad/"+mode,{method:"POST",body:JSON.stringify(body)});
+      setResult(data?.operation??data);
+    }catch(e){setError(e instanceof Error?e.message:"عملیات چک صیادی انجام نشد")}
+    finally{setBusy(false)}
+  };
+  return <div className="anp-full-page" dir="rtl">
+    <div className="anp-page-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">چک صیادی</h2><div style={{width:36}}/></div>
+    <div className="anp-page-body">
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:18}}>
+        {(Object.keys(labels) as Array<keyof typeof labels>).map(k=><button key={k} className={mode===k?"primary-button":"outline-button"} onClick={()=>{setMode(k);setError("");setResult(null)}} style={{padding:"10px 6px",fontSize:11}}>{labels[k]}</button>)}
+      </div>
+      <div className="anp-card" style={{padding:16}}>
+        <label className="field-label">شناسه صیادی ۱۶ رقمی</label>
+        <input className="anp-input" inputMode="numeric" dir="ltr" value={sayadId} onChange={e=>setSayadId(toFaDigits(e.target.value.replace(/\\D/g,"").slice(0,16)))} placeholder="•••• •••• •••• ••••"/>
+        {mode==="register"&&<><label className="field-label" style={{marginTop:14}}>مبلغ</label><input className="anp-input" inputMode="decimal" dir="ltr" value={amount} onChange={e=>setAmount(toFaDigits(e.target.value.replace(/[^0-9.]/g,"")))} placeholder="مبلغ به ریال"/><label className="field-label" style={{marginTop:14}}>تاریخ سررسید</label><input className="anp-input" dir="ltr" value={dueDate} onChange={e=>setDueDate(e.target.value.replace(/[^0-9-]/g,"").slice(0,10))} placeholder="YYYY-MM-DD"/></>}
+        {mode==="transfer"&&<><label className="field-label" style={{marginTop:14}}>کد ملی گیرنده</label><input className="anp-input" inputMode="numeric" dir="ltr" value={recipientNationalId} onChange={e=>setRecipientNationalId(toFaDigits(e.target.value.replace(/\\D/g,"").slice(0,10)))} placeholder="••••••••••"/></>}
+        {error&&<div className="field-err" style={{marginTop:10}}>{error}</div>}
+        <button className="primary-button" onClick={submit} disabled={busy} style={{width:"100%",marginTop:18}}>{busy?"در حال ارسال…":labels[mode]}</button>
+      </div>
+      {result&&<div className="anp-card" style={{padding:16,marginTop:14}}>
+        <div style={{fontWeight:900,fontSize:15}}>نتیجه عملیات</div>
+        <div style={{fontSize:12,color:"var(--text-muted)",marginTop:6}}>کد عملیات: <span dir="ltr">{String(result.operation_id??result.operationId??"—")}</span></div>
+        <pre style={{whiteSpace:"pre-wrap",overflow:"auto",fontSize:11,marginTop:12}}>{JSON.stringify(result,null,2)}</pre>
+      </div>}
+      <div style={{fontSize:11,color:"var(--text-muted)",lineHeight:1.8,marginTop:14}}>عملیات مستقیماً از سرویس آن پرداز ثبت و قابل پیگیری است؛ هیچ وضعیت یا نتیجه ساختگی در این صفحه تولید نمی‌شود.</div>
+    </div>
+  </div>;
+}
+
 function TransferScreen({user,onUpdate,transactions,onBack,onDone}:{user:UserData;rate:number;onUpdate:(u:UserData,tx:TxRecord)=>void;transactions:TxRecord[];onBack:()=>void;onDone:()=>void}){
   const [step,setStep]=useState<1|2>(1);
   // Step 1 state
@@ -6714,7 +6765,7 @@ const SERVICES=[
   {id:"property-reg",label:"ثبت اسناد",icon:"file-text",color:"#64748b",bg:"rgba(100,116,139,0.1)",action:"property-reg"},
   {id:"cashback",label:"بازگشت هزینه",icon:"refresh",color:"#00D6B0",bg:"rgba(0,214,176,0.12)",action:"cashback"},
   // Extra services — shown in AllServices, can be added to Home
-  {id:"cheque-seyadi",label:"چک صیادی",icon:"file-text",color:"#0891B2",bg:"rgba(8,145,178,0.12)",action:"soon"},
+  {id:"cheque-seyadi",label:"چک صیادی",icon:"file-text",color:"#0891B2",bg:"rgba(8,145,178,0.12)",action:"sayad"},
   {id:"social-ins",label:"تامین اجتماعی",icon:"shield",color:"#059669",bg:"rgba(5,150,105,0.12)",action:"soon"},
   {id:"payam-noor",label:"پیام نور",icon:"phone",color:"#D97706",bg:"rgba(217,119,6,0.12)",action:"soon"},
   {id:"credit-score",label:"رتبه اعتباری",icon:"trending-up",color:"#7C3AED",bg:"rgba(124,58,237,0.12)",action:"soon"},
@@ -10904,6 +10955,7 @@ export default function App() {
     else if(action==="property-reg"){setTab("home");setSubPage("property-reg")}
     else if(action==="charity"){setTab("home");setSubPage("charity")}
     else if(action==="card-balance"){setTab("home");setSubPage("card-balance")}
+    else if(action==="sayad"){setTab("home");setSubPage("sayad")}
     else if(action==="cashback"){setTab("home");setSubPage("cashback")}
     else if(action==="financial-center"){setTab("home");setSubPage("financial-center")}
     else if(action==="an-market"){setSubPage("an-market");}
@@ -10919,6 +10971,7 @@ export default function App() {
 
   const goBack=()=>setSubPage(null);
   const goHome=()=>{setSubPage(null);setTab("home")};
+  if(subPage==="sayad")return <div key="sayad" className={`app${lt} app-slide`} dir="rtl"><SayadScreen onBack={goBack}/><SNAV/></div>;
   if(subPage==="transfer")return <div key="transfer" className={`app${lt} app-slide`} dir="rtl"><TransferScreen user={user} rate={rate} onUpdate={updateWithTx} transactions={transactions} onBack={goBack} onDone={goHome}/><SNAV/></div>;
   if(subPage==="tether-swap")return <div key="tether-swap" className={`app${lt} app-slide`} dir="rtl"><TetherSwapScreen user={user} rate={rate} onUpdate={updateWithTx} onBack={goBack}/><SNAV/></div>;
   if(subPage==="exchange")return <div key="exchange" className={`app${lt} app-slide`} dir="rtl"><ExchangeScreen user={user} onBack={goBack} onUpdate={updateWithTx} onUpdateUser={updateUser} transactions={transactions} onForexBot={()=>setSubPage("forex-bot")}/></div>;
