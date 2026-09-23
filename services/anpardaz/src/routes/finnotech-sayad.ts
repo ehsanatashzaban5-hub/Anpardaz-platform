@@ -93,22 +93,29 @@ export function registerFinnotechSayadRoutes(app: FastifyInstance, pool: Pool) {
     const idempotencyKey = String(body.idempotencyKey ?? req.headers['idempotency-key'] ?? '');
     if (!idem(idempotencyKey)) return reply.code(400).send({ error: 'invalid_idempotency_key' });
 
+    const requestBody = providerPayload(body);
+    const requestFingerprint = fingerprint(requestBody);
     const existing = (await pool.query(
       'SELECT * FROM fintech_service_operations WHERE customer_id=$1 AND idempotency_key=$2 LIMIT 1',
       [customerId, idempotencyKey],
     )).rows[0];
-    if (existing) return { operation: existing, idempotent: true };
+    if (existing) {
+      const existingFingerprint = String(existing.request_fingerprint ?? '');
+      if (existingFingerprint && existingFingerprint !== requestFingerprint) {
+        return reply.code(409).send({ error: 'idempotency_key_reused' });
+      }
+      return { operation: existing, idempotent: true };
+    }
 
     const operationId = `ANPARDAZ-SAYAD-${randomUUID()}`;
     const metadata = safeMetadata(body);
-    const requestBody = providerPayload(body);
 
     try {
       await pool.query(
         `INSERT INTO fintech_service_operations
          (customer_id,service_code,operation_id,idempotency_key,request_fingerprint,status,provider_code,request_metadata)
          VALUES($1,$2,$3,$4,$5,'processing','FINNOTECH',$6)`,
-        [customerId, serviceCode, operationId, idempotencyKey, fingerprint(requestBody), JSON.stringify(metadata)],
+        [customerId, serviceCode, operationId, idempotencyKey, requestFingerprint, JSON.stringify(metadata)],
       );
     } catch (e: any) {
       if (e?.code === '23505') {
@@ -156,10 +163,21 @@ export function registerFinnotechSayadRoutes(app: FastifyInstance, pool: Pool) {
       return { operation: updated, result };
     } catch (e) {
       const error = e as Error & { code?: string; data?: unknown };
+      const uncertain = serviceCode !== 'sayad_inquiry';
       await pool.query(
-        `UPDATE fintech_service_operations SET status='failed',failure_code=$1,failure_message=$2,response_metadata=$3,updated_at=NOW(),completed_at=NOW() WHERE operation_id=$4`,
-        [error.code ?? 'FINNOTECH_ERROR', error.message.slice(0, 500), JSON.stringify(error.data ?? {}), operationId],
+        `UPDATE fintech_service_operations
+         SET status=$1,failure_code=$2,failure_message=$3,response_metadata=$4,updated_at=NOW(),completed_at=$5
+         WHERE operation_id=$6`,
+        [
+          uncertain ? 'manual_review' : 'failed',
+          error.code ?? 'FINNOTECH_ERROR',
+          error.message.slice(0, 500),
+          JSON.stringify(error.data ?? {}),
+          uncertain ? null : new Date(),
+          operationId,
+        ],
       );
+      if (uncertain) return reply.code(503).send({ error: 'finnotech_sayad_outcome_uncertain', operationId });
       throw e;
     }
   };
