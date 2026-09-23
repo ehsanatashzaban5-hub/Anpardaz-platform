@@ -81,10 +81,11 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
     const template=path('FINNOTECH_BALANCE_PATH');
     const endpoint=template.replace('{clientId}',encodeURIComponent(conn.client_id??process.env.FINNOTECH_CLIENT_ID??'')).replace('{deposit}',encodeURIComponent(account.provider_account_id??conn.provider_account_id??''));
     const card=(await pool.query('SELECT id,last4 FROM cards WHERE account_id=$1 AND customer_id=$2 ORDER BY id DESC LIMIT 1',[accountId,customerId])).rows[0];
+    if(!card?.last4)return reply.code(409).send({error:'card_not_linked_to_account'});
     const operationId=`ANPARDAZ-BAL-${randomUUID()}`;
     await pool.query(
       `INSERT INTO card_balance_checks(customer_id,card_id,operation_id,card_last4,provider_code,status) VALUES($1,$2,$3,$4,'FINNOTECH','processing')`,
-      [customerId,card?.id??null,operationId,card?.last4??'0000'],
+      [customerId,card.id,operationId,card.last4],
     );
     await pool.query(`INSERT INTO banking_provider_outbox(operation_id,operation_type,status) VALUES($1,'card_balance','processing')`,[operationId]);
     try {
