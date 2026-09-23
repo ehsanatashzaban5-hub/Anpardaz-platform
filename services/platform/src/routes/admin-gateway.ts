@@ -187,6 +187,16 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   // Browser-facing admin proxy for An Pardaz banking/service operations.
   const anpardazBase = () => (process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001').replace(/\/$/, '');
 
+  app.get('/api/v1/admin/ecosystem/anpardaz/sayad-operations', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
+    const result = await fetchJson(anpardazBase() + '/internal/v1/admin/sayad/operations' + q, {
+      headers: { authorization: process.env.ANPARDAZ_INTERNAL_TOKEN ? 'Bearer ' + process.env.ANPARDAZ_INTERNAL_TOKEN : '' },
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
   app.get('/api/v1/admin/ecosystem/anpardaz/banking-operations', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
