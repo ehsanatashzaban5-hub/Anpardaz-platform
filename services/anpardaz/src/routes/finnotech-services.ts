@@ -2,7 +2,7 @@ import type {FastifyInstance,FastifyReply,FastifyRequest} from 'fastify';
 import type {Pool} from 'pg';
 import {randomUUID,createHash} from 'node:crypto';
 import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
-import {decryptSecret,FinnotechClient} from '../finnotech.js';
+import {decryptSecret,encryptSecret,FinnotechClient} from '../finnotech.js';
 import {isFinnotechServiceCode} from '../finnotech-services.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
@@ -38,7 +38,7 @@ async function token(pool:Pool,row:any,client:FinnotechClient){
     if(!access)throw new Error('finnotech_refresh_missing_access_token');
     const expires=Number((refreshed.access_token as any)?.expiresIn??refreshed.expires_in??3600);
     await pool.query("UPDATE finnotech_connections SET access_token_enc=$1,refresh_token_enc=$2,access_token_expires_at=NOW()+($3::text || ' seconds')::interval,updated_at=NOW(),last_error=NULL WHERE id=$4",
-      [require('../finnotech.js').encryptSecret(access),refresh?require('../finnotech.js').encryptSecret(refresh):row.refresh_token_enc,expires,row.id]);
+      [encryptSecret(access),refresh?encryptSecret(refresh):row.refresh_token_enc,expires,row.id]);
     return access;
   }
   return decryptSecret(row.access_token_enc);
