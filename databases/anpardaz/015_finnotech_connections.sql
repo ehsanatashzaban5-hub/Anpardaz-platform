@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS finnotech_connections (
   provider TEXT NOT NULL DEFAULT 'FINNOTECH',
   client_id TEXT,
   bank_code TEXT,
+  provider_account_id TEXT,
   provider_subject TEXT,
   access_token_enc TEXT,
   refresh_token_enc TEXT,
@@ -28,6 +29,8 @@ CREATE TABLE IF NOT EXISTS finnotech_connections (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(customer_id, provider, bank_code)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_finnotech_customer_provider_bank
+  ON finnotech_connections(customer_id,provider,COALESCE(bank_code,''));
 
 CREATE INDEX IF NOT EXISTS idx_finnotech_connections_customer
   ON finnotech_connections(customer_id, status);
