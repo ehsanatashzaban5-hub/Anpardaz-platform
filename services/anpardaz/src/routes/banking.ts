@@ -164,6 +164,7 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
     )).rows[0];
     await pool.query(`INSERT INTO banking_provider_outbox(operation_id,operation_type) VALUES($1,'transfer')`,[operationId]);
 
+    await pool.query("UPDATE transfer_requests SET status='processing',updated_at=NOW() WHERE operation_id=$1 AND status='pending'",[operationId]);
     const provider=providerOr503(reply);if(!provider)return;
     try{
       const result=await provider.execute({
