@@ -103,12 +103,29 @@ export function registerFinnotechSayadRoutes(app: FastifyInstance, pool: Pool) {
     const metadata = safeMetadata(body);
     const requestBody = providerPayload(body);
 
-    await pool.query(
-      `INSERT INTO fintech_service_operations
-       (customer_id,service_code,operation_id,idempotency_key,request_fingerprint,status,provider_code,request_metadata)
-       VALUES($1,$2,$3,$4,$5,'processing','FINNOTECH',$6)`,
-      [customerId, serviceCode, operationId, idempotencyKey, fingerprint(requestBody), JSON.stringify(metadata)],
-    );
+    try {
+      await pool.query(
+        `INSERT INTO fintech_service_operations
+         (customer_id,service_code,operation_id,idempotency_key,request_fingerprint,status,provider_code,request_metadata)
+         VALUES($1,$2,$3,$4,$5,'processing','FINNOTECH',$6)`,
+        [customerId, serviceCode, operationId, idempotencyKey, fingerprint(requestBody), JSON.stringify(metadata)],
+      );
+    } catch (e: any) {
+      if (e?.code === '23505') {
+        const concurrent = (await pool.query(
+          'SELECT * FROM fintech_service_operations WHERE customer_id=$1 AND idempotency_key=$2 LIMIT 1',
+          [customerId, idempotencyKey],
+        )).rows[0];
+        if (concurrent) {
+          const existingFingerprint = String(concurrent.request_fingerprint ?? '');
+          if (existingFingerprint && existingFingerprint !== fingerprint(requestBody)) {
+            return reply.code(409).send({ error: 'idempotency_key_reused' });
+          }
+          return { operation: concurrent, idempotent: true };
+        }
+      }
+      throw e;
+    }
 
     try {
       const conn = await connection(pool, customerId);
