@@ -102,11 +102,21 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
     if(!source)return reply.code(404).send({error:'source_account_not_found'});
     const existing=(await pool.query('SELECT * FROM transfer_requests WHERE customer_id=$1 AND idempotency_key=$2',[customerId,b.idempotencyKey])).rows[0];
     if(existing)return {transfer:existing,idempotent:true};
-    const operationId=`ANPARDAZ-BANK-${randomUUID()}`;
-    const inserted=(await pool.query(`INSERT INTO transfer_requests(customer_id,source_account_id,destination_external,amount,currency,idempotency_key,operation_id,provider_code,status) VALUES($1,$2,$3,$4,$5,$6,$7,'FINNOTECH','processing') RETURNING *`,[customerId,source.id,b.destination,b.amount,source.currency,b.idempotencyKey,operationId])).rows[0];
     const conn=await connection(pool,customerId);if(!conn)return reply.code(409).send({error:'finnotech_account_not_connected'});
     if(!conn.provider_account_id && !source.provider_account_id)return reply.code(409).send({error:'provider_account_not_linked'});
-    const client=configured(reply);if(!client)return;
+    const operationId=`ANPARDAZ-BANK-${randomUUID()}`;
+    let inserted;
+    try{
+      inserted=(await pool.query(`INSERT INTO transfer_requests(customer_id,source_account_id,destination_external,amount,currency,idempotency_key,operation_id,provider_code,status) VALUES($1,$2,$3,$4,$5,$6,$7,'FINNOTECH','processing') RETURNING *`,[customerId,source.id,b.destination,b.amount,source.currency,b.idempotencyKey,operationId])).rows[0];
+    }catch(e:any){
+      if(e?.code==='23505'){
+        const concurrent=(await pool.query('SELECT * FROM transfer_requests WHERE customer_id=$1 AND idempotency_key=$2',[customerId,b.idempotencyKey])).rows[0];
+        if(concurrent)return {transfer:concurrent,idempotent:true};
+      }
+      throw e;
+    }
+    await pool.query(`INSERT INTO banking_provider_outbox(operation_id,operation_type) VALUES($1,'transfer')`,[operationId]);
+    const client=configured(reply);if(!client)return; 
     try{
       const access=await token(pool,conn,client); const endpoint=path('FINNOTECH_TRANSFER_PATH').replace('{clientId}',encodeURIComponent(conn.client_id??'')).replace('{deposit}',encodeURIComponent(source.provider_account_id??conn.provider_account_id??''));
       const result=await client.call(endpoint,access,{amount:b.amount,destination:b.destination,description:typeof b.description==='string'?b.description:null,operationId},'POST');
@@ -117,8 +127,10 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
       const updated=(await pool.query(`UPDATE transfer_requests SET status=$1,provider_operation_id=$2,external_reference=$3,provider_status=$4,updated_at=NOW() WHERE id=$5 RETURNING *`,[finalStatus,providerOperationId||null,externalReference,status,inserted.id])).rows[0];
       return {transfer:updated,providerResponse:result};
     }catch(e){
-      await pool.query(`UPDATE transfer_requests SET status='failed',provider_status='error',updated_at=NOW() WHERE id=$1`,[inserted.id]);
-      throw e;
+      const error=e as Error&{code?:string;data?:unknown};
+      await pool.query(`UPDATE transfer_requests SET status='processing',provider_status='manual_review',provider_error_code=$1,provider_error_message=$2,updated_at=NOW() WHERE id=$3`,[error.code??'PROVIDER_UNCERTAIN',error.message.slice(0,500),inserted.id]);
+      await pool.query(`UPDATE banking_provider_outbox SET status='manual_review',attempts=attempts+1,last_error=$1,updated_at=NOW() WHERE operation_id=$2 AND operation_type='transfer'`,[error.message.slice(0,500),operationId]);
+      return reply.code(503).send({error:'finnotech_transfer_outcome_uncertain',operationId});
     }
   });
 }
