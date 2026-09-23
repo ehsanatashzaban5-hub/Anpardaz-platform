@@ -131,7 +131,7 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
       const sameSource=Number(existing.source_account_id)===Number(b.sourceAccountId);
       const sameDestination=String(existing.destination_external??'')===String(b.destination);
       const sameAmount=String(existing.amount)===String(b.amount);
-      const sameCurrency=String(existing.currency)===String((await pool.query('SELECT currency FROM accounts WHERE id=$1',[Number(b.sourceAccountId)])).rows[0]?.currency??'');
+      const sameCurrency=String(existing.currency)===String(source.currency);
       if(!sameSource||!sameDestination||!sameAmount||!sameCurrency)return reply.code(409).send({error:'idempotency_key_reused'});
       return {transfer:existing,idempotent:true};
     }
