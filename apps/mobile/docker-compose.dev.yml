@@ -1,0 +1,22 @@
+services:
+  anpardaz-mobile-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: anpardaz-mobile:dev
+    container_name: anpardaz-mobile-dev
+    ports:
+      - "5175:8443"
+    environment:
+      NODE_ENV: development
+      PORT: 8443
+      VITE_ANSARRAF_API_URL: ${VITE_ANSARRAF_API_URL:-http://localhost:4002}
+    volumes:
+      - .:/app
+      - mobile_node_modules:/app/node_modules
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+volumes:
+  mobile_node_modules:

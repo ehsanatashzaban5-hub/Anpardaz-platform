@@ -45,8 +45,9 @@ import logoPostBank from "@/imports/postbank.png";
 import logoMellat from "@/imports/bank-mellat.png";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const FALLBACK_RATE = 87500;
+const liveRate = 0;
 const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
+const ANPARDAZ_API_BASE = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
 const KAVENEGAR_KEY = "";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -95,21 +96,7 @@ const EX_PAIRS = [
   "SUI/USDT","PEPE/USDT","WIF/USDT","JUP/USDT",
   "BTC/TOMAN","ETH/TOMAN","USDT/TOMAN","BNB/TOMAN","SOL/TOMAN","DOGE/TOMAN",
 ];
-const INITIAL_PRICES: Record<string, number> = {
-  "BTC/USDT":67543,"ETH/USDT":3852,"BNB/USDT":608,
-  "XRP/USDT":0.621,"ADA/USDT":0.483,"SOL/USDT":187,
-  "AVAX/USDT":42.3,"DOT/USDT":8.52,"MATIC/USDT":0.953,
-  "LINK/USDT":18.7,"UNI/USDT":12.5,"ATOM/USDT":11.3,
-  "LTC/USDT":93.2,"ETC/USDT":36.5,"DOGE/USDT":0.1865,
-  "TRX/USDT":0.1285,"NEAR/USDT":8.25,"ALGO/USDT":0.221,
-  "VET/USDT":0.0473,"SHIB/USDT":0.0000267,
-  "APE/USDT":1.87,"OP/USDT":2.97,"ARB/USDT":1.27,
-  "INJ/USDT":38.5,"SUI/USDT":1.97,"PEPE/USDT":0.0000187,
-  "WIF/USDT":3.48,"JUP/USDT":1.14,
-  "BTC/TOMAN":67543*87500,"ETH/TOMAN":3852*87500,
-  "USDT/TOMAN":87500,"BNB/TOMAN":608*87500,
-  "SOL/TOMAN":187*87500,"DOGE/TOMAN":0.1865*87500,
-};
+const INITIAL_PRICES: Record<string, number> = {};
 const TV_SYMBOLS: Record<string,string> = {
   "BTC/USDT":"BINANCE:BTCUSDT","ETH/USDT":"BINANCE:ETHUSDT",
   "BNB/USDT":"BINANCE:BNBUSDT","XRP/USDT":"BINANCE:XRPUSDT",
@@ -140,10 +127,6 @@ const DB = {
       const raw=JSON.parse(localStorage.getItem(`anp_user_${p}`)??"null");
       if(!raw)return null;
       const u:UserData={uid:"",cryptoBalances:{},...raw};
-      if(!u.cards?.length)u.cards=[{id:"card-melat-1",number:"6104338761369582",bank:"بانک ملت",holderName:(u.name||"")+" "+(u.family||"")}];
-      /* DEMO: ensure test balances for prototype */
-      if(!u.tomanBalance||u.tomanBalance===0)u.tomanBalance=10000000;
-      if(!u.usdtBalance||u.usdtBalance===0)u.usdtBalance=100;
       // Backfill uid for users registered before this field existed
       if(!u.uid){u.uid="uid_"+p.replace(/[^0-9]/g,"");localStorage.setItem(`anp_user_${p}`,JSON.stringify(u));}
       return u;
@@ -156,15 +139,7 @@ const DB = {
   saveTx:(p:string,t:TxRecord[])=>localStorage.setItem(`anp_tx_${p}`,JSON.stringify(t)),
   userExists:(p:string)=>!!localStorage.getItem(`anp_user_${p}`),
   // Exchange data — ALL keyed by uid so different users never share wallet/orders/positions
-  getExWallet:(uid:string):ExWallet=>{
-    const key=`anp_ex_wallet_${uid}`;
-    try{const raw=localStorage.getItem(key);if(!raw){const seed={toman:50000000,USDT:100,BTC:0.1,ETH:0,BNB:0,SOL:0,DOGE:0,ADA:0};localStorage.setItem(key,JSON.stringify(seed));return seed;}return JSON.parse(raw)||{toman:50000000,USDT:100,BTC:0.1,ETH:0,BNB:0,SOL:0,DOGE:0,ADA:0}}catch{return{toman:50000000,USDT:100,BTC:0.1,ETH:0,BNB:0,SOL:0,DOGE:0,ADA:0}}
-  },
-  saveExWallet:(uid:string,w:ExWallet)=>localStorage.setItem(`anp_ex_wallet_${uid}`,JSON.stringify(w)),
-  getExOrders:(uid:string):ExOrder[]=>{try{return JSON.parse(localStorage.getItem(`anp_ex_orders_${uid}`)??"[]")}catch{return[]}},
-  saveExOrders:(uid:string,o:ExOrder[])=>localStorage.setItem(`anp_ex_orders_${uid}`,JSON.stringify(o)),
-  getExPositions:(uid:string):ExPosition[]=>{try{return JSON.parse(localStorage.getItem(`anp_ex_positions_${uid}`)??"[]")}catch{return[]}},
-  saveExPositions:(uid:string,p:ExPosition[])=>localStorage.setItem(`anp_ex_positions_${uid}`,JSON.stringify(p)),
+  getExWallet:(_uid:string):ExWallet=>({toman:0,USDT:0,BTC:0,ETH:0,BNB:0,SOL:0,DOGE:0,ADA:0}),saveExWallet:(_uid:string,_w:ExWallet)=>undefined,getExOrders:(_uid:string):ExOrder[]=>[],saveExOrders:(_uid:string,_o:ExOrder[])=>undefined,getExPositions:(_uid:string):ExPosition[]=>[],saveExPositions:(_uid:string,_p:ExPosition[])=>undefined,
 };
 
 // ─── Operator Detection ───────────────────────────────────────────────────────
@@ -211,6 +186,13 @@ function BankLogo({bankName,size=42,rounded=12}:{bankName:string;size?:number;ro
 async function fetchUSDTRate():Promise<number|null>{
   try{const r=await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes?symbol=USDT/TOMAN`,{signal:AbortSignal.timeout(7000),cache:"no-store"});if(!r.ok)throw new Error("market_data_unavailable");const d=await r.json();const live=d?.quotes?.filter((q:any)=>!q.stale&&Number(q.lastPrice)>0);const preferred=live?.find((q:any)=>q.provider==="wallex")??live?.[0];return preferred?Number(preferred.lastPrice):null;}catch{return null}
 }
+type SarrafAssetRecord={id:number|string;symbol:string;status?:string};async function anpardazRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const res=await fetch(`${ANPARDAZ_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(data?.error??"anpardaz_request_failed"));return data;}
+async function anpardazCardBalance(cardNumber:string,otp:string,cvv2:string,expiryMonth:string,expiryYear:string){return anpardazRequest("/api/v1/cards/balance",{method:"POST",body:JSON.stringify({cardNumber,otp,cvv2,expiryMonth,expiryYear,idempotencyKey:crypto.randomUUID()})});}
+async function anpardazTransfer(destinationExternal:string,amount:number,currency:string,description:string){return anpardazRequest("/api/v1/transfers",{method:"POST",body:JSON.stringify({destinationExternal,amount:String(amount),currency,description,idempotencyKey:crypto.randomUUID()})});}
+async function sarrafRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANSARRAF_API_BASE)throw new Error("ansarraf_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const r=await fetch(`${ANSARRAF_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data?.error??"ansarraf_request_failed"));return data;}async function sarrafAssets():Promise<SarrafAssetRecord[]>{const d=await sarrafRequest("/api/v1/assets");return Array.isArray(d?.assets)?d.assets:[]}function sarrafAssetId(assets:SarrafAssetRecord[],symbol:string){const aliases=symbol==="TMN"?["TMN","TOMAN","IRT","IRR"]:symbol==="USDT"?["USDT"]:[symbol];const a=assets.find(x=>aliases.includes(String(x.symbol).toUpperCase())&&x.status!=="disabled");if(!a)throw new Error(`asset_not_available:${symbol}`);return a.id;}async function sarrafPlaceOrder(baseSymbol:string,quoteSymbol:string,side:"buy"|"sell",orderType:"market"|"limit",quantity:number,price?:number,quoteAmount?:number){const assets=await sarrafAssets();const body:any={baseAssetId:sarrafAssetId(assets,baseSymbol),quoteAssetId:sarrafAssetId(assets,quoteSymbol),side,orderType,quantity:String(quantity),idempotencyKey:crypto.randomUUID()};if(orderType==="limit")body.price=String(price);else if(side==="buy")body.quoteAmount=String(quoteAmount??0);return sarrafRequest("/api/v1/orders",{method:"POST",body:JSON.stringify(body)});}async function sarrafWalletMap():Promise<Record<string,number>>{const d=await sarrafRequest("/api/v1/wallets");const out:Record<string,number>={};for(const w of d?.wallets??[])out[String(w.symbol).toUpperCase()]=Number(w.available_balance??0);return out;}async function sarrafOrders():Promise<any[]>{const d=await sarrafRequest("/api/v1/orders");return Array.isArray(d?.orders)?d.orders:[]}
+async function sarrafOrderBook(symbol:string){const d=await sarrafRequest(`/api/v1/orderbook?symbol=${encodeURIComponent(symbol)}&limit=20`);return {bids:Array.isArray(d?.bids)?d.bids:[],asks:Array.isArray(d?.asks)?d.asks:[]};}
+async function sarrafSubmitKyc(payload:{fullName:string;nationalId:string;mobile:string;birthDate:string}){return sarrafRequest("/api/v1/kyc",{method:"POST",body:JSON.stringify(payload)});}
+
 async function sendOTP(phone:string,code:string):Promise<{ok:boolean;devCode?:string}>{
   if(!KAVENEGAR_KEY)return{ok:false,devCode:code};
   try{const url=`https://api.kavenegar.com/v1/${KAVENEGAR_KEY}/sms/send.json`;const body=new URLSearchParams({receptor:phone,message:`کد تأیید آن‌پرداز: ${code}`,sender:"10004346"});const r=await fetch(url,{method:"POST",body});const d=await r.json();return{ok:d.return?.status===200}}catch{return{ok:false,devCode:code}}
@@ -1607,14 +1589,14 @@ function TransferScreen({user,onUpdate,transactions,onBack,onDone}:{user:UserDat
     if(!otp){setStep2Err("رمز پویا را وارد کنید.");return}
     if(!cvv2){setStep2Err("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setStep2Err("تاریخ انقضا را وارد کنید.");return}
+    if(!srcCard){setStep2Err("کارت مبدا در آن پرداز ثبت نشده است.");return}
     setStep2Err("");setProcessing(true);
-    setTimeout(()=>{
-      const now=new Date();
-      const tx:TxRecord={id:genId(),userId:user.phone,type:"transfer",fromAsset:"toman",toAsset:"toman",amount:amountNum,fee:0,status:"done",createdAt:now.toISOString(),toAddress:destClean,fromCard:srcCard?.id,note:`${srcCard?.bank||""} · ${note||"کارت به کارت"} · ${srcCard?.number?.slice(-4)||""}`,source:"app"};
-      onUpdate(user,tx);
-      playChime();setProcessing(false);
-      setReceipt({title:"انتقال با موفقیت انجام شد",amount:`${fa(amountNum)} ریال`,destination:toFaDigits(fmtCard(destClean)),status:"success",detail:`کارت مبدا: ${toFaDigits(fmtCard(srcCard?.number??""))}`});
-    },3000);
+    anpardazTransfer(destClean,amountNum,"IRR",note).then((result)=>{
+      const tr=result?.transfer;const status=String(tr?.status??"processing");
+      const tx:TxRecord={id:String(tr?.id??tr?.operation_id??genId()),userId:user.phone,type:"transfer",fromAsset:"toman",toAsset:"toman",amount:amountNum,fee:0,status:status==="completed"?"done":status==="failed"?"failed":"pending",createdAt:String(tr?.created_at??new Date().toISOString()),toAddress:destClean,fromCard:srcCard.id,note:`${srcCard.bank||""} · ${note||"انتقال وجه"} · ${srcCard.number.slice(-4)}`,source:"app"};
+      onUpdate(user,tx);playChime();setProcessing(false);
+      setReceipt({title:status==="completed"?"انتقال با موفقیت انجام شد":status==="failed"?"انتقال ناموفق بود":"انتقال در حال پردازش است",amount:`${fa(amountNum)} ریال`,destination:toFaDigits(fmtCard(destClean)),status:status==="completed"?"success":status==="failed"?"failed":"pending",detail:`کد عملیات: ${String(tr?.operation_id??result?.operationId??"—")}`});
+    }).catch((e)=>{setProcessing(false);setStep2Err(e instanceof Error?e.message:"انتقال وجه انجام نشد")});
   };
 
   // ── Destination Card Picker — true full-page replacement ──
@@ -3859,19 +3841,8 @@ function ServiceScreen({name,onBack}:{name:string;onBack:()=>void}){
 
 type SupportTicket={id:string;subject:string;category:string;priority:string;body:string;status:string;createdAt:string;updatedAt:string;unread?:boolean;messages:{from:"user"|"agent";text:string;at:string;attachment?:string}[]};
 function ExchangePopup({children,onClose,onBack}:{children:ReactNode;onClose:()=>void;onBack?:()=>void}){useBackHandler(onBack||onClose);return <div className="exchange-page-view" dir="rtl"><div className="exchange-page-view-header"><button className="exchange-page-back-btn" onClick={onBack||onClose} aria-label="بازگشت"><Icon name="arrow" size={18}/></button><img src={anPardazLogo} alt="لوگوی صرافی آن‌پرداز" style={{height:30,objectFit:"contain",borderRadius:9}}/><button className="exchange-popup-close" onClick={onClose}>بستن</button></div><div className="exchange-page-view-body">{children}</div></div>}
-function ExchangeSupportCenter({onBack}:{onBack:()=>void}){
-  const storage="anp_exchange_tickets"; const [tickets,setTickets]=useState<SupportTicket[]>(()=>{try{return JSON.parse(localStorage.getItem(storage)??"[]")}catch{return[]}}),[tab,setTab]=useState<"new"|"list">("new"),[subject,setSubject]=useState(""),[category,setCategory]=useState(""),[priority,setPriority]=useState("متوسط"),[body,setBody]=useState(""),[attachment,setAttachment]=useState(""),[query,setQuery]=useState(""),[filter,setFilter]=useState("همه تیکت‌ها"),[selected,setSelected]=useState<SupportTicket|null>(null),[reply,setReply]=useState(""),[popup,setPopup]=useState<ReactNode|null>(null),[closeConfirm,setCloseConfirm]=useState(false),[selector,setSelector]=useState<"category"|"priority"|"filter"|null>(null);
-  const save=(next:SupportTicket[])=>{setTickets(next);localStorage.setItem(storage,JSON.stringify(next))}; const fmt=(d:string)=>new Date(d).toLocaleString("fa-IR",{dateStyle:"short",timeStyle:"short"});
-  const submit=()=>{if(!subject.trim()||!category||!body.trim()){setPopup(<><h3>اطلاعات ناقص است</h3><p>موضوع، دسته‌بندی و متن پیام را کامل کنید.</p></>);return}const now=new Date().toISOString(),t:SupportTicket={id:toFaDigits(String(Date.now()).slice(-7)),subject,category,priority,body,status:"باز",createdAt:now,updatedAt:now,messages:[{from:"user",text:body,at:now,attachment}]};save([t,...tickets]);setSubject("");setCategory("");setBody("");setAttachment("");setTab("list");setPopup(<><h3>تیکت شما با موفقیت ثبت شد.</h3><p>شماره تیکت: <b>{t.id}</b></p></>)};
-  const visible=tickets.filter(t=>(filter==="همه تیکت‌ها"||t.status===filter)&&(`${t.id} ${t.subject}`).includes(query)); const statusClass=(v:string)=>v==="باز"?"open":v==="پاسخ داده شده"?"answered":v==="بسته شده"?"closed":"review";
-  if(selected)return <div className="exchange-support-page"><div className="exchange-support-head"><button className="back-btn" onClick={()=>setSelected(null)}><Icon name="arrow" size={18}/></button><div><b>{selected.subject}</b><small>تیکت #{selected.id} · {selected.status}</small></div></div><div className="ticket-thread">{selected.messages.map((m,i)=><div className={`ticket-message ${m.from}`} key={i}><span>{m.text}</span>{m.attachment&&<em>📎 {m.attachment}</em>}<small>{fmt(m.at)} {m.from==="user"?"· مشاهده شد":""}</small></div>)}</div>{selected.status!=="بسته شده"&&<div className="ticket-reply"><input value={reply} onChange={e=>setReply(e.target.value)} placeholder="پاسخ خود را بنویسید"/><input type="file" onChange={e=>setAttachment(e.target.files?.[0]?.name??"")}/><button className="primary-button" onClick={()=>{if(!reply.trim())return;const now=new Date().toISOString();const updated={...selected,updatedAt:now,status:"در حال بررسی",messages:[...selected.messages,{from:"user" as const,text:reply,at:now,attachment}]};save(tickets.map(t=>t.id===updated.id?updated:t));setSelected(updated);setReply("");setAttachment("")}}>ارسال پاسخ</button></div>}<button className="outline-button ticket-close" onClick={()=>setCloseConfirm(true)} disabled={selected.status==="بسته شده"}>بستن تیکت</button>{closeConfirm&&<div style={{marginTop:12,padding:"16px",borderRadius:14,background:"rgba(232,92,92,0.07)",border:"1px solid rgba(232,92,92,0.25)",direction:"rtl"}}><div style={{fontSize:14,fontWeight:700,color:"#e85c5c",marginBottom:12}}>آیا از بستن این تیکت اطمینان دارید؟</div><div className="confirm-actions"><button className="outline-button" onClick={()=>setCloseConfirm(false)}>انصراف</button><button className="primary-button" style={{background:"#e8512a"}} onClick={()=>{const updated={...selected,status:"بسته شده",updatedAt:new Date().toISOString()};save(tickets.map(t=>t.id===updated.id?updated:t));setSelected(updated);setCloseConfirm(false)}}>بستن تیکت</button></div></div>}</div>;
-  const CATS=["مشکل واریز تومان","مشکل برداشت تومان","مشکل واریز تتر","مشکل برداشت تتر","مشکل احراز هویت","مشکل حساب کاربری","گزارش خطا","پیشنهادات و انتقادات","سایر موارد"];
-  const PRIS=["کم","متوسط","زیاد","فوری"];
-  if(selector==="category"||selector==="priority"){const items=selector==="category"?CATS:PRIS;const current=selector==="category"?category:priority;return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={()=>setSelector(null)}><Icon name="arrow" size={18}/></button><h2 className="expage-title">{selector==="category"?"انتخاب دسته‌بندی":"انتخاب اولویت"}</h2><div style={{width:36}}/></div><div className="expage-body"><div style={{display:"grid",gap:8,paddingBottom:24}}>{items.map(x=>{const chosen=current===x;return <button key={x} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 18px",borderRadius:14,background:chosen?"rgba(0,214,176,0.10)":"var(--card-bg)",border:chosen?"1.5px solid rgba(0,214,176,0.4)":"1px solid var(--border-color)",color:chosen?"var(--accent)":"var(--text-primary)",fontFamily:"Vazirmatn",fontSize:14,fontWeight:chosen?700:500,cursor:"pointer",textAlign:"right",boxSizing:"border-box",width:"100%",transition:"all .15s"}} onClick={()=>{if(selector==="category")setCategory(x);else setPriority(x);setSelector(null);}}><span>{x}</span>{chosen&&<Icon name="check" size={18}/>}</button>;})}</div></div></div>;}
-  return <div className="exchange-support-page" style={{position:"relative",overflow:"hidden"}}><div className="exchange-support-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><b>مرکز پشتیبانی صرافی</b><small>پاسخ‌گویی امن و سریع</small></div><img src={anPardazLogo} alt="آن‌پرداز"/></div><div className="support-tabs"><button className={tab==="new"?"active":""} onClick={()=>setTab("new")}>ارسال تیکت جدید</button><button className={tab==="list"?"active":""} onClick={()=>setTab("list")}>تیکت‌های من {tickets.some(t=>t.unread)&&<i>پیام جدید</i>}</button></div>{tab==="new"?<div className="ticket-form"><label>موضوع تیکت<input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع را وارد کنید"/></label><label>دسته‌بندی<button type="button" className="ticket-select-btn" onClick={()=>setSelector("category")}>{category||"انتخاب دسته‌بندی"}<span>⌄</span></button></label><label>اولویت<button type="button" className="ticket-select-btn" onClick={()=>setSelector("priority")}>{priority}<span>⌄</span></button></label><label>متن پیام<textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="شرح کامل درخواست خود را وارد کنید"/></label><label>پیوست فایل (اختیاری)<input type="file" onChange={e=>setAttachment(e.target.files?.[0]?.name??"")}/></label>{attachment&&<small>فایل انتخاب‌شده: {attachment}</small>}<button className="primary-button" onClick={submit}>ثبت تیکت</button></div>:<><div className="ticket-filter"><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="جستجو با شماره یا موضوع"/><button className="ticket-filter-button" onClick={()=>setSelector("filter")}>{filter} ⌄</button></div>{visible.length?visible.map(t=><button className="ticket-card" key={t.id} onClick={()=>setSelected(t)}><div><b>{t.subject}</b><small>#{t.id} · {fmt(t.updatedAt)}</small></div><span className={`ticket-status ${statusClass(t.status)}`}>{t.status}</span><em>{t.priority}</em></button>):<div className="exchange-empty"><b>هنوز هیچ تیکتی ثبت نکرده‌اید.</b><button className="primary-button" onClick={()=>setTab("new")}>ارسال تیکت جدید</button></div>}</>}{selector==="filter"&&<div style={{marginTop:8,padding:"16px",borderRadius:14,background:"var(--card-bg)",border:"1px solid var(--border-color)",direction:"rtl"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><h3 style={{margin:0,fontSize:15,fontWeight:800,color:"var(--text-primary)"}}>فیلتر تیکت‌ها</h3><button onClick={()=>setSelector(null)} style={{width:28,height:28,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border-color)",color:"var(--text-muted)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>✕</button></div><div className="exchange-choice-list">{["همه تیکت‌ها","باز","در حال بررسی","پاسخ داده شده","بسته شده"].map(x=>{const chosen=filter===x;return <button className={chosen?"selected":""} key={x} onClick={()=>{setFilter(x);setSelector(null)}}><span>{x}</span>{chosen&&<Icon name="check" size={17}/>}</button>})}</div></div>}{popup&&<div style={{marginTop:12,padding:"18px 20px",borderRadius:14,background:"var(--card-bg)",border:"1px solid var(--border-color)",direction:"rtl"}}><div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}><button onClick={()=>setPopup(null)} style={{width:28,height:28,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border-color)",color:"var(--text-muted)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>✕</button></div>{popup}</div>}</div>;
-}
-function ExchangeChat({onBack}:{onBack:()=>void}){const key="anp_exchange_chat";const [messages,setMessages]=useState<{from:"user"|"agent";text:string;at:string;attachment?:string}[]>(()=>{try{return JSON.parse(localStorage.getItem(key)??"[]")}catch{return[]}}),[started,setStarted]=useState(false),[text,setText]=useState(""),[typing,setTyping]=useState(false),[file,setFile]=useState("");const send=(value=text)=>{if(!value.trim()&&!file)return;const mine={from:"user" as const,text:value||"فایل پیوست شد",at:new Date().toISOString(),attachment:file};const next=[...messages,mine];setMessages(next);localStorage.setItem(key,JSON.stringify(next));setText("");setFile("");setTyping(true);setTimeout(()=>setTyping(false),1500)};return <div className="exchange-chat"><div className="exchange-support-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><b>چت با پشتیبان</b><small className="online">● پشتیبان آنلاین · محمد رضایی</small></div><img src={anPardazLogo} alt="آن‌پرداز"/></div>{!started?<div className="chat-welcome"><h2>سلام 👋</h2><p>به پشتیبانی صرافی خوش آمدید. لطفاً پیام خود را ارسال کنید تا کارشناسان در سریع‌ترین زمان ممکن پاسخ دهند.</p><button className="primary-button" onClick={()=>setStarted(true)}>شروع گفتگو</button></div>:<><div className="chat-shortcuts">{["مشکل واریز تومان","مشکل برداشت تومان","مشکل واریز تتر","مشکل برداشت تتر","مشکل احراز هویت","پیگیری تراکنش","سایر موارد"].map(x=><button key={x} onClick={()=>setText(x)}>{x}</button>)}</div><div className="chat-messages">{messages.map((m,i)=><div key={i} className={`chat-bubble ${m.from}`}><span>{m.text}</span>{m.attachment&&<em>📎 {m.attachment}</em>}<small>{new Date(m.at).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"})} · {m.from==="user"?"مشاهده شد":""}</small></div>)}{typing&&<div className="typing">پشتیبان در حال تایپ است... <i/><i/><i/></div>}</div><div className="chat-safety">لطفاً اطلاعات محرمانه مانند رمز کارت، CVV2 یا رمز پویا را برای پشتیبانی ارسال نکنید.</div><div className="chat-compose"><input value={text} onChange={e=>setText(e.target.value)} placeholder="پیام خود را بنویسید"/><label>📎<input type="file" hidden onChange={e=>setFile(e.target.files?.[0]?.name??"")}/></label><button onClick={()=>send()}>ارسال</button></div><button className="chat-receipt" onClick={()=>setText("رسید تراکنش را برای بررسی ارسال می‌کنم.")}>ارسال رسید تراکنش</button></>}</div>}
-
+function ExchangeSupportCenter({onBack}:{onBack:()=>void}){return <div className="exchange-support-page"><div className="exchange-support-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><b>مرکز پشتیبانی آن صراف</b><small>سرویس پشتیبانی</small></div><img src={anPardazLogo} alt="آن‌پرداز"/></div><div className="exchange-empty" style={{padding:24,textAlign:"center",lineHeight:1.9}}>سامانه تیکت هنوز به Backend پشتیبانی متصل نشده است؛ برای جلوگیری از ثبت یا نمایش اطلاعات ساختگی، این بخش فعلاً غیرفعال است.</div></div>}
+function ExchangeChat({onBack}:{onBack:()=>void}){return <div className="exchange-chat"><div className="exchange-support-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><b>چت با پشتیبانی</b><small>سرویس پشتیبانی</small></div><img src={anPardazLogo} alt="آن‌پرداز"/></div><div className="exchange-empty" style={{padding:24,textAlign:"center",lineHeight:1.9}}>چت زنده تا اتصال Backend پشتیبانی فعال نشده است؛ هیچ پاسخ، وضعیت آنلاین یا پیام ساختگی نمایش داده نمی‌شود.</div></div>}
 function ExchangeFeesPage({onBack}:{onBack:()=>void}){const [kind,setKind]=useState("خرید سریع"),[amount,setAmount]=useState(""),[calculated,setCalculated]=useState<number|null>(null),[faq,setFaq]=useState<string|null>(null),[showKindPicker,setShowKindPicker]=useState(false);const feeRate=kind==="انتقال داخلی"||kind.includes("واریز")?0:((kind==="خرید سریع"||kind==="فروش سریع") ? .004 : .003);const calc=()=>setCalculated((Number(toLatinDigits(amount))||0)*feeRate);const FeeTable=({headers,rows}:{headers:string[];rows:string[][]})=><div className="fee-table"><div className="fee-tr">{headers.map(h=><b key={h}>{h}</b>)}</div>{rows.map((r,i)=><div className="fee-tr" key={i}>{r.map((c,j)=><span key={j}>{c}</span>)}</div>)}</div>;return <div className="exchange-content-page"><header className="exchange-content-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><h1>کارمزدها</h1><p>تمامی کارمزدهای صرافی به صورت شفاف در این صفحه نمایش داده می‌شوند.</p></div><img src={anPardazLogo} alt="صرافی آن‌پرداز"/></header><section className="exchange-section"><h2>کارمزد معاملات</h2><FeeTable headers={["حجم معاملات ۳۰ روز اخیر","کارمزد سفارش‌گذار (Maker)","کارمزد سفارش‌بردار (Taker)"]} rows={[["کمتر از ۵۰ میلیون تومان","0.35%","0.40%"],["۵۰ تا ۲۰۰ میلیون تومان","0.30%","0.35%"],["۲۰۰ تا ۵۰۰ میلیون تومان","0.25%","0.30%"],["۵۰۰ میلیون تا ۱ میلیارد تومان","0.20%","0.25%"],["بیشتر از ۱ میلیارد تومان","0.15%","0.20%"]]}/><p className="fee-note">با افزایش حجم معاملات، کارمزد شما کاهش خواهد یافت.</p></section><section className="fee-split"><div className="exchange-section"><h2>کارمزد واریز تومان</h2><p>واریز تومان به صرافی کاملاً رایگان است.</p><span className="free-badge">بدون کارمزد</span></div><div className="exchange-section"><h2>کارمزد واریز تتر</h2><p>واریز تتر به صرافی بدون کارمزد است.</p><span className="free-badge">بدون کارمزد</span></div><div className="exchange-section"><h2>انتقال داخلی</h2><p>انتقال دارایی بین کاربران آن‌پرداز کاملاً رایگان است.</p><span className="free-badge">رایگان</span></div></section><section className="exchange-section"><h2>کارمزد برداشت تومان</h2><p>کارمزد برداشت تومان مطابق قوانین شبکه بانکی محاسبه می‌شود.</p><FeeTable headers={["مبلغ برداشت","کارمزد"]} rows={[["تا ۶۰۰ هزار تومان","1٪"],["۶۰۰ هزار تا ۲۰ میلیون تومان","۶,۰۰۰ تومان"],["بیش از ۲۰ میلیون تومان","۰.۰۱٪ مبلغ تراکنش (حداکثر ۷,۵۰۰ تومان)"]]}/></section><section className="exchange-section"><h2>کارمزد برداشت تتر</h2><FeeTable headers={["شبکه","کارمزد برداشت","حداقل برداشت"]} rows={[["TRC20","1 USDT","10 USDT"],["BEP20","0.5 USDT","10 USDT"],["ERC20","5 USDT","20 USDT"]]}/></section><section className="exchange-section"><h2>کارمزد خرید و فروش سریع</h2><div className="fee-line"><span>کارمزد خرید سریع: <b>0.40٪</b></span><span>کارمزد فروش سریع: <b>0.40٪</b></span></div><p className="fee-note">کارمزد قبل از ثبت نهایی سفارش به شما نمایش داده خواهد شد.</p></section><section className="exchange-section calculator"><h2>محاسبه‌گر کارمزد</h2><div style={{marginBottom:4}}><div className="fee-kind-label" style={{fontSize:12,marginBottom:6,fontWeight:600}}>نوع معامله</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{["خرید سریع","فروش سریع","معامله اسپات","واریز تومان","انتقال داخلی"].map(x=><button key={x} className={kind===x?"fee-kind-btn selected":"fee-kind-btn"} onClick={()=>{setKind(x);setCalculated(null);}} style={{padding:"8px 14px",borderRadius:10,cursor:"pointer",fontFamily:"Vazirmatn",fontSize:13,fontWeight:kind===x?700:500}}>{x}</button>)}</div></div><input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} inputMode="decimal" placeholder="مبلغ معامله (تومان)"/><button className="primary-button" onClick={calc}>محاسبه کارمزد</button>{calculated!==null&&<div className="calculator-result"><div><span>کارمزد</span><b>{fa(Math.round(calculated))} تومان</b></div><div><span>مبلغ نهایی پرداختی</span><b>{fa(Math.round((Number(amount)||0)+calculated))} تومان</b></div><div><span>مبلغ نهایی دریافتی</span><b>{fa(Math.round((Number(amount)||0)-calculated))} تومان</b></div></div>}</section><section className="exchange-section faq"><h2>سؤالات متداول</h2>{[["کارمزد معاملات چگونه محاسبه می‌شود؟","کارمزد هر سفارش براساس حجم معاملات ۳۰ روز اخیر و نوع سفارش محاسبه می‌شود."],["چگونه می‌توانم کارمزد کمتری پرداخت کنم؟","با افزایش حجم معاملات ماهانه، سطح کارمزدی شما به‌صورت خودکار کاهش می‌یابد."],["کارمزد برداشت تتر چقدر است؟","کارمزد برداشت به شبکه انتخابی بستگی دارد و پیش از تأیید نمایش داده می‌شود."],["آیا واریز تومان کارمزد دارد؟","خیر، واریز تومان به صرافی آن‌پرداز رایگان است."]].map(([q,a])=><button key={q} onClick={()=>setFaq(faq===q?null:q)}><b>{q}</b><span>{faq===q?"−":"+"}</span>{faq===q&&<p>{a}</p>}</button>)}</section></div>}
 function ExchangeVideoGuide({onBack}:{onBack:()=>void}){const videoRef=useRef<HTMLVideoElement>(null),[playing,setPlaying]=useState(false),[position,setPosition]=useState(()=>Number(localStorage.getItem("anp_exchange_video_position")||0)),[duration,setDuration]=useState(0),[volume,setVolume]=useState(.8),[muted,setMuted]=useState(false),[error,setError]=useState(false),[askResume,setAskResume]=useState(Number(localStorage.getItem("anp_exchange_video_position")||0)>0);const source="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";const fmt=(n:number)=>`${String(Math.floor(n/60)).padStart(2,"0")}:${String(Math.floor(n%60)).padStart(2,"0")}`;const seek=(v:number)=>{const el=videoRef.current;if(el){el.currentTime=Math.max(0,Math.min(duration,v));setPosition(el.currentTime)}};const toggle=()=>{const el=videoRef.current;if(!el)return;if(el.paused){el.play().then(()=>setPlaying(true)).catch(()=>setError(true))}else{el.pause();setPlaying(false)}};return <div className="exchange-content-page video-guide"><header className="exchange-content-head"><button className="back-btn" onClick={()=>{localStorage.setItem("anp_exchange_video_position",String(position));onBack()}}><Icon name="arrow" size={18}/></button><div><h1>راهنمای استفاده</h1><p>برای آشنایی با امکانات صرافی، ویدئوی آموزشی زیر را مشاهده کنید.</p></div><img src={anPardazLogo} alt="صرافی آن‌پرداز"/></header>{askResume&&<div style={{margin:"0 0 14px",padding:"16px",borderRadius:14,background:"rgba(0,214,176,0.07)",border:"1px solid rgba(0,214,176,0.2)",direction:"rtl"}}><div style={{fontSize:14,fontWeight:700,color:"#00D6B0",marginBottom:12}}>ادامه مشاهده از آخرین موقعیت؟</div><div className="confirm-actions"><button className="outline-button" onClick={()=>{seek(0);setAskResume(false)}}>شروع از ابتدا</button><button className="primary-button" onClick={()=>setAskResume(false)}>ادامه</button></div></div>}<section className="video-shell">{source?<video ref={videoRef} src={source} onLoadedMetadata={e=>{setDuration(e.currentTarget.duration);seek(position)}} onTimeUpdate={e=>{setPosition(e.currentTarget.currentTime);localStorage.setItem("anp_exchange_video_position",String(e.currentTarget.currentTime))}} onEnded={()=>setPlaying(false)} onError={()=>setError(true)}/>:<div className="video-placeholder"><Icon name="chart" size={48}/><b>ویدئوی آموزشی به‌زودی بارگذاری می‌شود</b><small>این بخش برای جایگزینی آسان فایل ویدئو آماده است.</small></div>}{error&&<div className="video-error">خطا در بارگذاری ویدئو <button onClick={()=>{setError(false);videoRef.current?.load()}}>تلاش مجدد</button></div>}<div className="video-controls"><button onClick={()=>seek(position-10)}>−۱۰</button><button className="video-play" onClick={toggle}>{playing?"Pause":"Play"}</button><button onClick={()=>seek(position+10)}>+۱۰</button><input type="range" min="0" max={duration||1} value={position} onChange={e=>seek(Number(e.target.value))}/><span>{fmt(position)} / {fmt(duration)}</span><button onClick={()=>{setMuted(!muted);if(videoRef.current)videoRef.current.muted=!muted}}>{muted?"🔇":"🔊"}</button><input className="volume" type="range" min="0" max="1" step=".05" value={volume} onChange={e=>{const v=Number(e.target.value);setVolume(v);if(videoRef.current)videoRef.current.volume=v}}/><button onClick={()=>videoRef.current?.requestFullscreen?.()}>⛶</button></div></section><button className="outline-button video-close" onClick={onBack}>بستن</button></div>}
 
@@ -3886,27 +3857,27 @@ function ExchangeInstantTrade({initialAsset,user,coins,onBack,onUpdate}:{initial
   const [pickerSearch,setPickerSearch]=useState("");
   const [processing,setProcessing]=useState(false);
   const [result,setResult]=useState<ReceiptData|null>(null);
-  const [error,setError]=useState("");
+  const [error,setError]=useState(""); const [liveWallets,setLiveWallets]=useState<Record<string,number>>({}); useEffect(()=>{let active=true;const load=async()=>{try{const w=await sarrafWalletMap();if(active)setLiveWallets(w);}catch{}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;clearInterval(id)}},[]);
 
   const selected=coins.find(c=>c.symbol===asset)??coins[0];
   // In buy mode: amount = quote currency (TMN or USDT). In sell mode: amount = base coin.
   const rawAmt=Number(amount)||0;
-  const priceInQuote=quote==="USDT"?selected.price/FALLBACK_RATE:selected.price;
+  const liveUsdtToman=Number(coins.find(c=>c.symbol==="USDT")?.price??0); const priceInQuote=quote==="USDT"?(liveUsdtToman>0?selected.price/liveUsdtToman:0):selected.price;
   const quoteSpent=side==="buy"?rawAmt:rawAmt*priceInQuote;
   const baseUnits=side==="buy"?rawAmt/Math.max(priceInQuote,1e-12):rawAmt;
   const feeRate=.003;
   const fee=quoteSpent*feeRate;
-  const quoteBalance=quote==="TMN"?user.tomanBalance:getCryptoBal(user,"USDT");
-  const baseBalance=getCryptoBal(user,asset);
+  const quoteBalance=quote==="TMN"?Number(liveWallets.TMN??0):Number(liveWallets.USDT??0);
+  const baseBalance=Number(liveWallets[String(asset).toUpperCase()]??0);
   const instantTomanNum=side==="buy"&&quote==="TMN"?Math.floor(rawAmt):0;
   const quoteLabel=quote==="TMN"?"تومان":"USDT";
   const fmtQ=(v:number)=>quote==="TMN"?fa(Math.round(v)):faFixed(v,4);
-  const avStr=side==="buy"?(quote==="TMN"?`${fa(user.tomanBalance)} تومان`:`${faFixed(quoteBalance,4)} USDT`):`${faFixed(baseBalance,6)} ${asset}`;
+  const avStr=side==="buy"?(quote==="TMN"?`${fa(quoteBalance)} تومان`:`${faFixed(quoteBalance,4)} USDT`):`${faFixed(baseBalance,6)} ${asset}`;
 
   const switchQuote=(q:"TMN"|"USDT")=>{if(asset==="USDT"&&q==="USDT")return;setQuote(q);setAmount("");};
   const usePercent=(p:number)=>{if(side==="buy")setAmount(String(Math.floor(quoteBalance*p/100*1e4)/1e4));else setAmount(String(Math.floor(baseBalance*p/100*1e8)/1e8));};
   const place=()=>{if(!rawAmt){setError("مقدار معامله را وارد کنید.");return}if(side==="buy"&&quoteSpent+fee>quoteBalance){setError(`موجودی ${quoteLabel} کافی نیست.`);return}if(side==="sell"&&baseUnits>baseBalance){setError(`موجودی ${asset} کافی نیست.`);return}setInstView("confirm");};
-  const execute=()=>{setInstView("main");setProcessing(true);setTimeout(()=>{const buying=side==="buy";const curBase=getCryptoBal(user,asset);const curUsdt=getCryptoBal(user,"USDT");let next:UserData={...user};if(quote==="TMN"){next.tomanBalance=buying?user.tomanBalance-quoteSpent-fee:user.tomanBalance+quoteSpent-fee;}else{next=withCryptoBal(next,"USDT",buying?curUsdt-quoteSpent-fee:curUsdt+quoteSpent-fee);}next=withCryptoBal(next,asset,buying?curBase+baseUnits:curBase-baseUnits);onUpdate(next,{id:genId(),userId:user.phone,type:"swap",fromAsset:buying?(quote==="TMN"?"toman":"USDT"):asset,toAsset:buying?asset:(quote==="TMN"?"toman":"USDT"),amount:buying?quoteSpent+fee:baseUnits,convertedAmount:buying?baseUnits:quoteSpent-fee,fee,status:"done",createdAt:new Date().toISOString(),note:`خرید و فروش آنی · ${buying?"خرید":"فروش"} ${asset}/${quote} · قیمت ${fmtQ(priceInQuote)}`,source:"exchange",tradeType:"instant"});setProcessing(false);setResult({title:"تراکنش با موفقیت انجام شد",amount:`${buying?faFixed(baseUnits,4):fmtQ(quoteSpent-fee)} ${buying?asset:quoteLabel}`,destination:`${buying?"خرید":"فروش"} ${selected.fa}`,detail:`قیمت اجرا: ${fmtQ(priceInQuote)} ${quoteLabel} · کارمزد: ${fmtQ(fee)} ${quoteLabel}`});setAmount("");},3000);};
+  const execute=async()=>{setInstView("main");setProcessing(true);setError("");try{const buying=side==="buy";const result=await sarrafPlaceOrder(asset,quote==="TMN"?"TMN":"USDT",buying?"buy":"sell","market",baseUnits,undefined,quoteSpent);setProcessing(false);setResult({title:"سفارش آنی در آن صراف ثبت شد",amount:`${buying?faFixed(baseUnits,4):fmtQ(quoteSpent)} ${buying?asset:quoteLabel}`,destination:`شناسه سفارش: ${String(result?.order?.id??result?.orderId??"—")}`,detail:"موجودی و کارمزد از حساب واقعی آن صراف محاسبه می‌شوند."});setAmount("");}catch(e){setProcessing(false);setError(e instanceof Error?e.message:"ثبت سفارش انجام نشد.");}};
 
   if(instView==="coin-picker") return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={()=>{setInstView("main");setPickerSearch("")}}><Icon name="arrow" size={20}/></button><h2 className="expage-title">انتخاب ارز</h2><div style={{width:36}}/></div><div className="expage-body"><div className="exchange-asset-search" style={{marginBottom:12}}><Icon name="search" size={17}/><input autoFocus value={pickerSearch} onChange={e=>setPickerSearch(e.target.value)} placeholder="جستجوی نام یا نماد ارز" style={{fontSize:14,padding:"13px 8px"}}/></div><div className="exchange-asset-list" style={{gap:3}}>{coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(pickerSearch.toLowerCase())).map(c=>{const isSel=asset===c.symbol;return <button key={c.symbol} onClick={()=>{setAsset(c.symbol);if(c.symbol==="USDT")setQuote("TMN");setInstView("main");setAmount("");}} style={{padding:"13px 10px",borderRadius:13,background:isSel?"rgba(0,214,176,0.1)":"transparent",border:`1px solid ${isSel?"rgba(0,214,176,0.3)":"rgba(120,190,210,0.08)"}`,marginBottom:2}}><CoinLogo symbol={c.symbol} size={42}/><span style={{display:"grid",gap:4,flex:1}}><b style={{fontSize:15,fontWeight:700,color:isSel?"#00D6B0":"var(--text-primary)"}}>{c.fa}</b><small style={{fontSize:12,fontWeight:700,color:isSel?"rgba(0,214,176,0.75)":"var(--text-muted)",letterSpacing:"0.04em"}}>{c.symbol}</small></span>{isSel&&<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00D6B0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" strokeOpacity=".25"/><polyline points="8 12 11 15 16 9"/></svg>}</button>;})}</div></div></div>;
 
@@ -3972,545 +3943,342 @@ function ExchangeInstantTrade({initialAsset,user,coins,onBack,onUpdate}:{initial
   </div>;
 }
 
-function ExchangeChartPage({asset,coin,coins,user,favorites,onToggleFavorite,onBack,onInstant,onUpdate,onPairSelect}:{asset:string;coin:(typeof EX_COINS)[number];coins:typeof EX_COINS;user:UserData;favorites:string[];onToggleFavorite:(symbol:string)=>void;onBack:()=>void;onInstant:(asset:string)=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onPairSelect:(asset:string)=>void}){const tvTheme=localStorage.getItem("anp_theme")==="light"?"light":"dark";const [tab,setTab]=useState("آخرین سفارش‌ها"),[pairOpen,setPairOpen]=useState(false),[pairFilter,setPairFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[pairSearch,setPairSearch]=useState(""),[orderSide,setOrderSide]=useState<"buy"|"sell"|null>(null),[orderType,setOrderType]=useState("قیمت بازار"),[orderAmount,setOrderAmount]=useState(""),[processing,setProcessing]=useState(false),[receipt,setReceipt]=useState<ReceiptData|null>(null);const favorite=favorites.includes(asset);const toggle=()=>onToggleFavorite(asset);const closeOrder=()=>{setOrderSide(null);setOrderAmount("")};const submitOrder=()=>{const quantity=Number(toLatinDigits(orderAmount));if(!quantity||!orderSide)return;const total=quantity*coin.price;setProcessing(true);window.setTimeout(()=>{const buying=orderSide==="buy";const curCrypto=getCryptoBal(user,asset);let next=buying?{...user,tomanBalance:user.tomanBalance-total}:{...user,tomanBalance:user.tomanBalance+total};next=withCryptoBal(next,asset,buying?curCrypto+quantity:curCrypto-quantity);onUpdate(next,{id:genId(),userId:user.phone,type:"swap",fromAsset:buying?"toman":asset,toAsset:buying?asset:"toman",amount:buying?total:quantity,convertedAmount:buying?quantity:total,fee:0,status:"done",createdAt:new Date().toISOString(),note:`معامله نمودار · ${buying?"خرید":"فروش"} ${asset}/TMN · ${orderType} · قیمت ${Math.round(coin.price)}`,source:"exchange",tradeType:"spot"});setProcessing(false);closeOrder();setReceipt({title:`${orderSide==="buy"?"خرید":"فروش"} ${asset} ثبت شد`,amount:`${faFixed(quantity,4)} ${asset}`,destination:`${fa(Math.round(total))} تومان`,detail:"سفارش از صفحه نمودار با قیمت لحظه‌ای ثبت شد."})},1800)};return <div className="chart-trade-page"><header className="protrade-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><button className="pair-selector" onClick={()=>setPairOpen(true)}><PairLogos base={asset} baseSize={26} quoteSize={15}/><div className="ps-info"><div className="ps-pair-row"><b>{asset} / TMN</b><svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div><div className="ps-price-row"><span className="ps-price">{fa(Math.round(coin.price))} <small>تومان</small></span><em className={coin.change>=0?"ps-change positive":"ps-change negative"}>{coin.change>=0?"+":""}{faFixed(coin.change,2)}٪</em></div></div></button><button aria-label="افزودن به علاقه‌مندی‌ها" className={favorite?"pair-favorite active":"pair-favorite"} onClick={toggle}>{favorite?"★":"☆"}</button></header><div className="tv-chart-frame"><iframe title={`${asset} chart`} src={`https://www.tradingview.com/widgetembed/?symbol=BINANCE%3A${asset}USDT&interval=60&hidesidetoolbar=0&theme=${tvTheme}&style=1&timezone=Asia%2FTehran&withdateranges=1`} /></div><div className="chart-info-tabs">{["آخرین سفارش‌ها","لیست معامله‌ها","درباره ارز"].map(x=><button key={x} className={tab===x?"active":""} onClick={()=>setTab(x)}>{x}</button>)}</div>{tab==="درباره ارز"?<div className="chart-about"><b>{coin.fa}</b><p>نماد: {asset}</p><p>شبکه‌های پشتیبانی‌شده: {coin.networks.join("، ")}</p><p>قیمت و عمق بازار به‌صورت زنده به‌روزرسانی می‌شود.</p></div>:<div className="book-grid chart-book"><div><h3>فروشندگان</h3>{[1,2,3].map(i=><p className="ask" key={i}>{fa(Math.round(coin.price*(1+i/1000)))}<span>{faFixed(i*.14,4)}</span></p>)}<b className="mid">{fa(Math.round(coin.price))}</b><h3>خریداران</h3>{[1,2,3].map(i=><p className="bid" key={i}>{fa(Math.round(coin.price*(1-i/1000)))}<span>{faFixed(i*.12,4)}</span></p>)}</div><div><h3>{tab}</h3>{[1,2,3,4].map(i=><p key={i}>{toFaDigits(`۱۴:${30+i}`)}<span>{fa(Math.round(coin.price*(1+(i%2?1:-1)/2000)))}</span></p>)}</div></div>}<div className="sticky-trade"><button type="button" className="buy" onClick={()=>setOrderSide("buy")}>خرید</button><button type="button" className="sell" onClick={()=>setOrderSide("sell")}>فروش</button><button type="button" className="instant" onClick={()=>onInstant(asset)}>خرید و فروش آنی</button></div>{orderSide&&<div className="expage" dir="rtl" style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:50,overflowY:"auto"}}><div className="expage-header"><button className="back-btn" onClick={closeOrder}><Icon name="arrow" size={20}/></button><h2 className="expage-title">{orderSide==="buy"?"ثبت سفارش خرید":"ثبت سفارش فروش"} {asset}</h2><div style={{width:36}}/></div><div className="expage-body"><div className="chart-order-panel"><span className={orderSide==="buy"?"chart-order-symbol buy":"chart-order-symbol sell"}>{orderSide==="buy"?"خرید":"فروش"}</span><p>قیمت لحظه‌ای <b>{fa(Math.round(coin.price))} تومان</b></p><div className="chart-order-types">{["قیمت ثابت","قیمت بازار","حد ضرر"].map(type=><button type="button" key={type} className={orderType===type?"active":""} onClick={()=>setOrderType(type)}>{type}</button>)}</div>{orderType!=="قیمت بازار"&&<label>قیمت {orderType==="حد ضرر"?"فعال‌سازی":"سفارش"}<input inputMode="decimal" placeholder={fa(Math.round(coin.price))}/></label>}<label>مقدار {asset}<input autoFocus inputMode="decimal" value={toFaDigits(orderAmount)} onChange={e=>setOrderAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder="مقدار را وارد کنید"/></label><div className="chart-order-total"><span>مبلغ تقریبی</span><b>{fa(Math.round((Number(orderAmount)||0)*coin.price))} تومان</b></div><button className={orderSide==="buy"?"chart-order-submit buy":"chart-order-submit sell"} disabled={!Number(orderAmount)||processing} onClick={submitOrder}>{orderSide==="buy"?"ثبت سفارش خرید":"ثبت سفارش فروش"}</button></div></div>{processing&&<AnPardazLoadingOverlay text="در حال ثبت سفارش..."/>}</div>}{pairOpen&&<div className="expage" dir="rtl" style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:50,overflowY:"auto"}}><div className="expage-header"><button className="back-btn" onClick={()=>setPairOpen(false)}><Icon name="arrow" size={20}/></button><h2 className="expage-title">انتخاب جفت ارز</h2><div style={{width:36}}/></div><div className="expage-body"><div className="market-filters">{(["همه","تومان","دلار تتر"] as const).map(x=><button className={pairFilter===x?"active":""} onClick={()=>setPairFilter(x)} key={x}>{x}</button>)}</div><div className="exchange-asset-search"><Icon name="search" size={16}/><input value={pairSearch} onChange={e=>setPairSearch(e.target.value)} placeholder="جستجوی ارز"/></div><div className="pair-picker-grid">{coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(pairSearch.toLowerCase())).flatMap(c=>pairFilter==="همه"?[{c,p:"TMN"},{c,p:"USDT"}]:[{c,p:pairFilter==="تومان"?"TMN":"USDT"}]).filter(({c,p})=>c.symbol!==p).map(({c,p})=><button key={`${c.symbol}${p}`} className="pair-card" onClick={()=>{onPairSelect(c.symbol);setPairOpen(false)}}><PairLogos base={c.symbol} quote={p} baseSize={36} quoteSize={20}/><b>{c.symbol} / {p}</b><small>{p==="TMN"?fa(Math.round(c.price))+" تومان":faFixed(c.price/FALLBACK_RATE,3)+" دلار تتر"}</small><em className={c.change>=0?"pp-up":"pp-down"}>{c.change>=0?"+":""}{faFixed(c.change,2)}٪</em></button>)}</div></div></div>}{!orderSide&&!pairOpen&&processing&&<AnPardazLoadingOverlay text="در حال ثبت سفارش..."/>}{receipt&&<TransactionReceipt data={receipt} onClose={()=>setReceipt(null)}/>}</div>}
-function MarginChartPage({asset:initAsset,coin:initCoin,coins,user,favorites,onToggleFavorite,onBack,onUpdate,onAssetChange}:{asset:string;coin:(typeof EX_COINS)[number];coins:typeof EX_COINS;user:UserData;favorites:string[];onToggleFavorite:(s:string)=>void;onBack:()=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onAssetChange:(s:string)=>void}){
-  const tvTheme=localStorage.getItem("anp_theme")==="light"?"light":"dark";
-  const [asset,setAsset]=useState(initAsset);
-  const [coin,setCoin]=useState(initCoin);
-  useEffect(()=>{const c=coins.find(x=>x.symbol===asset);if(c)setCoin(c);},[asset,coins]);
-  const [side,setSide]=useState<"long"|"short">("long"),[orderType,setOrderType]=useState("بازار"),[amount,setAmount]=useState(""),[priceInput,setPriceInput]=useState(""),[lev,setLev]=useState(5),[sl,setSl]=useState(""),[marginSubView,setMarginSubView]=useState<null|"confirm"|"pair">(null),[processing,setProcessing]=useState(false),[pairFilter,setPairFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[pairSearch,setPairSearch]=useState(""),[receipt,setReceipt]=useState<ReceiptData|null>(null),[selectedPct,setSelectedPct]=useState<number|null>(null);
-  const favorite=favorites.includes(asset);
-  const price=orderType==="قیمت ثابت"?(Number(priceInput)||coin.price):coin.price;
-  const qty=Number(amount)||0,total=price*qty,fee=total*.003,margin=total/lev;
-  const liq=side==="long"?price*(1-1/lev*.82):price*(1+1/lev*.82);
-  const risk=lev>=20?"زیاد ⚠️":lev>=5?"متوسط":"پایین";
-  const percent=(x:number)=>{setAmount(String(user.tomanBalance*lev*x/100/price));setSelectedPct(x);};
-  const [chartPositions,setChartPositions]=useState<ExPosition[]>(()=>DB.getExPositions(user.uid));
-  const closeChartPosition=(pos:ExPosition,currentPrice:number)=>{const pnl=pos.side==="long"?(currentPrice-pos.entry)*pos.qty*pos.leverage:(pos.entry-currentPrice)*pos.qty*pos.leverage;const returnAmt=pos.margin+pnl-pos.fee;const next={...user,tomanBalance:user.tomanBalance+Math.max(0,returnAmt)};const updated=DB.getExPositions(user.uid).filter(p=>p.id!==pos.id);DB.saveExPositions(user.uid, updated);setChartPositions(updated);onUpdate(next,{id:genId(),userId:user.phone,type:"swap",fromAsset:"toman",toAsset:"toman",amount:pos.margin,convertedAmount:Math.max(0,returnAmt),fee:pos.fee,status:"done",createdAt:new Date().toISOString(),note:`بستن موقعیت · ${pos.side==="long"?"لانگ":"شورت"} ${pos.asset}/TMN · P&L: ${Math.round(pnl)} تومان`,source:"exchange",tradeType:"margin"});};
-  const exec=()=>{
-    setMarginSubView(null);setProcessing(true);
-    setTimeout(()=>{
-      const buy=side==="long";
-      const orderId=genId();
-      const newPos:ExPosition={id:orderId,asset,side:buy?"long":"short",entry:price,qty,leverage:lev,margin,fee,openedAt:new Date().toISOString()};
-      const updatedPos=[newPos,...DB.getExPositions(user.uid)];
-      DB.saveExPositions(user.uid, updatedPos);setChartPositions(updatedPos);
-      const next={...user,tomanBalance:user.tomanBalance-total-fee};
-      onUpdate(next,{id:orderId,userId:user.phone,type:"swap",fromAsset:"toman",toAsset:asset.toLowerCase() as "toman"|"usdt",amount:total+fee,convertedAmount:qty,fee,status:"done",createdAt:new Date().toISOString(),note:`معامله تعهدی · ${buy?"لانگ":"شورت"} ${asset}/TMN · اهرم ${lev}x · قیمت ${Math.round(price)}`,source:"exchange",tradeType:"margin"});
-      setAmount("");setSelectedPct(null);setProcessing(false);
-      setReceipt({title:`${buy?"لانگ":"شورت"} ${asset} ثبت شد`,amount:`${faFixed(qty,4)} ${asset} · اهرم ${lev}x`,destination:`وجه تضمین: ${fa(Math.round(margin))} تومان`,detail:`قیمت لیکوئید تخمینی: ${fa(Math.round(liq))} تومان`});
-    },2000);
-  };
-  return <div className="chart-trade-page" style={{overflowY:"auto"}}>
-    <header className="protrade-head">
-      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button>
-      <button className="pair-selector" onClick={()=>setMarginSubView("pair")}><PairLogos base={asset} baseSize={26} quoteSize={15}/><div className="ps-info"><div className="ps-pair-row"><b>{asset} / TMN</b><svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div><div className="ps-price-row"><span className="ps-price">{fa(Math.round(coin.price))} <small>تومان</small></span><em className={coin.change>=0?"ps-change positive":"ps-change negative"}>{coin.change>=0?"+":""}{faFixed(coin.change,2)}٪</em></div></div></button>
-      <button aria-label="علاقه‌مندی" className={favorite?"pair-favorite active":"pair-favorite"} onClick={()=>onToggleFavorite(asset)}>{favorite?"★":"☆"}</button>
-    </header>
-    <div className="tv-chart-frame" style={{height:260}}>
-      <iframe title={`${asset} margin chart`} src={`https://www.tradingview.com/widgetembed/?symbol=BINANCE%3A${asset}USDT&interval=60&hidesidetoolbar=0&theme=${tvTheme}&style=1&timezone=Asia%2FTehran&withdateranges=1`} style={{width:"100%",height:"100%",border:"none"}}/>
-    </div>
-    {/* Margin trade panel — full width */}
-    <div className="margin-chart-panel">
-      <div className="mcp-risk-bar">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        معامله تعهدی دارای ریسک بالاست. فقط با سرمایه‌ای معامله کنید که توان از دست دادن آن را دارید.
-      </div>
-      <div className="mcp-side-row">
-        <button className={side==="long"?"mcp-side-btn active-buy":"mcp-side-btn"} onClick={()=>setSide("long")}>خرید (لانگ)</button>
-        <button className={side==="short"?"mcp-side-btn active-sell":"mcp-side-btn"} onClick={()=>setSide("short")}>فروش (شورت)</button>
-      </div>
-      <div className="mcp-lev-row"><span>اهرم</span>{[1,2,3,5,10,20,50,100].map(x=><button key={x} className={lev===x?"active":""} onClick={()=>setLev(x)}>{x}x</button>)}</div>
-      <div className="mcp-otype-row">{["قیمت ثابت","بازار","حد ضرر"].map(x=><button key={x} className={orderType===x?"active":""} onClick={()=>setOrderType(x)}>{x}</button>)}</div>
-      <div className="mcp-inputs">
-        {orderType!=="بازار"&&<label>قیمت ورود<input value={toFaDigits(priceInput)} onChange={e=>setPriceInput(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder={fa(Math.round(coin.price))}/></label>}
-        <label>مقدار {asset}<input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder={`مقدار ${asset}`}/></label>
-        <label>حد ضرر (اختیاری)<input value={toFaDigits(sl)} onChange={e=>setSl(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder="قیمت حد ضرر"/></label>
-      </div>
-      <div className="percent-row">{[25,50,75,100].map(x=><button key={x} className={selectedPct===x?"pct-selected":""} onClick={()=>percent(x)}>{x}٪</button>)}</div>
-      <div className="mcp-stats-grid">
-        {[["وجه تضمین",`${fa(Math.round(margin))} ت`],["لیکوئید",`${fa(Math.round(liq))} ت`],["ریسک",risk],["موجودی",`${fa(user.tomanBalance)} ت`],["مجموع",`${fa(Math.round(total))} ت`],["کارمزد",`${fa(Math.round(fee))} ت`]].map(([l,v])=><div key={l} className="mcp-stat-cell"><span>{l}</span><b>{v}</b></div>)}
-      </div>
-      <button className={`terminal-submit ${side==="long"?"buy":"sell"}`} onClick={()=>qty&&setMarginSubView("confirm")}>{side==="long"?"باز کردن لانگ ↑":"باز کردن شورت ↓"}</button>
-      {/* Active positions */}
-      {chartPositions.length>0&&<div className="mcp-positions-section"><div className="mcp-pos-header"><span>موقعیت‌های فعال</span><span className="mcp-pos-count">{chartPositions.length}</span></div><div className="positions-list">{chartPositions.map(pos=>{const c=coins.find(x=>x.symbol===pos.asset)??coins[0];const pnl=pos.side==="long"?(c.price-pos.entry)*pos.qty*pos.leverage:(pos.entry-c.price)*pos.qty*pos.leverage;const roe=pos.margin>0?pnl/pos.margin*100:0;return <div key={pos.id} className="position-card"><div className="pos-top"><div className="pos-left"><span className={pos.side==="long"?"pos-side long":"pos-side short"}>{pos.side==="long"?"لانگ ↑":"شورت ↓"}</span><b className="pos-pair">{pos.asset}/TMN</b><span className="pos-lev">{pos.leverage}x</span></div><button className="close-pos-btn" onClick={()=>closeChartPosition(pos,c.price)}>بستن موقعیت</button></div><div className="pos-grid"><div><span>قیمت ورود</span><b>{fa(Math.round(pos.entry))}</b></div><div><span>قیمت فعلی</span><b>{fa(Math.round(c.price))}</b></div><div><span>مقدار</span><b>{faFixed(pos.qty,4)}</b></div><div><span>وجه تضمین</span><b>{fa(Math.round(pos.margin))}</b></div><div><span>P&L</span><b className={pnl>=0?"pnl-pos":"pnl-neg"}>{pnl>=0?"+":""}{fa(Math.round(pnl))} ت</b></div><div><span>ROE٪</span><b className={roe>=0?"pnl-pos":"pnl-neg"}>{roe>=0?"+":""}{faFixed(roe,2)}٪</b></div></div></div>})}</div></div>}
-    </div>
-    {marginSubView==="confirm"&&<div className="expage" dir="rtl" style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:50}}><div className="expage-header"><button className="back-btn" onClick={()=>setMarginSubView(null)}><Icon name="arrow" size={20}/></button><h2 className="expage-title">تأیید سفارش تعهدی</h2><div style={{width:36}}/></div><div className="expage-body"><div className="exchange-confirm-lines"><div><span>جهت</span><b>{side==="long"?"لانگ ↑":"شورت ↓"}</b></div><div><span>اهرم</span><b>{lev}x</b></div><div><span>مقدار</span><b>{faFixed(qty,5)} {asset}</b></div><div><span>وجه تضمین</span><b>{fa(Math.round(margin))} تومان</b></div><div><span>لیکوئید تخمینی</span><b>{fa(Math.round(liq))} تومان</b></div></div><div className="confirm-actions"><button className="outline-button" onClick={()=>setMarginSubView(null)}>انصراف</button><button className={`primary-button ${side==="short"?"sell-btn":""}`} onClick={exec} disabled={processing}>{side==="long"?"باز کردن لانگ":"باز کردن شورت"}</button></div></div></div>}
-    {marginSubView==="pair"&&<div className="expage" dir="rtl" style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:50}}><div className="expage-header"><button className="back-btn" onClick={()=>setMarginSubView(null)}><Icon name="arrow" size={20}/></button><h2 className="expage-title">انتخاب جفت ارز</h2><div style={{width:36}}/></div><div className="expage-body"><div className="market-filters">{(["همه","تومان","دلار تتر"] as const).map(x=><button key={x} className={pairFilter===x?"active":""} onClick={()=>setPairFilter(x)}>{x}</button>)}</div><div className="exchange-asset-search"><Icon name="search" size={16}/><input value={pairSearch} onChange={e=>setPairSearch(e.target.value)} placeholder="جستجوی ارز"/></div><div className="pair-picker-grid">{coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(pairSearch.toLowerCase())).flatMap(c=>pairFilter==="همه"?[{c,p:"TMN"},{c,p:"USDT"}]:[{c,p:pairFilter==="تومان"?"TMN":"USDT"}]).filter(({c,p})=>c.symbol!==p).map(({c,p})=><button key={`${c.symbol}${p}`} className="pair-card" onClick={()=>{setAsset(c.symbol);onAssetChange(c.symbol);setMarginSubView(null)}}><PairLogos base={c.symbol} quote={p} baseSize={36} quoteSize={20}/><b>{c.symbol} / {p}</b><small>{p==="TMN"?fa(Math.round(c.price))+" تومان":faFixed(c.price/FALLBACK_RATE,3)+" دلار تتر"}</small><em className={c.change>=0?"pp-up":"pp-down"}>{c.change>=0?"+":""}{faFixed(c.change,2)}٪</em></button>)}</div></div></div>}
-    {processing&&<AnPardazLoadingOverlay text="در حال ثبت سفارش..."/>}
-    {receipt&&<TransactionReceipt data={receipt} onClose={()=>setReceipt(null)}/>}
-  </div>;
+function ExchangeChartPage({asset,coin,coins,user,favorites,onToggleFavorite,onBack,onInstant,onUpdate,onPairSelect}:{asset:string;coin:(typeof EX_COINS)[number];coins:typeof EX_COINS;user:UserData;favorites:string[];onToggleFavorite:(symbol:string)=>void;onBack:()=>void;onInstant:(asset:string)=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onPairSelect:(asset:string)=>void}){const tvTheme=localStorage.getItem("anp_theme")==="light"?"light":"dark";return <div className="chart-trade-page"><header className="protrade-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div className="ps-info"><div className="ps-pair-row"><b>{asset} / TMN</b></div><div className="ps-price-row"><span className="ps-price">{coin.price>0?fa(Math.round(coin.price)):"—"} <small>تومان</small></span><em>{Number.isFinite(coin.change)?(coin.change>=0?"+":"")+faFixed(coin.change,2)+"٪":"—"}</em></div></div><button className={favorites.includes(asset)?"pair-favorite active":"pair-favorite"} onClick={()=>onToggleFavorite(asset)}>{favorites.includes(asset)?"★":"☆"}</button></header><div className="tv-chart-frame"><iframe title={asset+" chart"} src={"https://www.tradingview.com/widgetembed/?symbol=BINANCE%3A"+asset+"USDT&interval=60&hidesidetoolbar=0&theme="+tvTheme+"&style=1&timezone=Asia%2FTehran&withdateranges=1"}/></div><div className="chart-about"><b>{coin.fa}</b><p>قیمت بازار از Backend آن صراف دریافت می‌شود؛ نمودار خارجی فقط نمایش تصویری بازار است.</p><p>دفتر سفارش و سفارش‌گذاری این صفحه داده ساختگی ندارد و از بخش معامله واقعی استفاده می‌کند.</p></div><button className="primary-button" onClick={()=>onInstant(asset)}>خرید و فروش آنی</button></div>}
+function MarginChartPage({asset,coin,onBack,coins,user,favorites,onToggleFavorite,onUpdate,onAssetChange}:{asset:string;coin:(typeof EX_COINS)[number];onBack:()=>void;coins?:typeof EX_COINS;user?:UserData;favorites?:string[];onToggleFavorite?:(s:string)=>void;onUpdate?:(u:UserData,tx:TxRecord)=>void;onAssetChange?:(s:string)=>void}){return <div className="chart-trade-page"><header className="protrade-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div className="ps-info"><b>{asset} / TMN</b><div className="ps-price-row"><span className="ps-price">{coin.price>0?fa(Math.round(coin.price)):"—"} <small>تومان</small></span></div></div></header><div className="warning-box" style={{margin:16}}>داده و اجرای معامله تعهدی تا اتصال کامل موتور واقعی Backend غیرفعال است. هیچ دفتر سفارش، قیمت، P&amp;L یا موقعیت ساختگی نمایش داده نمی‌شود.</div></div>}
+function ExchangeProTrade({mode,initialAsset,user,coins,onBack,onUpdate,onNavigate,onAssetChange,favorites,onToggleFavorite}:{mode:"spot"|"margin";initialAsset:string;user:UserData;coins:typeof EX_COINS;onBack:()=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onNavigate:(target:"instant",asset:string)=>void;onAssetChange:(asset:string)=>void;favorites:string[];onToggleFavorite:(symbol:string)=>void}){
+  const [asset,setAsset]=useState(initialAsset),[side,setSide]=useState<"buy"|"sell">("buy"),[orderType,setOrderType]=useState<"بازار"|"قیمت ثابت">("بازار"),[amount,setAmount]=useState(""),[priceInput,setPriceInput]=useState(""),[processing,setProcessing]=useState(false),[message,setMessage]=useState(""),[bids,setBids]=useState<any[]>([]),[asks,setAsks]=useState<any[]>([]),[liveWallets,setLiveWallets]=useState<Record<string,number>>({});
+  const coin=coins.find(c=>c.symbol===asset)??coins[0]; const livePrice=Number(coin?.price??0),limitPrice=Number(priceInput)||0,executionPrice=orderType==="قیمت ثابت"?limitPrice:livePrice,qty=Number(amount)||0,total=qty*executionPrice,fee=total*0.003; const baseBalance=Number(liveWallets[String(asset).toUpperCase()]??0),tomanBalance=Number(liveWallets.TMN??0),favorite=favorites.includes(asset);
+  useEffect(()=>{let active=true;const load=async()=>{try{const [w,b]=await Promise.all([sarrafWalletMap(),sarrafOrderBook(asset+"/TMN")]);if(!active)return;setLiveWallets(w);setBids(b.bids.map((x:any)=>Array.isArray(x)?{price:Number(x[0]),amount:Number(x[1])}:{price:Number(x.price),amount:Number(x.amount)}).filter((x:any)=>x.price>0&&x.amount>0));setAsks(b.asks.map((x:any)=>Array.isArray(x)?{price:Number(x[0]),amount:Number(x[1])}:{price:Number(x.price),amount:Number(x.amount)}).filter((x:any)=>x.price>0&&x.amount>0));}catch{if(active){setBids([]);setAsks([]);setLiveWallets({});}}};void load();const id=window.setInterval(()=>void load(),3000);return()=>{active=false;clearInterval(id)}},[asset]);
+  const submit=async()=>{setMessage("");if(mode==="margin"){setMessage("معامله تعهدی هنوز API اجرایی واقعی در Backend ندارد؛ برای جلوگیری از نمایش یا ثبت داده ساختگی غیرفعال است.");return;}if(!qty||qty<=0){setMessage("مقدار سفارش را وارد کنید.");return;}if(orderType==="قیمت ثابت"&&(!limitPrice||limitPrice<=0)){setMessage("قیمت سفارش را وارد کنید.");return;}if(!livePrice||livePrice<=0){setMessage("قیمت لحظه‌ای این بازار در دسترس نیست.");return;}if(side==="buy"&&orderType==="بازار"&&total+fee>tomanBalance){setMessage("موجودی تومان کافی نیست.");return;}if(side==="sell"&&qty>baseBalance){setMessage("موجودی "+asset+" کافی نیست.");return;}setProcessing(true);try{const result=await sarrafPlaceOrder(asset,"TMN",side,orderType==="بازار"?"market":"limit",qty,orderType==="قیمت ثابت"?limitPrice:undefined,side==="buy"?total:undefined);setMessage("سفارش واقعی ثبت شد؛ شناسه: "+String(result?.order?.id??result?.orderId??"—"));setAmount("");setPriceInput("");setLiveWallets(await sarrafWalletMap());}catch(e){setMessage(e instanceof Error?e.message:"ثبت سفارش انجام نشد.");}finally{setProcessing(false);}};
+  const fmtBook=(v:number)=>v>0?fa(Math.round(v)):"—";
+  return <div className="terminal-page"><header className="terminal-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={17}/></button><button className="pair-selector" onClick={()=>onAssetChange(asset)}><PairLogos base={asset} quote="TMN" baseSize={26} quoteSize={15}/><div className="ps-info"><div className="ps-pair-row"><b>{asset} / TMN</b></div><div className="ps-price-row"><span className="ps-price">{livePrice>0?fmtBook(livePrice):"—"} <small>تومان</small></span><em>{Number.isFinite(coin.change)?(coin.change>=0?"+":"")+faFixed(coin.change,2)+"٪":"—"}</em></div></div></button><button className={favorite?"pair-favorite active":"pair-favorite"} onClick={()=>onToggleFavorite(asset)}>{favorite?"★":"☆"}</button></header><div className="terminal-status"><span>قیمت زنده: {livePrice>0?fmtBook(livePrice)+" تومان":"—"}</span><span>دفتر سفارش: {bids.length||asks.length?"زنده":"در دسترس نیست"}</span><b>{mode==="margin"?"● تعهدی غیرفعال":"● اتصال Backend"}</b></div><main className="terminal-grid"><section className="terminal-book"><h2>دفتر سفارش</h2><div className="book-head"><span>قیمت</span><span>مقدار</span><span>مجموع</span></div>{asks.length?<div className="book-sells"><b>فروشندگان</b>{asks.slice(0,7).map((l:any,i:number)=><p key={i}><span>{fmtBook(l.price)}</span><span>{faFixed(l.amount,6)}</span><span>{fmtBook(l.price*l.amount)}</span></p>)}</div>:<div className="empty-orders">داده واقعی فروشندگان در دسترس نیست.</div>}<div className="book-mid"><b>{livePrice>0?fmtBook(livePrice):"—"}</b></div>{bids.length?<div className="book-buys"><b>خریداران</b>{bids.slice(0,7).map((l:any,i:number)=><p key={i}><span>{fmtBook(l.price)}</span><span>{faFixed(l.amount,6)}</span><span>{fmtBook(l.price*l.amount)}</span></p>)}</div>:<div className="empty-orders">داده واقعی خریداران در دسترس نیست.</div>}</section><section className="terminal-form"><div className="terminal-tabs"><button className={side==="buy"?"active buy":""} onClick={()=>setSide("buy")}>خرید</button><button className={side==="sell"?"active sell":""} onClick={()=>setSide("sell")}>فروش</button></div>{mode==="margin"&&<div className="warning-box">معامله تعهدی تا ایجاد API اجرایی واقعی Backend غیرفعال است.</div>}<div className="terminal-order-types"><button className={orderType==="قیمت ثابت"?"active":""} onClick={()=>setOrderType("قیمت ثابت")}>قیمت ثابت</button><button className={orderType==="بازار"?"active":""} onClick={()=>setOrderType("بازار")}>بازار</button></div>{orderType==="قیمت ثابت"&&<label>قیمت سفارش<input value={toFaDigits(priceInput)} onChange={e=>setPriceInput(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder={livePrice>0?fa(Math.round(livePrice)):"—"}/></label>}<label>مقدار {asset}<input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder="مقدار واقعی سفارش"/></label><label>مجموع<input readOnly value={executionPrice>0&&qty>0?fa(Math.round(total)):"—"}/></label><small>موجودی واقعی: {side==="buy"?fa(tomanBalance)+" تومان":faFixed(baseBalance,8)+" "+asset}</small>{message&&<div className="warning-box">{message}</div>}<button className={"terminal-submit "+(side==="buy"?"buy":"sell")} onClick={submit} disabled={processing||mode==="margin"}>{processing?"در حال ثبت…":mode==="margin"?"تعهدی فعلاً غیرفعال":"ثبت سفارش واقعی"}</button></section></main><section className="recent-trades"><h2>آخرین معاملات</h2><div className="empty-orders">تا اتصال feed معاملات واقعی، معامله ساختگی نمایش داده نمی‌شود.</div></section></div>;
 }
-
-function ExchangeProTrade({mode,initialAsset,user,coins,onBack,onUpdate,onNavigate,onAssetChange,favorites,onToggleFavorite}:{mode:"spot"|"margin";initialAsset:string;user:UserData;coins:typeof EX_COINS;onBack:()=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onNavigate:(target:"instant",asset:string)=>void;onAssetChange:(asset:string)=>void;favorites:string[];onToggleFavorite:(symbol:string)=>void}){const [asset,setAsset]=useState(initialAsset),[side,setSide]=useState(mode==="spot"?"buy":"long"),[orderType,setOrderType]=useState("بازار"),[amount,setAmount]=useState(""),[priceInput,setPriceInput]=useState(""),[lev,setLev]=useState(1),[picker,setPicker]=useState<boolean|"chart">(false),[confirm,setConfirm]=useState(false),[processing,setProcessing]=useState(false),[bottom,setBottom]=useState(mode==="spot"?"سفارش‌های باز":"موقعیت‌های باز"),[tick,setTick]=useState(0),[pairFilter,setPairFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[pairSearch,setPairSearch]=useState(""),[orders,setOrders]=useState<ExOrder[]>(()=>DB.getExOrders(user.uid)),[positions,setPositions]=useState<ExPosition[]>(()=>DB.getExPositions(user.uid)),[selectedPct,setSelectedPct]=useState<number|null>(null);const favorite=favorites.includes(asset);const coin=coins.find(c=>c.symbol===asset)??coins[0],price=orderType==="قیمت ثابت"?(Number(priceInput)||coin.price):coin.price,qty=Number(amount)||0,total=price*qty,fee=total*.003,margin=mode==="margin"?total/lev:total,liq=side==="long"?price*(1-1/lev*.82):price*(1+1/lev*.82);useEffect(()=>{const id=window.setInterval(()=>setTick(x=>x+1),1200);return()=>clearInterval(id)},[]);const levels=Array.from({length:15},(_,i)=>{const drift=(Math.sin(tick*.8+i)*.00045);return {p:coin.price*(1+(i+1)*.0007+drift),q:.04+(i+1)*.013}});const toggleFavorite=()=>onToggleFavorite(asset);const place=()=>qty&&setConfirm(true);const exWallet=DB.getExWallet(user.uid);const exBase=(exWallet as Record<string,number>)[asset]??0;const exUsdt=exWallet.USDT??0;const exToman=exWallet.toman??0;const exec=()=>{setConfirm(false);setProcessing(true);setTimeout(()=>{const buy=side==="buy"||side==="long";const orderId=genId();const wallet=DB.getExWallet(user.uid);if(mode==="spot"){const newBase=(wallet as Record<string,number>)[asset]??0;const newUsdt=wallet.USDT??0;const updW={...wallet,[asset]:buy?newBase+qty:Math.max(0,newBase-qty),USDT:buy?Math.max(0,newUsdt-total-fee):newUsdt+total-fee};DB.saveExWallet(user.uid, updW);const newOrder:ExOrder={id:orderId,pair:`${asset}/USDT`,side:buy?"buy":"sell",price,amount:qty,total,status:"filled",createdAt:new Date().toISOString(),mode:"spot"};const updatedOrders=[newOrder,...DB.getExOrders(user.uid)];DB.saveExOrders(user.uid, updatedOrders);setOrders(updatedOrders);}else{const newToman=wallet.toman??0;const updW={...wallet,toman:buy?Math.max(0,newToman-total-fee):newToman+total-fee};DB.saveExWallet(user.uid, updW);const newPos:ExPosition={id:orderId,asset,side:buy?"long":"short",entry:price,qty,leverage:lev,margin,fee,openedAt:new Date().toISOString()};const updatedPos=[newPos,...DB.getExPositions(user.uid)];DB.saveExPositions(user.uid, updatedPos);setPositions(updatedPos);}onUpdate(user,{id:orderId,userId:user.phone,type:"swap",fromAsset:buy?"toman":asset,toAsset:buy?asset:"toman",amount:buy?total+fee:qty,convertedAmount:buy?qty:total-fee,fee,status:"done",createdAt:new Date().toISOString(),note:`${mode==="margin"?"معامله تعهدی":"معامله اسپات"} · ${buy?"خرید":"فروش"} ${asset}/USDT · ${orderType} · قیمت ${Math.round(price)}`,source:"exchange",tradeType:mode==="spot"?"spot":"margin"});setAmount("");setSelectedPct(null);setProcessing(false);},3000);};const closePosition=(pos:ExPosition,currentPrice:number)=>{const pnl=pos.side==="long"?(currentPrice-pos.entry)*pos.qty*pos.leverage:(pos.entry-currentPrice)*pos.qty*pos.leverage;const returnAmt=pos.margin+pnl-pos.fee;const wallet=DB.getExWallet(user.uid);DB.saveExWallet(user.uid, {...wallet,toman:(wallet.toman??0)+Math.max(0,returnAmt)});const updatedPos=DB.getExPositions(user.uid).filter(p=>p.id!==pos.id);DB.saveExPositions(user.uid, updatedPos);setPositions(updatedPos);onUpdate(user,{id:genId(),userId:user.phone,type:"swap",fromAsset:"toman",toAsset:"toman",amount:pos.margin,convertedAmount:Math.max(0,returnAmt),fee:pos.fee,status:"done",createdAt:new Date().toISOString(),note:`بستن موقعیت · ${pos.side==="long"?"لانگ":"شورت"} ${pos.asset}/USDT · P&L: ${Math.round(pnl)} تومان`,source:"exchange",tradeType:"margin"});};const percent=(x:number)=>{setAmount(String((mode==="margin"?exToman*lev:exUsdt)*x/100/price));setSelectedPct(x);};if(picker==="chart"&&mode==="spot")return <ExchangeChartPage asset={asset} coin={coin} coins={coins} user={user} favorites={favorites} onToggleFavorite={onToggleFavorite} onBack={()=>setPicker(false)} onInstant={(next)=>onNavigate("instant",next)} onUpdate={onUpdate} onPairSelect={(next)=>{setAsset(next);onAssetChange(next)}}/>;if(picker==="chart"&&mode==="margin")return <MarginChartPage asset={asset} coin={coin} coins={coins} user={user} favorites={favorites} onToggleFavorite={onToggleFavorite} onBack={()=>setPicker(false)} onUpdate={onUpdate} onAssetChange={(next)=>{setAsset(next);onAssetChange(next)}}/>;return <div className="terminal-page"><header className="terminal-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={17}/></button><button className="pair-selector" onClick={()=>setPicker(true)}><PairLogos base={asset} baseSize={26} quoteSize={15}/><div className="ps-info"><div className="ps-pair-row"><b>{asset} / TMN</b><svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div><div className="ps-price-row"><span className="ps-price">{fa(Math.round(coin.price))} <small>تومان</small></span><em className={coin.change>=0?"ps-change positive":"ps-change negative"}>{coin.change>=0?"+":""}{faFixed(coin.change,2)}٪</em></div></div></button><button className="candle-icon" onClick={()=>setPicker("chart" as any)}><i/><i/><i/></button><button aria-label="افزودن به علاقه‌مندی‌ها" className={favorite?"pair-favorite active":"pair-favorite"} onClick={toggleFavorite}>{favorite?"★":"☆"}</button></header><div className="terminal-status"><span>بیشینه {fa(Math.round(coin.price*1.03))}</span><span>کمینه {fa(Math.round(coin.price*.97))}</span><b>● در حال معامله</b></div><main className="terminal-grid"><section className="terminal-book"><h2>خریداران / فروشندگان</h2><div className="book-head"><span>قیمت</span><span>مقدار</span><span>مجموع</span></div><div className="book-sells"><b>فروشندگان</b>{levels.slice(0,7).reverse().map((l,i)=><p key={i}><span>{fa(Math.round(l.p))}</span><span>{faFixed(l.q,4)}</span><span>{fa(Math.round(l.p*l.q))}</span></p>)}</div><div className="book-mid"><b>{fa(Math.round(coin.price))}</b><small>{coin.change>=0?"+":""}{faFixed(coin.change,2)}٪</small></div><div className="book-buys"><b>خریداران</b>{levels.slice(7).map((l,i)=>{const p=l.p*(.996-i*.0007);return <p key={i}><span>{fa(Math.round(p))}</span><span>{faFixed(l.q,4)}</span><span>{fa(Math.round(p*l.q))}</span></p>})}</div></section><section className="terminal-form"><div className="terminal-tabs"><button className={side==="buy"||side==="long"?"active buy":""} onClick={()=>setSide(mode==="spot"?"buy":"long")}>{mode==="spot"?"خرید":"خرید (لانگ)"}</button><button className={side==="sell"||side==="short"?"active sell":""} onClick={()=>setSide(mode==="spot"?"sell":"short")}>{mode==="spot"?"فروش":"فروش (شورت)"}</button></div>{mode==="margin"&&<div className="terminal-leverage"><span>اهرم</span>{[1,2,3,5,10,20,50,100].map(x=><button className={lev===x?"active":""} onClick={()=>setLev(x)} key={x}>{x}x</button>)}</div>}<div className="terminal-order-types">{["قیمت ثابت","بازار","حد ضرر"].map(x=><button className={orderType===x?"active":""} onClick={()=>setOrderType(x)} key={x}>{x}</button>)}</div>{orderType!=="بازار"&&<label>قیمت {mode==="margin"?"ورود":""}<input value={toFaDigits(priceInput)} onChange={e=>setPriceInput(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder={fa(Math.round(coin.price))}/></label>}<label>مقدار<input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder={`${asset} مقدار`}/></label>{mode==="margin"&&<><div className="terminal-risk"><span>وجه تضمین<b>{fa(Math.round(margin))}</b></span><span>لیکویید<b>{fa(Math.round(liq))}</b></span><span>ریسک<b>{lev>=20?"زیاد":"متوسط"}</b></span></div></>}<label>مجموع<input readOnly value={fa(Math.round(total))} placeholder="مجموع"/></label><small>در دسترس: {mode==="spot"?(side==="buy"||side==="long"?`${faFixed(exUsdt,2)} USDT`:`${faFixed(exBase,4)} ${asset}`):`${fa(Math.round(exToman))} تومان`}</small><div className="percent-row">{[25,50,75,100].map(x=><button className={selectedPct===x?"pct-selected":""} onClick={()=>percent(x)} key={x}>{x}٪</button>)}</div><button className={`terminal-submit ${side==="buy"||side==="long"?"buy":"sell"}`} onClick={place}>{mode==="margin"?(side==="long"?"باز کردن لانگ":"باز کردن شورت"):(side==="buy"?"خرید":"فروش")}</button></section></main><section className="recent-trades"><h2>آخرین معامله‌ها</h2><div className="book-head"><span>زمان</span><span>قیمت</span><span>مقدار</span></div>{levels.slice(0,5).map((l,i)=><p className={i%2?"buy":"sell"} key={i}><span>{toFaDigits(`۱۴:${31+i}`)}</span><span>{fa(Math.round(l.p))}</span><span>{faFixed(l.q,4)}</span></p>)}</section><nav className="terminal-bottom-tabs">{(mode==="spot"?["سفارش‌های باز","سفارش‌های بسته شده","تاریخچه سفارش‌ها","تاریخچه معامله‌ها"]:["موقعیت‌های باز","سفارش‌های باز","تاریخچه موقعیت‌ها","تاریخچه معامله‌ها"]).map(x=><button className={bottom===x?"active":""} onClick={()=>setBottom(x)} key={x}>{x}</button>)}</nav><section className="terminal-bottom-content">{mode==="spot"?(<>{(()=>{const filtered=bottom==="سفارش‌های باز"?orders.filter(o=>o.mode==="spot"&&o.status==="open"):bottom==="سفارش‌های بسته شده"?orders.filter(o=>o.mode==="spot"&&o.status==="filled"):bottom==="تاریخچه سفارش‌ها"?orders.filter(o=>o.mode==="spot"):orders.filter(o=>o.mode==="spot"&&o.status==="filled");const allSpot=filtered;return filtered.length===0?<div className="empty-orders"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".3"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="16" x2="12" y2="16"/></svg><span>{bottom==="سفارش‌های باز"?"سفارش باز وجود ندارد":bottom==="سفارش‌های بسته شده"?"سفارش بسته‌ای یافت نشد":"تاریخچه‌ای یافت نشد"}</span></div>:<div className="orders-table"><div className="orders-head"><span>ارز</span><span>نوع</span><span>قیمت</span><span>مقدار</span><span>وضعیت</span></div>{filtered.map(o=><div key={o.id} className="order-row"><span><b>{o.pair}</b></span><span className={o.side==="buy"?"buy-label":"sell-label"}>{o.side==="buy"?"خرید":"فروش"}</span><span>{fa(Math.round(o.price))}</span><span>{faFixed(o.amount,4)}</span><span className={`order-status ${o.status}`}>{o.status==="filled"?"تکمیل":o.status==="open"?"باز":"لغو"}</span></div>)}</div>})()}</>):(bottom==="موقعیت‌های باز"?positions.length===0?<div className="empty-orders"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" opacity=".3"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>موقعیت باز وجود ندارد</span></div>:<div className="positions-list">{positions.map(pos=>{const c=coins.find(x=>x.symbol===pos.asset)??coins[0];const pnl=pos.side==="long"?(c.price-pos.entry)*pos.qty*pos.leverage:(pos.entry-c.price)*pos.qty*pos.leverage;const roe=pos.margin>0?pnl/pos.margin*100:0;return <div key={pos.id} className="position-card"><div className="pos-top"><div className="pos-left"><span className={pos.side==="long"?"pos-side long":"pos-side short"}>{pos.side==="long"?"لانگ ↑":"شورت ↓"}</span><b className="pos-pair">{pos.asset}/TMN</b><span className="pos-lev">{pos.leverage}x</span></div><button className="close-pos-btn" onClick={()=>closePosition(pos,c.price)}>بستن موقعیت</button></div><div className="pos-grid"><div><span>قیمت ورود</span><b>{fa(Math.round(pos.entry))}</b></div><div><span>قیمت فعلی</span><b>{fa(Math.round(c.price))}</b></div><div><span>مقدار</span><b>{faFixed(pos.qty,4)}</b></div><div><span>وجه تضمین</span><b>{fa(Math.round(pos.margin))}</b></div><div><span>سود / زیان</span><b className={pnl>=0?"pnl-pos":"pnl-neg"}>{pnl>=0?"+":""}{fa(Math.round(pnl))} ت</b></div><div><span>ROE٪</span><b className={roe>=0?"pnl-pos":"pnl-neg"}>{roe>=0?"+":""}{faFixed(roe,2)}٪</b></div></div></div>})}</div>:<div className="empty-orders"><span>تاریخچه‌ای یافت نشد</span></div>)}</section>{picker===true&&<div className="expage" dir="rtl" style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:50}}><div className="expage-header"><button className="back-btn" onClick={()=>setPicker(false)}><Icon name="arrow" size={20}/></button><h2 className="expage-title">انتخاب جفت ارز</h2><div style={{width:36}}/></div><div className="expage-body"><div className="market-filters">{(["همه","تومان","دلار تتر"] as const).map(x=><button key={x} className={pairFilter===x?"active":""} onClick={()=>setPairFilter(x)}>{x}</button>)}</div><div className="exchange-asset-search"><Icon name="search" size={16}/><input value={pairSearch} onChange={e=>setPairSearch(e.target.value)} placeholder="جستجوی ارز"/></div><div className="pair-picker-grid">{coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(pairSearch.toLowerCase())).flatMap(c=>pairFilter==="همه"?[{c,p:"TMN"},{c,p:"USDT"}]:[{c,p:pairFilter==="تومان"?"TMN":"USDT"}]).filter(({c,p})=>c.symbol!==p).map(({c,p})=><button key={`${c.symbol}${p}`} className="pair-card" onClick={()=>{setAsset(c.symbol);onAssetChange(c.symbol);setPicker(false)}}><PairLogos base={c.symbol} quote={p} baseSize={36} quoteSize={20}/><b>{c.symbol} / {p}</b><small>{p==="TMN"?fa(Math.round(c.price))+" تومان":faFixed(c.price/FALLBACK_RATE,3)+" دلار تتر"}</small><em className={c.change>=0?"pp-up":"pp-down"}>{c.change>=0?"+":""}{faFixed(c.change,2)}٪</em></button>)}</div></div></div>}{confirm&&<div className="expage" dir="rtl" style={{position:"absolute",top:0,left:0,right:0,bottom:0,zIndex:50}}><div className="expage-header"><button className="back-btn" onClick={()=>setConfirm(false)}><Icon name="arrow" size={20}/></button><h2 className="expage-title">تأیید سفارش</h2><div style={{width:36}}/></div><div className="expage-body"><div className="exchange-confirm-lines"><div><span>نوع سفارش</span><b>{orderType}</b></div><div><span>نوع معامله</span><b>{side}</b></div><div><span>مقدار</span><b>{faFixed(qty,5)}</b></div><div><span>مجموع</span><b>{fa(Math.round(total+fee))}</b></div></div><div className="confirm-actions"><button className="outline-button" onClick={()=>setConfirm(false)}>انصراف</button><button className="primary-button" onClick={exec} disabled={processing}>تأیید</button></div></div></div>}{processing&&<AnPardazLoadingOverlay text="در حال انجام سفارش..."/>}</div>}
-function CandleChart({price}:{price:number}){const [bars,setBars]=useState(()=>Array.from({length:28},(_,i)=>{const o=50+Math.sin(i*.61)*11;const c=o+(Math.cos(i*1.9)*7);return {o,c,h:Math.max(o,c)+5,l:Math.min(o,c)-5,v:10+Math.abs(Math.sin(i))*22}}));useEffect(()=>{const id=window.setInterval(()=>setBars(p=>[...p.slice(1),(()=>{const o=p[p.length-1].c;const c=o+(Math.random()-.48)*9;return{o,c,h:Math.max(o,c)+Math.random()*5,l:Math.min(o,c)-Math.random()*5,v:10+Math.random()*28}})()]),1800);return()=>clearInterval(id)},[]);const scale=(v:number)=>92-(v-20)/60*68;return <div className="candle-chart"><div className="chart-mode"><b>کندل</b><span>قیمت: {fa(Math.round(price))} تومان</span></div><svg viewBox="0 0 320 122" preserveAspectRatio="none">{[28,48,68,88].map(y=><line key={y} x1="0" x2="320" y1={y} y2={y}/>) }{bars.map((b,i)=>{const x=8+i*11,w=6,up=b.c>=b.o;return <g key={i} className={up?"up":"down"}><line x1={x+w/2} x2={x+w/2} y1={scale(b.h)} y2={scale(b.l)}/><rect x={x} y={scale(Math.max(b.o,b.c))} width={w} height={Math.max(2,Math.abs(scale(b.o)-scale(b.c)))}/><rect className="volume" x={x} y={116-b.v/2} width={w} height={b.v/2}/></g>})}</svg></div>}
-
-function ExchangeDepositFlow({coins,onClose,onToman}:{coins:typeof EX_COINS;onClose:()=>void;onToman:()=>void}){
-  const [asset,setAsset]=useState<string|null>(null),[network,setNetwork]=useState(""),[search,setSearch]=useState(""),[copied,setCopied]=useState<string|null>(null);
-  const coin=coins.find(c=>c.symbol===asset);const networks=coin?.networks??[];
-  const rawAddr=`${asset?.toLowerCase()||"crypto"}1q7v3m5n8kp0a2r9d4x6w8h1`;
-  const copyAddr=async()=>{try{await navigator.clipboard?.writeText(rawAddr);setCopied("addr");setTimeout(()=>setCopied(null),2000)}catch{}};
-  const qr=Array.from({length:121},(_,i)=>((i*i+i*7+(asset?.charCodeAt(0)||0))%5<2));
-
-  if(!asset)return <div className="expage" dir="rtl">
-    <div className="expage-header">
-      <button className="back-btn" onClick={onClose}><Icon name="arrow" size={20}/></button>
-      <h2 className="expage-title">انتخاب دارایی برای واریز</h2>
-      <div style={{width:36}}/>
-    </div>
-    <div className="expage-body">
-      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:10}}>
-        <button onClick={onToman} style={{display:"flex",alignItems:"center",gap:14,padding:"16px 18px",borderRadius:16,background:"rgba(0,214,176,0.08)",border:"1.5px solid rgba(0,214,176,0.25)",cursor:"pointer",textAlign:"right",fontFamily:"Vazirmatn",color:"var(--text-primary)",transition:"all .18s"}}>
-          <img src={TMN_FLAG_LOGO} width={42} height={42} style={{borderRadius:"50%",flexShrink:0}} alt="تومان"/>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:800,fontSize:16}}>تومان</div>
-            <div style={{fontSize:12,color:"var(--text-muted)",marginTop:3}}>TMN · واریز از درگاه بانکی</div>
-          </div>
-          <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="rgba(0,214,176,0.7)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>
-      </div>
-      <div style={{fontSize:13,color:"var(--text-muted)",marginBottom:10,fontWeight:700,letterSpacing:"0.01em"}}>ارزهای دیجیتال</div>
-      <div style={{display:"flex",alignItems:"center",gap:8,border:"1px solid rgba(120,190,210,0.18)",background:"rgba(6,28,43,0.6)",borderRadius:12,padding:"0 12px",marginBottom:14}}>
-        <Icon name="search" size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="جستجوی ارز..." style={{flex:1,border:0,background:"transparent",outline:0,color:"var(--text-primary)",padding:"11px 6px",fontFamily:"Vazirmatn",fontSize:13}}/>
-      </div>
-      <div style={{display:"flex",flexDirection:"column",gap:7}}>
-        {coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(search.toLowerCase())).map(c=><button key={c.symbol} onClick={()=>{setAsset(c.symbol);setNetwork("");}} style={{display:"flex",alignItems:"center",gap:13,padding:"13px 16px",borderRadius:14,background:"var(--card-bg)",border:"1px solid var(--border-light)",cursor:"pointer",textAlign:"right",fontFamily:"Vazirmatn",color:"var(--text-primary)",transition:"all .15s"}}>
-          <CoinLogo symbol={c.symbol} size={38}/>
-          <div style={{flex:1}}>
-            <div style={{fontWeight:700,fontSize:15}}>{c.fa}</div>
-            <div style={{fontSize:12,color:"var(--text-muted)",marginTop:3}}>{c.symbol}</div>
-          </div>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="rgba(120,190,210,0.5)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>)}
-      </div>
-    </div>
-  </div>;
-
-  return <div className="expage" dir="rtl">
-    <div className="expage-header">
-      <button className="back-btn" onClick={()=>{setAsset(null);setNetwork("");setSearch("");}}><Icon name="arrow" size={20}/></button>
-      <h2 className="expage-title">واریز {coin?.fa}</h2>
-      <div style={{width:36}}/>
-    </div>
-    <div className="expage-body">
-    <h3 style={{display:"none"}}>واریز {coin?.fa}</h3>
-    {/* Security note */}
-    <div style={{background:"rgba(245,166,35,0.08)",border:"1px solid rgba(245,166,35,0.22)",borderRadius:13,padding:"12px 16px",marginBottom:20,fontSize:13,color:"#c8982a",lineHeight:1.85,textAlign:"right"}}>
-      <span style={{fontWeight:700}}>⚠ توجه: </span>
-      آدرس‌های واریز به‌صورت دوره‌ای تغییر می‌کنند. فقط {coin?.symbol} را روی شبکه انتخاب‌شده ارسال کنید.
-    </div>
-    {/* Network selector */}
-    <div style={{marginBottom:20}}>
-      <div style={{fontSize:13,color:"var(--text-muted)",marginBottom:10,fontWeight:700,letterSpacing:"0.01em",textAlign:"right"}}>انتخاب شبکه</div>
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {networks.map(n=><button key={n} onClick={()=>setNetwork(n)} style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",padding:"17px 52px",borderRadius:14,background:network===n?"rgba(0,214,176,0.12)":"var(--card-bg)",border:`1.5px solid ${network===n?"rgba(0,214,176,0.55)":"var(--border-light)"}`,cursor:"pointer",fontFamily:"Vazirmatn",color:network===n?"#00D6B0":"var(--text-primary)",fontSize:18,fontWeight:800,letterSpacing:"0.06em",transition:"all .18s",boxShadow:network===n?"0 0 0 3px rgba(0,214,176,0.08)":"none"}}>
-          <span>{n}</span>
-          {network===n&&<svg style={{position:"absolute",insetInlineStart:16,top:"50%",transform:"translateY(-50%)"}} width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00D6B0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" strokeOpacity=".3"/><path d="m7 12 3.5 3.5L17 9"/></svg>}
-        </button>)}
-      </div>
-    </div>
-    {network&&<>
-      {/* QR + Address as one cohesive card */}
-      <div style={{borderRadius:16,background:"var(--card-bg2,var(--card-bg))",border:"1px solid var(--border-color)",padding:"22px 18px 18px",marginBottom:14}}>
-        {/* QR block */}
-        <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:18}}>
-          <div style={{padding:10,background:"#fff",borderRadius:14,boxShadow:"0 2px 16px rgba(0,0,0,.18)",marginBottom:10}}>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(11,1fr)",gap:2,width:132}}>
-              {qr.map((on,i)=><div key={i} style={{width:10,height:10,borderRadius:2,background:on?"#0a1a2a":"transparent"}}/>)}
-            </div>
-          </div>
-          <div style={{fontSize:12,color:"var(--text-muted)",fontWeight:600}}>اسکن QR برای دریافت آدرس</div>
-        </div>
-        {/* Address label */}
-        <div style={{fontSize:14,color:"var(--text-muted)",marginBottom:10,fontWeight:700,textAlign:"right"}}>آدرس واریز {coin?.symbol}</div>
-        {/* Address — always LTR, Latin/ASCII only, never converted to Persian */}
-        <div
-          dir="ltr"
-          lang="en"
-          style={{
-            fontFamily:"'Courier New',Courier,'Lucida Console',monospace",
-            fontSize:14,
-            fontWeight:600,
-            color:"var(--text-primary)",
-            letterSpacing:"0.04em",
-            wordBreak:"break-all",
-            overflowWrap:"anywhere",
-            lineHeight:1.8,
-            marginBottom:14,
-            userSelect:"all",
-            padding:"12px 14px",
-            background:"rgba(0,0,0,0.22)",
-            borderRadius:11,
-            border:"1px solid rgba(255,255,255,0.08)",
-            unicodeBidi:"embed",
-            textAlign:"left",
-          }}
-        >{rawAddr}</div>
-        <button
-          onClick={copyAddr}
-          style={{
-            width:"100%",
-            minHeight:50,
-            padding:"13px",
-            borderRadius:12,
-            border:`1.5px solid ${copied==="addr"?"rgba(0,214,176,0.55)":"rgba(0,214,176,0.3)"}`,
-            background:copied==="addr"?"rgba(0,214,176,0.2)":"rgba(0,214,176,0.1)",
-            color:"#00D6B0",
-            fontFamily:"Vazirmatn",
-            fontSize:15,
-            fontWeight:700,
-            cursor:"pointer",
-            transition:"all .2s",
-            display:"flex",
-            alignItems:"center",
-            justifyContent:"center",
-            gap:8,
-          }}
-        >
-          {copied==="addr"
-            ?<><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6"/></svg>آدرس کپی شد</>
-            :<>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              کپی آدرس
-            </>
-          }
-        </button>
-      </div>
-      {/* Info grid */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
-        {[["حداقل واریز",`۱ ${coin?.symbol}`],["تأیید شبکه","۱ تأیید"],["زمان تخمینی","۵ تا ۳۰ دقیقه"],["کارمزد","رایگان"]].map(([l,v])=><div key={l} style={{padding:"14px 16px",borderRadius:13,background:"var(--card-bg)",border:"1px solid var(--border-faint)"}}>
-          <div style={{fontSize:12,color:"var(--text-muted)",marginBottom:6,fontWeight:700,lineHeight:1.5}}>{l}</div>
-          <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",lineHeight:1.3}}>{v}</div>
-        </div>)}
-      </div>
-    </>}
-    </div>
-  </div>;
-}
+function CandleChart({price}:{price:number}){return <div className="candle-chart" dir="rtl"><div className="chart-mode"><b>کندل</b><span>{Number.isFinite(price)&&price>0?<>قیمت زنده: {fa(Math.round(price))} تومان</>:<>قیمت زنده در دسترس نیست</>}</span></div><div style={{minHeight:122,display:"grid",placeItems:"center",color:"var(--text-muted)",fontSize:12,padding:20,textAlign:"center"}}>داده کندل تاریخی/زنده هنوز از Backend دریافت نشده است.<br/>هیچ کندل ساختگی نمایش داده نمی‌شود.</div></div>}
+function ExchangeDepositFlow({coins,onClose,onToman}:{coins:typeof EX_COINS;onClose:()=>void;onToman:()=>void}){const [asset,setAsset]=useState<string|null>(null),[search,setSearch]=useState("");const coin=coins.find(c=>c.symbol===asset);if(!asset)return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={onClose}><Icon name="arrow" size={20}/></button><h2 className="expage-title">انتخاب دارایی برای واریز</h2><div style={{width:36}}/></div><div className="expage-body"><button onClick={onToman} style={{display:"flex",alignItems:"center",gap:14,padding:"16px 18px",borderRadius:16,background:"rgba(0,214,176,0.08)",border:"1.5px solid rgba(0,214,176,0.25)",cursor:"pointer",textAlign:"right",fontFamily:"Vazirmatn",color:"var(--text-primary)",width:"100%",boxSizing:"border-box"}}><img src={TMN_FLAG_LOGO} width={42} height={42} style={{borderRadius:"50%",flexShrink:0}} alt="تومان"/><div style={{flex:1}}><div style={{fontWeight:800,fontSize:16}}>تومان</div><div style={{fontSize:12,color:"var(--text-muted)",marginTop:3}}>TMN · واریز بانکی</div></div></button><div style={{fontSize:13,color:"var(--text-muted)",margin:"18px 0 10px",fontWeight:700}}>ارزهای دیجیتال</div><div className="exchange-asset-search"><Icon name="search" size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="جستجوی ارز..."/></div><div style={{display:"flex",flexDirection:"column",gap:7,marginTop:12}}>{coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(search.toLowerCase())).map(c=><button key={c.symbol} onClick={()=>setAsset(c.symbol)} className="asset-row"><CoinLogo symbol={c.symbol} size={38}/><div style={{flex:1,textAlign:"right"}}><div style={{fontWeight:700,fontSize:15}}>{c.fa}</div><div style={{fontSize:12,color:"var(--text-muted)",marginTop:3}}>{c.symbol}</div></div><Icon name="arrow" size={16}/></button>)}</div></div></div>;return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={()=>setAsset(null)}><Icon name="arrow" size={20}/></button><h2 className="expage-title">واریز ${coin?.fa??""}</h2><div style={{width:36}}/></div><div className="expage-body"><div className="warning-box"><b>آدرس واریز واقعی در دسترس نیست</b><p>برای جلوگیری از نمایش داده ساختگی، تا زمانی که سرویس کیف پول Backend آدرس واقعی این دارایی و شبکه را صادر نکند، هیچ آدرس، QR، حداقل واریز یا کارمزد ساختگی نمایش داده نمی‌شود.</p></div></div></div>}
 
 // ─── Exchange Screen ──────────────────────────────────────────────────────────
 const EX_COINS=[
   // ─── Major / Stablecoin ───────────────────────────────────────────────────
-  {symbol:"USDT",fa:"دلار تتر",price:0,change:.42,networks:["TRC۲۰","ERC۲۰","BEP۲۰"]},
+  {symbol:"USDT",fa:"دلار تتر",price:0,change:Number.NaN,networks:["TRC۲۰","ERC۲۰","BEP۲۰"]},
   // ─── Top Layer-1 ─────────────────────────────────────────────────────────
-  {symbol:"BTC",fa:"بیت‌کوین",price:0,change:1.24,networks:["Bitcoin"]},
-  {symbol:"ETH",fa:"اتریوم",price:0,change:-.68,networks:["ERC۲۰","Arbitrum"]},
-  {symbol:"SOL",fa:"سولانا",price:0,change:2.16,networks:["Solana"]},
-  {symbol:"BNB",fa:"بایننس کوین",price:0,change:.95,networks:["BEP۲۰"]},
-  {symbol:"XRP",fa:"ریپل",price:0,change:.87,networks:["XRP Ledger"]},
-  {symbol:"ADA",fa:"کاردانو",price:0,change:-.43,networks:["Cardano"]},
-  {symbol:"DOGE",fa:"دوج‌کوین",price:0,change:-1.12,networks:["Dogecoin"]},
-  {symbol:"TON",fa:"تون کوین",price:0,change:1.3,networks:["TON"]},
-  {symbol:"AVAX",fa:"اوالانچ",price:0,change:1.55,networks:["Avalanche","ERC۲۰"]},
-  {symbol:"SUI",fa:"سوئی",price:0,change:2.4,networks:["Sui"]},
-  {symbol:"DOT",fa:"پولکادات",price:0,change:-.29,networks:["Polkadot"]},
-  {symbol:"LINK",fa:"چین‌لینک",price:0,change:2.1,networks:["ERC۲۰"]},
-  {symbol:"LTC",fa:"لایت‌کوین",price:0,change:.66,networks:["Litecoin"]},
-  {symbol:"TRX",fa:"ترون",price:0,change:.33,networks:["TRC۲۰"]},
-  {symbol:"NEAR",fa:"نیر پروتکل",price:0,change:1.87,networks:["NEAR"]},
-  {symbol:"APT",fa:"آپتوس",price:0,change:-.63,networks:["Aptos"]},
-  {symbol:"POL",fa:"پل (پالیگان)",price:0,change:.91,networks:["Polygon","ERC۲۰"]},
-  {symbol:"ICP",fa:"اینترنت کامپیوتر",price:0,change:-1.05,networks:["ICP"]},
-  {symbol:"ETC",fa:"اتریوم کلاسیک",price:0,change:-.8,networks:["ETC"]},
-  {symbol:"BCH",fa:"بیت‌کوین کش",price:0,change:.45,networks:["Bitcoin Cash"]},
-  {symbol:"XLM",fa:"استلار",price:0,change:.72,networks:["Stellar"]},
-  {symbol:"ALGO",fa:"الگوریتم",price:0,change:-.6,networks:["Algorand"]},
-  {symbol:"XTZ",fa:"تزوس",price:0,change:.35,networks:["Tezos"]},
-  {symbol:"EGLD",fa:"مولتی‌ورس ایکس",price:0,change:1.1,networks:["MultiversX"]},
-  {symbol:"FLOW",fa:"فلو",price:0,change:.55,networks:["Flow"]},
-  {symbol:"ONE",fa:"هارمونی",price:0,change:-.4,networks:["Harmony"]},
+  {symbol:"BTC",fa:"بیت‌کوین",price:0,change:Number.NaN,networks:["Bitcoin"]},
+  {symbol:"ETH",fa:"اتریوم",price:0,change:Number.NaN,networks:["ERC۲۰","Arbitrum"]},
+  {symbol:"SOL",fa:"سولانا",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"BNB",fa:"بایننس کوین",price:0,change:Number.NaN,networks:["BEP۲۰"]},
+  {symbol:"XRP",fa:"ریپل",price:0,change:Number.NaN,networks:["XRP Ledger"]},
+  {symbol:"ADA",fa:"کاردانو",price:0,change:Number.NaN,networks:["Cardano"]},
+  {symbol:"DOGE",fa:"دوج‌کوین",price:0,change:Number.NaN,networks:["Dogecoin"]},
+  {symbol:"TON",fa:"تون کوین",price:0,change:Number.NaN,networks:["TON"]},
+  {symbol:"AVAX",fa:"اوالانچ",price:0,change:Number.NaN,networks:["Avalanche","ERC۲۰"]},
+  {symbol:"SUI",fa:"سوئی",price:0,change:Number.NaN,networks:["Sui"]},
+  {symbol:"DOT",fa:"پولکادات",price:0,change:Number.NaN,networks:["Polkadot"]},
+  {symbol:"LINK",fa:"چین‌لینک",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"LTC",fa:"لایت‌کوین",price:0,change:Number.NaN,networks:["Litecoin"]},
+  {symbol:"TRX",fa:"ترون",price:0,change:Number.NaN,networks:["TRC۲۰"]},
+  {symbol:"NEAR",fa:"نیر پروتکل",price:0,change:Number.NaN,networks:["NEAR"]},
+  {symbol:"APT",fa:"آپتوس",price:0,change:Number.NaN,networks:["Aptos"]},
+  {symbol:"POL",fa:"پل (پالیگان)",price:0,change:Number.NaN,networks:["Polygon","ERC۲۰"]},
+  {symbol:"ICP",fa:"اینترنت کامپیوتر",price:0,change:Number.NaN,networks:["ICP"]},
+  {symbol:"ETC",fa:"اتریوم کلاسیک",price:0,change:Number.NaN,networks:["ETC"]},
+  {symbol:"BCH",fa:"بیت‌کوین کش",price:0,change:Number.NaN,networks:["Bitcoin Cash"]},
+  {symbol:"XLM",fa:"استلار",price:0,change:Number.NaN,networks:["Stellar"]},
+  {symbol:"ALGO",fa:"الگوریتم",price:0,change:Number.NaN,networks:["Algorand"]},
+  {symbol:"XTZ",fa:"تزوس",price:0,change:Number.NaN,networks:["Tezos"]},
+  {symbol:"EGLD",fa:"مولتی‌ورس ایکس",price:0,change:Number.NaN,networks:["MultiversX"]},
+  {symbol:"FLOW",fa:"فلو",price:0,change:Number.NaN,networks:["Flow"]},
+  {symbol:"ONE",fa:"هارمونی",price:0,change:Number.NaN,networks:["Harmony"]},
   // ─── Layer-2 / Scaling ───────────────────────────────────────────────────
-  {symbol:"ARB",fa:"آربیتروم",price:0,change:1.8,networks:["Arbitrum"]},
-  {symbol:"STRK",fa:"استارک‌نت",price:0,change:2.1,networks:["Starknet"]},
-  {symbol:"MNT",fa:"منتل",price:0,change:.9,networks:["Mantle"]},
-  {symbol:"FLR",fa:"فلر",price:0,change:-.5,networks:["Flare","ERC۲۰"]},
+  {symbol:"ARB",fa:"آربیتروم",price:0,change:Number.NaN,networks:["Arbitrum"]},
+  {symbol:"STRK",fa:"استارک‌نت",price:0,change:Number.NaN,networks:["Starknet"]},
+  {symbol:"MNT",fa:"منتل",price:0,change:Number.NaN,networks:["Mantle"]},
+  {symbol:"FLR",fa:"فلر",price:0,change:Number.NaN,networks:["Flare","ERC۲۰"]},
   // ─── DeFi ────────────────────────────────────────────────────────────────
-  {symbol:"AAVE",fa:"آوه",price:0,change:1.9,networks:["ERC۲۰"]},
-  {symbol:"UNI",fa:"یونی‌سواپ",price:0,change:1.22,networks:["ERC۲۰"]},
-  {symbol:"CRV",fa:"کرو دائو",price:0,change:-.7,networks:["ERC۲۰"]},
-  {symbol:"SNX",fa:"سینتتیکس",price:0,change:.6,networks:["ERC۲۰"]},
-  {symbol:"BAL",fa:"بالانسر",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"YFI",fa:"یرن فایننس",price:0,change:-.9,networks:["ERC۲۰"]},
-  {symbol:"1INCH",fa:"وان اینچ",price:0,change:.8,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"SUSHI",fa:"سوشی‌سواپ",price:0,change:1.1,networks:["ERC۲۰"]},
-  {symbol:"CAKE",fa:"پنکیک‌سواپ",price:0,change:.5,networks:["BEP۲۰"]},
-  {symbol:"CVX",fa:"کانوکس فایننس",price:0,change:-.4,networks:["ERC۲۰"]},
-  {symbol:"DYDX",fa:"دی‌وای‌دی‌ایکس",price:0,change:1.3,networks:["ERC۲۰"]},
-  {symbol:"RUNE",fa:"ثورچین",price:0,change:.9,networks:["THORChain"]},
-  {symbol:"ONDO",fa:"اوندو",price:0,change:1.5,networks:["ERC۲۰"]},
-  {symbol:"OSMO",fa:"اوسموسیس",price:0,change:.4,networks:["Cosmos"]},
-  {symbol:"AERO",fa:"آئرودروم",price:0,change:1.2,networks:["Base"]},
-  {symbol:"MORPHO",fa:"مورفو",price:0,change:.7,networks:["ERC۲۰"]},
-  {symbol:"ENA",fa:"اتنا",price:0,change:2.3,networks:["ERC۲۰"]},
+  {symbol:"AAVE",fa:"آوه",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"UNI",fa:"یونی‌سواپ",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"CRV",fa:"کرو دائو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"SNX",fa:"سینتتیکس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"BAL",fa:"بالانسر",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"YFI",fa:"یرن فایننس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"1INCH",fa:"وان اینچ",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"SUSHI",fa:"سوشی‌سواپ",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"CAKE",fa:"پنکیک‌سواپ",price:0,change:Number.NaN,networks:["BEP۲۰"]},
+  {symbol:"CVX",fa:"کانوکس فایننس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"DYDX",fa:"دی‌وای‌دی‌ایکس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"RUNE",fa:"ثورچین",price:0,change:Number.NaN,networks:["THORChain"]},
+  {symbol:"ONDO",fa:"اوندو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"OSMO",fa:"اوسموسیس",price:0,change:Number.NaN,networks:["Cosmos"]},
+  {symbol:"AERO",fa:"آئرودروم",price:0,change:Number.NaN,networks:["Base"]},
+  {symbol:"MORPHO",fa:"مورفو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"ENA",fa:"اتنا",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── AI / Data ───────────────────────────────────────────────────────────
-  {symbol:"FET",fa:"فچ ای‌آی",price:0,change:1.6,networks:["ERC۲۰"]},
-  {symbol:"RENDER",fa:"رندر",price:0,change:2.0,networks:["Solana","ERC۲۰"]},
-  {symbol:"GRT",fa:"گراف",price:0,change:.9,networks:["ERC۲۰"]},
-  {symbol:"TAO",fa:"بیتنسور",price:0,change:3.1,networks:["Bittensor"]},
-  {symbol:"CGPT",fa:"چین‌جی‌پی‌تی",price:0,change:1.4,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"KAITO",fa:"کایتو",price:0,change:2.8,networks:["ERC۲۰"]},
+  {symbol:"FET",fa:"فچ ای‌آی",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"RENDER",fa:"رندر",price:0,change:Number.NaN,networks:["Solana","ERC۲۰"]},
+  {symbol:"GRT",fa:"گراف",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"TAO",fa:"بیتنسور",price:0,change:Number.NaN,networks:["Bittensor"]},
+  {symbol:"CGPT",fa:"چین‌جی‌پی‌تی",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"KAITO",fa:"کایتو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Oracle / Infrastructure ─────────────────────────────────────────────
-  {symbol:"ATOM",fa:"کازماس",price:0,change:.74,networks:["Cosmos"]},
-  {symbol:"PYTH",fa:"پیث نتورک",price:0,change:1.1,networks:["Solana","ERC۲۰"]},
-  {symbol:"BAND",fa:"بند پروتکل",price:0,change:.6,networks:["Cosmos","ERC۲۰"]},
-  {symbol:"API3",fa:"ای‌پی‌آی تری",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"NMR",fa:"نومرایر",price:0,change:-.5,networks:["ERC۲۰"]},
-  {symbol:"QNT",fa:"کوانت",price:0,change:.8,networks:["ERC۲۰"]},
+  {symbol:"ATOM",fa:"کازماس",price:0,change:Number.NaN,networks:["Cosmos"]},
+  {symbol:"PYTH",fa:"پیث نتورک",price:0,change:Number.NaN,networks:["Solana","ERC۲۰"]},
+  {symbol:"BAND",fa:"بند پروتکل",price:0,change:Number.NaN,networks:["Cosmos","ERC۲۰"]},
+  {symbol:"API3",fa:"ای‌پی‌آی تری",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"NMR",fa:"نومرایر",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"QNT",fa:"کوانت",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Gaming / Metaverse ──────────────────────────────────────────────────
-  {symbol:"AXS",fa:"اکسی اینفینیتی",price:0,change:.7,networks:["ERC۲۰","Ronin"]},
-  {symbol:"SAND",fa:"سندباکس",price:0,change:-.6,networks:["ERC۲۰"]},
-  {symbol:"MANA",fa:"دیسنترالند",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"GALA",fa:"گالا",price:0,change:1.2,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"IMX",fa:"ایمیوتبل",price:0,change:.9,networks:["ImmutableX","ERC۲۰"]},
-  {symbol:"ENJ",fa:"انجین کوین",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"CHZ",fa:"چیلیز",price:0,change:.5,networks:["ERC۲۰","Chiliz"]},
-  {symbol:"ALICE",fa:"آلیس",price:0,change:-.3,networks:["BEP۲۰","ERC۲۰"]},
-  {symbol:"MAGIC",fa:"ترژر",price:0,change:.8,networks:["Arbitrum","ERC۲۰"]},
+  {symbol:"AXS",fa:"اکسی اینفینیتی",price:0,change:Number.NaN,networks:["ERC۲۰","Ronin"]},
+  {symbol:"SAND",fa:"سندباکس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"MANA",fa:"دیسنترالند",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"GALA",fa:"گالا",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"IMX",fa:"ایمیوتبل",price:0,change:Number.NaN,networks:["ImmutableX","ERC۲۰"]},
+  {symbol:"ENJ",fa:"انجین کوین",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"CHZ",fa:"چیلیز",price:0,change:Number.NaN,networks:["ERC۲۰","Chiliz"]},
+  {symbol:"ALICE",fa:"آلیس",price:0,change:Number.NaN,networks:["BEP۲۰","ERC۲۰"]},
+  {symbol:"MAGIC",fa:"ترژر",price:0,change:Number.NaN,networks:["Arbitrum","ERC۲۰"]},
   // ─── Layer-1 Privacy / Alternative ──────────────────────────────────────
-  {symbol:"XMR",fa:"مونرو",price:0,change:.5,networks:["Monero"]},
-  {symbol:"ZEC",fa:"زی‌کش",price:0,change:-.4,networks:["Zcash"]},
-  {symbol:"DASH",fa:"دَش",price:0,change:.3,networks:["Dash"]},
-  {symbol:"FIL",fa:"فایل‌کوین",price:0,change:.48,networks:["FIL"]},
-  {symbol:"HBAR",fa:"هدرا",price:0,change:.6,networks:["Hedera"]},
-  {symbol:"ZEN",fa:"هورایزن",price:0,change:.2,networks:["Horizen","ERC۲۰"]},
+  {symbol:"XMR",fa:"مونرو",price:0,change:Number.NaN,networks:["Monero"]},
+  {symbol:"ZEC",fa:"زی‌کش",price:0,change:Number.NaN,networks:["Zcash"]},
+  {symbol:"DASH",fa:"دَش",price:0,change:Number.NaN,networks:["Dash"]},
+  {symbol:"FIL",fa:"فایل‌کوین",price:0,change:Number.NaN,networks:["FIL"]},
+  {symbol:"HBAR",fa:"هدرا",price:0,change:Number.NaN,networks:["Hedera"]},
+  {symbol:"ZEN",fa:"هورایزن",price:0,change:Number.NaN,networks:["Horizen","ERC۲۰"]},
   // ─── Ecosystem / Exchange ────────────────────────────────────────────────
-  {symbol:"SEI",fa:"سی",price:0,change:1.7,networks:["Sei"]},
-  {symbol:"TIA",fa:"سلستیا",price:0,change:1.4,networks:["Celestia"]},
-  {symbol:"JUP",fa:"ژوپیتر",price:0,change:1.9,networks:["Solana"]},
-  {symbol:"ORCA",fa:"اورکا",price:0,change:.8,networks:["Solana"]},
-  {symbol:"RAY",fa:"ردیوم",price:0,change:1.0,networks:["Solana"]},
-  {symbol:"KAS",fa:"کسپا",price:0,change:2.5,networks:["Kaspa"]},
-  {symbol:"OM",fa:"مانترا",price:0,change:1.8,networks:["ERC۲۰"]},
-  {symbol:"HYPE",fa:"هایپرلیکوئید",price:0,change:3.5,networks:["Hyperliquid"]},
-  {symbol:"EIGEN",fa:"آیگن لیر",price:0,change:.9,networks:["ERC۲۰"]},
-  {symbol:"ETHFI",fa:"اتر فای",price:0,change:1.1,networks:["ERC۲۰"]},
+  {symbol:"SEI",fa:"سی",price:0,change:Number.NaN,networks:["Sei"]},
+  {symbol:"TIA",fa:"سلستیا",price:0,change:Number.NaN,networks:["Celestia"]},
+  {symbol:"JUP",fa:"ژوپیتر",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"ORCA",fa:"اورکا",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"RAY",fa:"ردیوم",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"KAS",fa:"کسپا",price:0,change:Number.NaN,networks:["Kaspa"]},
+  {symbol:"OM",fa:"مانترا",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"HYPE",fa:"هایپرلیکوئید",price:0,change:Number.NaN,networks:["Hyperliquid"]},
+  {symbol:"EIGEN",fa:"آیگن لیر",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"ETHFI",fa:"اتر فای",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Meme / Community ────────────────────────────────────────────────────
-  {symbol:"SHIB",fa:"شیبا اینو",price:0,change:-2.1,networks:["ERC۲۰"]},
-  {symbol:"PEPE",fa:"پپه",price:0,change:3.4,networks:["ERC۲۰"]},
-  {symbol:"FLOKI",fa:"فلوکی اینو",price:0,change:1.8,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"BONK",fa:"بونک",price:0,change:4.1,networks:["Solana"]},
-  {symbol:"WIF",fa:"داگ ویف هت",price:0,change:2.9,networks:["Solana"]},
-  {symbol:"NOT",fa:"نات‌کوین",price:0,change:1.6,networks:["TON"]},
-  {symbol:"HMSTR",fa:"همستر کامبت",price:0,change:-1.3,networks:["TON"]},
-  {symbol:"CATI",fa:"کتیزن",price:0,change:-.8,networks:["TON"]},
-  {symbol:"MAJOR",fa:"میجر",price:0,change:.5,networks:["TON"]},
-  {symbol:"DOGS",fa:"داگز",price:0,change:-.7,networks:["TON"]},
-  {symbol:"BOME",fa:"بوک آف میم",price:0,change:2.1,networks:["Solana"]},
-  {symbol:"MOG",fa:"ماگ کوین",price:0,change:3.2,networks:["ERC۲۰"]},
-  {symbol:"TURBO",fa:"توربو",price:0,change:1.5,networks:["ERC۲۰"]},
-  {symbol:"NEIRO",fa:"نیرو",price:0,change:2.7,networks:["ERC۲۰"]},
-  {symbol:"PENGU",fa:"پاجی پنگوئن",price:0,change:1.9,networks:["Solana"]},
-  {symbol:"MEME",fa:"میم کوین",price:0,change:.8,networks:["ERC۲۰"]},
+  {symbol:"SHIB",fa:"شیبا اینو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"PEPE",fa:"پپه",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"FLOKI",fa:"فلوکی اینو",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"BONK",fa:"بونک",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"WIF",fa:"داگ ویف هت",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"NOT",fa:"نات‌کوین",price:0,change:Number.NaN,networks:["TON"]},
+  {symbol:"HMSTR",fa:"همستر کامبت",price:0,change:Number.NaN,networks:["TON"]},
+  {symbol:"CATI",fa:"کتیزن",price:0,change:Number.NaN,networks:["TON"]},
+  {symbol:"MAJOR",fa:"میجر",price:0,change:Number.NaN,networks:["TON"]},
+  {symbol:"DOGS",fa:"داگز",price:0,change:Number.NaN,networks:["TON"]},
+  {symbol:"BOME",fa:"بوک آف میم",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"MOG",fa:"ماگ کوین",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"TURBO",fa:"توربو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"NEIRO",fa:"نیرو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"PENGU",fa:"پاجی پنگوئن",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"MEME",fa:"میم کوین",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Other notable ───────────────────────────────────────────────────────
-  {symbol:"WLD",fa:"ورلد کوین",price:0,change:1.2,networks:["ERC۲۰","Optimism"]},
-  {symbol:"MASK",fa:"ماسک نتورک",price:0,change:.6,networks:["ERC۲۰"]},
-  {symbol:"ZRX",fa:"زیرو ایکس",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"BAT",fa:"بیسیک اتنشن",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"LRC",fa:"لوپرینگ",price:0,change:.5,networks:["ERC۲۰"]},
-  {symbol:"ZIL",fa:"زیلیکا",price:0,change:-.3,networks:["Zilliqa","ERC۲۰"]},
-  {symbol:"HOT",fa:"هولو",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"SKL",fa:"اسکیل",price:0,change:.6,networks:["ERC۲۰"]},
-  {symbol:"CELR",fa:"سلر نتورک",price:0,change:.3,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"UMA",fa:"اوما",price:0,change:.7,networks:["ERC۲۰"]},
-  {symbol:"LPT",fa:"لایوپیر",price:0,change:.5,networks:["ERC۲۰"]},
-  {symbol:"JASMY",fa:"جسمی",price:0,change:-.4,networks:["ERC۲۰"]},
-  {symbol:"AGLD",fa:"ادونچر گلد",price:0,change:.8,networks:["ERC۲۰"]},
-  {symbol:"POLS",fa:"پولکا استارتر",price:0,change:.5,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"GMT",fa:"استپ این",price:0,change:.9,networks:["Solana","ERC۲۰"]},
-  {symbol:"APE",fa:"ایپ کوین",price:0,change:-.6,networks:["ERC۲۰"]},
-  {symbol:"DEXE",fa:"دکسی",price:0,change:.7,networks:["ERC۲۰"]},
-  {symbol:"PEOPLE",fa:"کانستیتوشن دائو",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"EDU",fa:"اوپن کامپوس",price:0,change:.6,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"BTTC",fa:"بیت تورنت",price:0,change:-.5,networks:["TRC۲۰","BEP۲۰"]},
-  {symbol:"BICO",fa:"بایکونومی",price:0,change:.5,networks:["ERC۲۰"]},
-  {symbol:"VIRTUAL",fa:"ویرچوال پروتکل",price:0,change:2.1,networks:["Base","ERC۲۰"]},
-  {symbol:"KAIA",fa:"کایا",price:0,change:.6,networks:["Kaia"]},
-  {symbol:"SUPER",fa:"سوپرورس",price:0,change:.7,networks:["ERC۲۰","Solana"]},
-  {symbol:"TRB",fa:"تلور",price:0,change:.9,networks:["ERC۲۰"]},
-  {symbol:"MDT",fa:"مژربل دیتا",price:0,change:.3,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"JST",fa:"جاست",price:0,change:.2,networks:["TRC۲۰"]},
-  {symbol:"TNSR",fa:"تنسور",price:0,change:1.0,networks:["Solana"]},
-  {symbol:"IO",fa:"آی‌او دات نت",price:0,change:1.3,networks:["Solana","ERC۲۰"]},
+  {symbol:"WLD",fa:"ورلد کوین",price:0,change:Number.NaN,networks:["ERC۲۰","Optimism"]},
+  {symbol:"MASK",fa:"ماسک نتورک",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"ZRX",fa:"زیرو ایکس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"BAT",fa:"بیسیک اتنشن",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"LRC",fa:"لوپرینگ",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"ZIL",fa:"زیلیکا",price:0,change:Number.NaN,networks:["Zilliqa","ERC۲۰"]},
+  {symbol:"HOT",fa:"هولو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"SKL",fa:"اسکیل",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"CELR",fa:"سلر نتورک",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"UMA",fa:"اوما",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"LPT",fa:"لایوپیر",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"JASMY",fa:"جسمی",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"AGLD",fa:"ادونچر گلد",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"POLS",fa:"پولکا استارتر",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"GMT",fa:"استپ این",price:0,change:Number.NaN,networks:["Solana","ERC۲۰"]},
+  {symbol:"APE",fa:"ایپ کوین",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"DEXE",fa:"دکسی",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"PEOPLE",fa:"کانستیتوشن دائو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"EDU",fa:"اوپن کامپوس",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"BTTC",fa:"بیت تورنت",price:0,change:Number.NaN,networks:["TRC۲۰","BEP۲۰"]},
+  {symbol:"BICO",fa:"بایکونومی",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"VIRTUAL",fa:"ویرچوال پروتکل",price:0,change:Number.NaN,networks:["Base","ERC۲۰"]},
+  {symbol:"KAIA",fa:"کایا",price:0,change:Number.NaN,networks:["Kaia"]},
+  {symbol:"SUPER",fa:"سوپرورس",price:0,change:Number.NaN,networks:["ERC۲۰","Solana"]},
+  {symbol:"TRB",fa:"تلور",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"MDT",fa:"مژربل دیتا",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"JST",fa:"جاست",price:0,change:Number.NaN,networks:["TRC۲۰"]},
+  {symbol:"TNSR",fa:"تنسور",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"IO",fa:"آی‌او دات نت",price:0,change:Number.NaN,networks:["Solana","ERC۲۰"]},
   // ─── Layer-2 & Scaling (additional) ─────────────────────────────────────
-  {symbol:"OP",fa:"اپتیمیزم",price:0,change:1.5,networks:["Optimism","ERC۲۰"]},
-  {symbol:"ZK",fa:"زی‌کی‌سینک",price:0,change:-.9,networks:["zkSync"]},
-  {symbol:"MANTA",fa:"مانتا نتورک",price:0,change:1.1,networks:["Manta","ERC۲۰"]},
-  {symbol:"ALT",fa:"آلت‌لیر",price:0,change:-.7,networks:["ERC۲۰","Arbitrum"]},
-  {symbol:"JTO",fa:"جیتو",price:0,change:1.3,networks:["Solana"]},
-  {symbol:"RDNT",fa:"ردینت کپیتال",price:0,change:-.5,networks:["Arbitrum","BNB Chain"]},
-  {symbol:"NTRN",fa:"نوترون",price:0,change:.8,networks:["Cosmos"]},
+  {symbol:"OP",fa:"اپتیمیزم",price:0,change:Number.NaN,networks:["Optimism","ERC۲۰"]},
+  {symbol:"ZK",fa:"زی‌کی‌سینک",price:0,change:Number.NaN,networks:["zkSync"]},
+  {symbol:"MANTA",fa:"مانتا نتورک",price:0,change:Number.NaN,networks:["Manta","ERC۲۰"]},
+  {symbol:"ALT",fa:"آلت‌لیر",price:0,change:Number.NaN,networks:["ERC۲۰","Arbitrum"]},
+  {symbol:"JTO",fa:"جیتو",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"RDNT",fa:"ردینت کپیتال",price:0,change:Number.NaN,networks:["Arbitrum","BNB Chain"]},
+  {symbol:"NTRN",fa:"نوترون",price:0,change:Number.NaN,networks:["Cosmos"]},
   // ─── DeFi (additional) ───────────────────────────────────────────────────
-  {symbol:"MKR",fa:"میکر دائو",price:0,change:.7,networks:["ERC۲۰"]},
-  {symbol:"COMP",fa:"کامپاند",price:0,change:.5,networks:["ERC۲۰"]},
-  {symbol:"LDO",fa:"لیدو",price:0,change:1.2,networks:["ERC۲۰"]},
-  {symbol:"PENDLE",fa:"پندل",price:0,change:1.8,networks:["ERC۲۰","Arbitrum"]},
-  {symbol:"GMX",fa:"جی‌ام‌ایکس",price:0,change:.9,networks:["Arbitrum","Avalanche"]},
-  {symbol:"BLUR",fa:"بلور",price:0,change:1.4,networks:["ERC۲۰"]},
-  {symbol:"FXS",fa:"فرکس شیر",price:0,change:.6,networks:["ERC۲۰"]},
-  {symbol:"LQTY",fa:"لیکوییتی",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"RPL",fa:"راکت پول",price:0,change:.8,networks:["ERC۲۰"]},
-  {symbol:"PERP",fa:"پرپچوال پروتکل",price:0,change:.5,networks:["Optimism","ERC۲۰"]},
-  {symbol:"GNO",fa:"گنوسیس",price:0,change:.6,networks:["ERC۲۰","Gnosis"]},
-  {symbol:"GLM",fa:"گولم",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"OCEAN",fa:"اوشن پروتکل",price:0,change:.7,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"BADGER",fa:"بجر",price:0,change:.5,networks:["ERC۲۰"]},
+  {symbol:"MKR",fa:"میکر دائو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"COMP",fa:"کامپاند",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"LDO",fa:"لیدو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"PENDLE",fa:"پندل",price:0,change:Number.NaN,networks:["ERC۲۰","Arbitrum"]},
+  {symbol:"GMX",fa:"جی‌ام‌ایکس",price:0,change:Number.NaN,networks:["Arbitrum","Avalanche"]},
+  {symbol:"BLUR",fa:"بلور",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"FXS",fa:"فرکس شیر",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"LQTY",fa:"لیکوییتی",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"RPL",fa:"راکت پول",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"PERP",fa:"پرپچوال پروتکل",price:0,change:Number.NaN,networks:["Optimism","ERC۲۰"]},
+  {symbol:"GNO",fa:"گنوسیس",price:0,change:Number.NaN,networks:["ERC۲۰","Gnosis"]},
+  {symbol:"GLM",fa:"گولم",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"OCEAN",fa:"اوشن پروتکل",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"BADGER",fa:"بجر",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Infrastructure & Oracle (additional) ────────────────────────────────
-  {symbol:"ENS",fa:"اتریوم نیم سرویس",price:0,change:.9,networks:["ERC۲۰"]},
-  {symbol:"STX",fa:"استکس",price:0,change:1.2,networks:["Stacks"]},
-  {symbol:"ORDI",fa:"اوردی",price:0,change:2.1,networks:["Bitcoin"]},
-  {symbol:"STORJ",fa:"استورج",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"ANKR",fa:"انکر",price:0,change:.5,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"ID",fa:"اسپیس آی‌دی",price:0,change:.8,networks:["BNB Chain","ERC۲۰"]},
-  {symbol:"GTC",fa:"گیت‌کوین",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"ARPA",fa:"آرپا",price:0,change:.3,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"ARKM",fa:"آرکام",price:0,change:1.1,networks:["ERC۲۰"]},
-  {symbol:"FLUX",fa:"فلاکس",price:0,change:.6,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"RVN",fa:"ریون‌کوین",price:0,change:.3,networks:["Ravencoin"]},
-  {symbol:"POWR",fa:"پاور لجر",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"CTSI",fa:"کارتسی",price:0,change:.3,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"ENS",fa:"اتریوم نیم سرویس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"STX",fa:"استکس",price:0,change:Number.NaN,networks:["Stacks"]},
+  {symbol:"ORDI",fa:"اوردی",price:0,change:Number.NaN,networks:["Bitcoin"]},
+  {symbol:"STORJ",fa:"استورج",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"ANKR",fa:"انکر",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"ID",fa:"اسپیس آی‌دی",price:0,change:Number.NaN,networks:["BNB Chain","ERC۲۰"]},
+  {symbol:"GTC",fa:"گیت‌کوین",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"ARPA",fa:"آرپا",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"ARKM",fa:"آرکام",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"FLUX",fa:"فلاکس",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"RVN",fa:"ریون‌کوین",price:0,change:Number.NaN,networks:["Ravencoin"]},
+  {symbol:"POWR",fa:"پاور لجر",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"CTSI",fa:"کارتسی",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
   // ─── Exchange Tokens ──────────────────────────────────────────────────────
-  {symbol:"BGB",fa:"بیت‌گت توکن",price:0,change:1.3,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"KCS",fa:"کوکوین توکن",price:0,change:.7,networks:["KCS"]},
-  {symbol:"WOO",fa:"وو نتورک",price:0,change:.6,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"TWT",fa:"تراست والت توکن",price:0,change:.8,networks:["BEP۲۰"]},
-  {symbol:"CRO",fa:"کرونوس",price:0,change:.5,networks:["Cronos","ERC۲۰"]},
-  {symbol:"OKB",fa:"اوکی‌ایکس توکن",price:0,change:.9,networks:["ERC۲۰","OKC"]},
+  {symbol:"BGB",fa:"بیت‌گت توکن",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"KCS",fa:"کوکوین توکن",price:0,change:Number.NaN,networks:["KCS"]},
+  {symbol:"WOO",fa:"وو نتورک",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"TWT",fa:"تراست والت توکن",price:0,change:Number.NaN,networks:["BEP۲۰"]},
+  {symbol:"CRO",fa:"کرونوس",price:0,change:Number.NaN,networks:["Cronos","ERC۲۰"]},
+  {symbol:"OKB",fa:"اوکی‌ایکس توکن",price:0,change:Number.NaN,networks:["ERC۲۰","OKC"]},
   // ─── Alternative Layer-1s ─────────────────────────────────────────────────
-  {symbol:"INJ",fa:"اینجکتیو",price:0,change:2.0,networks:["Injective","ERC۲۰"]},
-  {symbol:"VET",fa:"وی‌چین",price:0,change:.6,networks:["VeChain"]},
-  {symbol:"KAVA",fa:"کاوا",price:0,change:.7,networks:["Kava","Cosmos"]},
-  {symbol:"CELO",fa:"سلو",price:0,change:.5,networks:["Celo"]},
-  {symbol:"ROSE",fa:"اوسیس نتورک",price:0,change:.8,networks:["Oasis"]},
-  {symbol:"WAVES",fa:"ویوز",price:0,change:.4,networks:["Waves"]},
-  {symbol:"NEO",fa:"نئو",price:0,change:.5,networks:["Neo"]},
-  {symbol:"QTUM",fa:"کوانتوم",price:0,change:.3,networks:["Qtum"]},
-  {symbol:"FTM",fa:"فانتوم",price:0,change:1.1,networks:["Fantom","ERC۲۰","BEP۲۰"]},
-  {symbol:"EOS",fa:"ایوس",price:0,change:.4,networks:["EOS"]},
-  {symbol:"HIVE",fa:"هایو",price:0,change:.3,networks:["Hive"]},
-  {symbol:"LSK",fa:"لیسک",price:0,change:.5,networks:["Lisk"]},
-  {symbol:"ARK",fa:"آرک",price:0,change:.4,networks:["Ark"]},
-  {symbol:"IOST",fa:"آی‌اوست",price:0,change:.3,networks:["IOST"]},
-  {symbol:"NULS",fa:"نالس",price:0,change:.4,networks:["NULS"]},
-  {symbol:"DUSK",fa:"داسک",price:0,change:.5,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"INJ",fa:"اینجکتیو",price:0,change:Number.NaN,networks:["Injective","ERC۲۰"]},
+  {symbol:"VET",fa:"وی‌چین",price:0,change:Number.NaN,networks:["VeChain"]},
+  {symbol:"KAVA",fa:"کاوا",price:0,change:Number.NaN,networks:["Kava","Cosmos"]},
+  {symbol:"CELO",fa:"سلو",price:0,change:Number.NaN,networks:["Celo"]},
+  {symbol:"ROSE",fa:"اوسیس نتورک",price:0,change:Number.NaN,networks:["Oasis"]},
+  {symbol:"WAVES",fa:"ویوز",price:0,change:Number.NaN,networks:["Waves"]},
+  {symbol:"NEO",fa:"نئو",price:0,change:Number.NaN,networks:["Neo"]},
+  {symbol:"QTUM",fa:"کوانتوم",price:0,change:Number.NaN,networks:["Qtum"]},
+  {symbol:"FTM",fa:"فانتوم",price:0,change:Number.NaN,networks:["Fantom","ERC۲۰","BEP۲۰"]},
+  {symbol:"EOS",fa:"ایوس",price:0,change:Number.NaN,networks:["EOS"]},
+  {symbol:"HIVE",fa:"هایو",price:0,change:Number.NaN,networks:["Hive"]},
+  {symbol:"LSK",fa:"لیسک",price:0,change:Number.NaN,networks:["Lisk"]},
+  {symbol:"ARK",fa:"آرک",price:0,change:Number.NaN,networks:["Ark"]},
+  {symbol:"IOST",fa:"آی‌اوست",price:0,change:Number.NaN,networks:["IOST"]},
+  {symbol:"NULS",fa:"نالس",price:0,change:Number.NaN,networks:["NULS"]},
+  {symbol:"DUSK",fa:"داسک",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
   // ─── Gaming / NFT (additional) ────────────────────────────────────────────
-  {symbol:"ILV",fa:"ایلووویوم",price:0,change:.8,networks:["ERC۲۰"]},
-  {symbol:"LOOKS",fa:"لوکس‌رر",price:0,change:.5,networks:["ERC۲۰"]},
-  {symbol:"AUDIO",fa:"اودیوس",price:0,change:.6,networks:["Solana","ERC۲۰"]},
-  {symbol:"TLM",fa:"تلوم",price:0,change:.4,networks:["BEP۲۰","ERC۲۰","WAX"]},
-  {symbol:"PIXEL",fa:"پیکسل",price:0,change:.7,networks:["Ronin","ERC۲۰"]},
-  {symbol:"VOXEL",fa:"ووکسل",price:0,change:.5,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"SLP",fa:"اسموث لاو",price:0,change:-.3,networks:["Ronin","ERC۲۰"]},
+  {symbol:"ILV",fa:"ایلووویوم",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"LOOKS",fa:"لوکس‌رر",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"AUDIO",fa:"اودیوس",price:0,change:Number.NaN,networks:["Solana","ERC۲۰"]},
+  {symbol:"TLM",fa:"تلوم",price:0,change:Number.NaN,networks:["BEP۲۰","ERC۲۰","WAX"]},
+  {symbol:"PIXEL",fa:"پیکسل",price:0,change:Number.NaN,networks:["Ronin","ERC۲۰"]},
+  {symbol:"VOXEL",fa:"ووکسل",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"SLP",fa:"اسموث لاو",price:0,change:Number.NaN,networks:["Ronin","ERC۲۰"]},
   // ─── DeFi / DEX (additional) ─────────────────────────────────────────────
-  {symbol:"ACH",fa:"الکیمی پی",price:0,change:.4,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"OGN",fa:"اوریجین پروتکل",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"UNFI",fa:"یونی‌فای",price:0,change:.5,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"PUNDIX",fa:"پوندی‌ایکس",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"REEF",fa:"ریف فایننس",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"CYBER",fa:"سایبرکانکت",price:0,change:.7,networks:["BNB Chain","ERC۲۰"]},
-  {symbol:"HOOK",fa:"هوکد پروتکل",price:0,change:.5,networks:["BNB Chain"]},
-  {symbol:"HFT",fa:"هشفلو",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"CHESS",fa:"ترانچس",price:0,change:.3,networks:["BEP۲۰","ERC۲۰"]},
-  {symbol:"LIT",fa:"لیتنتری",price:0,change:.5,networks:["ERC۲۰","BEP۲۰"]},
-  {symbol:"XVS",fa:"ونوس",price:0,change:.6,networks:["BEP۲۰"]},
-  {symbol:"BAKE",fa:"بیکری سواپ",price:0,change:.4,networks:["BEP۲۰"]},
-  {symbol:"NFP",fa:"ان‌اف‌پرامپت",price:0,change:.5,networks:["BNB Chain"]},
-  {symbol:"ACE",fa:"اندورنس",price:0,change:.6,networks:["BNB Chain"]},
-  {symbol:"LUNC",fa:"لونا کلاسیک",price:0,change:-.5,networks:["Terra Classic"]},
+  {symbol:"ACH",fa:"الکیمی پی",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"OGN",fa:"اوریجین پروتکل",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"UNFI",fa:"یونی‌فای",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"PUNDIX",fa:"پوندی‌ایکس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"REEF",fa:"ریف فایننس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"CYBER",fa:"سایبرکانکت",price:0,change:Number.NaN,networks:["BNB Chain","ERC۲۰"]},
+  {symbol:"HOOK",fa:"هوکد پروتکل",price:0,change:Number.NaN,networks:["BNB Chain"]},
+  {symbol:"HFT",fa:"هشفلو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"CHESS",fa:"ترانچس",price:0,change:Number.NaN,networks:["BEP۲۰","ERC۲۰"]},
+  {symbol:"LIT",fa:"لیتنتری",price:0,change:Number.NaN,networks:["ERC۲۰","BEP۲۰"]},
+  {symbol:"XVS",fa:"ونوس",price:0,change:Number.NaN,networks:["BEP۲۰"]},
+  {symbol:"BAKE",fa:"بیکری سواپ",price:0,change:Number.NaN,networks:["BEP۲۰"]},
+  {symbol:"NFP",fa:"ان‌اف‌پرامپت",price:0,change:Number.NaN,networks:["BNB Chain"]},
+  {symbol:"ACE",fa:"اندورنس",price:0,change:Number.NaN,networks:["BNB Chain"]},
+  {symbol:"LUNC",fa:"لونا کلاسیک",price:0,change:Number.NaN,networks:["Terra Classic"]},
   // ─── Payments & Privacy (additional) ────────────────────────────────────
-  {symbol:"CTXC",fa:"کورتکس",price:0,change:.4,networks:["ERC۲۰"]},
+  {symbol:"CTXC",fa:"کورتکس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Exchange Tokens (additional) ────────────────────────────────────────
-  {symbol:"GT",fa:"گیت توکن",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"MX",fa:"ام اکس توکن",price:0,change:.2,networks:["ERC۲۰"]},
-  {symbol:"HT",fa:"هیوبی توکن",price:0,change:.2,networks:["ERC۲۰"]},
+  {symbol:"GT",fa:"گیت توکن",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"MX",fa:"ام اکس توکن",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"HT",fa:"هیوبی توکن",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Layer-1 (additional) ────────────────────────────────────────────────
-  {symbol:"THETA",fa:"تتا نتورک",price:0,change:.4,networks:["Theta"]},
-  {symbol:"TFUEL",fa:"تتا فیول",price:0,change:.3,networks:["Theta"]},
-  {symbol:"DCR",fa:"دیکرد",price:0,change:.2,networks:["Decred"]},
-  {symbol:"XEC",fa:"ای کش",price:0,change:.1,networks:["eCash"]},
-  {symbol:"KSM",fa:"کوساما",price:0,change:-.3,networks:["Kusama"]},
-  {symbol:"ONT",fa:"آنتولوژی",price:0,change:.2,networks:["Ontology"]},
-  {symbol:"ELF",fa:"الف",price:0,change:.1,networks:["ERC۲۰","aelf"]},
-  {symbol:"CKB",fa:"سیکی بایت",price:0,change:.2,networks:["Nervos"]},
-  {symbol:"ASTR",fa:"استار نتورک",price:0,change:.3,networks:["Astar"]},
-  {symbol:"CSPR",fa:"کسپر نتورک",price:0,change:.1,networks:["Casper"]},
-  {symbol:"GLMR",fa:"مون بیم",price:0,change:-.2,networks:["Moonbeam"]},
-  {symbol:"BTG",fa:"بیت کوین گلد",price:0,change:.2,networks:["BTG"]},
-  {symbol:"CFX",fa:"کانفلاکس",price:0,change:.3,networks:["Conflux"]},
-  {symbol:"KLAY",fa:"کلایتن",price:0,change:.1,networks:["Klaytn"]},
-  {symbol:"ICX",fa:"آیکون",price:0,change:.1,networks:["ICON"]},
-  {symbol:"XDC",fa:"اکس دی سی",price:0,change:.2,networks:["XDC"]},
-  {symbol:"LEO",fa:"لئو",price:0,change:.1,networks:["ERC۲۰"]},
-  {symbol:"PI",fa:"پای نتورک",price:0,change:.5,networks:["Pi Network"]},
+  {symbol:"THETA",fa:"تتا نتورک",price:0,change:Number.NaN,networks:["Theta"]},
+  {symbol:"TFUEL",fa:"تتا فیول",price:0,change:Number.NaN,networks:["Theta"]},
+  {symbol:"DCR",fa:"دیکرد",price:0,change:Number.NaN,networks:["Decred"]},
+  {symbol:"XEC",fa:"ای کش",price:0,change:Number.NaN,networks:["eCash"]},
+  {symbol:"KSM",fa:"کوساما",price:0,change:Number.NaN,networks:["Kusama"]},
+  {symbol:"ONT",fa:"آنتولوژی",price:0,change:Number.NaN,networks:["Ontology"]},
+  {symbol:"ELF",fa:"الف",price:0,change:Number.NaN,networks:["ERC۲۰","aelf"]},
+  {symbol:"CKB",fa:"سیکی بایت",price:0,change:Number.NaN,networks:["Nervos"]},
+  {symbol:"ASTR",fa:"استار نتورک",price:0,change:Number.NaN,networks:["Astar"]},
+  {symbol:"CSPR",fa:"کسپر نتورک",price:0,change:Number.NaN,networks:["Casper"]},
+  {symbol:"GLMR",fa:"مون بیم",price:0,change:Number.NaN,networks:["Moonbeam"]},
+  {symbol:"BTG",fa:"بیت کوین گلد",price:0,change:Number.NaN,networks:["BTG"]},
+  {symbol:"CFX",fa:"کانفلاکس",price:0,change:Number.NaN,networks:["Conflux"]},
+  {symbol:"KLAY",fa:"کلایتن",price:0,change:Number.NaN,networks:["Klaytn"]},
+  {symbol:"ICX",fa:"آیکون",price:0,change:Number.NaN,networks:["ICON"]},
+  {symbol:"XDC",fa:"اکس دی سی",price:0,change:Number.NaN,networks:["XDC"]},
+  {symbol:"LEO",fa:"لئو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"PI",fa:"پای نتورک",price:0,change:Number.NaN,networks:["Pi Network"]},
   // ─── Scaling / L2 (additional) ───────────────────────────────────────────
-  {symbol:"METIS",fa:"متیس",price:0,change:.5,networks:["Metis"]},
-  {symbol:"MINA",fa:"مینا پروتکل",price:0,change:.3,networks:["Mina"]},
-  {symbol:"ZETA",fa:"زتا چین",price:0,change:.4,networks:["ZetaChain"]},
-  {symbol:"RON",fa:"رونین",price:0,change:.5,networks:["Ronin"]},
-  {symbol:"DYM",fa:"دایمنشن",price:0,change:.4,networks:["Dymension"]},
-  {symbol:"AXL",fa:"اکسلار",price:0,change:.3,networks:["Axelar"]},
-  {symbol:"SAGA",fa:"ساگا",price:0,change:.4,networks:["Saga"]},
-  {symbol:"OMNI",fa:"امنی نتورک",price:0,change:.3,networks:["Omni"]},
-  {symbol:"CORE",fa:"کور دائو",price:0,change:.4,networks:["Core DAO"]},
+  {symbol:"METIS",fa:"متیس",price:0,change:Number.NaN,networks:["Metis"]},
+  {symbol:"MINA",fa:"مینا پروتکل",price:0,change:Number.NaN,networks:["Mina"]},
+  {symbol:"ZETA",fa:"زتا چین",price:0,change:Number.NaN,networks:["ZetaChain"]},
+  {symbol:"RON",fa:"رونین",price:0,change:Number.NaN,networks:["Ronin"]},
+  {symbol:"DYM",fa:"دایمنشن",price:0,change:Number.NaN,networks:["Dymension"]},
+  {symbol:"AXL",fa:"اکسلار",price:0,change:Number.NaN,networks:["Axelar"]},
+  {symbol:"SAGA",fa:"ساگا",price:0,change:Number.NaN,networks:["Saga"]},
+  {symbol:"OMNI",fa:"امنی نتورک",price:0,change:Number.NaN,networks:["Omni"]},
+  {symbol:"CORE",fa:"کور دائو",price:0,change:Number.NaN,networks:["Core DAO"]},
   // ─── AI / Data (additional) ──────────────────────────────────────────────
-  {symbol:"AR",fa:"آرویو",price:0,change:.5,networks:["Arweave"]},
-  {symbol:"NKN",fa:"ان کی ان",price:0,change:.2,networks:["NKN"]},
-  {symbol:"AIOZ",fa:"آیوز نتورک",price:0,change:.4,networks:["ERC۲۰","BNB Chain"]},
-  {symbol:"AI16Z",fa:"ای آی ۱۶ زد",price:0,change:.7,networks:["Solana"]},
-  {symbol:"TRAC",fa:"اوریجین تریل",price:0,change:.3,networks:["ERC۲۰"]},
+  {symbol:"AR",fa:"آرویو",price:0,change:Number.NaN,networks:["Arweave"]},
+  {symbol:"NKN",fa:"ان کی ان",price:0,change:Number.NaN,networks:["NKN"]},
+  {symbol:"AIOZ",fa:"آیوز نتورک",price:0,change:Number.NaN,networks:["ERC۲۰","BNB Chain"]},
+  {symbol:"AI16Z",fa:"ای آی ۱۶ زد",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"TRAC",fa:"اوریجین تریل",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── DeFi / DEX (additional) ─────────────────────────────────────────────
-  {symbol:"ZRO",fa:"لیر زیرو",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"C98",fa:"کوین ۹۸",price:0,change:.3,networks:["BNB Chain","Solana"]},
-  {symbol:"CHR",fa:"کرومیا",price:0,change:.2,networks:["ERC۲۰"]},
-  {symbol:"GAL",fa:"گلکسی",price:0,change:.4,networks:["BNB Chain","ERC۲۰"]},
-  {symbol:"LUNA",fa:"لونا",price:0,change:-.5,networks:["Terra"]},
-  {symbol:"VANA",fa:"وانا",price:0,change:.6,networks:["ERC۲۰"]},
-  {symbol:"KNC",fa:"کایبر نتورک",price:0,change:-.3,networks:["ERC۲۰"]},
-  {symbol:"BNT",fa:"بنکر",price:0,change:.1,networks:["ERC۲۰"]},
-  {symbol:"RLC",fa:"آی اگزک",price:0,change:.2,networks:["ERC۲۰"]},
-  {symbol:"REN",fa:"رن پروتکل",price:0,change:-.4,networks:["ERC۲۰"]},
-  {symbol:"OXT",fa:"ارکید",price:0,change:.1,networks:["ERC۲۰"]},
-  {symbol:"CVC",fa:"سیویک",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"SSV",fa:"اس اس وی نتورک",price:0,change:.5,networks:["ERC۲۰"]},
-  {symbol:"YGG",fa:"ییلد گیلد گیمز",price:0,change:.4,networks:["ERC۲۰"]},
-  {symbol:"SPELL",fa:"اسپل توکن",price:0,change:-.5,networks:["ERC۲۰","Arbitrum"]},
-  {symbol:"BANANA",fa:"بنانا گان",price:0,change:.8,networks:["ERC۲۰"]},
-  {symbol:"PYR",fa:"ولکان فورجد",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"MTL",fa:"متال",price:0,change:.2,networks:["ERC۲۰"]},
-  {symbol:"BSW",fa:"بای سواپ",price:0,change:.3,networks:["BNB Chain"]},
-  {symbol:"HIFI",fa:"های‌فای",price:0,change:.2,networks:["ERC۲۰"]},
-  {symbol:"AMP",fa:"امپ",price:0,change:.2,networks:["ERC۲۰"]},
+  {symbol:"ZRO",fa:"لیر زیرو",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"C98",fa:"کوین ۹۸",price:0,change:Number.NaN,networks:["BNB Chain","Solana"]},
+  {symbol:"CHR",fa:"کرومیا",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"GAL",fa:"گلکسی",price:0,change:Number.NaN,networks:["BNB Chain","ERC۲۰"]},
+  {symbol:"LUNA",fa:"لونا",price:0,change:Number.NaN,networks:["Terra"]},
+  {symbol:"VANA",fa:"وانا",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"KNC",fa:"کایبر نتورک",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"BNT",fa:"بنکر",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"RLC",fa:"آی اگزک",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"REN",fa:"رن پروتکل",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"OXT",fa:"ارکید",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"CVC",fa:"سیویک",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"SSV",fa:"اس اس وی نتورک",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"YGG",fa:"ییلد گیلد گیمز",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"SPELL",fa:"اسپل توکن",price:0,change:Number.NaN,networks:["ERC۲۰","Arbitrum"]},
+  {symbol:"BANANA",fa:"بنانا گان",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"PYR",fa:"ولکان فورجد",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"MTL",fa:"متال",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"BSW",fa:"بای سواپ",price:0,change:Number.NaN,networks:["BNB Chain"]},
+  {symbol:"HIFI",fa:"های‌فای",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"AMP",fa:"امپ",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Gaming / NFT (additional) ───────────────────────────────────────────
-  {symbol:"WAXP",fa:"واکس",price:0,change:.2,networks:["WAX"]},
-  {symbol:"OMG",fa:"او ام جی",price:0,change:.1,networks:["ERC۲۰"]},
+  {symbol:"WAXP",fa:"واکس",price:0,change:Number.NaN,networks:["WAX"]},
+  {symbol:"OMG",fa:"او ام جی",price:0,change:Number.NaN,networks:["ERC۲۰"]},
   // ─── Infrastructure (additional) ─────────────────────────────────────────
-  {symbol:"WEMIX",fa:"ومیکس",price:0,change:.3,networks:["WEMIX"]},
-  {symbol:"SFP",fa:"سیف پل",price:0,change:.3,networks:["BNB Chain","ERC۲۰"]},
-  {symbol:"HNT",fa:"هلیوم",price:0,change:.4,networks:["Solana","HNT"]},
-  {symbol:"VTHO",fa:"وتور",price:0,change:.2,networks:["VeChain"]},
-  {symbol:"IOTX",fa:"آیوتکس",price:0,change:.3,networks:["IoTeX","ERC۲۰"]},
-  {symbol:"GRASS",fa:"گرس",price:0,change:.7,networks:["Solana"]},
-  {symbol:"BEAM",fa:"بیم",price:0,change:.4,networks:["Beam"]},
-  {symbol:"GAS",fa:"گس",price:0,change:.3,networks:["NEO"]},
-  {symbol:"AKT",fa:"آکاش نتورک",price:0,change:.3,networks:["Cosmos"]},
-  {symbol:"BORG",fa:"سوییس بورگ",price:0,change:.2,networks:["ERC۲۰"]},
-  {symbol:"CFG",fa:"سنتریفیوژ",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"STRD",fa:"استراید",price:0,change:.3,networks:["Cosmos"]},
-  {symbol:"XCH",fa:"چیا",price:0,change:.2,networks:["Chia"]},
-  {symbol:"POLYX",fa:"پالی مش",price:0,change:.2,networks:["Polymesh"]},
-  {symbol:"REQ",fa:"ریکوئست",price:0,change:.2,networks:["ERC۲۰","Polygon"]},
+  {symbol:"WEMIX",fa:"ومیکس",price:0,change:Number.NaN,networks:["WEMIX"]},
+  {symbol:"SFP",fa:"سیف پل",price:0,change:Number.NaN,networks:["BNB Chain","ERC۲۰"]},
+  {symbol:"HNT",fa:"هلیوم",price:0,change:Number.NaN,networks:["Solana","HNT"]},
+  {symbol:"VTHO",fa:"وتور",price:0,change:Number.NaN,networks:["VeChain"]},
+  {symbol:"IOTX",fa:"آیوتکس",price:0,change:Number.NaN,networks:["IoTeX","ERC۲۰"]},
+  {symbol:"GRASS",fa:"گرس",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"BEAM",fa:"بیم",price:0,change:Number.NaN,networks:["Beam"]},
+  {symbol:"GAS",fa:"گس",price:0,change:Number.NaN,networks:["NEO"]},
+  {symbol:"AKT",fa:"آکاش نتورک",price:0,change:Number.NaN,networks:["Cosmos"]},
+  {symbol:"BORG",fa:"سوییس بورگ",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"CFG",fa:"سنتریفیوژ",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"STRD",fa:"استراید",price:0,change:Number.NaN,networks:["Cosmos"]},
+  {symbol:"XCH",fa:"چیا",price:0,change:Number.NaN,networks:["Chia"]},
+  {symbol:"POLYX",fa:"پالی مش",price:0,change:Number.NaN,networks:["Polymesh"]},
+  {symbol:"REQ",fa:"ریکوئست",price:0,change:Number.NaN,networks:["ERC۲۰","Polygon"]},
   // ─── Meme / Community (additional) ───────────────────────────────────────
-  {symbol:"TRUMP",fa:"ترامپ",price:0,change:1.2,networks:["Solana"]},
-  {symbol:"BRETT",fa:"برت",price:0,change:.8,networks:["Base"]},
-  {symbol:"PNUT",fa:"پینات",price:0,change:.9,networks:["Solana"]},
-  {symbol:"MEW",fa:"میو کت",price:0,change:.7,networks:["Solana"]},
-  {symbol:"ME",fa:"مجیک ادن",price:0,change:.6,networks:["Solana"]},
+  {symbol:"TRUMP",fa:"ترامپ",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"BRETT",fa:"برت",price:0,change:Number.NaN,networks:["Base"]},
+  {symbol:"PNUT",fa:"پینات",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"MEW",fa:"میو کت",price:0,change:Number.NaN,networks:["Solana"]},
+  {symbol:"ME",fa:"مجیک ادن",price:0,change:Number.NaN,networks:["Solana"]},
   // ─── Payments (additional) ───────────────────────────────────────────────
-  {symbol:"SXP",fa:"سولار",price:0,change:.2,networks:["BNB Chain","ERC۲۰"]},
-  {symbol:"TEL",fa:"تل کوین",price:0,change:.1,networks:["ERC۲۰"]},
-  {symbol:"RSR",fa:"رزرو رایتس",price:0,change:.3,networks:["ERC۲۰"]},
-  {symbol:"WIN",fa:"وین لینک",price:0,change:.4,networks:["TRON","BNB Chain"]},
-  {symbol:"MBL",fa:"مووی بلاک",price:0,change:.2,networks:["BNB Chain"]},
-  {symbol:"RLB",fa:"رولبیت",price:0,change:.4,networks:["ERC۲۰"]},
+  {symbol:"SXP",fa:"سولار",price:0,change:Number.NaN,networks:["BNB Chain","ERC۲۰"]},
+  {symbol:"TEL",fa:"تل کوین",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"RSR",fa:"رزرو رایتس",price:0,change:Number.NaN,networks:["ERC۲۰"]},
+  {symbol:"WIN",fa:"وین لینک",price:0,change:Number.NaN,networks:["TRON","BNB Chain"]},
+  {symbol:"MBL",fa:"مووی بلاک",price:0,change:Number.NaN,networks:["BNB Chain"]},
+  {symbol:"RLB",fa:"رولبیت",price:0,change:Number.NaN,networks:["ERC۲۰"]},
 ];
 function CoinLogo({symbol,size=32}:{symbol:string;size?:number}){return <img className="coin-logo" width={size} height={size} src={`https://assets.coincap.io/assets/icons/${symbol.toLowerCase()}@2x.png`} alt={`لوگوی ${symbol}`} onError={e=>{e.currentTarget.style.visibility="hidden"}}/>}
 const TMN_LOGO=(()=>{const s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><defs><clipPath id="tc"><circle cx="15" cy="15" r="15"/></clipPath></defs><g clip-path="url(#tc)"><rect y="0" width="30" height="10" fill="#1a7f3c"/><rect y="10" width="30" height="10" fill="#f5f5f5"/><rect y="20" width="30" height="11" fill="#c0392b"/></g><text x="15" y="20" text-anchor="middle" font-size="11" font-weight="900" fill="rgba(0,0,0,0.45)" font-family="sans-serif">T</text></svg>';return`data:image/svg+xml;base64,${btoa(s)}`;})();
@@ -4518,10 +4286,8 @@ function PairLogos({base,quote="TMN",baseSize=26,quoteSize=15}:{base:string;quot
 // ─── Forex Bot Screen ─────────────────────────────────────────────────────────
 type BotStatus = "inactive"|"pending"|"active";
 interface BotSession{id:string;amount:number;activatedAt:string;deactivatedAt?:string;pnl?:number}
-function getBotState(phone:string):{status:BotStatus;amount:number;activatedAt?:string;lastDeactivatedAt?:string;sessions:BotSession[]}{
-  try{return JSON.parse(localStorage.getItem(`anp_bot_${phone}`)||"null")||{status:"inactive",amount:0,sessions:[]};}catch{return{status:"inactive",amount:0,sessions:[]};}
-}
-function saveBotState(phone:string,s:ReturnType<typeof getBotState>){localStorage.setItem(`anp_bot_${phone}`,JSON.stringify(s));}
+function getBotState(_phone:string):{status:BotStatus;amount:number;activatedAt?:string;lastDeactivatedAt?:string;sessions:BotSession[]}{return{status:"inactive",amount:0,sessions:[]};}
+function saveBotState(_phone:string,_s:ReturnType<typeof getBotState>){}
 
 function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void}){
   const [bs,setBs]=useState(()=>getBotState(user.phone));
@@ -4536,6 +4302,8 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
   const [showHelp,setShowHelp]=useState(false);
   const [helpOpen,setHelpOpen]=useState<number|null>(null);
   const [showPdfPopup,setShowPdfPopup]=useState(false);
+  const [liveForexWallet,setLiveForexWallet]=useState(0);
+  useEffect(()=>{let active=true;const load=async()=>{try{const w=await sarrafWalletMap();if(active)setLiveForexWallet(Number(w.USDT??0));}catch{if(active)setLiveForexWallet(0);}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;window.clearInterval(id)}},[user.uid]);
 
   useEffect(()=>{const id=setInterval(()=>setTick(t=>t+1),400);return()=>clearInterval(id);},[]);
 
@@ -4548,64 +4316,19 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
     }
   },[bs]);
 
-  useEffect(()=>{
-    if(bs.status==="pending"){
-      const t=setTimeout(()=>{
-        const next={...bs,status:"active" as BotStatus};
-        saveBotState(user.phone,next);
-        setBs(next);
-      },4000);
-      return()=>clearTimeout(t);
-    }
-  },[bs.status]);
-
-  const displayUsdt = user.usdtBalance > 0 ? user.usdtBalance : 50;
+  const displayUsdt = liveForexWallet;
   const maxAlloc=Math.max(0,displayUsdt-3);
   const allocNum=Number(toLatinDigits(amount))||0;
 
-  const handleActivate=()=>{
-    if(!allocNum||allocNum<=0){setAmountErr("مقدار را وارد کنید.");return;}
-    if(allocNum>maxAlloc){setAmountErr(`حداکثر ${faFixed(maxAlloc,2)} دلار تتر می‌توانید تخصیص دهید.`);return;}
-    setAmountErr("");
-    const nextUser={...user,usdtBalance:user.usdtBalance-allocNum};
-    onUpdate(nextUser,{id:genId(),userId:user.phone,type:"service",fromAsset:"usdt",toAsset:"usdt",amount:allocNum,fee:0,status:"done",createdAt:new Date().toISOString(),note:`ربات فارکس · تخصیص ${faFixed(allocNum,2)} USDT`});
-    const newSession:BotSession={id:genId(),amount:allocNum,activatedAt:new Date().toISOString()};
-    const next:typeof bs={...bs,status:"pending",amount:allocNum,activatedAt:new Date().toISOString(),sessions:[newSession,...bs.sessions]};
-    saveBotState(user.phone,next);
-    setBs(next);
-    setShowCandlePopup(true);
-  };
+  const handleActivate=()=>{setAmountErr("اجرای واقعی فارکس‌بات هنوز به Backend متصل نشده است؛ هیچ مبلغی از موجودی کسر نمی‌شود.");};
 
-  const handleDeactivate=()=>{
-    setDeactivating(true);
-    setTimeout(()=>{
-      const mockPnl=(Math.random()>0.5?1:-1)*allocNum*0.05;
-      const returned=allocNum+(mockPnl>0?mockPnl:0);
-      const nextUser={...user,usdtBalance:user.usdtBalance+returned};
-      onUpdate(nextUser,{id:genId(),userId:user.phone,type:"service",fromAsset:"usdt",toAsset:"usdt",amount:returned,fee:0,status:"done",createdAt:new Date().toISOString(),note:`ربات فارکس · بازگشت ${faFixed(returned,2)} USDT · ${mockPnl>=0?"سود":"زیان"} ${faFixed(Math.abs(mockPnl),2)}`});
-      const updatedSessions=bs.sessions.map((s,i)=>i===0?{...s,deactivatedAt:new Date().toISOString(),pnl:mockPnl}:s);
-      const next:typeof bs={status:"inactive",amount:0,lastDeactivatedAt:new Date().toISOString(),sessions:updatedSessions};
-      saveBotState(user.phone,next);
-      setBs(next);
-      setShowCandlePopup(false);
-      setShowDeactivateConfirm(false);
-      setDeactivating(false);
-      setAmount("");
-      setCooledDown(false);
-    },2000);
-  };
+  const handleDeactivate=()=>{setAmountErr("اجرای واقعی فارکس‌بات هنوز به Backend متصل نشده است؛ هیچ سود یا زیان ساختگی ثبت نمی‌شود.");};
 
   const totalPnl=bs.sessions.reduce((a,s)=>a+(s.pnl||0),0);
   const cooldownRemaining=bs.lastDeactivatedAt?Math.max(0,24*60*60*1000-(Date.now()-new Date(bs.lastDeactivatedAt).getTime())):0;
   const cooldownHours=Math.ceil(cooldownRemaining/3600000);
 
-  const candles=Array.from({length:12},(_,i)=>{
-    const h=30+Math.sin(i*1.3+tick*0.5)*18;
-    const l=h-10-Math.abs(Math.sin(i*0.8+tick*0.3))*15;
-    const o=l+Math.random()*((h-l)*0.3);
-    const c=l+Math.random()*((h-l)*0.7);
-    return{h,l,o,c,bull:c>=o};
-  });
+  const candles: Array<{h:number;l:number;o:number;c:number;bull:boolean}> = [];
 
   const faqTopics=[
     {q:"فارکس چیست؟",a:"فارکس (Foreign Exchange) بزرگترین بازار مالی جهان است که در آن ارزهای مختلف کشورها خرید و فروش می‌شوند. حجم روزانه آن به بیش از ۶ تریلیون دلار می‌رسد."},
@@ -4663,7 +4386,7 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
         <div style={{position:"absolute",left:-20,bottom:-20,width:100,height:100,borderRadius:"50%",background:"rgba(255,255,255,0.03)"}}/>
         <div style={{fontSize:11,opacity:0.65,marginBottom:8,letterSpacing:0.5}}>موجودی کل دارایی USDT</div>
         <div style={{fontSize:34,fontWeight:900,marginBottom:2,letterSpacing:-1}}>{faFixed(displayUsdt,2)}<span style={{fontSize:15,opacity:0.7,marginRight:8}}>دلار تتر</span></div>
-        <div style={{fontSize:13,opacity:0.55,marginBottom:16}}>{fa(Math.round(displayUsdt*87500))} تومان</div>
+        <div style={{fontSize:13,opacity:0.55,marginBottom:16}}>{displayUsdt>0?"—":"—"} تومان</div>
         <div style={{display:"flex",gap:16,flexWrap:"wrap",alignItems:"center"}}>
           <div>
             <div style={{fontSize:10,opacity:0.55,marginBottom:3}}>سود/زیان کل</div>
@@ -5213,14 +4936,14 @@ function QrScannerOverlay({onClose,onScan}:{onClose:()=>void;onScan:(addr:string
   </div>;
 }
 
-function TomanWithdrawScreen({user,onBack,onGoHome,onHistory}:{user:UserData;onBack:()=>void;onGoHome:()=>void;onHistory?:()=>void}){
+function TomanWithdrawScreen({user,available,onBack,onGoHome,onHistory}:{user:UserData;available:number;onBack:()=>void;onGoHome:()=>void;onHistory?:()=>void}){
   const [selCard,setSelCard]=useState<BankCard|null>(user.cards[0]||null);
   const [showCardPicker,setShowCardPicker]=useState(false);
   const [twAmount,setTwAmount]=useState("");
   const [showOtp,setShowOtp]=useState(false);
   const [err,setErr]=useState("");
   const twAmtNum=parseInt(toLatinDigits(twAmount).replace(/\D/g,""))||0;
-  const withdrawValid=!!selCard&&twAmtNum>0&&twAmtNum<=user.tomanBalance;
+  const withdrawValid=!!selCard&&twAmtNum>0&&twAmtNum<=available;
   const fmtCard=(v:string)=>v.replace(/(.{4})(?=.)/g,"$1 ");
   const submit=()=>{
     if(!selCard){setErr("کارت مقصد را انتخاب کنید.");return;}
@@ -5254,21 +4977,21 @@ function TomanWithdrawScreen({user,onBack,onGoHome,onHistory}:{user:UserData;onB
             )}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>
           </button>
-          <div style={{fontSize:13,color:"#e6a817",marginTop:6,padding:"8px 12px",background:"rgba(230,168,23,0.1)",borderRadius:10,border:"1px solid rgba(230,168,23,0.2)"}}>مقدار برداشت مجاز امروز برای شبای این کارت مبلغ ۱۰۰،۰۰۰،۰۰۰ تومان است.</div>
+          <div style={{fontSize:13,color:"#e6a817",marginTop:6,padding:"8px 12px",background:"rgba(230,168,23,0.1)",borderRadius:10,border:"1px solid rgba(230,168,23,0.2)"}}>مبلغ قابل برداشت در این صفحه از موجودی واقعی کیف پول آن صراف محاسبه می‌شود.</div>
         </div>
         <div className="bform-field" style={{marginBottom:8}}>
           <label className="field-label">مقدار برداشت به تومان</label>
           <div style={{display:"flex",alignItems:"center",gap:8,background:"var(--input-bg)",border:"1.5px solid var(--border-color)",borderRadius:16,padding:"4px 4px 4px 12px",minHeight:60}}>
             <input style={{flex:1,background:"none",border:"none",outline:"none",color:"var(--text-primary)",fontSize:17,fontFamily:"Vazirmatn",padding:"10px 4px",textAlign:"right",direction:"ltr",minWidth:0}}
               inputMode="numeric" placeholder="مبلغ مورد نظر" value={twAmtNum?fa(twAmtNum):""} onChange={e=>setTwAmount(toLatinDigits(e.target.value).replace(/\D/g,""))}/>
-            <button style={{fontSize:11,padding:"8px 12px",borderRadius:12,background:"var(--accent)",color:"#001",border:"none",cursor:"pointer",fontFamily:"Vazirmatn",fontWeight:700,flexShrink:0,whiteSpace:"nowrap",lineHeight:1.3}} onClick={()=>setTwAmount(String(user.tomanBalance))}>حداکثر<br/>قابل برداشت</button>
+            <button style={{fontSize:11,padding:"8px 12px",borderRadius:12,background:"var(--accent)",color:"#001",border:"none",cursor:"pointer",fontFamily:"Vazirmatn",fontWeight:700,flexShrink:0,whiteSpace:"nowrap",lineHeight:1.3}} onClick={()=>setTwAmount(String(available))}>حداکثر<br/>قابل برداشت</button>
           </div>
           {twAmtNum>0&&<div className="amount-words" style={{marginTop:4}}>{numToFaWords(twAmtNum)} تومان</div>}
-          <div style={{fontSize:13,color:"var(--text-muted)",marginTop:6,paddingRight:4}}>کل موجودی شما: <strong style={{color:"var(--text-primary)"}}>{fa(user.tomanBalance)}</strong> تومان</div>
+          <div style={{fontSize:13,color:"var(--text-muted)",marginTop:6,paddingRight:4}}>موجودی واقعی کیف پول: <strong style={{color:"var(--text-primary)"}}>{fa(available)}</strong> تومان</div>
         </div>
         {err&&<p className="field-err">{err}</p>}
         <div style={{borderRadius:12,padding:"14px",background:"var(--card-bg)",border:"1px solid var(--border-color)",marginTop:8}}>
-          <div style={{fontSize:13,color:"var(--text-muted)",lineHeight:2,marginBottom:10}}>مقدار حداکثر برداشت ۲۰،۰۰۰ تومان. درخواست‌های برداشت ثبت‌شده، وارد صف سیکل‌های پایا شده و در اولین سیکل یا در برخی موارد تا ۴۸ ساعت تسویه خواهد شد.</div>
+          <div style={{fontSize:13,color:"var(--text-muted)",lineHeight:2,marginBottom:10}}>ثبت و تسویه برداشت بانکی این مسیر هنوز به سرویس بانکی Backend متصل نشده است؛ تا اتصال آن هیچ برداشت ساختگی یا کسر موجودی محلی انجام نمی‌شود.</div>
           <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)",marginBottom:8}}>سیکل‌های پایا (روزهای غیر تعطیل)</div>
           {[["ثبت پیش از ۱۲ ظهر","ساعت ۱۲:۴۵ همان روز"],["ثبت پیش از ۱۸ عصر","ساعت ۱۸:۴۵ همان روز"],["ثبت پس از ساعت ۱۸ عصر","ساعت ۱۲:۴۵ روز کاری بعد"]].map(([a,b])=><div key={a} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"var(--text-muted)",padding:"5px 0",borderBottom:"1px solid var(--border-color)"}}><span>{a}</span><span style={{color:"var(--accent)"}}>{b}</span></div>)}
           <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)",margin:"10px 0 6px"}}>سیکل‌های پایا (روزهای تعطیل)</div>
@@ -5603,16 +5326,17 @@ function WithdrawPage({asset,network,available,processing,withdrawAddr,setWithdr
 
 function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexBot}:{user:UserData;onBack:()=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onUpdateUser?:(u:UserData)=>void;transactions:TxRecord[];onForexBot?:()=>void}){
   type View="home"|"markets"|"trade"|"assets"|"withdraw"|"deposit"|"deposit-select"|"history"|"fees"|"guide"|"instant"|"spot"|"margin"|"spot-chart"|"margin-chart"|"support"|"tickets"|"chat"|"withdraw-select"|"toman-withdraw"|"toman-deposit"|"coin-select"|"network-select"|"withdraw-confirm"|"tx-detail"|"trade-type-select"|"trade-display-select";
-  const [view,setView]=useState<View>("home"),[search,setSearch]=useState(""),[marketFilter,setMarketFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[asset,setAsset]=useState("USDT"),[network,setNetwork]=useState(""),[amount,setAmount]=useState(""),[address,setAddress]=useState(""),[picker,setPicker]=useState<"coin"|"network"|null>(null),[favorite,setFavorite]=useState<string[]>(()=>{const DEFAULTS=["BTC","ETH","SOL","BNB","DOGE"];try{const s=localStorage.getItem(`anp_exchange_favorites_${user.uid}`);if(s===null){localStorage.setItem(`anp_exchange_favorites_${user.uid}`,JSON.stringify(DEFAULTS));return DEFAULTS;}return JSON.parse(s)}catch{return DEFAULTS}}),[selectedAsset,setSelectedAsset]=useState("USDT"),[tradePicker,setTradePicker]=useState(false),[tradeDisplayPicker,setTradeDisplayPicker]=useState<null|"spot"|"margin">(null),[depositOpen,setDepositOpen]=useState(false),[notice,setNotice]=useState(""),[tradeSide,setTradeSide]=useState<"buy"|"sell">("buy"),[tradeAmount,setTradeAmount]=useState(""),[processing,setProcessing]=useState(false),[receipt,setReceipt]=useState<ReceiptData|null>(null),[coins,setCoins]=useState(EX_COINS),[marketUpdated,setMarketUpdated]=useState<Date|null>(null),[feeDetail,setFeeDetail]=useState<string|null>(null),[showWithdrawOtp,setShowWithdrawOtp]=useState(false),[withdrawSummary,setWithdrawSummary]=useState<{amount:string;destination:string;network:string;address:string}>({amount:"",destination:"",network:"",address:""}),[txDetailRecord,setTxDetailRecord]=useState<TxRecord|null>(null),[prevView,setPrevView]=useState<View>("history"),[selReturnView,setSelReturnView]=useState<View>("withdraw"),[balUnit,setBalUnit]=useState<"tmn"|"usdt">("tmn"),[hidden,setHidden]=useState(false),[toDepositTab,setToDepositTab]=useState<"card"|"paya">("card"),[withdrawAddr,setWithdrawAddr]=useState(""),[withdrawAmt,setWithdrawAmt]=useState("");
-  const pendingWithdrawCb=useRef<(()=>void)|null>(null);
+  const [view,setView]=useState<View>("home"),[search,setSearch]=useState(""),[marketFilter,setMarketFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[asset,setAsset]=useState("USDT"),[network,setNetwork]=useState(""),[amount,setAmount]=useState(""),[address,setAddress]=useState(""),[picker,setPicker]=useState<"coin"|"network"|null>(null),[favorite,setFavorite]=useState<string[]>(()=>{const DEFAULTS=["BTC","ETH","SOL","BNB","DOGE"];try{const s=localStorage.getItem(`anp_exchange_favorites_${user.uid}`);if(s===null){localStorage.setItem(`anp_exchange_favorites_${user.uid}`,JSON.stringify(DEFAULTS));return DEFAULTS;}return JSON.parse(s)}catch{return DEFAULTS}}),[selectedAsset,setSelectedAsset]=useState("USDT"),[tradePicker,setTradePicker]=useState(false),[tradeDisplayPicker,setTradeDisplayPicker]=useState<null|"spot"|"margin">(null),[depositOpen,setDepositOpen]=useState(false),[notice,setNotice]=useState(""),[tradeSide,setTradeSide]=useState<"buy"|"sell">("buy"),[tradeAmount,setTradeAmount]=useState(""),[processing,setProcessing]=useState(false),[receipt,setReceipt]=useState<ReceiptData|null>(null),[coins,setCoins]=useState(EX_COINS),[liveWallets,setLiveWallets]=useState<Record<string,number>>({}),[marketUpdated,setMarketUpdated]=useState<Date|null>(null),[feeDetail,setFeeDetail]=useState<string|null>(null),[showWithdrawOtp,setShowWithdrawOtp]=useState(false),[withdrawSummary,setWithdrawSummary]=useState<{amount:string;destination:string;network:string;address:string}>({amount:"",destination:"",network:"",address:""}),[txDetailRecord,setTxDetailRecord]=useState<TxRecord|null>(null),[prevView,setPrevView]=useState<View>("history"),[selReturnView,setSelReturnView]=useState<View>("withdraw"),[balUnit,setBalUnit]=useState<"tmn"|"usdt">("tmn"),[hidden,setHidden]=useState(false),[toDepositTab,setToDepositTab]=useState<"card"|"paya">("card"),[withdrawAddr,setWithdrawAddr]=useState(""),[withdrawAmt,setWithdrawAmt]=useState("");
+  const pendingWithdrawCb=useRef<(()=>void)|null>(null); const liveRate=Number(coins.find(c=>c.symbol==="USDT")?.price??0);
   const [kycFlow,setKycFlow]=useState<null|"photo"|"profile"|"anim">(null);
   const [kycPhoto,setKycPhoto]=useState("");
   const [kycProfile,setKycProfile]=useState({name:"",family:"",nationalId:"",birthDate:""});
   const [kycFailed,setKycFailed]=useState(false);
   const [pendingKycDest,setPendingKycDest]=useState<View>("assets");
   const goWithKyc=(dest:View)=>{if(user.kycDone){go(dest);return;}setPendingKycDest(dest);setKycFlow("photo");setKycFailed(false);};
-  useEffect(()=>{let active=true;const load=async()=>{try{const r=await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes`,{signal:AbortSignal.timeout(7000),cache:"no-store"});if(!r.ok)throw new Error("market_data_unavailable");const d=await r.json();const quotes=Array.isArray(d?.quotes)?d.quotes:[];const live=quotes.filter((q:any)=>!q.stale&&Number(q.lastPrice)>0);const bySymbol=new Map<string,any>();for(const q of live){const current=bySymbol.get(q.symbol);if(!current||q.provider==="wallex")bySymbol.set(q.symbol,q);}const tomanRate=Number(bySymbol.get("USDT/TOMAN")?.lastPrice||0);if(active&&tomanRate>0&&_viewRef.current!=="withdraw-confirm"){setCoins(previous=>previous.map(c=>{if(c.symbol==="USDT")return {...c,price:tomanRate};const usdt=bySymbol.get(`${c.symbol}/USDT`);const toman=bySymbol.get(`${c.symbol}/TOMAN`);const price=toman?Number(toman.lastPrice):(usdt?tomanRate*Number(usdt.lastPrice):0);return {...c,price,change:usdt?.change??c.change,volume:usdt?.volume??(c as any).volume};}));setMarketUpdated(new Date());}}catch{/* keep the last verified backend quote; never synthesize a mock price */}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;window.clearInterval(id)}},[]);
-  const coin=coins.find(c=>c.symbol===asset)??coins[0]; const available=getCryptoBal(user,asset);
+  useEffect(()=>{let active=true;const load=async()=>{try{const r=await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes`,{signal:AbortSignal.timeout(7000),cache:"no-store"});if(!r.ok)throw new Error("market_data_unavailable");const d=await r.json();const quotes=Array.isArray(d?.quotes)?d.quotes:[];const live=quotes.filter((q:any)=>q.provider==="wallex"&&!q.stale&&Number(q.lastPrice)>0);const bySymbol=new Map<string,any>();for(const q of live)bySymbol.set(q.symbol,q);const tomanRate=Number(bySymbol.get("USDT/TOMAN")?.lastPrice||0);if(active&&tomanRate>0&&_viewRef.current!=="withdraw-confirm"){setCoins(previous=>previous.map(c=>{if(c.symbol==="USDT")return {...c,price:tomanRate};const usdt=bySymbol.get(`${c.symbol}/USDT`);const toman=bySymbol.get(`${c.symbol}/TOMAN`);const price=toman?Number(toman.lastPrice):(usdt?tomanRate*Number(usdt.lastPrice):0);return {...c,price,change:Number.isFinite(Number(usdt?.change24h))?Number(usdt.change24h):c.change,volume:usdt?.volume24h??(c as any).volume};}));setMarketUpdated(new Date());}}catch{/* keep the last verified backend quote; never synthesize a mock price */}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;window.clearInterval(id)}},[]);
+  useEffect(()=>{let active=true;const loadWallets=async()=>{try{const wallet=await sarrafWalletMap();if(active)setLiveWallets(wallet);}catch{if(active)setLiveWallets({});}};void loadWallets();const id=window.setInterval(()=>void loadWallets(),5000);return()=>{active=false;window.clearInterval(id)}},[]);
+  const coin=coins.find(c=>c.symbol===asset)??coins[0]; const available=Number(liveWallets[String(asset).toUpperCase()]??0);
   const navBusy=useRef(false);
   const go=(next:View)=>{if(navBusy.current)return;navBusy.current=true;setView(next);setNotice("");setTimeout(()=>{navBusy.current=false},400)};
   const goDetail=(tx:TxRecord,from:View)=>{setTxDetailRecord(tx);setPrevView(from);go('tx-detail');};
@@ -5629,7 +5353,7 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexB
   const selectCoin=(s:string)=>{setAsset(s);setSelectedAsset(s);setNetwork("");setPicker(null)};
   const toggleFavorite=(symbol:string)=>setFavorite(current=>{const next=current.includes(symbol)?current.filter(x=>x!==symbol):[...current,symbol];localStorage.setItem(`anp_exchange_favorites_${user.uid}`,JSON.stringify(next));return next});
   const openSelectedTrading=(target:"instant"|"spot"|"margin")=>{if(target==="instant"){go("instant")}else{setTradeDisplayPicker(target);go("trade-display-select")}};
-  const addressValue=`${asset.toLowerCase()}1q7v3m5nz8kp0a2r9d4x6w${network.replace(/[^A-Z]/g,"").toLowerCase()||"net"}8h1`;
+  const addressValue="";
   const ExchangeTopBar=()=><div className="exchange-top"><button onClick={onBack} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(124,58,237,0.1)",border:"1.5px solid rgba(124,58,237,0.25)",borderRadius:20,padding:"6px 12px 6px 10px",cursor:"pointer",fontFamily:"Vazirmatn",fontSize:11,fontWeight:700,color:"#9d71ea",flexShrink:0,whiteSpace:"nowrap"}}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>بازگشت به آن‌پرداز</button><div className="exchange-brand"><img src={anPardazLogo} className="exchange-logo-img" alt="آن‌پرداز"/><b>آن صراف</b></div><span className="connection"><i/> {marketUpdated?"نرخ زنده":"در حال اتصال"}</span></div>;
   const ExchangeFooterNav=()=>{
     const NAV_ITEMS:[string,string,JSX.Element][]=[
@@ -5652,19 +5376,39 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexB
     </nav>;
   };
   const AssetSelect=({label}:{label:string})=><label className="exchange-field">{label}<button onClick={()=>{setSelReturnView(view);go('coin-select');}}><span className="coin-inline"><CoinLogo symbol={asset} size={24}/><b>{coin.fa}</b><small>{asset}</small></span><span>⌄</span></button></label>;
-  const NetworkSelect=()=> <label className="exchange-field">نوع شبکه<button disabled={!asset} onClick={()=>{setSelReturnView(view);go('network-select');}}><span>{network||"شبکه را انتخاب کنید"}</span><span>⌄</span></button>{network&&<em>کارمزد شبکه: {asset==='USDT'?'۰٫۵ دلار تتر':'۰٫۰۰۰۵ '+asset}</em>}</label>;
-  const Home=()=> <div className="exchange-page"><section className="exchange-hero" style={{position:"relative"}}>{(()=>{const _bs=getBotState(user.phone);const _botOn=_bs.status==="active"||_bs.status==="pending";return <button onClick={()=>onForexBot?.()} className={_botOn?"forex-bot-btn bot-on":"forex-bot-btn"}><svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><rect x="2" y="4" width="9" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><circle cx="4.8" cy="7" r=".85" fill="currentColor"/><circle cx="8.2" cy="7" r=".85" fill="currentColor"/><path d="M5 2.5h3M6.5 2.5v1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/><path d="M3.2 10l-1.4 1.5M9.8 10l1.4 1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/></svg><span>ربات فارکس</span><span className={_botOn?"bot-pill on":"bot-pill"}>{_botOn?"فعال":"غیرفعال"}</span></button>;})()}<div><span className="live-dot"/> وضعیت بازار: آنلاین</div><h1>دارایی دیجیتال، با کنترل کامل</h1><p>با آن‌پرداز، خرید و فروش آنی و مدیریت کوین‌ها ساده و امن است.</p></section><div className="quick-actions">{[['واریز تومان','deposit-info'],['خرید و فروش آنی','instant'],['معاملات اسپات','spot'],['معامله تعهدی','margin'],['ارسال تیکت','tickets'],['چت با پشتیبان','chat'],['کارمزدها','fees'],['راهنمای استفاده','guide']].map(([l,x])=><button key={l} onClick={()=>x==='deposit-info'?go('toman-deposit'):x==='spot'?go('spot'):x==='margin'?go('margin'):x==='instant'?go('instant'):x==='guide'?go('guide'):x==='tickets'?go('tickets'):x==='chat'?go('chat'):x==='support'?go('support'):x==='fees'?go('fees'):setNotice(x)}>{l}</button>)}</div><section className="section-title"><h2>خرید و فروش آنی</h2><button onClick={()=>go('markets')}>همه بازارها</button></section><div className="coin-strip">{coins.slice(0,4).map(c=><button key={c.symbol} onClick={()=>{selectCoin(c.symbol);go('instant')}}><PairLogos base={c.symbol} baseSize={28} quoteSize={16}/><b>{c.fa}</b><small>{c.symbol}/TMN</small><strong>{fa(c.price)} تومان</strong></button>)}</div><section className="section-title"><h2>ارزهای محبوب</h2><button onClick={()=>go("markets")}>مدیریت</button></section>{favorite.length?<div className="favorite-watchlist">{coins.filter(c=>favorite.includes(c.symbol)).map(c=><button className="favorite-watch-card" key={c.symbol} onClick={()=>{selectCoin(c.symbol);go("spot")}}><PairLogos base={c.symbol} baseSize={28} quoteSize={16}/><div><b>{c.symbol} / TMN</b><small>{c.fa}</small></div><strong>{fa(Math.round(c.price))} تومان</strong><em className={c.change>=0?"positive":"negative"}>{c.change>=0?"+":""}{faFixed(c.change,2)}٪</em></button>)}</div>:<div className="empty-state">با لمس ستاره کنار هر بازار، ارزهای محبوب شما اینجا نمایش داده می‌شوند.</div>}</div>;
+  const NetworkSelect=()=> <label className="exchange-field">نوع شبکه<button disabled={!asset} onClick={()=>{setSelReturnView(view);go('network-select');}}><span>{network||"شبکه را انتخاب کنید"}</span><span>⌄</span></button>{network&&<em>کارمزد شبکه پس از دریافت از سرویس کیف پول نمایش داده می‌شود.</em>}</label>;
+  const Home=()=> <div className="exchange-page"><section className="exchange-hero" style={{position:"relative"}}>{(()=>{const _bs=getBotState(user.phone);const _botOn=_bs.status==="active"||_bs.status==="pending";return <button onClick={()=>onForexBot?.()} className={_botOn?"forex-bot-btn bot-on":"forex-bot-btn"}><svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><rect x="2" y="4" width="9" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><circle cx="4.8" cy="7" r=".85" fill="currentColor"/><circle cx="8.2" cy="7" r=".85" fill="currentColor"/><path d="M5 2.5h3M6.5 2.5v1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/><path d="M3.2 10l-1.4 1.5M9.8 10l1.4 1.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/></svg><span>ربات فارکس</span><span className={_botOn?"bot-pill on":"bot-pill"}>{_botOn?"فعال":"غیرفعال"}</span></button>;})()}<div><span className="live-dot"/> وضعیت بازار: آنلاین</div><h1>دارایی دیجیتال، با کنترل کامل</h1><p>با آن‌پرداز، خرید و فروش آنی و مدیریت کوین‌ها ساده و امن است.</p></section><div className="quick-actions">{[['واریز تومان','deposit-info'],['خرید و فروش آنی','instant'],['معاملات اسپات','spot'],['معامله تعهدی','margin'],['ارسال تیکت','tickets'],['چت با پشتیبان','chat'],['کارمزدها','fees'],['راهنمای استفاده','guide']].map(([l,x])=><button key={l} onClick={()=>x==='deposit-info'?go('toman-deposit'):x==='spot'?go('spot'):x==='margin'?go('margin'):x==='instant'?go('instant'):x==='guide'?go('guide'):x==='tickets'?go('tickets'):x==='chat'?go('chat'):x==='support'?go('support'):x==='fees'?go('fees'):setNotice(x)}>{l}</button>)}</div><section className="section-title"><h2>خرید و فروش آنی</h2><button onClick={()=>go('markets')}>همه بازارها</button></section><div className="coin-strip">{coins.slice(0,4).map(c=><button key={c.symbol} onClick={()=>{selectCoin(c.symbol);go('instant')}}><PairLogos base={c.symbol} baseSize={28} quoteSize={16}/><b>{c.fa}</b><small>{c.symbol}/TMN</small><strong>{fa(c.price)} تومان</strong></button>)}</div><section className="section-title"><h2>ارزهای محبوب</h2><button onClick={()=>go("markets")}>مدیریت</button></section>{favorite.length?<div className="favorite-watchlist">{coins.filter(c=>favorite.includes(c.symbol)).map(c=><button className="favorite-watch-card" key={c.symbol} onClick={()=>{selectCoin(c.symbol);go("spot")}}><PairLogos base={c.symbol} baseSize={28} quoteSize={16}/><div><b>{c.symbol} / TMN</b><small>{c.fa}</small></div><strong>{fa(Math.round(c.price))} تومان</strong><em className={c.change>=0?"positive":"negative"}>{Number.isFinite(c.change)?(c.change>=0?"+":"")+faFixed(c.change,2)+"٪":"—"}</em></button>)}</div>:<div className="empty-state">با لمس ستاره کنار هر بازار، ارزهای محبوب شما اینجا نمایش داده می‌شوند.</div>}</div>;
   const MarketRow=({c}:{c:(typeof coins)[number]})=><button className="market-row" onClick={()=>{selectCoin(c.symbol);go('trade-type-select')}}><span className={favorite.includes(c.symbol)?"star on":"star"} onClick={e=>{e.stopPropagation();toggleFavorite(c.symbol)}}>★</span><span className="coin-inline"><CoinLogo symbol={c.symbol}/><b>{c.symbol}</b><small>{c.fa}</small></span><b>{fa(c.price)}</b><span className={c.change>=0?'positive':'negative'}>{c.change>=0?'+':''}{faFixed(c.change,2)}٪</span></button>;
-  const Markets=()=>{const rows=coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(search.toLowerCase())).flatMap(c=>marketFilter==="همه"?[{c,pair:"TMN",price:c.price},{c,pair:"USDT",price:c.symbol==="USDT"?1:c.price/FALLBACK_RATE}]:[{c,pair:marketFilter==="تومان"?"TMN":"USDT",price:marketFilter==="تومان"?c.price:(c.symbol==="USDT"?1:c.price/FALLBACK_RATE)}]).filter(({c,pair})=>c.symbol!==pair);const openPair=(symbol:string)=>{selectCoin(symbol);navBusy.current=false;go('spot')};return <div className="exchange-page markets-pro"><div className="markets-title"><div><h2>بازارها</h2><small>نرخ‌ها به‌صورت زنده به‌روزرسانی می‌شوند</small></div><span className="live-dot"/></div><div className="market-search"><Icon name="search" size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="جستجوی ارز یا جفت‌ارز"/></div><div className="market-filters">{(["همه","تومان","دلار تتر"] as const).map(x=><button type="button" key={x} className={marketFilter===x?"active":""} onClick={()=>setMarketFilter(x)}>{x}</button>)}</div><div className="market-card-grid">{rows.map(({c,pair,price})=>{const vol=fa(Math.round((pair==="TMN"?price:price*FALLBACK_RATE)*.018));const isPos=c.change>=0;return <div className="market-card" key={`${c.symbol}-${pair}`} role="button" tabIndex={0} onClick={()=>openPair(c.symbol)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPair(c.symbol)}}}><div className="mc-top"><div className="mc-logos"><PairLogos base={c.symbol} quote={pair} baseSize={28} quoteSize={17}/></div><div className="mc-pair"><b>{c.symbol} / {pair}</b><small>{c.fa}</small></div><button type="button" aria-label={favorite.includes(c.symbol)?`حذف ${c.symbol} از علاقه‌مندی‌ها`:`افزودن ${c.symbol} به علاقه‌مندی‌ها`} className={favorite.includes(c.symbol)?"mc-star on":"mc-star"} onClick={e=>{e.stopPropagation();toggleFavorite(c.symbol)}}>★</button></div><div className="mc-price">{pair==="TMN"?`${fa(Math.round(price))} تومان`:`${faFixed(price,3)} دلار تتر`}</div><div className="mc-bottom"><span className={isPos?"mc-change positive":"mc-change negative"}>{isPos?"+":""}{faFixed(c.change,2)}٪</span><span className="mc-vol">حجم: {vol}</span></div></div>})} </div></div>};
-  const Trade=()=>{const units=Number(tradeAmount)||0;const price=coin.price;const total=units*price;const submitTrade=()=>{if(!units){setReceipt({title:"",status:"failed",detail:"مقدار معامله را وارد کنید."});return}const curBal=getCryptoBal(user,asset);if(tradeSide==="buy"&&total>user.tomanBalance){setReceipt({title:"",status:"failed",detail:"موجودی تومان کافی نیست."});return}if(tradeSide==="sell"&&units>curBal){setReceipt({title:"",status:"failed",detail:`موجودی ${asset} کافی نیست.`});return}setProcessing(true);setTimeout(()=>{const buying=tradeSide==="buy";let next=buying?{...user,tomanBalance:user.tomanBalance-total}:{...user,tomanBalance:user.tomanBalance+total};next=withCryptoBal(next,asset,buying?curBal+units:curBal-units);onUpdate(next,{id:genId(),userId:user.phone,type:"swap",fromAsset:buying?"toman":asset,toAsset:buying?asset:"toman",amount:buying?total:units,convertedAmount:buying?units:total,fee:0,status:"done",createdAt:new Date().toISOString(),note:`معامله آنی · ${buying?"خرید":"فروش"} ${asset}`,source:"exchange",tradeType:"instant"});setProcessing(false);setReceipt({title:"سفارش آنی با موفقیت انجام شد",amount:`${buying?faFixed(units,4):fa(Math.round(total))} ${buying?asset:"تومان"}`,detail:"رسید معامله در تاریخچه تراکنش‌ها ثبت شد."});setTradeAmount("")},3000)};return <div className="exchange-page"><div className="page-title"><h2>معامله آنی</h2><button onClick={()=>go("markets")}>بازارها</button></div><div className="segmented"><button className={tradeSide==="buy"?"active":""} onClick={()=>setTradeSide("buy")}>خرید</button><button className={tradeSide==="sell"?"active":""} onClick={()=>setTradeSide("sell")}>فروش</button></div><AssetSelect label="دارایی"/><label className="exchange-field">مقدار {asset}<div className="field-input"><input value={toFaDigits(tradeAmount)} inputMode="decimal" onChange={e=>setTradeAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder="مقدار را وارد کنید"/><button onClick={()=>setTradeAmount(tradeSide==="sell"?String(getCryptoBal(user,asset)):String(Math.floor(user.tomanBalance/price*100)/100))}>همه</button></div></label><section className="fee-card"><span>قیمت لحظه‌ای</span><b>{fa(Math.round(price))} تومان</b><div><span>جمع معامله <strong>{fa(Math.round(total))} تومان</strong></span></div></section><button className="primary-button" onClick={submitTrade}>{tradeSide==="buy"?"خرید آنی":"فروش آنی"}</button><p className="muted-copy">معامله تعهدی پس از تکمیل احراز ریسک و اتصال کیف پول معاملاتی فعال خواهد شد.</p></div>};
+  const Markets=()=>{const rows=coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(search.toLowerCase())).flatMap(c=>marketFilter==="همه"?[{c,pair:"TMN",price:c.price},{c,pair:"USDT",price:c.symbol==="USDT"?1:(liveRate>0?c.price/liveRate:0)}]:[{c,pair:marketFilter==="تومان"?"TMN":"USDT",price:marketFilter==="تومان"?c.price:(c.symbol==="USDT"?1:(liveRate>0?c.price/liveRate:0))}]).filter(({c,pair})=>c.symbol!==pair);const openPair=(symbol:string)=>{selectCoin(symbol);navBusy.current=false;go('spot')};return <div className="exchange-page markets-pro"><div className="markets-title"><div><h2>بازارها</h2><small>نرخ‌ها به‌صورت زنده به‌روزرسانی می‌شوند</small></div><span className="live-dot"/></div><div className="market-search"><Icon name="search" size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="جستجوی ارز یا جفت‌ارز"/></div><div className="market-filters">{(["همه","تومان","دلار تتر"] as const).map(x=><button type="button" key={x} className={marketFilter===x?"active":""} onClick={()=>setMarketFilter(x)}>{x}</button>)}</div><div className="market-card-grid">{rows.map(({c,pair,price})=>{const vol=Number.isFinite(Number((c as any).volume))&&Number((c as any).volume)>0?fa(Number((c as any).volume)):"—";const isPos=c.change>=0;return <div className="market-card" key={`${c.symbol}-${pair}`} role="button" tabIndex={0} onClick={()=>openPair(c.symbol)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPair(c.symbol)}}}><div className="mc-top"><div className="mc-logos"><PairLogos base={c.symbol} quote={pair} baseSize={28} quoteSize={17}/></div><div className="mc-pair"><b>{c.symbol} / {pair}</b><small>{c.fa}</small></div><button type="button" aria-label={favorite.includes(c.symbol)?`حذف ${c.symbol} از علاقه‌مندی‌ها`:`افزودن ${c.symbol} به علاقه‌مندی‌ها`} className={favorite.includes(c.symbol)?"mc-star on":"mc-star"} onClick={e=>{e.stopPropagation();toggleFavorite(c.symbol)}}>★</button></div><div className="mc-price">{pair==="TMN"?`${fa(Math.round(price))} تومان`:`${faFixed(price,3)} دلار تتر`}</div><div className="mc-bottom"><span className={isPos?"mc-change positive":"mc-change negative"}>{isPos?"+":""}{faFixed(c.change,2)}٪</span><span className="mc-vol">حجم: {vol}</span></div></div>})} </div></div>};
+  const Trade=()=>{
+    const units=Number(tradeAmount)||0;
+    const price=coin.price;
+    const total=units*price;
+    const liveBaseBalance=Number(liveWallets[String(asset).toUpperCase()]??0);
+    const liveTomanBalance=Number(liveWallets.TMN??0);
+    const submitTrade=async()=>{
+      if(!units||!Number.isFinite(price)||price<=0){setReceipt({title:"",status:"failed",detail:"مقدار یا قیمت لحظه‌ای بازار در دسترس نیست."});return;}
+      if(tradeSide==="buy"&&total>liveTomanBalance){setReceipt({title:"",status:"failed",detail:"موجودی تومان کافی نیست."});return;}
+      if(tradeSide==="sell"&&units>liveBaseBalance){setReceipt({title:"",status:"failed",detail:`موجودی ${asset} کافی نیست.`});return;}
+      setProcessing(true);setReceipt(null);
+      try{
+        const result=await sarrafPlaceOrder(asset,"TMN",tradeSide,"market",units,undefined,tradeSide==="buy"?total:undefined);
+        setProcessing(false);
+        setReceipt({title:"سفارش آنی در آن صراف ثبت شد",amount:`${tradeSide==="buy"?faFixed(units,4):fa(Math.round(total))} ${tradeSide==="buy"?asset:"تومان"}`,detail:`شناسه سفارش: ${String(result?.order?.id??result?.orderId??"—")}`});
+        setTradeAmount("");
+      }catch(e){setProcessing(false);setReceipt({title:"",status:"failed",detail:e instanceof Error?e.message:"ثبت سفارش انجام نشد."});}
+    };
+    return <div className="exchange-page"><div className="page-title"><h2>معامله آنی</h2><button onClick={()=>go("markets")}>بازارها</button></div><div className="segmented"><button className={tradeSide==="buy"?"active":""} onClick={()=>setTradeSide("buy")}>خرید</button><button className={tradeSide==="sell"?"active":""} onClick={()=>setTradeSide("sell")}>فروش</button></div><AssetSelect label="دارایی"/><label className="exchange-field">مقدار {asset}<div className="field-input"><input value={toFaDigits(tradeAmount)} inputMode="decimal" onChange={e=>setTradeAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} placeholder="مقدار را وارد کنید"/><button onClick={()=>setTradeAmount(tradeSide==="sell"?String(liveBaseBalance):String(Math.floor(liveTomanBalance/Math.max(price,1e-12)*100)/100))}>همه</button></div></label><section className="fee-card"><span>قیمت لحظه‌ای</span><b>{Number.isFinite(price)&&price>0?fa(Math.round(price))+" تومان":"—"}</b><div><span>جمع معامله <strong>{Number.isFinite(total)&&total>0?fa(Math.round(total))+" تومان":"—"}</strong></span></div></section><button className="primary-button" onClick={submitTrade} disabled={processing}>{processing?"در حال ثبت…":tradeSide==="buy"?"خرید آنی":"فروش آنی"}</button><p className="muted-copy">سفارش مستقیماً به Backend آن صراف ارسال می‌شود و نتیجه واقعی بازار ثبت خواهد شد.</p></div>;
+  };
   const Assets=()=>{
-  const tmnBal=user.tomanBalance;
-  const RATE=87500;
-  const totalTmn=Math.round(tmnBal+user.usdtBalance*RATE);
-  const totalUsdt=(tmnBal/RATE+user.usdtBalance);
+  const tmnBal=Number(liveWallets.TMN??0);
+  const usdtBal=Number(liveWallets.USDT??0);
+  const RATE=liveRate;
+  const totalTmn=RATE>0?Math.round(tmnBal+usdtBal*RATE):null;
+  const totalUsdt=RATE>0?(tmnBal/RATE+usdtBal):null;
   const EyeOpenIcon=()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
   const EyeOffIcon=()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
-  const rawBal=balUnit==="tmn"?fa(totalTmn):faFixed(totalUsdt,4);
+  const rawBal=balUnit==="tmn"?(totalTmn==null?"—":fa(totalTmn)):(totalUsdt==null?"—":faFixed(totalUsdt,4));
   return <div className="exchange-page" style={{padding:"0 16px"}}>
     {/* Balance card — dark navy with teal accent, fully visible rounded top corners */}
     <section className="assets-balance-card">
@@ -5719,7 +5463,7 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexB
           </div>
         </div>
         {coins.map(c=>{
-          const bal=getCryptoBal(user,c.symbol);
+          const bal=Number(liveWallets[String(c.symbol).toUpperCase()]??0);
           const balDisplay=hidden?"••••":(bal>0?faFixed(bal,4):"۰");
           return <div className="asset-row asset-row-link" key={c.symbol} role="button" tabIndex={0} style={{cursor:"pointer"}} onClick={()=>{selectCoin(c.symbol);go('spot')}} onKeyDown={e=>e.key==="Enter"&&go('spot')}>
             <span className="coin-inline"><CoinLogo symbol={c.symbol} size={34}/><b>{c.fa}</b><small>{c.symbol}</small></span>
@@ -5731,14 +5475,36 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexB
     </div>
   </div>;
 };
-  const Deposit=()=>{const [depositAddrCopied,setDepositAddrCopied]=useState(false);const copyDepositAddr=()=>{navigator.clipboard?.writeText(addressValue).then(()=>{setDepositAddrCopied(true);setTimeout(()=>setDepositAddrCopied(false),2000)}).catch(()=>{});};return <div className="exchange-page" style={{padding:0}}><div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",borderBottom:"1px solid var(--border-faint)"}}><button onClick={()=>go('deposit-select')} style={{width:36,height:36,borderRadius:10,background:"var(--card-bg2)",border:"1px solid var(--border-faint)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="arrow" size={18}/></button><h2 style={{flex:1,textAlign:"center",margin:0,fontSize:16,fontWeight:800,color:"var(--text-primary)"}}>واریز کوین</h2><div style={{width:36}}/></div><div style={{padding:"16px 16px 80px"}}><div className="warning-box"><b>نکات امنیتی واریز کوین</b><p>برای امنیت بیشتر، آدرس کیف پول‌ها به‌صورت دوره‌ای تغییر می‌کند. از واریز قرارداد هوشمند خودداری کنید. واریز مستقیم از صرافی‌های خارجی می‌تواند محدودیت ایجاد کند؛ در صورت نیاز از کیف پول شخصی استفاده کنید.</p></div><AssetSelect label="کوین"/><NetworkSelect/>{network&&<section className="address-card" style={{textAlign:"right"}}><div style={{padding:10,background:"#fff",borderRadius:12,boxShadow:"0 2px 12px rgba(0,0,0,0.14)",margin:"0 auto 14px",width:"fit-content"}}><div style={{display:"grid",gridTemplateColumns:"repeat(11,1fr)",gap:2,width:121}}>{Array.from({length:121},(_,i)=>((i*i+i*7+(asset.charCodeAt(0)||0)+network.charCodeAt(0))%5<2)).map((on,i)=><div key={i} style={{width:9,height:9,borderRadius:1,background:on?"#0a1a2a":"transparent"}}/>)}</div></div><div style={{fontSize:13,color:"var(--text-muted)",marginBottom:8,fontWeight:600,textAlign:"center"}}>آدرس واریز {asset}</div><div style={{position:"relative",marginBottom:12}}><input readOnly value={addressValue} dir="ltr" lang="en" onClick={e=>(e.target as HTMLInputElement).select()} style={{width:"100%",boxSizing:"border-box",fontFamily:"'Courier New',Courier,monospace",fontSize:12,fontWeight:600,color:"var(--text-primary)",letterSpacing:"0.03em",wordBreak:"break-all",padding:"12px 14px",background:"var(--input-bg)",border:"1px solid var(--border-color)",borderRadius:10,outline:"none",cursor:"text",textAlign:"left",direction:"ltr"}}/></div><button onClick={copyDepositAddr} style={{width:"100%",minHeight:46,padding:"11px",borderRadius:11,border:`1.5px solid ${depositAddrCopied?"rgba(0,214,176,0.55)":"rgba(0,214,176,0.3)"}`,background:depositAddrCopied?"rgba(0,214,176,0.12)":"var(--accent-dim,rgba(0,214,176,0.08))",color:"var(--accent,#00D6B0)",fontFamily:"Vazirmatn",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all .18s"}}>{depositAddrCopied?<>✓ آدرس کپی شد</>:<><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>کپی آدرس</>}</button><p style={{textAlign:"right",marginTop:10}}>مبلغ واریزی پس از یک تأیید شبکه، واریز می‌شود. ارسال کوین غیر از {asset} به این آدرس می‌تواند موجب از دست رفتن دارایی شود.</p></section>}</div></div>;};
+  const Deposit=()=>{
+  const [depositAddrCopied,setDepositAddrCopied]=useState(false);
+  const copyDepositAddr=()=>{if(!addressValue)return;navigator.clipboard?.writeText(addressValue).then(()=>{setDepositAddrCopied(true);setTimeout(()=>setDepositAddrCopied(false),2000)}).catch(()=>{});};
+  return <div className="exchange-page" style={{padding:0}}>
+    <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",borderBottom:"1px solid var(--border-faint)"}}><button onClick={()=>go('deposit-select')} style={{width:36,height:36,borderRadius:10,background:"var(--card-bg2)",border:"1px solid var(--border-faint)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="arrow" size={18}/></button><h2 style={{flex:1,textAlign:"center",margin:0,fontSize:16,fontWeight:800,color:"var(--text-primary)"}}>واریز کوین</h2><div style={{width:36}}/></div>
+    <div style={{padding:"16px 16px 80px"}}>
+      <div className="warning-box"><b>نکات امنیتی واریز کوین</b><p>آدرس واریز فقط زمانی نمایش داده می‌شود که سرویس کیف پول واقعی آن را برای این حساب و شبکه ارائه کند. از نمایش یا استفاده از آدرس ساختگی خودداری می‌شود.</p></div>
+      <AssetSelect label="کوین"/><NetworkSelect/>
+      <section className="address-card" style={{textAlign:"right",marginTop:14}}>
+        {addressValue ? <>
+          <div style={{fontSize:13,color:"var(--text-muted)",marginBottom:8,fontWeight:600,textAlign:"center"}}>آدرس واریز {asset}</div>
+          <input readOnly value={addressValue} dir="ltr" lang="en" onClick={e=>(e.target as HTMLInputElement).select()} style={{width:"100%",boxSizing:"border-box",fontFamily:"'Courier New',Courier,monospace",fontSize:12,fontWeight:600,color:"var(--text-primary)",letterSpacing:"0.03em",wordBreak:"break-all",padding:"12px 14px",background:"var(--input-bg)",border:"1px solid var(--border-color)",borderRadius:10,outline:"none",textAlign:"left",direction:"ltr"}}/>
+          <button onClick={copyDepositAddr} style={{width:"100%",minHeight:46,padding:"11px",marginTop:10,borderRadius:11,border:"1.5px solid rgba(0,214,176,0.3)",background:"var(--accent-dim,rgba(0,214,176,0.08))",color:"var(--accent,#00D6B0)",fontFamily:"Vazirmatn",fontSize:14,fontWeight:700,cursor:"pointer"}}>{depositAddrCopied?"✓ آدرس کپی شد":"کپی آدرس"}</button>
+        </> : <div style={{padding:"24px 14px",textAlign:"center",color:"var(--text-muted)",lineHeight:1.9,fontSize:13}}>آدرس واریز واقعی برای این کوین و شبکه هنوز از سرویس کیف پول دریافت نشده است.<br/><b style={{color:"var(--text-primary)"}}>تا زمان دریافت آدرس، هیچ QR یا آدرس ساختگی نمایش داده نمی‌شود.</b></div>}
+      </section>
+    </div>
+  </div>;
+};
   const DepositSelect=()=>{const [depSearch,setDepSearch]=useState("");const filteredCoins=coins.filter(c=>(c.symbol+c.fa).toLowerCase().includes(depSearch.toLowerCase()));return <div className="exchange-page" style={{padding:0}}><div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",borderBottom:"1px solid var(--border-faint)",flexShrink:0}}><button onClick={()=>go('assets')} style={{width:36,height:36,borderRadius:10,background:"var(--card-bg2)",border:"1px solid var(--border-faint)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="arrow" size={18}/></button><h2 style={{flex:1,textAlign:"center",margin:0,fontSize:16,fontWeight:800,color:"var(--text-primary)"}}>واریز — انتخاب دارایی</h2><div style={{width:36}}/></div><div style={{padding:"16px 16px 80px",overflowY:"auto",flex:1}}><button onClick={()=>go('toman-deposit')} style={{display:"flex",alignItems:"center",gap:14,width:"100%",padding:"16px 18px",borderRadius:16,background:"rgba(0,214,176,0.07)",border:"1.5px solid rgba(0,214,176,0.22)",cursor:"pointer",textAlign:"right",fontFamily:"Vazirmatn",color:"var(--text-primary)",transition:"all .15s",marginBottom:16,boxSizing:"border-box"}}><span style={{fontSize:28,flexShrink:0}}>🇮🇷</span><div style={{flex:1}}><div style={{fontWeight:800,fontSize:16,color:"var(--text-primary)"}}>تومان</div><div style={{fontSize:12,color:"var(--text-muted)",marginTop:3}}>TMN · واریز از درگاه بانکی</div></div><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 12L10 8 6 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity=".45"/></svg></button><div style={{fontSize:12,color:"var(--text-muted)",marginBottom:10,fontWeight:700}}>ارزهای دیجیتال</div><div style={{display:"flex",alignItems:"center",gap:8,border:"1px solid var(--border-color)",background:"var(--input-bg)",borderRadius:12,padding:"0 12px",marginBottom:14}}><Icon name="search" size={16}/><input value={depSearch} onChange={e=>setDepSearch(e.target.value)} placeholder="جستجوی ارز..." style={{flex:1,border:0,background:"transparent",outline:0,color:"var(--text-primary)",padding:"10px 6px",fontFamily:"Vazirmatn",fontSize:13}}/></div><div style={{display:"flex",flexDirection:"column",gap:7}}>{filteredCoins.map(c=><button key={c.symbol} onClick={()=>{selectCoin(c.symbol);setNetwork("");go('deposit');}} style={{display:"flex",alignItems:"center",gap:13,padding:"13px 16px",borderRadius:14,background:"var(--card-bg)",border:"1px solid var(--border-light)",cursor:"pointer",textAlign:"right",fontFamily:"Vazirmatn",color:"var(--text-primary)",transition:"all .15s",boxSizing:"border-box",width:"100%"}}><CoinLogo symbol={c.symbol} size={38}/><div style={{flex:1}}><div style={{fontWeight:700,fontSize:15,color:"var(--text-primary)"}}>{c.fa}</div><div style={{fontSize:12,color:"var(--text-muted)",marginTop:3}}>{c.symbol}</div></div><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 12L10 8 6 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity=".45"/></svg></button>)}</div></div></div>;};
   const handleWithdrawSubmit=(addr:string,amt:string)=>{
     const value=Number(amt);
+    if(!Number.isFinite(value)||value<=0){setNotice("مبلغ برداشت نامعتبر است.");return;}
     setAddress(addr);setAmount(amt);
-    pendingWithdrawCb.current=()=>{
-      onUpdate(user,{id:genId(),userId:user.phone,type:"withdraw",fromAsset:asset,toAsset:asset,amount:value,fee:0,status:"pending",createdAt:new Date().toISOString(),toAddress:addr,note:`برداشت ${asset} · شبکه ${network}`,source:"exchange",tradeType:"withdraw"});
-      setNotice("برداشت ثبت شد — درخواست برداشت ارز دیجیتال شما با موفقیت ثبت شد.");
+    pendingWithdrawCb.current=async()=>{
+      try{
+        const assets=await sarrafAssets();
+        const assetId=sarrafAssetId(assets,asset);
+        const result=await sarrafRequest("/api/v1/withdrawals",{method:"POST",body:JSON.stringify({assetId,amount:String(value),network:network.trim(),destination:addr.trim(),idempotencyKey:crypto.randomUUID()})});
+        setNotice(`درخواست برداشت در آن صراف ثبت شد. شناسه: ${String(result?.withdrawal?.id??result?.withdrawalId??"—")}`);
+      }catch(e){setNotice(e instanceof Error?e.message:"ثبت برداشت انجام نشد.");}
     };
     setWithdrawSummary({amount:`${toFaDigits(amt)} ${asset==="USDT"?"دلار تتر":asset}`,destination:`شبکه ${network} · ${addr.slice(0,8)}...`,network,address:addr});
     go("withdraw-confirm");
@@ -5920,9 +5686,9 @@ const TxDetailPage=()=>{
 };
   if(kycFlow==="photo")return <OnboardPhoto onDone={p=>{setKycPhoto(p);setKycFlow("profile")}} onBack={()=>setKycFlow(null)} initialAccepted={true}/>;
   if(kycFlow==="profile")return <OnboardProfile onDone={d=>{setKycProfile(d);setKycFlow("anim")}} onBack={()=>setKycFlow("photo")} initialData={kycProfile}/>;
-  if(kycFlow==="anim")return <VerificationAnimation onSuccess={()=>{const updated={...user,kycDone:true,name:kycProfile.name||user.name,family:kycProfile.family||user.family,nationalId:kycProfile.nationalId||user.nationalId,birthDate:kycProfile.birthDate||user.birthDate,photo:kycPhoto||user.photo};DB.saveUser(updated);if(onUpdateUser)onUpdateUser(updated);setKycFlow(null);go(pendingKycDest);}} onFail={()=>setKycFailed(true)}/>;
+  if(kycFlow==="anim")return <VerificationAnimation onSuccess={async()=>{try{await sarrafSubmitKyc({fullName:`${kycProfile.name||user.name} ${kycProfile.family||user.family}`.trim(),nationalId:kycProfile.nationalId||user.nationalId,mobile:user.phone,birthDate:kycProfile.birthDate||user.birthDate});const updated={...user,name:kycProfile.name||user.name,family:kycProfile.family||user.family,nationalId:kycProfile.nationalId||user.nationalId,birthDate:kycProfile.birthDate||user.birthDate,photo:kycPhoto||user.photo,kycDone:true};DB.saveUser(updated);if(onUpdateUser)onUpdateUser(updated);setKycFlow(null);go(pendingKycDest);}catch{setKycFailed(true);}}} onFail={()=>setKycFailed(true)}/>;
   if(kycFailed)return <div className="anp-full-page" dir="rtl" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:24}}><div style={{width:72,height:72,borderRadius:"50%",background:"rgba(239,68,68,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><div style={{fontSize:17,fontWeight:800,color:"var(--text-primary)",textAlign:"center"}}>احراز هویت ناموفق</div><div style={{fontSize:13,color:"var(--text-muted)",textAlign:"center",lineHeight:1.8,maxWidth:300}}>احراز هویت شما ناموفق بود. لطفاً مدارک خود را بررسی کرده و دوباره تلاش کنید.</div><button className="primary-button" onClick={()=>{setKycFailed(false);setKycFlow("photo");}}>تلاش مجدد</button><button className="outline-button" onClick={()=>setKycFailed(false)}>بازگشت به صرافی</button></div>;
-  return <div className="subscreen exchange-shell" dir="rtl" style={{display:"flex",flexDirection:"column",height:"100dvh"}}><ExchangeTopBar/><div className="subscreen-body exchange-body" style={{flex:1,overflowY:"auto",paddingBottom:0}}>{view==='home'?<Home/>:view==='spot'?<ExchangeProTrade mode="spot" initialAsset={selectedAsset} user={user} coins={coins} onBack={()=>go('home')} onUpdate={onUpdate} onNavigate={(target,nextAsset)=>{selectCoin(nextAsset);go(target)}} onAssetChange={selectCoin} favorites={favorite} onToggleFavorite={toggleFavorite}/>:view==='margin'?<ExchangeProTrade mode="margin" initialAsset={selectedAsset} user={user} coins={coins} onBack={()=>go('home')} onUpdate={onUpdate} onNavigate={(target,nextAsset)=>{selectCoin(nextAsset);go(target)}} onAssetChange={selectCoin} favorites={favorite} onToggleFavorite={toggleFavorite}/>:view==='spot-chart'?<ExchangeChartPage asset={selectedAsset} coin={coins.find(c=>c.symbol===selectedAsset)??coins[0]} coins={coins} user={user} favorites={favorite} onToggleFavorite={toggleFavorite} onBack={()=>go('home')} onInstant={(a)=>{selectCoin(a);go('instant')}} onUpdate={onUpdate} onPairSelect={(a)=>{selectCoin(a)}}/>:view==='margin-chart'?<MarginChartPage asset={selectedAsset} coin={coins.find(c=>c.symbol===selectedAsset)??coins[0]} coins={coins} user={user} favorites={favorite} onToggleFavorite={toggleFavorite} onBack={()=>go('home')} onUpdate={onUpdate} onAssetChange={selectCoin}/>:view==='instant'?<ExchangeInstantTrade initialAsset={selectedAsset} user={user} coins={coins} onBack={()=>go('home')} onUpdate={onUpdate}/>:view==='fees'?<ExchangeFeesPage onBack={()=>go('home')}/>:view==='guide'?<ExchangeVideoGuide onBack={()=>go('home')}/>:view==='tickets'?<ExchangeSupportCenter onBack={()=>go('home')}/>:view==='chat'?<ExchangeChat onBack={()=>go('home')}/>:view==='markets'?Markets():view==='trade'?<Trade/>:view==='assets'?<Assets/>:view==='deposit'?<Deposit/>:view==='deposit-select'?<DepositSelect/>:view==='withdraw'?<WithdrawPage asset={asset} network={network} available={available} processing={processing} withdrawAddr={withdrawAddr} setWithdrawAddr={setWithdrawAddr} withdrawAmt={withdrawAmt} setWithdrawAmt={setWithdrawAmt} assetSelectEl={<AssetSelect label="نام کوین"/>} networkSelectEl={<NetworkSelect/>} onBack={()=>go("withdraw-select")} onHistory={()=>go("history")} onSubmit={handleWithdrawSubmit}/>:view==='history'?<History/>:view==='withdraw-select'?<WithdrawSelect/>:view==='toman-withdraw'?<TomanWithdrawScreen user={user} onBack={()=>go('withdraw-select')} onGoHome={()=>go('home')} onHistory={()=>go('history')}/>:view==='toman-deposit'?<TomanDepositPage user={user} tab={toDepositTab} setTab={setToDepositTab} onBack={()=>go('assets')}/>:view==='coin-select'?<CoinSelectPage/>:view==='network-select'?<NetworkSelectPage/>:view==='withdraw-confirm'?<WithdrawConfirmPage withdrawSummary={withdrawSummary} pendingWithdrawCb={pendingWithdrawCb} onBack={()=>go("withdraw")} onDone={()=>go("history")} onGoHome={()=>go("home")}/>:view==='tx-detail'?<TxDetailPage/>:view==='trade-type-select'?<TradeTypeSelectPage/>:view==='trade-display-select'?<TradeDisplaySelectPage/>:<Support/>}</div><ExchangeFooterNav/>{notice&&!notice.startsWith("exchange:")&&<div className="exchange-notice"><span>{notice}</span><button onClick={()=>setNotice('')} style={{border:"none",background:"transparent",color:"var(--accent)",fontFamily:"Vazirmatn",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0,padding:"4px 8px"}}>بستن</button></div>}{processing&&<AnPardazLoadingOverlay text="در حال انجام برداشت..."/>}{receipt&&createPortal(<TransactionReceipt data={receipt} onClose={()=>setReceipt(null)}/>,document.body)}</div>;
+  return <div className="subscreen exchange-shell" dir="rtl" style={{display:"flex",flexDirection:"column",height:"100dvh"}}><ExchangeTopBar/><div className="subscreen-body exchange-body" style={{flex:1,overflowY:"auto",paddingBottom:0}}>{view==='home'?<Home/>:view==='spot'?<ExchangeProTrade mode="spot" initialAsset={selectedAsset} user={user} coins={coins} onBack={()=>go('home')} onUpdate={onUpdate} onNavigate={(target,nextAsset)=>{selectCoin(nextAsset);go(target)}} onAssetChange={selectCoin} favorites={favorite} onToggleFavorite={toggleFavorite}/>:view==='margin'?<ExchangeProTrade mode="margin" initialAsset={selectedAsset} user={user} coins={coins} onBack={()=>go('home')} onUpdate={onUpdate} onNavigate={(target,nextAsset)=>{selectCoin(nextAsset);go(target)}} onAssetChange={selectCoin} favorites={favorite} onToggleFavorite={toggleFavorite}/>:view==='spot-chart'?<ExchangeChartPage asset={selectedAsset} coin={coins.find(c=>c.symbol===selectedAsset)??coins[0]} coins={coins} user={user} favorites={favorite} onToggleFavorite={toggleFavorite} onBack={()=>go('home')} onInstant={(a)=>{selectCoin(a);go('instant')}} onUpdate={onUpdate} onPairSelect={(a)=>{selectCoin(a)}}/>:view==='margin-chart'?<MarginChartPage asset={selectedAsset} coin={coins.find(c=>c.symbol===selectedAsset)??coins[0]} coins={coins} user={user} favorites={favorite} onToggleFavorite={toggleFavorite} onBack={()=>go('home')} onUpdate={onUpdate} onAssetChange={selectCoin}/>:view==='instant'?<ExchangeInstantTrade initialAsset={selectedAsset} user={user} coins={coins} onBack={()=>go('home')} onUpdate={onUpdate}/>:view==='fees'?<ExchangeFeesPage onBack={()=>go('home')}/>:view==='guide'?<ExchangeVideoGuide onBack={()=>go('home')}/>:view==='tickets'?<ExchangeSupportCenter onBack={()=>go('home')}/>:view==='chat'?<ExchangeChat onBack={()=>go('home')}/>:view==='markets'?Markets():view==='trade'?<Trade/>:view==='assets'?<Assets/>:view==='deposit'?<Deposit/>:view==='deposit-select'?<DepositSelect/>:view==='withdraw'?<WithdrawPage asset={asset} network={network} available={available} processing={processing} withdrawAddr={withdrawAddr} setWithdrawAddr={setWithdrawAddr} withdrawAmt={withdrawAmt} setWithdrawAmt={setWithdrawAmt} assetSelectEl={<AssetSelect label="نام کوین"/>} networkSelectEl={<NetworkSelect/>} onBack={()=>go("withdraw-select")} onHistory={()=>go("history")} onSubmit={handleWithdrawSubmit}/>:view==='history'?<History/>:view==='withdraw-select'?<WithdrawSelect/>:view==='toman-withdraw'?<TomanWithdrawScreen user={user} available={Number(liveWallets.TMN??0)} onBack={()=>go('withdraw-select')} onGoHome={()=>go('home')} onHistory={()=>go('history')}/>:view==='toman-deposit'?<TomanDepositPage user={user} tab={toDepositTab} setTab={setToDepositTab} onBack={()=>go('assets')}/>:view==='coin-select'?<CoinSelectPage/>:view==='network-select'?<NetworkSelectPage/>:view==='withdraw-confirm'?<WithdrawConfirmPage withdrawSummary={withdrawSummary} pendingWithdrawCb={pendingWithdrawCb} onBack={()=>go("withdraw")} onDone={()=>go("history")} onGoHome={()=>go("home")}/>:view==='tx-detail'?<TxDetailPage/>:view==='trade-type-select'?<TradeTypeSelectPage/>:view==='trade-display-select'?<TradeDisplaySelectPage/>:<Support/>}</div><ExchangeFooterNav/>{notice&&!notice.startsWith("exchange:")&&<div className="exchange-notice"><span>{notice}</span><button onClick={()=>setNotice('')} style={{border:"none",background:"transparent",color:"var(--accent)",fontFamily:"Vazirmatn",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0,padding:"4px 8px"}}>بستن</button></div>}{processing&&<AnPardazLoadingOverlay text="در حال انجام برداشت..."/>}{receipt&&createPortal(<TransactionReceipt data={receipt} onClose={()=>setReceipt(null)}/>,document.body)}</div>;
 }
 
 
@@ -6633,12 +6399,11 @@ function CardBalanceScreen({user,onBack,onDone}:{user:UserData;onBack:()=>void;o
     const month=Number(toLatinDigits(expM));
     if(month<1||month>12){setErr("ماه انقضا باید بین ۱ تا ۱۲ باشد.");return}
     setErr("");setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);
-      const fake=Math.floor(Math.random()*50000000+5000000);
-      resetSensitive();
-      setReceipt({title:"موجودی کارت",amount:`${fa(fake)} ریال`,destination:toFaDigits(fmtCard(activeRaw)),status:"success",detail:"موجودی لحظه‌ای با موفقیت دریافت شد."});
-    },2500);
+    anpardazCardBalance(activeRaw,toLatinDigits(otp),toLatinDigits(cvv2),toLatinDigits(expM),toLatinDigits(expY)).then((result)=>{
+      const check=result?.check;const status=String(check?.status??"processing");const balance=check?.balance;
+      resetSensitive();setProcessing(false);
+      setReceipt({title:status==="completed"?"موجودی کارت":status==="failed"?"استعلام موجودی ناموفق بود":"استعلام موجودی در حال پردازش است",amount:balance!=null?`${fa(balance)} ریال`:undefined,destination:toFaDigits(fmtCard(activeRaw)),status:status==="completed"?"success":status==="failed"?"failed":"pending",detail:balance!=null?"موجودی واقعی از سرویس بانکی دریافت شد.":"وضعیت استعلام از سرویس بانکی ثبت شد."});
+    }).catch((e)=>{setProcessing(false);setErr(e instanceof Error?e.message:"استعلام موجودی انجام نشد")});
   };
 
   return <>
@@ -11097,7 +10862,7 @@ export default function App() {
   const updateUser=useCallback((u:UserData)=>{DB.saveUser(u);setUser(u)},[]);
   const updateWithTx=useCallback((u:UserData,tx:TxRecord)=>{const txs=[tx,...transactions];DB.saveUser(u);DB.saveTx(u.phone,txs);setUser(u);setTransactions(txs);if(localStorage.getItem(`anp_notifications_${u.uid}`)!=="off")playChime()},[transactions]);
 
-  const handleVerified=(phone:string)=>{DB.setCurrentPhone(phone);const existing=DB.getUser(phone);if(existing){setUser(existing);setTransactions(DB.getTx(phone));const hs=localStorage.getItem(`anp_home_services_${existing.uid}`);if(hs){try{const p=JSON.parse(hs);if(Array.isArray(p))setHomeServices(p);}catch{}}const hp=localStorage.getItem(`anp_home_platforms_${existing.uid}`);if(hp){try{const p=JSON.parse(hp);if(Array.isArray(p))setHomePlatforms(p);}catch{}}setShowCashback(localStorage.getItem(`anp_show_cashback_${existing.uid}`)!=="false");setAppState(existing.pin?"unlock-pin":"ready")}else{const uid=_genUid();const newUser:UserData={uid,name:"",family:"",nationalId:"",birthDate:"",phone,photo:"",pin:"",tomanBalance:10000000,usdtBalance:100,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(newUser);DB.setCurrentPhone(phone);setUser(newUser);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setPendingTour(true);setAppState("ready")}};
+  const handleVerified=(phone:string)=>{DB.setCurrentPhone(phone);const existing=DB.getUser(phone);if(existing){setUser(existing);setTransactions(DB.getTx(phone));const hs=localStorage.getItem(`anp_home_services_${existing.uid}`);if(hs){try{const p=JSON.parse(hs);if(Array.isArray(p))setHomeServices(p);}catch{}}const hp=localStorage.getItem(`anp_home_platforms_${existing.uid}`);if(hp){try{const p=JSON.parse(hp);if(Array.isArray(p))setHomePlatforms(p);}catch{}}setShowCashback(localStorage.getItem(`anp_show_cashback_${existing.uid}`)!=="false");setAppState(existing.pin?"unlock-pin":"ready")}else{const uid=_genUid();const newUser:UserData={uid,name:"",family:"",nationalId:"",birthDate:"",phone,photo:"",pin:"",tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(newUser);DB.setCurrentPhone(phone);setUser(newUser);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setPendingTour(true);setAppState("ready")}};
   const handleLogout=()=>{DB.setCurrentPhone("");setUser(null);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setHomePlatforms(DEFAULT_HOME_PLATFORMS);setShowCashback(true);setTab("home");setSubPage(null);setAppState("login")};
 
   const [obPhoto,setObPhoto]=useState("");
@@ -11112,7 +10877,7 @@ export default function App() {
   if(appState==="onboard-profile")return <OnboardProfile onDone={d=>{setObProfile(d);setAppState("onboard-pin")}} onBack={()=>setAppState("onboard-photo")} initialData={obProfile}/>;
   if(appState==="unlock-pin"&&user)return <PinUnlock user={user} onVerified={()=>setAppState("ready")}/>;
   if(appState==="onboard-pin")return <OnboardPin onDone={pin=>{setPendingPin(pin);setAppState("verify-anim")}} onSkip={()=>{setPendingPin("");setAppState("verify-anim")}} onBack={()=>setAppState("onboard-profile")}/>;
-  if(appState==="verify-anim")return <VerificationAnimation onSuccess={()=>{const u:UserData={uid:_genUid(),...obProfile,phone:pendingPhone,photo:obPhoto,pin:pendingPin,tomanBalance:10000000,usdtBalance:100,cryptoBalances:{},cards:[{id:"card-melat-1",number:"6104338761369582",bank:"بانک ملت",holderName:obProfile.name+" "+obProfile.family}],registeredAt:new Date().toISOString()};DB.saveUser(u);DB.setCurrentPhone(u.phone);setUser(u);setTransactions([]);setHomeServices(SERVICES.slice(0,8).map(s=>s.id));setHomeSkeleton(false);setAppState("ready");setPendingTour(true);}} onFail={()=>{setPendingPin("");setAppState("onboard-pin")}}/>;
+  if(appState==="verify-anim")return <VerificationAnimation onSuccess={()=>{const u:UserData={uid:_genUid(),...obProfile,phone:pendingPhone,photo:obPhoto,pin:pendingPin,tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(u);DB.setCurrentPhone(u.phone);setUser(u);setTransactions([]);setHomeServices(SERVICES.slice(0,8).map(s=>s.id));setHomeSkeleton(false);setAppState("ready");setPendingTour(true);}} onFail={()=>{setPendingPin("");setAppState("onboard-pin")}}/>;
   if(!user)return null;
 
   const initials=(user.name?.[0]??"")+(user.family?.[0]??"")||"؟";

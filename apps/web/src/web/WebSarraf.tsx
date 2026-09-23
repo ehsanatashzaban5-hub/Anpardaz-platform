@@ -82,21 +82,21 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
   const [backendKycStatus, setBackendKycStatus] = useState<KycStatus | null>(null);
   const isMobile = useIsMobile(900);
 
-  const logoColor = (symbol: string) => { let h = 0; for (const ch of symbol) h = (h * 31 + ch.charCodeAt(0)) % 360; return \`hsl(\${h} 55% 42%)\`; };
+  const logoColor = (symbol: string) => { let h = 0; for (const ch of symbol) h = (h * 31 + ch.charCodeAt(0)) % 360; return `hsl(${h} 55% 42%)`; };
 
   useEffect(() => {
     let active = true;
     const loadMarkets = async () => {
       try {
         const [assetResponse, quoteResponse] = await Promise.all([
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/assets\`, { signal: AbortSignal.timeout(7000), cache: "no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/market-data/quotes\`, { signal: AbortSignal.timeout(7000), cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/assets`, { signal: AbortSignal.timeout(7000), cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes`, { signal: AbortSignal.timeout(7000), cache: "no-store" }),
         ]);
         if (!assetResponse.ok || !quoteResponse.ok) throw new Error("market_data_unavailable");
         const assetBody = await assetResponse.json();
         const quoteBody = await quoteResponse.json();
         const rows = Array.isArray(assetBody?.assets) ? assetBody.assets : [];
-        const quotes = Array.isArray(quoteBody?.quotes) ? quoteBody.quotes.filter((q: any) => !q.stale && Number(q.lastPrice) > 0) : [];
+        const quotes = Array.isArray(quoteBody?.quotes) ? quoteBody.quotes.filter((q: any) => q.provider === "wallex" && !q.stale && Number(q.lastPrice) > 0) : [];
         const bySymbol = new Map<string, any>();
         for (const q of quotes) {
           const current = bySymbol.get(q.symbol);
@@ -105,16 +105,21 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
         const tomanRate = Number(bySymbol.get("USDT/TOMAN")?.lastPrice || 0);
         const mapped: CryptoAsset[] = rows.map((row: any) => {
           const symbol = String(row.symbol).toUpperCase();
-          const usdt = bySymbol.get(\`\${symbol}/USDT\`);
-          const toman = bySymbol.get(\`\${symbol}/TOMAN\`);
+          const usdt = bySymbol.get(`${symbol}/USDT`);
+          const toman = bySymbol.get(`${symbol}/TOMAN`);
           const price = symbol === "USDT" ? tomanRate : Number(usdt?.lastPrice || 0);
           const priceIrt = symbol === "USDT" ? tomanRate : Number(toman?.lastPrice || (price > 0 && tomanRate > 0 ? price * tomanRate : 0));
           return {
             id: String(row.id), symbol, name: String(row.name), nameFa: String(row.name), logoUrl: undefined,
-            logoColor: logoColor(symbol), price, priceIrt, change24h: Number.NaN, volume24h: Number.NaN,
-            marketCap: Number.NaN, high24h: Number.NaN, low24h: Number.NaN, rank: 0,
+            logoColor: logoColor(symbol), price, priceIrt,
+            change24h: Number(usdt?.change24h ?? toman?.change24h ?? Number.NaN),
+            volume24h: Number(usdt?.volume24h ?? toman?.volume24h ?? Number.NaN),
+            marketCap: Number.NaN,
+            high24h: Number(usdt?.high24h ?? toman?.high24h ?? Number.NaN),
+            low24h: Number(usdt?.low24h ?? toman?.low24h ?? Number.NaN),
+            rank: 0,
           };
-        });
+        }).filter((asset: CryptoAsset) => Number.isFinite(asset.price) && asset.price > 0);
         if (!active) return;
         setLiveAssets(mapped);
         setAsset(previous => previous ? (mapped.find(a => a.id === previous.id) ?? mapped[0] ?? null) : (mapped[0] ?? null));
@@ -134,14 +139,14 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
     let active = true;
     const loadAccount = async () => {
       try {
-        const headers = { authorization: \`Bearer \${token}\` };
+        const headers = { authorization: `Bearer ${token}` };
         const [walletR, orderR, tradeR, depositR, withdrawalR, kycR] = await Promise.all([
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/wallets\`, { headers, cache:"no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/orders\`, { headers, cache:"no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/trades\`, { headers, cache:"no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/deposits\`, { headers, cache:"no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/withdrawals\`, { headers, cache:"no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/kyc\`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/wallets`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/orders`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/trades`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/deposits`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/withdrawals`, { headers, cache:"no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/kyc`, { headers, cache:"no-store" }),
         ]);
         if (!active) return;
         if (walletR.ok) setWallets((await walletR.json()).wallets ?? []);
@@ -149,8 +154,8 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
         if (depositR.ok) setDeposits((await depositR.json()).deposits ?? []);
         if (withdrawalR.ok) setWithdrawals((await withdrawalR.json()).withdrawals ?? []);
         if (kycR.ok) {
-          const status = String((await kycR.json()).kyc?.status ?? "");
-          setBackendKycStatus(status === "verified" ? "verified" : status === "pending" || status === "submitted" ? "pending" : status ? "not_verified" : null);
+          const status = String((await kycR.json()).kyc?.status ?? "").toUpperCase();
+          setBackendKycStatus(status === "VERIFIED" || status === "APPROVED" ? "verified" : status === "ADMIN_REVIEW" || status === "PROVIDER_CHECKING" || status === "SUBMITTED" ? "pending" : status ? "not_verified" : null);
         }
         void tradeR;
       } catch {
@@ -194,10 +199,10 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
     let active = true;
     const loadBook = async () => {
       try {
-        const symbol = \`\${selectedAsset.symbol}/USDT\`;
+        const symbol = `${selectedAsset.symbol}/USDT`;
       const [bookResponse, tradesResponse] = await Promise.all([
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/orderbook?symbol=\${encodeURIComponent(symbol)}&limit=20\`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
-          fetch(\`\${ANSARRAF_API_BASE}/api/v1/market-data/trades?symbol=\${encodeURIComponent(symbol)}&limit=20\`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/orderbook?symbol=${encodeURIComponent(symbol)}&limit=20`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/trades?symbol=${encodeURIComponent(symbol)}&limit=20`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
         ]);
         if (!bookResponse.ok) throw new Error("orderbook_unavailable");
         const book = await bookResponse.json();
@@ -698,7 +703,7 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
     setSubmitting(true); setSubmitMessage("");
     try {
       const token = window.localStorage.getItem("anpardaz:accessToken") ?? "";
-      const response = await fetch(\`\${ANSARRAF_API_BASE}/api/v1/orders\`, { method:"POST", headers:{ authorization:\`Bearer \${token}\`, "content-type":"application/json" }, body:JSON.stringify(body) });
+      const response = await fetch(`${ANSARRAF_API_BASE}/api/v1/orders`, { method:"POST", headers:{ authorization:`Bearer ${token}`, "content-type":"application/json" }, body:JSON.stringify(body) });
       const result = await response.json().catch(()=>({}));
       if (!response.ok) throw new Error(result?.error ?? "order_failed");
       onAmount(""); onPrice(""); setSubmitMessage("سفارش با موفقیت در آن صراف ثبت شد.");
@@ -903,7 +908,7 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
               <span style={{ textAlign:"center" }}>{trade.amount.toFixed(6)}</span>
               <span style={{ textAlign:"left" }}>{trade.time}</span>
             </div>
-          ))        </div>
+          ))}        </div>
       </div>
     </div>
   );
@@ -1017,246 +1022,47 @@ function KycGate({ kycStatus }: { kycStatus:KycStatus }) {
 }
 
 // ── Deposit Toman Tab ──────────────────────────────
-function DepositTomanTab({ kycStatus }: { kycStatus:KycStatus }) {
-  const [method, setMethod] = useState<"card"|"bank">("card");
-  if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>;
-  return (
-    <div style={{ maxWidth:560, padding:"24px 0" }}>
-      <h2 style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>واریز تومان</h2>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:20 }}>
-        {[{ id:"card", label:"کارت بانکی (شاپرک)", icon:"credit-card", desc:"واریز آنی تا ۵۰ میلیون تومان" },
-          { id:"bank", label:"انتقال بانکی (پایا/ساتنا)", icon:"deposit", desc:"واریز تا ۵۰۰ میلیون تومان" }
-        ].map(m => (
-          <button key={m.id} onClick={()=>setMethod(m.id as any)} className="w-card" style={{ padding:"18px", textAlign:"right", border:`2px solid ${method===m.id?"rgba(8,145,178,0.5)":"var(--w-border)"}`, background:method===m.id?"rgba(8,145,178,0.05)":"var(--w-card)", cursor:"pointer" }}>
-            <div style={{ fontSize:24, marginBottom:8 }}><WI n={m.icon} s={24} style={{ color:"#0891b2" }}/></div>
-            <div style={{ fontSize:13, fontWeight:800, marginBottom:4 }}>{m.label}</div>
-            <div style={{ fontSize:11, color:"var(--w-muted)" }}>{m.desc}</div>
-          </button>
-        ))}
-      </div>
-      {method === "card" && (
-        <div className="w-card" style={{ padding:"22px" }}>
-          <div style={{ fontSize:13, fontWeight:700, marginBottom:14 }}>واریز با کارت بانکی</div>
-          <div style={{ marginBottom:12 }}>
-            <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>مبلغ (تومان)</label>
-            <input className="w-input" placeholder="مثال: ۵,۰۰۰,۰۰۰" inputMode="numeric"/>
-          </div>
-          <div style={{ padding:"10px 12px", background:"var(--w-card2)", borderRadius:8, fontSize:12, color:"var(--w-muted)", marginBottom:14 }}>
-            کارت‌های عضو شبکه شتاب قابل استفاده هستند. سقف تراکنش روزانه: ۵۰ میلیون تومان
-          </div>
-          <button className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px" }}>انتقال به درگاه پرداخت</button>
-        </div>
-      )}
-      {method === "bank" && (
-        <div className="w-card" style={{ padding:"22px" }}>
-          <div style={{ fontSize:13, fontWeight:700, marginBottom:14 }}>اطلاعات حساب بانکی</div>
-          {[["شماره حساب","6219861034567890"],["شماره شبا","IR120570028080010840901200"]].map(([l,v])=>(
-            <div key={l} style={{ marginBottom:12 }}>
-              <div style={{ fontSize:11, color:"var(--w-muted)", marginBottom:4 }}>{l}</div>
-              <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--w-card2)", border:"1px solid var(--w-border)", borderRadius:8, padding:"10px 14px" }}>
-                <span style={{ flex:1, fontFamily:"monospace", fontSize:13, letterSpacing:1 }}>{v}</span>
-                <button style={{ background:"none", border:"none", cursor:"pointer", color:"#0891b2", fontSize:11, fontWeight:700 }}><WI n="copy" s={12}/> کپی</button>
-              </div>
-            </div>
-          ))}
-          <div style={{ padding:"10px 12px", background:"rgba(8,145,178,0.07)", borderRadius:8, fontSize:12, color:"#0891b2", marginTop:8 }}>
-            در توضیحات انتقال، شناسه کاربری خود را ذکر کنید. واریز پایا ۲-۳ ساعت کاری اعمال می‌شود.
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+function DepositTomanTab({ kycStatus }: { kycStatus:KycStatus }) { if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>; return <div className="w-card" style={{maxWidth:560,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>واریز تومان</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>در Backend فعلی آن صراف، درگاه پرداخت تومان و حساب بانکی/شبا برای واریز کاربر فعال نشده است. تا زمان اتصال سرویس پرداخت، هیچ شماره حساب، شبا، سقف یا موجودی آزمایشی نمایش داده نمی‌شود.</p></div>; }
 
 // ── Deposit Coin Tab ───────────────────────────────
-function DepositCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) {
-  const [selAsset, setSelAsset] = useState(assets[0]);
-  const [network, setNetwork] = useState<"TRC20"|"ERC20"|"BEP20"|"BTC"|"SOL">("TRC20");
-  const [searchCoin, setSearchCoin] = useState("");
-  if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>;
-  const ADDR: Record<string,string> = { TRC20:"TXqz8fR2mQAYn12r4Yp8HktZL42QvWmT9P", ERC20:"0x71C7656EC7ab88b098defB751B7401B5f6d8976F", BEP20:"bnb1grpf0955h0ykzq3ar5nmum7y6gdfl6lxfn46h2", BTC:"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", SOL:"7KqpRwzkB7zRJpNLbRthXm6kHcDLFXPQ3JZvyCoMGxkV" };
-  const NETS: Record<string,string[]> = { BTC:["BTC"], ETH:["ERC20"], BNB:["BEP20"], SOL:["SOL"], USDT:["TRC20","ERC20","BEP20"], USDC:["ERC20","BEP20"], default:["TRC20","ERC20","BEP20"] };
-  const nets = NETS[selAsset.symbol] || NETS.default;
-  const filtered = assets.filter(a => a.symbol.includes(searchCoin.toUpperCase()) || a.nameFa.includes(searchCoin)).slice(0,30);
-  return (
-    <div style={{ display:"flex", gap:20, padding:"24px 0", alignItems:"flex-start" }}>
-      <div style={{ width:220, flexShrink:0 }}>
-        <div style={{ fontSize:14, fontWeight:800, marginBottom:10 }}>انتخاب رمزارز</div>
-        <input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{ marginBottom:8, fontSize:12 }}/>
-        <div style={{ background:"var(--w-card)", border:"1px solid var(--w-border)", borderRadius:10, overflow:"hidden", maxHeight:360, overflowY:"auto" }}>
-          {filtered.map(a => (
-            <div key={a.id} onClick={()=>{setSelAsset(a);const ns=NETS[a.symbol]||NETS.default;setNetwork(ns[0] as any);}} style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", cursor:"pointer", background:selAsset.id===a.id?"rgba(8,145,178,0.08)":"transparent", borderBottom:"1px solid var(--w-border)", transition:"background 0.1s" }}>
-              <div style={{ width:24, height:24, borderRadius:"50%", background:a.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:8, fontWeight:900, flexShrink:0 }}>{a.symbol.slice(0,3)}</div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:700 }}>{a.symbol}</div>
-                <div style={{ fontSize:10, color:"var(--w-muted)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.nameFa}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ flex:1, maxWidth:560 }}>
-        <h2 style={{ fontSize:17, fontWeight:900, marginBottom:16 }}>واریز {selAsset.symbol}</h2>
-        <div className="w-card" style={{ padding:"22px" }}>
-          <div style={{ marginBottom:16 }}>
-            <label style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:8 }}>شبکه</label>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              {nets.map((n:string)=>(
-                <button key={n} onClick={()=>setNetwork(n as any)} style={{ padding:"7px 16px", borderRadius:8, border:`1.5px solid ${network===n?"rgba(8,145,178,0.5)":"var(--w-border)"}`, background:network===n?"rgba(8,145,178,0.08)":"transparent", color:network===n?"#0891b2":"var(--w-muted)", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Vazirmatn" }}>{n}</button>
-              ))}
-            </div>
-          </div>
-          <div style={{ display:"flex", gap:20, marginBottom:16, alignItems:"flex-start" }}>
-            <div style={{ width:120, height:120, borderRadius:12, background:"var(--w-card2)", border:"1px solid var(--w-border)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <WI n="qr-code" s={44} style={{ opacity:0.25 }}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", marginBottom:6 }}>آدرس واریز ({network})</div>
-              <div style={{ background:"var(--w-card2)", border:"1px solid var(--w-border)", borderRadius:9, padding:"11px", fontSize:11, wordBreak:"break-all", fontFamily:"monospace", letterSpacing:0.3 }}>{ADDR[network] || ADDR.TRC20}</div>
-              <button className="w-btn w-btn-ghost" style={{ marginTop:8, padding:"6px 12px", fontSize:11 }}><WI n="copy" s={12}/> کپی آدرس</button>
-            </div>
-          </div>
-          <div style={{ padding:"11px 14px", background:"rgba(217,119,6,0.07)", border:"1px solid rgba(217,119,6,0.18)", borderRadius:9, fontSize:12, color:"#d97706", lineHeight:1.7 }}>
-            فقط {selAsset.symbol} را روی شبکه {network} ارسال کنید. ارسال توکن‌های دیگر موجب از دست رفتن دارایی می‌شود.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+function DepositCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) { if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>; return <div className="w-card" style={{maxWidth:560,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>واریز رمزارز</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>آدرس واریز واقعی از Backend/Provider فعلی صادر نمی‌شود. تا زمان فعال شدن سرویس آدرس کیف پول، آدرس نمونه یا ساختگی نمایش داده نمی‌شود.</p></div>; }
 
 // ── Withdraw Toman Tab ─────────────────────────────
-function WithdrawTomanTab({ kycStatus }: { kycStatus:KycStatus }) {
-  const [amount, setAmount] = useState("");
-  const [card, setCard] = useState("");
-  if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>;
-  return (
-    <div style={{ maxWidth:520, padding:"24px 0" }}>
-      <h2 style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>برداشت تومان</h2>
-      <div className="w-card" style={{ padding:"22px" }}>
-        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-          <div>
-            <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>شماره کارت مقصد</label>
-            <input value={card} onChange={e=>setCard(e.target.value)} placeholder="۱۶ رقم شماره کارت" className="w-input" maxLength={16} inputMode="numeric" style={{ fontFamily:"monospace", letterSpacing:2 }}/>
-          </div>
-          <div>
-            <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>مبلغ (تومان)</label>
-            <div style={{ position:"relative" }}>
-              <input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="حداقل ۱۰۰,۰۰۰ تومان" className="w-input" inputMode="numeric"/>
-            </div>
-          </div>
-          <div style={{ padding:"10px 12px", background:"var(--w-card2)", borderRadius:9, fontSize:12 }}>
-            {[["موجودی قابل برداشت","۳,۲۵۰,۰۰۰ تومان"],["کارمزد برداشت","رایگان"],["زمان واریز","فوری (ساعات اداری)"]].map(([k,v])=>(
-              <div key={k as string} style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                <span style={{ color:"var(--w-muted)" }}>{k}</span><span style={{ fontWeight:700 }}>{v}</span>
-              </div>
-            ))}
-          </div>
-          <button disabled={!card||!amount} className="w-btn w-btn-primary" style={{ padding:"12px", opacity:card&&amount?1:0.5 }}>
-            <WI n="withdraw" s={15}/> درخواست برداشت تومان
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+function WithdrawTomanTab({ kycStatus }: { kycStatus:KycStatus }) { if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>; return <div className="w-card" style={{maxWidth:520,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>برداشت تومان</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>برداشت تومان در Backend فعلی آن صراف به سرویس بانکی متصل نشده است؛ بنابراین فرم ثبت برداشت یا شماره کارت مقصد فعال نیست.</p></div>; }
 
 // ── Withdraw Coin Tab ──────────────────────────────
 function WithdrawCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) {
-  const [selAsset, setSelAsset] = useState(assets[0]);
-  const [network, setNetwork] = useState<string>("TRC20");
-  const [address, setAddress] = useState("");
-  const [wAmount, setWAmount] = useState("");
-  const [step, setStep] = useState<"form"|"otp"|"done">("form");
-  const [otp, setOtp] = useState("");
-  const [searchCoin, setSearchCoin] = useState("");
-  if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>;
-  const NETS: Record<string,string[]> = { BTC:["BTC"], ETH:["ERC20"], BNB:["BEP20"], SOL:["SOL"], USDT:["TRC20","ERC20","BEP20"], default:["TRC20","ERC20","BEP20"] };
-  const nets = NETS[selAsset.symbol] || NETS.default;
-  const feeMap: Record<string,string> = { TRC20:"1 USDT", ERC20:"5 USDT", BEP20:"0.5 USDT", BTC:"0.0001 BTC", SOL:"0.01 SOL" };
-  const filtered = assets.filter(a => a.symbol.includes(searchCoin.toUpperCase()) || a.nameFa.includes(searchCoin)).slice(0,30);
-  if (step === "done") return (
-    <div style={{ textAlign:"center", padding:"60px 24px" }}>
-      <div style={{ width:64, height:64, borderRadius:"50%", background:"rgba(16,185,129,0.12)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", color:"#10b981" }}><WI n="check" s={30}/></div>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:8 }}>درخواست ثبت شد</div>
-      <div style={{ fontSize:13, color:"var(--w-muted)", marginBottom:24 }}>برداشت {wAmount} {selAsset.symbol} در صف پردازش قرار گرفت.</div>
-      <button onClick={()=>{setStep("form");setAddress("");setWAmount("");setOtp("");}} className="w-btn w-btn-ghost">برداشت جدید</button>
-    </div>
-  );
-  if (step === "otp") return (
-    <div style={{ maxWidth:400, padding:"40px 0", margin:"0 auto" }}>
-      <div className="w-card" style={{ padding:"28px", textAlign:"center" }}>
-        <div style={{ fontSize:40, marginBottom:12 }}>📱</div>
-        <div style={{ fontSize:16, fontWeight:900, marginBottom:8 }}>تأیید دو مرحله‌ای</div>
-        <div style={{ fontSize:12, color:"var(--w-muted)", marginBottom:20 }}>کد ۶ رقمی ارسال شده به شماره موبایل خود را وارد کنید</div>
-        <input value={otp} onChange={e=>setOtp(e.target.value)} maxLength={6} className="w-input" style={{ textAlign:"center", fontSize:24, letterSpacing:8, fontFamily:"monospace" }} inputMode="numeric" placeholder="------"/>
-        <div style={{ display:"flex", gap:8, marginTop:16 }}>
-          <button onClick={()=>setStep("form")} className="w-btn w-btn-ghost" style={{ flex:1 }}>بازگشت</button>
-          <button onClick={()=>setStep("done")} disabled={otp.length!==6} className="w-btn w-btn-primary" style={{ flex:1, opacity:otp.length===6?1:0.5 }}>تأیید</button>
-        </div>
-      </div>
-    </div>
-  );
-  return (
-    <div style={{ display:"flex", gap:20, padding:"24px 0", alignItems:"flex-start" }}>
-      <div style={{ width:220, flexShrink:0 }}>
-        <div style={{ fontSize:14, fontWeight:800, marginBottom:10 }}>انتخاب رمزارز</div>
-        <input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{ marginBottom:8, fontSize:12 }}/>
-        <div style={{ background:"var(--w-card)", border:"1px solid var(--w-border)", borderRadius:10, overflow:"hidden", maxHeight:360, overflowY:"auto" }}>
-          {filtered.map(a => (
-            <div key={a.id} onClick={()=>{setSelAsset(a);const ns=NETS[a.symbol]||NETS.default;setNetwork(ns[0]);}} style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", cursor:"pointer", background:selAsset.id===a.id?"rgba(8,145,178,0.08)":"transparent", borderBottom:"1px solid var(--w-border)" }}>
-              <div style={{ width:24, height:24, borderRadius:"50%", background:a.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:8, fontWeight:900, flexShrink:0 }}>{a.symbol.slice(0,3)}</div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:700 }}>{a.symbol}</div>
-                <div style={{ fontSize:10, color:"var(--w-muted)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.nameFa}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ flex:1, maxWidth:520 }}>
-        <h2 style={{ fontSize:17, fontWeight:900, marginBottom:16 }}>برداشت {selAsset.symbol}</h2>
-        <div className="w-card" style={{ padding:"22px" }}>
-          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:8 }}>شبکه</label>
-              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-                {nets.map((n:string)=>(
-                  <button key={n} onClick={()=>setNetwork(n)} style={{ padding:"7px 16px", borderRadius:8, border:`1.5px solid ${network===n?"rgba(8,145,178,0.5)":"var(--w-border)"}`, background:network===n?"rgba(8,145,178,0.08)":"transparent", color:network===n?"#0891b2":"var(--w-muted)", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Vazirmatn" }}>{n}</button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>آدرس مقصد</label>
-              <input value={address} onChange={e=>setAddress(e.target.value)} placeholder={`آدرس ${selAsset.symbol} روی ${network}`} className="w-input" style={{ fontFamily:"monospace", fontSize:12 }}/>
-            </div>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>مقدار ({selAsset.symbol})</label>
-              <div style={{ position:"relative" }}>
-                <input value={wAmount} onChange={e=>setWAmount(e.target.value)} placeholder="0.00" className="w-input" style={{ paddingLeft:50 }} inputMode="decimal"/>
-                <button onClick={()=>setWAmount("0.5")} style={{ position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", fontSize:11, fontWeight:700, color:"#0891b2", background:"none", border:"none", cursor:"pointer" }}>MAX</button>
-              </div>
-            </div>
-            <div style={{ padding:"10px 12px", background:"var(--w-card2)", borderRadius:9, fontSize:12 }}>
-              {[["کارمزد شبکه",feeMap[network]||"—"],["دریافتی",wAmount?`${Math.max(0,parseFloat(wAmount)-0.001).toFixed(4)} ${selAsset.symbol}`:"—"]].map(([k,v])=>(
-                <div key={k as string} style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-                  <span style={{ color:"var(--w-muted)" }}>{k}</span><span style={{ fontWeight:700 }}>{v}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ padding:"10px 12px", background:"rgba(220,38,38,0.06)", borderRadius:9, fontSize:11, color:"#dc2626" }}>
-              آدرس را با دقت بررسی کنید. تراکنش‌های ارز دیجیتال برگشت‌پذیر نیستند.
-            </div>
-            <button disabled={!address||!wAmount} onClick={()=>setStep("otp")} className="w-btn w-btn-primary" style={{ padding:"12px", opacity:address&&wAmount?1:0.5 }}>
-              <WI n="withdraw" s={15}/> ادامه و تأیید
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const [selAsset,setSelAsset]=useState(assets[0]);
+  const [network,setNetwork]=useState("");
+  const [address,setAddress]=useState("");
+  const [wAmount,setWAmount]=useState("");
+  const [step,setStep]=useState<"form"|"confirm"|"done">("form");
+  const [otp,setOtp]=useState("");
+  const [searchCoin,setSearchCoin]=useState("");
+  const [submitting,setSubmitting]=useState(false);
+  const [message,setMessage]=useState("");
+  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus}/>;
+  const NETS:Record<string,string[]>={BTC:["BTC"],ETH:["ERC20"],BNB:["BEP20"],SOL:["SOL"],USDT:["TRC20","ERC20","BEP20"],default:["TRC20","ERC20","BEP20"]};
+  const nets=NETS[selAsset.symbol]||NETS.default;
+  const filtered=assets.filter(a=>a.symbol.includes(searchCoin.toUpperCase())||a.nameFa.includes(searchCoin)).slice(0,30);
+  const submit=async()=>{
+    if(otp.length!==6)return;
+    setSubmitting(true);setMessage("");
+    try{
+      const token=window.localStorage.getItem("anpardaz:accessToken")??"";
+      const response=await fetch(ANSARRAF_API_BASE+"/api/v1/withdrawals",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({assetId:selAsset.id,amount:wAmount.trim(),network:network.trim(),destination:address.trim(),idempotencyKey:crypto.randomUUID()})});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result?.error??"withdrawal_failed");
+      setStep("done");
+    }catch(error){
+      const errors:any={insufficient_available_balance:"موجودی کافی نیست.",kyc_required:"احراز هویت لازم است.",asset_not_available:"این دارایی در آن صراف فعال نیست.",invalid_withdrawal:"اطلاعات برداشت نامعتبر است."};
+      setMessage(errors[(error as Error).message]??"ثبت برداشت انجام نشد.");
+    }finally{setSubmitting(false);}
+  };
+  if(step==="done")return <div style={{textAlign:"center",padding:"60px 24px"}}><div style={{width:64,height:64,borderRadius:"50%",background:"rgba(16,185,129,0.12)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",color:"#10b981"}}><WI n="check" s={30}/></div><div style={{fontSize:18,fontWeight:900,marginBottom:8}}>درخواست برداشت ثبت شد</div><div style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,marginBottom:24}}>درخواست شما در Backend آن صراف ثبت شده و مطابق فرآیند تأیید و ارسال بررسی می‌شود.</div><button onClick={()=>{setStep("form");setAddress("");setWAmount("");setOtp("");setMessage("");}} className="w-btn w-btn-ghost">برداشت جدید</button></div>;
+  if(step==="confirm")return <div style={{maxWidth:460,padding:"40px 0",margin:"0 auto"}}><div className="w-card" style={{padding:28}}><div style={{fontSize:16,fontWeight:900,marginBottom:14}}>تأیید درخواست برداشت</div><div style={{display:"grid",gap:9,fontSize:13,marginBottom:18}}><div>دارایی: <b>{selAsset.symbol}</b></div><div>شبکه: <b>{network}</b></div><div>مبلغ: <b>{wAmount}</b></div><div style={{wordBreak:"break-all"}}>مقصد: <b>{address}</b></div><div style={{color:"var(--w-muted)"}}>کارمزد شبکه از سرویس کیف پول دریافت می‌شود و مقدار ساختگی نمایش داده نمی‌شود.</div></div><input value={otp} onChange={e=>setOtp(e.target.value.replace(/\\D/g,"").slice(0,6))} maxLength={6} className="w-input" style={{textAlign:"center",fontSize:22,letterSpacing:7}} inputMode="numeric" placeholder="کد ۶ رقمی تأیید"/>{message&&<div style={{color:"#dc2626",fontSize:12,marginTop:9}}>{message}</div>}<div style={{display:"flex",gap:8,marginTop:16}}><button onClick={()=>setStep("form")} className="w-btn w-btn-ghost" style={{flex:1}}>بازگشت</button><button onClick={submit} disabled={otp.length!==6||submitting} className="w-btn w-btn-primary" style={{flex:1,opacity:otp.length===6&&!submitting?1:.5}}>{submitting?"در حال ثبت…":"تأیید و ثبت برداشت"}</button></div></div></div>;
+  return <div style={{display:"flex",gap:20,padding:"24px 0",alignItems:"flex-start"}}><div style={{width:220,flexShrink:0}}><div style={{fontSize:14,fontWeight:800,marginBottom:10}}>انتخاب رمزارز</div><input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{marginBottom:8,fontSize:12}}/><div style={{background:"var(--w-card)",border:"1px solid var(--w-border)",borderRadius:10,overflow:"hidden",maxHeight:360,overflowY:"auto"}}>{filtered.map(a=><div key={a.id} onClick={()=>{setSelAsset(a);const ns=NETS[a.symbol]||NETS.default;setNetwork(ns[0]);}} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:selAsset.id===a.id?"rgba(8,145,178,0.08)":"transparent",borderBottom:"1px solid var(--w-border)"}}><div style={{width:24,height:24,borderRadius:"50%",background:a.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:900,flexShrink:0}}>{a.symbol.slice(0,3)}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700}}>{a.nameFa}</div><div style={{fontSize:10,color:"var(--w-muted)"}}>{a.symbol}</div></div></div>)}</div></div><div style={{flex:1,maxWidth:520}}><div className="w-card" style={{padding:20}}><h3 style={{margin:"0 0 16px",fontSize:17,fontWeight:900}}>برداشت {selAsset.symbol}</h3><label style={{fontSize:11,fontWeight:700,color:"var(--w-muted)"}}>شبکه</label><select value={network} onChange={e=>setNetwork(e.target.value)} className="w-input" style={{margin:"6px 0 14px"}}>{nets.map(n=><option key={n} value={n}>{n}</option>)}</select><label style={{fontSize:11,fontWeight:700,color:"var(--w-muted)"}}>آدرس مقصد</label><input value={address} onChange={e=>setAddress(e.target.value)} placeholder={"آدرس "+selAsset.symbol+" روی "+network} className="w-input" style={{fontFamily:"monospace",fontSize:12,margin:"6px 0 14px"}}/><label style={{fontSize:11,fontWeight:700,color:"var(--w-muted)"}}>مقدار ({selAsset.symbol})</label><input value={wAmount} onChange={e=>setWAmount(e.target.value)} placeholder="مقدار واقعی برداشت" className="w-input" style={{margin:"6px 0 14px"}} inputMode="decimal"/><div style={{padding:"10px 12px",background:"var(--w-card2)",borderRadius:9,fontSize:12,marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--w-muted)"}}>کارمزد شبکه</span><b>—</b></div><div style={{fontSize:11,color:"var(--w-muted)",marginTop:5}}>کارمزد فقط پس از دریافت از سرویس کیف پول نمایش داده می‌شود.</div></div><div style={{padding:"10px 12px",background:"rgba(220,38,38,0.06)",borderRadius:9,fontSize:11,color:"#dc2626",marginBottom:12}}>آدرس را با دقت بررسی کنید. تراکنش‌های ارز دیجیتال برگشت‌پذیر نیستند.</div>{message&&<div style={{color:"#dc2626",fontSize:12,marginBottom:10}}>{message}</div>}<button disabled={!address.trim()||!wAmount.trim()||!network} onClick={()=>setStep("confirm")} className="w-btn w-btn-primary" style={{padding:"12px",opacity:address.trim()&&wAmount.trim()&&network?1:.5}}>ادامه و تأیید</button></div></div></div>;
 }
-
 // ── Orders Tab ─────────────────────────────────────
 function OrdersTab({ orders }: { orders:any[] }) {
   const [activeTab, setActiveTab] = useState<"open"|"history">("open");
@@ -1265,7 +1071,7 @@ function OrdersTab({ orders }: { orders:any[] }) {
     <div style={{ padding:"20px 0" }}>
       <div style={{ display:"flex", gap:12, marginBottom:16 }}>
         {(["open","history"] as const).map(t => (
-          <button key={t} onClick={()=>setActiveTab(t)} style={{ padding:"8px 20px", borderRadius:8, border:\`1px solid \${activeTab===t?"rgba(8,145,178,0.4)":"var(--w-border)"}\`, background:activeTab===t?"rgba(8,145,178,0.08)":"transparent", color:activeTab===t?"#0891b2":"var(--w-muted)", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"Vazirmatn" }}>
+          <button key={t} onClick={()=>setActiveTab(t)} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${activeTab===t?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:activeTab===t?"rgba(8,145,178,0.08)":"transparent", color:activeTab===t?"#0891b2":"var(--w-muted)", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"Vazirmatn" }}>
             {t==="open"?"سفارشات باز":"تاریخچه سفارشات"}
           </button>
         ))}
@@ -1325,7 +1131,7 @@ function TransactionsTab({ orders, deposits, withdrawals, onSelectTx }: { orders
             <thead><tr style={{ background:"var(--w-card2)" }}>{["نوع","مقدار","تاریخ","وضعیت","شناسه","جزئیات"].map(h=><th key={h} style={{ padding:"10px 14px", textAlign:"right", color:"var(--w-muted)", fontSize:11 }}>{h}</th>)}</tr></thead>
             <tbody>{filtered.map((tx,i)=>(
               <tr key={tx.txid+"-"+i} style={{ borderBottom:"1px solid var(--w-border)", cursor:"pointer" }} onClick={()=>onSelectTx(tx)}>
-                <td style={{ padding:"12px 14px" }}><span style={{ padding:"3px 10px", borderRadius:6, background:\`\${tx.color}15\`, color:tx.color, fontSize:12, fontWeight:700 }}>{tx.type}</span></td>
+                <td style={{ padding:"12px 14px" }}><span style={{ padding:"3px 10px", borderRadius:6, background:`${tx.color}15`, color:tx.color, fontSize:12, fontWeight:700 }}>{tx.type}</span></td>
                 <td style={{ padding:"12px 14px", fontWeight:800, color:tx.color }}>{tx.amount}</td>
                 <td style={{ padding:"12px 14px" }}>{tx.date}</td>
                 <td style={{ padding:"12px 14px" }}>{tx.status}</td>
@@ -1372,36 +1178,14 @@ function TxDetailView({ tx, onBack }: { tx:any; onBack:()=>void }) {
 
 // ── Fees Tab ───────────────────────────────────────
 function FeesTab() {
-  const tiers = [
-    { label:"عادی",    vol:"کمتر از ۵۰۰ دلار",   maker:"۰.۱۵٪",  taker:"۰.۱۸٪" },
-    { label:"VIP 1",   vol:"۵۰۰ تا ۵۰۰۰",       maker:"۰.۱۲٪",  taker:"۰.۱۵٪" },
-    { label:"VIP 2",   vol:"۵۰۰۰ تا ۵۰۰۰۰",     maker:"۰.۱۰٪",  taker:"۰.۱۲٪" },
-    { label:"VIP 3",   vol:"۵۰۰۰۰ تا ۵۰۰۰۰۰",   maker:"۰.۰۸٪",  taker:"۰.۱۰٪" },
-    { label:"Market Maker",vol:"+۵۰۰,۰۰۰",       maker:"۰.۰۰٪",  taker:"۰.۰۵٪" },
-  ];
   return (
-    <div style={{ padding:"24px 0" }}>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>جدول کارمزدها</div>
-      <div className="w-card" style={{ overflow:"hidden" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-          <thead>
-            <tr style={{ background:"var(--w-card2)" }}>
-              {["سطح","حجم ۳۰ روزه (USDT)","کارمزد Maker","کارمزد Taker"].map(h=>(
-                <th key={h} style={{ padding:"12px 16px", textAlign:"right", color:"var(--w-muted)", fontWeight:600, fontSize:11 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tiers.map((t,i) => (
-              <tr key={i} style={{ borderBottom:"1px solid var(--w-border)", background:i===0?"rgba(8,145,178,0.04)":"transparent" }}>
-                <td style={{ padding:"12px 16px", fontWeight:700 }}>{t.label}{i===0&&<span style={{ fontSize:10, marginRight:6, background:"rgba(8,145,178,0.1)", color:"#0891b2", padding:"2px 6px", borderRadius:4 }}>سطح شما</span>}</td>
-                <td style={{ padding:"12px 16px" }}>{t.vol}</td>
-                <td style={{ padding:"12px 16px", color:"#10b981", fontWeight:700 }}>{t.maker}</td>
-                <td style={{ padding:"12px 16px", color:"#f43f5e", fontWeight:700 }}>{t.taker}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div style={{ padding:"24px 0", maxWidth:640 }}>
+      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>کارمزدها</div>
+      <div className="w-card" style={{ padding:"22px" }}>
+        <div style={{ fontSize:13, fontWeight:800, marginBottom:8 }}>کارمزد واقعی حساب</div>
+        <div style={{ fontSize:12, color:"var(--w-muted)", lineHeight:1.9 }}>
+          نرخ کارمزد این حساب باید از تنظیمات واقعی بک‌اند و ارائه‌دهنده دریافت شود. هیچ نرخ یا سطح VIP ساختگی در رابط نمایش داده نمی‌شود.
+        </div>
       </div>
     </div>
   );
@@ -1410,29 +1194,14 @@ function FeesTab() {
 // ── Security Tab ───────────────────────────────────
 function SecurityTab() {
   return (
-    <div style={{ padding:"24px 0", maxWidth:580 }}>
+    <div style={{ padding:"24px 0", maxWidth:640 }}>
       <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>امنیت حساب</div>
-      {[
-        { title:"تأیید دو مرحله‌ای (۲FA)", desc:"با Google Authenticator یا پیامک امنیت حساب را بالا ببرید", status:"فعال نشده", color:"#f43f5e", icon:"shield" },
-        { title:"ضد فیشینگ", desc:"یک کد شخصی انتخاب کنید که در همه ایمیل‌های آن صراف نمایش داده شود", status:"تنظیم نشده", color:"#d97706", icon:"lock" },
-        { title:"مدیریت دستگاه‌ها", desc:"مشاهده و مدیریت دستگاه‌هایی که وارد حساب شما شده‌اند", status:"۱ دستگاه", color:"#059669", icon:"device" },
-      ].map(item => (
-        <div key={item.title} className="w-card" style={{ padding:"18px", marginBottom:12 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <div style={{ width:40, height:40, borderRadius:11, background:`${item.color}15`, display:"flex", alignItems:"center", justifyContent:"center", color:item.color }}>
-              <WI n={item.icon} s={20}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{item.title}</div>
-              <div style={{ fontSize:11, color:"var(--w-muted)", marginTop:2 }}>{item.desc}</div>
-            </div>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <span style={{ fontSize:11, color:item.color, fontWeight:700 }}>{item.status}</span>
-              <button className="w-btn w-btn-ghost" style={{ padding:"6px 14px", fontSize:12 }}>تنظیم</button>
-            </div>
-          </div>
+      <div className="w-card" style={{ padding:"22px" }}>
+        <div style={{ fontSize:13, fontWeight:800, marginBottom:8 }}>مدیریت امنیت</div>
+        <div style={{ fontSize:12, color:"var(--w-muted)", lineHeight:1.9 }}>
+          وضعیت ۲FA، دستگاه‌ها و تنظیمات ضد فیشینگ تا زمان اتصال سرویس امنیت حساب از بک‌اند نمایش داده نمی‌شود.
         </div>
-      ))}
+      </div>
     </div>
   );
 }
@@ -1445,7 +1214,7 @@ function TradeSelectTab({ asset, onInstant, onSpot, onMargin, isLoggedIn, onAuth
   const cards = [
     { id:"instant", label:"خرید/فروش لحظه‌ای", sublabel:"لحظه‌ای", icon:"swap", color:"#059669", desc:"خرید یا فروش آنی با قیمت بازار. ساده‌ترین روش معامله.", badge:"پیشنهادی", onClick: isLoggedIn ? onInstant : onAuth },
     { id:"spot", label:"معامله اسپات", sublabel:"اسپات", icon:"bar-chart", color:"#0891b2", desc:"معامله با دفتر سفارشات کامل. بازار، لیمیت و استاپ-لیمیت.", badge:"حرفه‌ای", onClick: onSpot },
-    { id:"margin", label:"معامله تعهدی", sublabel:"مارجین", icon:"trending-up", color:"#7c3aed", desc:"معامله با اهرم تا ×۱۰. امکان Long و Short با استفاده از وام.", badge:"ریسک بالا", onClick: isLoggedIn ? onMargin : onAuth },
+    { id:"margin", label:"معامله تعهدی", sublabel:"مارجین", icon:"trending-up", color:"#7c3aed", desc:"API اجرایی معاملات تعهدی هنوز در بک‌اند آن صراف فعال نشده است.", badge:"فعلاً غیرفعال", onClick: ()=>{} },
   ];
   return (
     <div style={{ padding:"32px 0" }}>
@@ -1481,325 +1250,64 @@ function TradeSelectTab({ asset, onInstant, onSpot, onMargin, isLoggedIn, onAuth
 function InstantTradeTab({ asset, onBack, isLoggedIn, onAuth }: { asset:CryptoAsset; onBack:()=>void; isLoggedIn:boolean; onAuth:()=>void }) {
   const [side, setSide] = useState<"buy"|"sell">("buy");
   const [amount, setAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
   const [done, setDone] = useState(false);
   const estimated = side === "buy" ? (parseFloat(amount)||0)/asset.price : (parseFloat(amount)||0)*asset.price;
+  const submit = async () => {
+    if (!isLoggedIn) return onAuth();
+    const input = Number(amount);
+    if (!Number.isFinite(input) || input <= 0 || !Number.isFinite(asset.price) || asset.price <= 0) { setMessage("مقدار معامله معتبر نیست."); return; }
+    const token = window.localStorage.getItem("anpardaz:accessToken") ?? "";
+    if (!token) return onAuth();
+    setSubmitting(true); setMessage("");
+    try {
+      const headers = { authorization:"Bearer " + token, "content-type":"application/json" };
+      const [assetsR, kycR] = await Promise.all([
+        fetch(ANSARRAF_API_BASE + "/api/v1/assets", { headers, cache:"no-store" }),
+        fetch(ANSARRAF_API_BASE + "/api/v1/kyc", { headers, cache:"no-store" }),
+      ]);
+      const assetsBody = await assetsR.json().catch(()=>({}));
+      const kycBody = await kycR.json().catch(()=>({}));
+      const status = String(kycBody?.kyc?.status ?? "").toUpperCase();
+      if (status && !["VERIFIED","APPROVED"].includes(status)) { setMessage("برای معامله ابتدا احراز هویت را تکمیل و تأیید کنید."); return; }
+      const rows = Array.isArray(assetsBody?.assets) ? assetsBody.assets : [];
+      const quote = rows.find((x:any) => String(x.symbol).toUpperCase() === "USDT");
+      if (!quote) throw new Error("quote_asset_unavailable");
+      const quantity = side === "buy" ? input / asset.price : input;
+      const body:any = { baseAssetId:Number(asset.id), quoteAssetId:Number(quote.id), side, orderType:"market", quantity:quantity.toString(), idempotencyKey:crypto.randomUUID() };
+      if (side === "buy") body.quoteAmount = input.toString();
+      const response = await fetch(ANSARRAF_API_BASE + "/api/v1/orders", { method:"POST", headers, body:JSON.stringify(body) });
+      const result = await response.json().catch(()=>({}));
+      if (!response.ok) { const errors:any={insufficient_available_balance:"موجودی کافی نیست.",kyc_required:"احراز هویت لازم است.",invalid_order:"اطلاعات سفارش نامعتبر است."}; throw new Error(errors[result?.error] ?? "ثبت معامله انجام نشد."); }
+      setDone(true);
+    } catch (error) { setMessage((error as Error).message === "quote_asset_unavailable" ? "دارایی USDT در صراف در دسترس نیست." : ((error as Error).message || "ثبت معامله انجام نشد.")); }
+    finally { setSubmitting(false); }
+  };
   if (done) return (
     <div style={{ padding:"60px 24px", textAlign:"center", maxWidth:400, margin:"0 auto" }}>
       <div style={{ width:72, height:72, borderRadius:"50%", background:"rgba(16,185,129,0.12)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", color:"#10b981", fontSize:40 }}>✓</div>
-      <div style={{ fontSize:22, fontWeight:900, marginBottom:8 }}>{side==="buy"?"خرید موفق":"فروش موفق"}</div>
+      <div style={{ fontSize:22, fontWeight:900, marginBottom:8 }}>{side==="buy"?"خرید ثبت شد":"فروش ثبت شد"}</div>
       <div style={{ fontSize:14, color:"var(--w-muted)", marginBottom:6 }}>{amount} {side==="buy"?"USDT":asset.symbol}</div>
-      <div style={{ fontSize:14, fontWeight:800, marginBottom:24 }}>{estimated.toFixed(side==="buy"?6:2)} {side==="buy"?asset.symbol:"USDT"} دریافت شد</div>
-      <div style={{ display:"flex", gap:8, justifyContent:"center" }}>
-        <button onClick={()=>{setDone(false);setAmount("");}} className="w-btn w-btn-ghost">معامله جدید</button>
-        <button onClick={onBack} className="w-btn w-btn-primary">بازگشت</button>
-      </div>
+      <div style={{ fontSize:14, fontWeight:800, marginBottom:24 }}>سفارش واقعی در بک‌اند آن صراف ثبت شد.</div>
+      <div style={{ display:"flex", gap:8, justifyContent:"center" }}><button onClick={()=>{setDone(false);setAmount("");}} className="w-btn w-btn-ghost">معامله جدید</button><button onClick={onBack} className="w-btn w-btn-primary">بازگشت</button></div>
     </div>
   );
   return (
     <div style={{ padding:"32px 0", maxWidth:440 }}>
-      <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:20 }}>
-        <WI n="arrow-right" s={13}/> انتخاب نوع معامله
-      </button>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-        <div style={{ width:44, height:44, borderRadius:"50%", background:asset.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:900, fontSize:13 }}>{asset.symbol.slice(0,3)}</div>
-        <div>
-          <div style={{ fontSize:16, fontWeight:900 }}>{asset.nameFa} ({asset.symbol})</div>
-          <div style={{ fontSize:13, fontWeight:800, color:clr(asset.change24h) }}>${fmtP(asset.price)} <span style={{ fontSize:11 }}>{asset.change24h>0?"+":""}{asset.change24h.toFixed(2)}%</span></div>
-        </div>
-      </div>
+      <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:20 }}><WI n="arrow-right" s={13}/> انتخاب نوع معامله</button>
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}><div style={{ width:44, height:44, borderRadius:"50%", background:asset.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:900, fontSize:13 }}>{asset.symbol.slice(0,3)}</div><div><div style={{ fontSize:16, fontWeight:900 }}>{asset.nameFa} ({asset.symbol})</div><div style={{ fontSize:13, fontWeight:800, color:clr(asset.change24h) }}>{Number.isFinite(asset.change24h) ? (asset.change24h>0?"+":"") + asset.change24h.toFixed(2) + "%" : "—"} · ${fmtP(asset.price)}</div></div></div>
       <div className="w-card" style={{ padding:"24px" }}>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", background:"var(--w-card2)", borderRadius:10, padding:3, marginBottom:20 }}>
-          <button onClick={()=>setSide("buy")} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="buy"?"#10b981":"transparent", color:side==="buy"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>خرید {asset.symbol}</button>
-          <button onClick={()=>setSide("sell")} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="sell"?"#f43f5e":"transparent", color:side==="sell"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>فروش {asset.symbol}</button>
-        </div>
-        <div style={{ marginBottom:14 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)", marginBottom:6 }}>
-            <span>{side==="buy"?"پرداخت می‌کنید":"می‌فروشید"}</span>
-            <span>موجودی: {side==="buy"?"0.00 USDT":`0.00 ${asset.symbol}`}</span>
-          </div>
-          <div style={{ position:"relative" }}>
-            <input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" className="w-input" style={{ paddingLeft:56, fontSize:16 }} inputMode="decimal"/>
-            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, fontWeight:700, color:"var(--w-muted)" }}>{side==="buy"?"USDT":asset.symbol}</span>
-          </div>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:6, marginBottom:16 }}>
-          {["25%","50%","75%","همه"].map(p=>(
-            <button key={p} style={{ padding:"6px", borderRadius:7, border:"1px solid var(--w-border)", background:"transparent", color:"var(--w-muted)", fontSize:12, cursor:"pointer", fontFamily:"Vazirmatn" }}>{p}</button>
-          ))}
-        </div>
-        {amount && (
-          <div style={{ padding:"12px 14px", background:"var(--w-card2)", borderRadius:9, marginBottom:16 }}>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:13, marginBottom:4 }}>
-              <span style={{ color:"var(--w-muted)" }}>{side==="buy"?"دریافت می‌کنید":"معادل USDT"}</span>
-              <span style={{ fontWeight:800 }}>{estimated.toFixed(side==="buy"?6:2)} {side==="buy"?asset.symbol:"USDT"}</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)" }}>
-              <span>قیمت</span><span>${fmtP(asset.price)}</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)" }}>
-              <span>کارمزد (۰.۱٪)</span><span>{side==="buy"?`$${(parseFloat(amount)*0.001).toFixed(4)}`:`${(parseFloat(amount)*0.001).toFixed(6)} ${asset.symbol}`}</span>
-            </div>
-          </div>
-        )}
-        {!isLoggedIn ? (
-          <button onClick={onAuth} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e" }}>
-            <WI n="lock" s={15}/> ورود برای معامله
-          </button>
-        ) : (
-          <button disabled={!amount} onClick={()=>setDone(true)} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e", opacity:amount?1:0.5, fontSize:15 }}>
-            {side==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
-          </button>
-        )}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", background:"var(--w-card2)", borderRadius:10, padding:3, marginBottom:20 }}><button onClick={()=>{setSide("buy");setMessage("")}} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="buy"?"#10b981":"transparent", color:side==="buy"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>خرید {asset.symbol}</button><button onClick={()=>{setSide("sell");setMessage("")}} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="sell"?"#f43f5e":"transparent", color:side==="sell"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>فروش {asset.symbol}</button></div>
+        <div style={{ marginBottom:14 }}><div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)", marginBottom:6 }}><span>{side==="buy"?"پرداخت می‌کنید":"می‌فروشید"}</span><span>موجودی از حساب واقعی دریافت می‌شود</span></div><div style={{ position:"relative" }}><input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" className="w-input" style={{ paddingLeft:56, fontSize:16 }} inputMode="decimal"/><span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, fontWeight:700, color:"var(--w-muted)" }}>{side==="buy"?"USDT":asset.symbol}</span></div></div>
+        {amount && <div style={{ padding:"12px 14px", background:"var(--w-card2)", borderRadius:9, marginBottom:16 }}><div style={{ display:"flex", justifyContent:"space-between", fontSize:13, marginBottom:4 }}><span style={{ color:"var(--w-muted)" }}>{side==="buy"?"دریافت می‌کنید":"معادل USDT"}</span><span style={{ fontWeight:800 }}>{estimated.toFixed(side==="buy"?6:2)} {side==="buy"?asset.symbol:"USDT"}</span></div><div style={{ fontSize:11, color:"var(--w-muted)" }}>قیمت بازار: ${fmtP(asset.price)} · کارمزد طبق تنظیمات واقعی حساب</div></div>}
+        {message && <div style={{ padding:"10px 12px", background:"rgba(244,63,94,0.08)", color:"#f43f5e", borderRadius:8, fontSize:12, marginBottom:12 }}>{message}</div>}
+        {!isLoggedIn ? <button onClick={onAuth} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e" }}><WI n="lock" s={15}/> ورود برای معامله</button> : <button disabled={!amount || submitting} onClick={submit} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e", opacity:amount && !submitting?1:0.5, fontSize:15 }}>{submitting ? "در حال ثبت..." : (side==="buy"?"خرید ":"فروش ") + asset.symbol}</button>}
       </div>
     </div>
   );
 }
-
 // ── Support Tab ────────────────────────────────────
-function SupportTab({ isLoggedIn, onAuth }: { isLoggedIn:boolean; onAuth:()=>void }) {
-  const [view, setView] = useState<"list"|"new"|"chat">("list");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
-  const [chatMsg, setChatMsg] = useState("");
-  const [messages, setMessages] = useState([
-    { from:"support", text:"سلام! به پشتیبانی آن صراف خوش آمدید. چطور می‌توانم کمک کنم؟", time:"۱۰:۳۰" },
-  ]);
-  const TICKETS = [
-    { id:"TK-1042", subject:"مشکل در برداشت USDT", status:"در انتظار پاسخ", date:"۱۴۰۳/۰۸/۲۲", color:"#d97706" },
-    { id:"TK-1038", subject:"سؤال درباره کارمزد", status:"پاسخ داده شده", date:"۱۴۰۳/۰۸/۱۸", color:"#10b981" },
-    { id:"TK-1025", subject:"احراز هویت رد شد", status:"بسته شده", date:"۱۴۰۳/۰۸/۱۰", color:"var(--w-muted)" },
-  ];
-  if (!isLoggedIn) return (
-    <div style={{ textAlign:"center", padding:"60px 24px" }}>
-      <WI n="comment" s={40} style={{ opacity:0.2, marginBottom:16 }}/>
-      <div style={{ fontSize:16, fontWeight:800, marginBottom:8 }}>ورود برای مشاهده تیکت‌ها</div>
-      <button onClick={onAuth} className="w-btn w-btn-primary" style={{ padding:"10px 24px", marginTop:8 }}>ورود / ثبت‌نام</button>
-    </div>
-  );
-  if (view === "chat") return (
-    <div style={{ padding:"20px 0", display:"flex", flexDirection:"column", height:"calc(100vh - var(--w-header) - 100px)" }}>
-      <button onClick={()=>setView("list")} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:16 }}>
-        <WI n="arrow-right" s={13}/> بازگشت
-      </button>
-      <div className="w-card" style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        <div style={{ padding:"14px 16px", borderBottom:"1px solid var(--w-border)", fontSize:14, fontWeight:800 }}>چت با پشتیبانی</div>
-        <div style={{ flex:1, overflowY:"auto", padding:"16px" }}>
-          {messages.map((m,i)=>(
-            <div key={i} style={{ display:"flex", gap:10, marginBottom:14, justifyContent:m.from==="user"?"flex-start":"flex-end" }}>
-              {m.from==="support" && <div style={{ width:32, height:32, borderRadius:"50%", background:"rgba(8,145,178,0.1)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, color:"#0891b2", fontSize:12, fontWeight:800 }}>پ</div>}
-              <div style={{ maxWidth:"70%", padding:"10px 14px", borderRadius:12, background:m.from==="user"?"rgba(124,58,237,0.08)":"var(--w-card2)", fontSize:13 }}>
-                {m.text}
-                <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:4, textAlign:"left" }}>{m.time}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ padding:"12px 16px", borderTop:"1px solid var(--w-border)", display:"flex", gap:8 }}>
-          <input value={chatMsg} onChange={e=>setChatMsg(e.target.value)} placeholder="پیام خود را بنویسید..." className="w-input" style={{ flex:1 }}
-            onKeyDown={e=>{if(e.key==="Enter"&&chatMsg.trim()){setMessages(p=>[...p,{from:"user",text:chatMsg.trim(),time:"اکنون"}]);setChatMsg("");setTimeout(()=>setMessages(p=>[...p,{from:"support",text:"پیام شما دریافت شد. کارشناسان ما به زودی پاسخ خواهند داد.",time:"اکنون"}]),1500);}}}
-          />
-          <button onClick={()=>{if(!chatMsg.trim())return;setMessages(p=>[...p,{from:"user",text:chatMsg.trim(),time:"اکنون"}]);setChatMsg("")}} className="w-btn w-btn-primary" style={{ padding:"10px 18px" }}><WI n="send" s={15}/></button>
-        </div>
-      </div>
-    </div>
-  );
-  if (view === "new") return (
-    <div style={{ padding:"24px 0", maxWidth:560 }}>
-      <button onClick={()=>setView("list")} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:20 }}>
-        <WI n="arrow-right" s={13}/> بازگشت به تیکت‌ها
-      </button>
-      <h2 style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>تیکت جدید</h2>
-      <div className="w-card" style={{ padding:"22px", display:"flex", flexDirection:"column", gap:14 }}>
-        <div>
-          <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>موضوع</label>
-          <input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع مشکل یا سؤال خود را بنویسید" className="w-input"/>
-        </div>
-        <div>
-          <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>دسته‌بندی</label>
-          <select className="w-input" style={{ appearance:"none" }}>
-            {["واریز و برداشت","معاملات","احراز هویت","امنیت","سایر"].map(c=><option key={c}>{c}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>توضیحات</label>
-          <textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="مشکل خود را با جزئیات توضیح دهید..." className="w-input" rows={5} style={{ resize:"vertical" }}/>
-        </div>
-        <button disabled={!subject||!body} onClick={()=>setView("list")} className="w-btn w-btn-primary" style={{ padding:"12px", opacity:subject&&body?1:0.5 }}>
-          ارسال تیکت
-        </button>
-      </div>
-    </div>
-  );
-  return (
-    <div style={{ padding:"20px 0" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-        <div style={{ fontSize:16, fontWeight:900 }}>تیکت‌های پشتیبانی</div>
-        <div style={{ display:"flex", gap:8 }}>
-          <button onClick={()=>setView("chat")} className="w-btn w-btn-ghost" style={{ padding:"8px 16px", fontSize:12 }}><WI n="comment" s={13}/> چت زنده</button>
-          <button onClick={()=>setView("new")} className="w-btn w-btn-primary" style={{ padding:"8px 16px", fontSize:12 }}>تیکت جدید +</button>
-        </div>
-      </div>
-      <div className="w-card" style={{ overflow:"hidden" }}>
-        {TICKETS.map((t,i) => (
-          <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderBottom:i<TICKETS.length-1?"1px solid var(--w-border)":"none", cursor:"pointer", transition:"background 0.1s" }}
-            onMouseEnter={e=>(e.currentTarget as HTMLDivElement).style.background="var(--w-hover)"}
-            onMouseLeave={e=>(e.currentTarget as HTMLDivElement).style.background="transparent"}
-          >
-            <div style={{ width:36, height:36, borderRadius:10, background:`${t.color}15`, display:"flex", alignItems:"center", justifyContent:"center", color:t.color, flexShrink:0 }}>
-              <WI n="comment" s={17}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{t.subject}</div>
-              <div style={{ fontSize:11, color:"var(--w-muted)", marginTop:2 }}>{t.id} · {t.date}</div>
-            </div>
-            <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, background:`${t.color}15`, color:t.color }}>{t.status}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+function SupportTab({ isLoggedIn, onAuth }: { isLoggedIn:boolean; onAuth:()=>void }) { if(!isLoggedIn)return <div style={{padding:"60px 20px",textAlign:"center"}}><h2>پشتیبانی آن صراف</h2><p style={{color:"var(--w-muted)"}}>برای دسترسی وارد حساب شوید.</p><button className="w-btn w-btn-primary" onClick={onAuth}>ورود</button></div>; return <div className="w-card" style={{maxWidth:640,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>پشتیبانی آن صراف</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>سامانه تیکت/چت پشتیبانی آن صراف هنوز به Backend پشتیبانی متصل نشده است. برای جلوگیری از ثبت یا پاسخ ساختگی، این بخش تا اتصال سرویس واقعی غیرفعال است.</p></div>; }
 
-// ── Guide Tab ──────────────────────────────────────
-function GuideTab() {
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(35);
-  const VIDEOS = [
-    { title:"آشنایی با آن صراف", duration:"۵:۳۲", done:true },
-    { title:"نحوه واریز و برداشت", duration:"۸:۱۵", done:true },
-    { title:"معامله اسپات برای مبتدیان", duration:"۱۲:۴۰", done:false },
-    { title:"معامله تعهدی (مارجین)", duration:"۱۵:۲۲", done:false },
-    { title:"فارکس بات: تنظیمات", duration:"۹:۵۸", done:false },
-    { title:"امنیت حساب و ۲FA", duration:"۶:۱۰", done:false },
-  ];
-  return (
-    <div style={{ padding:"24px 0", display:"flex", gap:24, alignItems:"flex-start" }}>
-      <div style={{ flex:1 }}>
-        <div className="w-card" style={{ overflow:"hidden", marginBottom:16 }}>
-          <div style={{ height:320, background:"#0a0a12", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", cursor:"pointer" }} onClick={()=>setPlaying(!playing)}>
-            <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,rgba(8,145,178,0.15),rgba(124,58,237,0.1))" }}/>
-            {!playing ? (
-              <div style={{ width:72, height:72, borderRadius:"50%", background:"rgba(255,255,255,0.15)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <WI n="play" s={32} style={{ color:"#fff", marginRight:-4 }}/>
-              </div>
-            ) : (
-              <div style={{ display:"flex", gap:4 }}>
-                {[...Array(3)].map((_,i)=><div key={i} style={{ width:4, height:24+i*8, background:"#0891b2", borderRadius:2, animation:`pulse ${0.8+i*0.2}s ease-in-out infinite alternate` }}/>)}
-              </div>
-            )}
-            <div style={{ position:"absolute", bottom:12, right:16, fontSize:13, color:"rgba(255,255,255,0.8)", fontWeight:700 }}>معامله اسپات برای مبتدیان</div>
-          </div>
-          <div style={{ padding:"14px 16px" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-              <span style={{ fontSize:11, color:"var(--w-muted)" }}>۳:۵۲ / ۱۲:۴۰</span>
-              <div style={{ flex:1, height:4, background:"var(--w-card2)", borderRadius:4, overflow:"hidden", cursor:"pointer" }}
-                onClick={e=>{ const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); setProgress(((e.clientX-r.left)/r.width)*100); }}>
-                <div style={{ height:"100%", width:`${progress}%`, background:"#0891b2", transition:"width 0.1s" }}/>
-              </div>
-              <button onClick={()=>setPlaying(!playing)} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)" }}>
-                <WI n={playing?"pause":"play"} s={16}/>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div style={{ width:280 }}>
-        <div style={{ fontSize:14, fontWeight:800, marginBottom:12 }}>فهرست دروس</div>
-        <div className="w-card" style={{ overflow:"hidden" }}>
-          {VIDEOS.map((v,i)=>(
-            <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom:i<VIDEOS.length-1?"1px solid var(--w-border)":"none", cursor:"pointer", background:i===2?"rgba(8,145,178,0.06)":"transparent" }}>
-              <div style={{ width:28, height:28, borderRadius:8, background:v.done?"rgba(16,185,129,0.12)":i===2?"rgba(8,145,178,0.12)":"var(--w-card2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, color:v.done?"#10b981":i===2?"#0891b2":"var(--w-muted)" }}>
-                {v.done ? <WI n="check" s={13}/> : <WI n="play" s={12}/>}
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:v.done||i===2?700:500, color:i===2?"#0891b2":"var(--w-text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.title}</div>
-                <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:1 }}>{v.duration}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Forex Bot Tab ──────────────────────────────────
-function ForexBotTab({ asset }: { asset:CryptoAsset }) {
-  const [active, setActive] = useState(false);
-  const [investAmount, setInvestAmount] = useState("1000");
-  const SESSIONS = [
-    { date:"۱۴۰۳/۰۸/۲۲", pair:"BTC/USDT", trades:FA(14), pnl:"+$۸۲.۵۰", pnlPct:"+۸.۲٪", color:"#10b981" },
-    { date:"۱۴۰۳/۰۸/۲۱", pair:"ETH/USDT", trades:FA(9), pnl:"+$۳۴.۲۰", pnlPct:"+۳.۴٪", color:"#10b981" },
-    { date:"۱۴۰۳/۰۸/۲۰", pair:"SOL/USDT", trades:FA(11), pnl:"-$۱۵.۸۰", pnlPct:"-۱.۶٪", color:"#f43f5e" },
-    { date:"۱۴۰۳/۰۸/۱۹", pair:"BNB/USDT", trades:FA(7), pnl:"+$۵۶.۱۰", pnlPct:"+۵.۶٪", color:"#10b981" },
-  ];
-  return (
-    <div style={{ padding:"24px 0" }}>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14, marginBottom:24 }}>
-        {[["سود کل","$۱۵۷.۰۰","#10b981"],["معاملات امروز",FA(14),"#0891b2"],["وضعیت بات",active?"فعال":"غیرفعال",active?"#10b981":"#f43f5e"]].map(([l,v,c])=>(
-          <div key={l as string} className="w-card" style={{ padding:"18px" }}>
-            <div style={{ fontSize:11, color:"var(--w-muted)", marginBottom:6 }}>{l}</div>
-            <div style={{ fontSize:20, fontWeight:900, color:c as string }}>{v}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display:"flex", gap:20, alignItems:"flex-start" }}>
-        <div style={{ flex:1 }}>
-          <div className="w-card" style={{ padding:"22px", marginBottom:16 }}>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-              <div>
-                <div style={{ fontSize:15, fontWeight:900 }}>فارکس بات آن صراف</div>
-                <div style={{ fontSize:12, color:"var(--w-muted)", marginTop:2 }}>معامله خودکار با هوش مصنوعی</div>
-              </div>
-              <button onClick={()=>setActive(!active)} style={{ width:52, height:28, borderRadius:14, border:"none", cursor:"pointer", background:active?"#10b981":"var(--w-card2)", transition:"all 0.22s", position:"relative" }}>
-                <div style={{ width:20, height:20, borderRadius:"50%", background:"#fff", position:"absolute", top:4, transition:"right 0.22s", right:active?28:4, boxShadow:"0 1px 4px rgba(0,0,0,0.2)" }}/>
-              </button>
-            </div>
-            <div style={{ marginBottom:14 }}>
-              <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>سرمایه اختصاصی (USDT)</label>
-              <div style={{ position:"relative" }}>
-                <input value={investAmount} onChange={e=>setInvestAmount(e.target.value)} className="w-input" inputMode="decimal"/>
-              </div>
-            </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
-              <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>جفت ارز</label>
-                <select className="w-input" style={{ appearance:"none" }}>
-                  {["BTC/USDT","ETH/USDT","SOL/USDT","BNB/USDT"].map(p=><option key={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>استراتژی</label>
-                <select className="w-input" style={{ appearance:"none" }}>
-                  {["DCA","Grid","Scalp","Trend"].map(s=><option key={s}>{s}</option>)}
-                </select>
-              </div>
-            </div>
-            <div style={{ padding:"10px 12px", background:active?"rgba(16,185,129,0.08)":"var(--w-card2)", borderRadius:9, fontSize:12, color:active?"#10b981":"var(--w-muted)" }}>
-              {active ? "✓ بات در حال معامله است. آخرین فعالیت ۲ دقیقه پیش" : "بات غیرفعال است. سوئیچ را روشن کنید تا شروع شود."}
-            </div>
-          </div>
-        </div>
-        <div style={{ width:340 }}>
-          <div style={{ fontSize:14, fontWeight:800, marginBottom:12 }}>تاریخچه سشن‌ها</div>
-          <div className="w-card" style={{ overflow:"hidden" }}>
-            {SESSIONS.map((s,i)=>(
-              <div key={i} style={{ padding:"12px 14px", borderBottom:i<SESSIONS.length-1?"1px solid var(--w-border)":"none" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <div>
-                    <div style={{ fontSize:12, fontWeight:700 }}>{s.pair}</div>
-                    <div style={{ fontSize:10, color:"var(--w-muted)" }}>{s.date} · {s.trades} معامله</div>
-                  </div>
-                  <div style={{ textAlign:"left" }}>
-                    <div style={{ fontSize:14, fontWeight:900, color:s.color }}>{s.pnl}</div>
-                    <div style={{ fontSize:11, color:s.color }}>{s.pnlPct}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+function ForexBotTab({ asset:_asset }: { asset:CryptoAsset }) { return <div className="w-card" style={{maxWidth:640,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>فارکس بات</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>Execution واقعی Forex Bot و ثبت سود/زیان در Backend آن صراف فعلاً وجود ندارد؛ تا زمان ساخت API اجرایی، این بخش فعال نیست و هیچ معامله یا سود ساختگی نمایش داده نمی‌شود.</p></div>; }

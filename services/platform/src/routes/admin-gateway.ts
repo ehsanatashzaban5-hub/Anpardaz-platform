@@ -191,7 +191,9 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
-    const result = await fetchJson(anpardazBase() + '/api/v1/services/operations' + q, { headers: forwardUser(request) });
+    const internalToken=process.env.ANPARDAZ_INTERNAL_TOKEN;
+    if(!internalToken)return reply.code(503).send({error:'anpardaz_internal_token_not_configured'});
+    const result = await fetchJson(anpardazBase() + '/internal/v1/admin/operations' + q, { headers: { authorization: 'Bearer ' + internalToken } });
     return reply.code(result.status).send(result.body);
   });
 

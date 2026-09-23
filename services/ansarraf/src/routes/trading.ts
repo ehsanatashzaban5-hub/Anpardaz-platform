@@ -19,6 +19,8 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
    if(!id(b.baseAssetId)||!id(b.quoteAssetId)||b.baseAssetId===b.quoteAssetId||!['buy','sell'].includes(b.side)||!['market','limit'].includes(b.orderType)||!amount(b.quantity)||(b.orderType==='limit'&&!amount(b.price))||(b.orderType==='market'&&b.price!=null)||(b.orderType==='market'&&b.side==='buy'&&!amount(marketBuyQuote))||!idem(b.idempotencyKey))
      return reply.code(400).send({error:'invalid_order'});
    const customer=await ensureCustomer(pool,a.auth);
+   const kyc=await ensureKycRequired(pool,customer);
+   if(!kyc.allowed)return reply.code(403).send({error:'kyc_required',kycStatus:kyc.status});
    const assets=await pool.query("SELECT id FROM assets WHERE id=ANY($1::bigint[]) AND status='active'",[[b.baseAssetId,b.quoteAssetId]]);
    if(assets.rows.length!==2)return reply.code(400).send({error:'asset_not_available'});
    const requestFingerprint=fp({baseAssetId:b.baseAssetId,quoteAssetId:b.quoteAssetId,side:b.side,orderType:b.orderType,quantity:b.quantity,price:b.price??null,quoteAmount:marketBuyQuote??null});
