@@ -51,39 +51,106 @@ function ProductDetail({p,onBack,fav,onFav}:{p:Product;onBack:()=>void;fav:boole
 }
 
 export default function WebMarket({onNavigate:_onNavigate}:Props){
- const [tab,setTab]=useState<Tab>("home"),[products,setProducts]=useState<Product[]>([]),[cats,setCats]=useState<Category[]>([]),[q,setQ]=useState(""),[search,setSearch]=useState(""),[cat,setCat]=useState("all"),[selected,setSelected]=useState<Product|null>(null),[favorites,setFavorites]=useState<Set<string>>(new Set()),[compare,setCompare]=useState<string[]>([]),[home,setHome]=useState<any>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[ticket,setTicket]=useState(""),[tickets,setTickets]=useState<any[]>([]),[selectedTicket,setSelectedTicket]=useState<any|null>(null),[ticketMessages,setTicketMessages]=useState<any[]>([]),[ticketReply,setTicketReply]=useState(""),[aiInput,setAiInput]=useState(""),[aiBusy,setAiBusy]=useState(false),[aiAnswer,setAiAnswer]=useState("");
- const load=async()=>{setLoading(true);try{
-   if(search&&token())await fetch(API+"/api/v1/market/search",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({query:search,filters:{category:cat},surface:"web"})}).catch(()=>{});
-   const r=await fetch(API+"/api/v1/market/catalog?limit=100"+(search?"&q="+encodeURIComponent(search):"")+(cat!=="all"?"&category="+encodeURIComponent(cat):""));if(!r.ok)throw 0;const d=await r.json();setProducts((d.products||[]).map(mapProduct));setError("")}catch{setProducts([]);setError("اطلاعات واقعی آن مارکت در دسترس نیست.")}finally{setLoading(false)}};
- useEffect(()=>{void load()},[search,cat]);
- useEffect(()=>{fetch(API+"/api/v1/market/home?limit=12",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>d&&setHome(d)).catch(()=>{})},[]);
- useEffect(()=>{(async()=>{try{const c=await fetch(API+"/api/v1/market/categories");if(c.ok)setCats((await c.json()).categories||[]);if(token()){const f=await fetch(API+"/api/v1/market/me/favorites",{headers:auth()});if(f.ok)setFavorites(new Set(((await f.json()).products||[]).map((x:any)=>String(x.id))))}}catch{}})()},[]);
- useEffect(()=>{if(tab==="me"&&token())void fetch(API+"/api/v1/market/me/tickets",{headers:auth()}).then(r=>r.ok?r.json():null).then(d=>d&&setTickets(d.tickets||[]))},[tab]); useEffect(()=>{if(selected){fetch(API+"/api/v1/market/seo?type=product&id="+encodeURIComponent(selected.id)).then(r=>r.ok?r.json():null).then(d=>{const s=d?.seo;if(!s)return;document.title=s.title;const set=(n:string,v:string)=>{let e=document.querySelector('meta[name="'+n+'"]') as HTMLMetaElement|null;if(!e){e=document.createElement('meta');e.name=n;document.head.appendChild(e)}e.content=v};set("description",s.description||"");set("keywords",(s.keywords||[]).join(","));let l=document.querySelector('link[rel="canonical"]') as HTMLLinkElement|null;if(!l){l=document.createElement('link');l.rel="canonical";document.head.appendChild(l)}l.href=location.origin+s.canonical_path}).catch(()=>{})}},[selected]);
+ const [tab,setTab]=useState<Tab>("home");
+ const [products,setProducts]=useState<Product[]>([]);
+ const [cats,setCats]=useState<Category[]>([]);
+ const [search,setSearch]=useState("");
+ const [q,setQ]=useState("");
+ const [cat,setCat]=useState("all");
+ const [selected,setSelected]=useState<Product|null>(null);
+ const [favorites,setFavorites]=useState<Set<string>>(new Set());
+ const [compare,setCompare]=useState<string[]>([]);
+ const [home,setHome]=useState<any>(null);
+ const [loading,setLoading]=useState(true);
+ const [error,setError]=useState("");
+ const [aiInput,setAiInput]=useState("");
+ const [aiAnswer,setAiAnswer]=useState("");
+ const [aiBusy,setAiBusy]=useState(false);
+ const load=async()=>{
+  setLoading(true);
+  try{
+   const url=API+"/api/v1/market/catalog?limit=100"+(search?"&q="+encodeURIComponent(search):"")+(cat!=="all"?"&category="+encodeURIComponent(cat):"");
+   const r=await fetch(url,{cache:"no-store"});
+   if(!r.ok)throw new Error("catalog");
+   const d=await r.json();
+   setProducts((d.products||[]).map(mapProduct));
+   setError("");
+  }catch{setProducts([]);setError("اطلاعات واقعی آن مارکت در دسترس نیست.");}
+  finally{setLoading(false);}
+ };
+ useEffect(()=>{void load();},[search,cat]);
+ useEffect(()=>{fetch(API+"/api/v1/market/home?limit=12",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(setHome).catch(()=>{});},[]);
+ useEffect(()=>{
+  fetch(API+"/api/v1/market/categories",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>d&&setCats(d.categories||[])).catch(()=>{});
+  if(token())fetch(API+"/api/v1/market/me/favorites",{headers:auth()}).then(r=>r.ok?r.json():null).then(d=>d&&setFavorites(new Set((d.products||[]).map((x:any)=>String(x.id)))).catch(()=>{});
+ },[]);
+ useEffect(()=>{
+  if(selected)fetch(API+"/api/v1/market/seo?type=product&id="+encodeURIComponent(selected.id)).then(r=>r.ok?r.json():null).then(d=>{
+   if(!d?.seo)return;
+   document.title=d.seo.title||"آن مارکت";
+  }).catch(()=>{});
+ },[selected]);
  const roots=cats.filter(c=>!c.parent_id);
- const toggleFav=async(id:string)=>{if(!token())return;const r=await fetch(API+"/api/v1/market/products/"+encodeURIComponent(id)+"/favorite",{method:"POST",headers:auth()});if(r.ok){const d=await r.json();setFavorites(s=>{const n=new Set(s);d.favorite?n.add(id):n.delete(id);return n})}};
- const compareToggle=(id:string)=>setCompare(x=>{const next=x.includes(id)?x.filter(i=>i!==id):x.length<6?[...x,id]:x;if(next.length>=2&&token())fetch(API+"/api/v1/market/me/comparisons",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({productIds:next,title:"مقایسه آن مارکت"})}).catch(()=>{});return next});
- const runAi=async()=>{if(!aiInput.trim()||!token())return;setAiBusy(true);try{const r=await fetch(API+"/api/v1/market/ai/assist",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({workflowCode:compare.length>1?"market.compare":"market.assist",input:aiInput.trim(),compareIds:compare})});const d=await r.json();setAiAnswer(d.output?.text||d.output||"پاسخی دریافت نشد.")}catch{setAiAnswer("ارتباط با دستیار برقرار نشد.")}finally{setAiBusy(false)}};
- const openTicket=async(t:any)=>{if(!token())return;try{const r=await fetch(API+"/api/v1/market/me/tickets/"+t.id,{headers:auth()});if(r.ok){const d=await r.json();setSelectedTicket(d.ticket);setTicketMessages(d.messages||[]);setTicketReply("")}}catch{}};
- const replyTicket=async()=>{if(!selectedTicket||!ticketReply.trim())return;const r=await fetch(API+"/api/v1/market/me/tickets/"+selectedTicket.id+"/messages",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({message:ticketReply.trim()})});if(r.ok){setTicketReply("");await openTicket(selectedTicket);const d=await fetch(API+"/api/v1/market/me/tickets",{headers:auth()});if(d.ok)setTickets((await d.json()).tickets||[])}};
- const submitTicket=async()=>{if(!token()||!ticket.trim())return;const r=await fetch(API+"/api/v1/market/tickets",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({subject:"پشتیبانی آن مارکت",message:ticket.trim()})});if(r.ok){setTicket("");const d=await fetch(API+"/api/v1/market/me/tickets",{headers:auth()});if(d.ok)setTickets((await d.json()).tickets||[])}};
+ const toggleFav=async(id:string)=>{
+  if(!token())return;
+  const r=await fetch(API+"/api/v1/market/products/"+encodeURIComponent(id)+"/favorite",{method:"POST",headers:auth()});
+  if(r.ok){const d=await r.json();setFavorites(s=>{const n=new Set(s);d.favorite?n.add(id):n.delete(id);return n;});}
+ };
+ const compareToggle=(id:string)=>{
+  setCompare(x=>{
+   const next=x.includes(id)?x.filter(i=>i!==id):x.length<6?[...x,id]:x;
+   if(next.length>=2&&token())fetch(API+"/api/v1/market/me/comparisons",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({productIds:next,title:"مقایسه آن مارکت"})}).catch(()=>{});
+   return next;
+  });
+ };
+ const runAi=async()=>{
+  if(!aiInput.trim()||!token())return;
+  setAiBusy(true);
+  try{
+   const r=await fetch(API+"/api/v1/market/ai/assist",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({workflowCode:compare.length>1?"market.compare":"market.assist",input:aiInput.trim(),compareIds:compare})});
+   const d=await r.json();
+   setAiAnswer(d.output?.text||d.output||"پاسخی دریافت نشد.");
+  }catch{setAiAnswer("ارتباط با دستیار برقرار نشد.");}
+  finally{setAiBusy(false);}
+ };
  if(selected)return <ProductDetail p={selected} onBack={()=>setSelected(null)} fav={favorites.has(selected.id)} onFav={()=>void toggleFav(selected.id)}/>;
- const tabBtn=(t:Tab,l:string)=><button className={"am-tab"+(tab===t?" active":"")} onClick={()=>setTab(t)}>{l}</button>;
- return <>
-  <div className="am-header" style={{position:"relative"}}><div style={{padding:"18px 16px 14px",maxWidth:1280,margin:"auto"}}>
-   <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}><div style={{width:44,height:44,borderRadius:14,background:"var(--am-accent)",display:"grid",placeItems:"center",color:"#fff",fontSize:22}}>⌂</div><div style={{flex:1}}><div style={{fontSize:20,fontWeight:900}}>آن مارکت</div><div style={{fontSize:11,color:"var(--am-muted)",marginTop:3}}>مقایسه قیمت از فروشگاه‌های واقعی</div></div><div style={{fontSize:11,fontWeight:800,color:"var(--am-accent)",background:"var(--am-accent-light)",padding:"9px 12px",borderRadius:12}}>{fa(roots.length)} دسته اصلی</div></div>
-   <div className="am-search-hero" style={{margin:0}}><div style={{display:"flex",alignItems:"center",padding:"4px 10px 4px 14px",gap:8}}><span style={{fontSize:20,color:"var(--am-muted)"}}>⌕</span><input className="am-home-search" value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&setSearch(q.trim())} placeholder="جستجو در محصولات واقعی…"/><Btn primary onClick={()=>setSearch(q.trim())}>جستجو</Btn></div></div>
-  </div><div className="am-tabs">{tabBtn("home","خانه")}{tabBtn("assistant","دستیار هوشمند")}{tabBtn("categories","دسته‌بندی‌ها")}{tabBtn("me","آن مارکت من")}</div></div>
-  {tab==="home"&&<><div style={{display:"flex",overflowX:"auto",gap:2,padding:"14px 16px 8px"}}>{roots.map(c=><button key={c.id} className="am-cat-chip" onClick={()=>setCat(c.slug)}><span className="am-cat-chip-icon">⌂</span><span className="am-cat-chip-label">{c.name_fa}</span></button>)}</div>
-   <div className="am-compare-bar" style={{margin:"6px 16px 14px",border:"1px solid var(--am-accent-border)",borderRadius:16}}><button className={"am-compare-btn"+(compare.length>0?" active":"")} onClick={()=>setTab("assistant")}><span>▦</span>{compare.length>1?"مقایسه فعال است":"مقایسه کن"}{compare.length>0&&<span>{fa(compare.length)} محصول</span>}<span className="am-pulse-dot"/></button></div>
-   <div style={{padding:"0 16px 10px"}}>
-    {(home?.categories??[]).filter((x:any)=>!x.parent_id).length>0&&<div style={{display:"flex",gap:8,overflowX:"auto",padding:"4px 0 10px",scrollbarWidth:"none" as any}}>{(home.categories??[]).filter((x:any)=>!x.parent_id).slice(0,18).map((x:any)=><button key={x.id} onClick={()=>setCat(x.slug)} style={{flexShrink:0,minWidth:112,padding:"12px 10px",borderRadius:16,border:"1px solid var(--am-border)",background:"var(--am-card)",fontFamily:"Vazirmatn",fontWeight:800,fontSize:11,color:"var(--am-text)"}}>{x.name_fa}</button>)}</div>}
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:12,marginBottom:12}}>
-      {(home?.sections??[]).filter((s:any)=>s.section_type==="products").slice(0,3).map((s:any)=><Card key={s.key} style={{padding:14}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}><b>{s.title}</b><span style={{fontSize:10,color:"var(--am-muted)"}}>داده واقعی</span></div><div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:8}}>{(home?.products??[]).slice(0,4).map((p:any)=><button key={p.id} onClick={()=>setSelected(mapProduct(p))} style={{border:"1px solid var(--am-border)",background:"var(--am-card)",borderRadius:12,padding:8,textAlign:"right",fontFamily:"Vazirmatn"}}><div style={{fontSize:11,fontWeight:800,lineHeight:1.5}}>{p.title}</div><div style={{fontSize:10,color:"var(--am-accent)",marginTop:5}}>{p.price_min>0?money(Number(p.price_min)):"قیمت اعلام نشده"}</div></button>)}</div></Card>)}
+ return <div className="an-market-root" dir="rtl" style={vars}>
+  <div className="am-header">
+   <div style={{padding:"18px 16px 14px",maxWidth:1280,margin:"auto"}}>
+    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+     <div style={{width:44,height:44,borderRadius:14,background:"var(--am-accent)",display:"grid",placeItems:"center",color:"#fff",fontSize:22}}>⌂</div>
+     <div style={{flex:1}}><div style={{fontSize:20,fontWeight:900}}>آن مارکت</div><div style={{fontSize:11,color:"var(--am-muted)",marginTop:3}}>مقایسه قیمت از فروشگاه‌های واقعی</div></div>
+     <div style={{fontSize:11,fontWeight:800,color:"var(--am-accent)",background:"var(--am-accent-light)",padding:"9px 12px",borderRadius:12}}>{fa(roots.length)} دسته اصلی</div>
     </div>
-   </div><div style={{padding:"0 16px"}}>{loading?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت محصولات واقعی…</Card>:error?<Card style={{padding:60,textAlign:"center",color:"#DC2626"}}>{error}</Card>:products.length===0?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>هنوز محصول واقعی در دیتابیس ثبت نشده است؛ بعد از اتصال فید فروشگاه‌ها این بخش خودکار پر می‌شود.</Card>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:14}}>{products.map(p=><ProductCard key={p.id} p={p} fav={favorites.has(p.id)} onFav={()=>void toggleFav(p.id)} onOpen={()=>setSelected(p)} selected={compare.includes(p.id)} onCompare={()=>compareToggle(p.id)}/>)}</div>}</div>
-  </>}
-  {tab==="assistant"&&<div style={{padding:16,maxWidth:980,margin:"auto"}}><Card><div className="am-search-head"><div className="am-ai-avatar">✦</div><div><b>دستیار هوشمند آن مارکت</b><div style={{fontSize:11,color:"var(--am-muted)"}}>فقط بر پایه داده‌های واقعی آن مارکت</div></div></div><div style={{padding:18}}>{compare.length>1&&<div style={{color:"var(--am-accent)",fontSize:12,fontWeight:800,marginBottom:10}}>{fa(compare.length)} محصول برای مقایسه انتخاب شده است.</div>}<textarea value={aiInput} onChange={e=>setAiInput(e.target.value)} placeholder={compare.length>1?"تفاوت این محصولات را بر اساس داده‌های واقعی مقایسه کن…":"مثلاً برای یک لپ‌تاپ مناسب برنامه‌نویسی چه گزینه‌هایی دارم؟"} style={{width:"100%",boxSizing:"border-box",minHeight:150,padding:14,borderRadius:14,border:"1.5px solid var(--am-border)",fontFamily:"Vazirmatn"}}/><Btn primary disabled={aiBusy||!token()} onClick={()=>void runAi()} style={{marginTop:10}}>{aiBusy?"در حال بررسی…":"ارسال به دستیار"}</Btn>{aiAnswer&&<div className="am-bubble-ai" style={{marginTop:16,maxWidth:"100%"}}>{aiAnswer}</div>}</div></Card></div>}
+    <div className="am-search-hero">
+     <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <span style={{fontSize:20,color:"var(--am-muted)"}}>⌕</span>
+      <input className="am-home-search" value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&setSearch(q.trim())} placeholder="جستجو در محصولات واقعی…"/>
+      <Btn primary onClick={()=>setSearch(q.trim())}>جستجو</Btn>
+     </div>
+    </div>
+   </div>
+   <div className="am-tabs">
+    <button className={"am-tab"+(tab==="home"?" active":"")} onClick={()=>setTab("home")}>خانه</button>
+    <button className={"am-tab"+(tab==="assistant"?" active":"")} onClick={()=>setTab("assistant")}>دستیار هوشمند</button>
+    <button className={"am-tab"+(tab==="categories"?" active":"")} onClick={()=>setTab("categories")}>دسته‌بندی‌ها</button>
+    <button className={"am-tab"+(tab==="me"?" active":"")} onClick={()=>setTab("me")}>آن مارکت من</button>
+   </div>
+  </div>
+  {tab==="home"&&<div>
+   <div style={{display:"flex",overflowX:"auto",gap:8,padding:"14px 16px 8px"}}>
+    {roots.map(c=><button key={c.id} className="am-cat-chip" onClick={()=>setCat(c.slug)}><span className="am-cat-chip-label">{c.name_fa}</span></button>)}
+   </div>
+   <div className="am-compare-bar" style={{margin:"6px 16px 14px",border:"1px solid var(--am-accent-border)",borderRadius:16}}>
+    <button className={"am-compare-btn"+(compare.length>0?" active":"")} onClick={()=>setTab("assistant")}><span>▦</span>{compare.length>1?"مقایسه فعال است":"مقایسه کن"}{compare.length>0&&<span>{fa(compare.length)} محصول</span>}</button>
+   </div>
+   <div style={{padding:"0 16px 14px"}}>
+    {(home?.sections||[]).filter((s:any)=>s.section_type==="products").slice(0,3).map((s:any)=><Card key={s.key} style={{padding:14,marginBottom:12}}><b>{s.title}</b><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:8,marginTop:10}}>{(home?.products||[]).slice(0,4).map((p:any)=><button key={p.id} onClick={()=>setSelected(mapProduct(p))} style={{border:"1px solid var(--am-border)",background:"var(--am-card)",borderRadius:12,padding:10,textAlign:"right",fontFamily:"Vazirmatn"}}><div style={{fontSize:11,fontWeight:800}}>{p.title}</div><div style={{fontSize:10,color:"var(--am-accent)",marginTop:5}}>{p.price_min>0?money(Number(p.price_min)):"قیمت اعلام نشده"}</div></button>)}</div></Card>)}
+    {loading?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت محصولات واقعی…</Card>:error?<Card style={{padding:60,textAlign:"center",color:"#DC2626"}}>{error}</Card>:products.length===0?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>هنوز محصول واقعی در دیتابیس ثبت نشده است؛ بعد از اتصال فید فروشگاه‌ها این بخش خودکار پر می‌شود.</Card>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:14}}>{products.map(p=><ProductCard key={p.id} p={p} fav={favorites.has(p.id)} onFav={()=>void toggleFav(p.id)} onOpen={()=>setSelected(p)} selected={compare.includes(p.id)} onCompare={()=>compareToggle(p.id)}/>)}</div>}
+   </div>
+  </div>}
+  {tab==="assistant"&&<div style={{padding:16,maxWidth:980,margin:"auto"}}><Card><div className="am-search-head"><div className="am-ai-avatar">✦</div><div><b>دستیار هوشمند آن مارکت</b><div style={{fontSize:11,color:"var(--am-muted)"}}>بر پایه داده‌های واقعی آن مارکت</div></div></div><div style={{padding:18}}>{compare.length>1&&<div style={{color:"var(--am-accent)",fontSize:12,fontWeight:800,marginBottom:10}}>{fa(compare.length)} محصول برای مقایسه انتخاب شده است.</div>}<textarea value={aiInput} onChange={e=>setAiInput(e.target.value)} placeholder={compare.length>1?"تفاوت این محصولات را بر اساس داده‌های واقعی مقایسه کن…":"درباره محصولات آن مارکت سؤال بپرس…"} style={{width:"100%",boxSizing:"border-box",minHeight:150,padding:14,borderRadius:14,border:"1.5px solid var(--am-border)",fontFamily:"Vazirmatn"}}/><Btn primary disabled={aiBusy||!token()} onClick={()=>void runAi()} style={{marginTop:10}}>{aiBusy?"در حال بررسی…":"ارسال به دستیار"}</Btn>{aiAnswer&&<div className="am-bubble-ai" style={{marginTop:16}}>{aiAnswer}</div>}</div></Card></div>}
   {tab==="categories"&&<div style={{padding:16,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:10}}>{roots.map(c=><button key={c.id} className="am-cat-row" onClick={()=>setCat(c.slug)}><span className="am-cat-row-icon">⌂</span><span style={{flex:1}}><b>{c.name_fa}</b><small style={{display:"block",color:"var(--am-muted)",marginTop:5}}>مشاهده محصولات واقعی این دسته</small></span><span>‹</span></button>)}</div>}
-  {tab==="me"&&<div style={{padding:16,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:10}}><Card style={{padding:18,gridColumn:"1 / -1"}}><b>پروفایل آن مارکت</b><div style={{display:"flex",gap:12,alignItems:"center",marginTop:10}}><img src={API+"/api/v1/market/me/profile/avatar"} onError={e=>(e.currentTarget.style.display="none")} style={{width:56,height:56,borderRadius:16,objectFit:"cover",border:"1px solid var(--am-border)"}}/><div><span style={{fontSize:12,color:"var(--am-muted)",display:"block"}}>پروفایل از حساب آن پرداز استفاده می‌کند.</span><label className="am-cat-chip" style={{display:"inline-flex",marginTop:8,cursor:"pointer"}}>تغییر عکس<input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={async e=>{const f=e.target.files?.[0];if(!f||!token())return;if(f.size>1048576){window.alert("حداکثر حجم عکس ۱ مگابایت است.");return}const reader=new FileReader();reader.onload=async()=>{const data=String(reader.result);await fetch(API+"/api/v1/market/me/profile/avatar",{method:"PUT",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({mimeType:f.type,data})});window.location.reload()};reader.readAsDataURL(f)}}/></label></div></div></Card><Card style={{padding:18}}><b>آخرین مقایسه‌ها</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:7}}>{fa(compare.length)} محصول در مقایسه فعلی</div></Card><Card style={{padding:18}}><b>نشان‌گذاری شده‌ها</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:7}}>{fa(favorites.size)} محصول</div></Card><Card style={{padding:18}}><b>بازدید شده‌ها و جستجوها</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:7}}>تاریخچه در سرور آن مارکت نگهداری می‌شود.</div></Card><Card style={{padding:18}}><b>گفت‌وگوهای دستیار</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:7}}>تاریخچه خلاصه و اجرای AI در سرور ثبت می‌شود.</div></Card><Card style={{padding:18}}><b>تیکت‌های پشتیبانی</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:7}}>{fa(tickets.length)} تیکت</div></Card><Card style={{padding:18}}><b>تیکت‌های من</b>{tickets.map((t:any)=><button key={t.id} onClick={()=>void openTicket(t)} style={{display:"block",width:"100%",textAlign:"right",marginTop:8,padding:10,borderRadius:10,border:"1px solid var(--am-border)",background:"var(--am-card)",fontFamily:"Vazirmatn"}}><b>{t.subject}</b><div style={{fontSize:10,color:"var(--am-muted)",marginTop:4}}>#{t.id} · {t.status}</div></button>)}{tickets.length===0&&<div style={{fontSize:12,color:"var(--am-muted)",marginTop:10}}>تیکتی ثبت نشده است.</div>}</Card><Card style={{padding:18}}><b>ثبت تیکت پشتیبانی</b><textarea value={ticket} onChange={e=>setTicket(e.target.value)} placeholder="شرح مشکل یا سؤال" style={{width:"100%",boxSizing:"border-box",minHeight:110,marginTop:10,padding:12,borderRadius:12,border:"1px solid var(--am-border)",fontFamily:"Vazirmatn"}}/><Btn primary disabled={!token()||!ticket.trim()} onClick={()=>void submitTicket()} style={{marginTop:9}}>ثبت تیکت</Btn></Card>{selectedTicket&&<Card style={{padding:18,gridColumn:"1 / -1"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><b>{selectedTicket.subject}</b><Btn onClick={()=>setSelectedTicket(null)}>بستن</Btn></div><div style={{display:"grid",gap:8,marginTop:12,maxHeight:320,overflowY:"auto"}}>{ticketMessages.map((m:any,i:number)=><div key={i} style={{padding:10,borderRadius:10,background:m.author_type==="user"?"var(--am-accent-light)":"var(--am-card)",border:"1px solid var(--am-border)"}}><div style={{fontSize:10,color:"var(--am-muted)",marginBottom:4}}>{m.author_type==="user"?"شما":"پشتیبانی"}</div>{m.message}</div>)}</div>{selectedTicket.status!=="closed"&&<><textarea value={ticketReply} onChange={e=>setTicketReply(e.target.value)} placeholder="پاسخ به تیکت..." style={{width:"100%",boxSizing:"border-box",minHeight:90,marginTop:12,padding:12,borderRadius:12,border:"1px solid var(--am-border)",fontFamily:"Vazirmatn"}}/><Btn primary disabled={!ticketReply.trim()} onClick={()=>void replyTicket()} style={{marginTop:9}}>ارسال پاسخ</Btn></>}</Card>}</div>
- </>
+  {tab==="me"&&<div style={{padding:16,maxWidth:980,margin:"auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10}}><Card style={{padding:18}}><b>آن مارکت من</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>حساب کاربری از احراز هویت آن پرداز استفاده می‌کند.</div></Card><Card style={{padding:18}}><b>نشان‌گذاری‌ها</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>{fa(favorites.size)} محصول</div></Card><Card style={{padding:18}}><b>مقایسه فعلی</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>{fa(compare.length)} محصول</div></Card><Card style={{padding:18}}><b>تاریخچه</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>بازدیدها، جستجوها و اجرای AI در سرور ثبت می‌شوند.</div></Card></div>}
+ </div>;
 }
