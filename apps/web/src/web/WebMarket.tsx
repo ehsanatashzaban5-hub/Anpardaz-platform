@@ -14,8 +14,8 @@ const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶
 const fmtIRT = (n: number) => `${FA(Math.round(n/10000).toLocaleString())} هزار تومان`;
 const fmtUSD = (n: number) => `$${n.toLocaleString("en-US", { maximumFractionDigits:0 })}`;
 
-const MARKET_API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")??"";
-let MARKET_MARKET_PRODUCTS:Product[]=[];
+const MARKET_API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")??"";
+let MARKET_PRODUCTS:Product[]=[];
 
 const SORT_OPTIONS = [
   { id:"newest",    label:"جدیدترین" },
@@ -38,7 +38,7 @@ export default function WebMarket({ onNavigate }: Props) {
   const [compareList, setCompareList] = useState<string[]>([]);
   const [showCompare, setShowCompare] = useState(false);
 
-  useEffect(()=>{(async()=>{try{const r=await fetch(MARKET_API+"/api/v1/market/catalog?limit=100");const d=await r.json();MARKET_MARKET_PRODUCTS=(d.products??[]).map((p:any)=>({id:String(p.id),title:p.title??"",titleFa:p.title??"",description:p.description??"",price:Number(p.priceMin??0),originalPrice:Number(p.priceMax??0)>Number(p.priceMin??0)?Number(p.priceMax):undefined,images:[],category:p.category_slug??"other",subcategory:p.category_name_fa,seller:{id:String(p.offers?.[0]?.store_id??"store"),name:p.offers?.[0]?.store_name??"فروشگاه",nameFa:p.offers?.[0]?.store_name??"فروشگاه",rating:0,reviewCount:0,salesCount:0,isVerified:true,joinedAt:""},rating:0,reviewCount:0,stock:1,sold:0,tags:[],specs:p.specs??{}}));setSortBy(v=>v);}catch(e){console.error(e)}})();},[]);
+  useEffect(()=>{(async()=>{try{const r=await fetch(MARKET_API+"/api/v1/market/catalog?limit=100");const d=await r.json();MARKET_PRODUCTS=(d.products??[]).map((p:any)=>({id:String(p.id),title:p.title??"",titleFa:p.title??"",description:p.description??"",price:Number(p.priceMin??0),originalPrice:Number(p.priceMax??0)>Number(p.priceMin??0)?Number(p.priceMax):undefined,images:[],category:p.category_slug??"other",subcategory:p.category_name_fa,seller:{id:String(p.offers?.[0]?.store_id??"store"),name:p.offers?.[0]?.store_name??"فروشگاه",nameFa:p.offers?.[0]?.store_name??"فروشگاه",rating:0,reviewCount:0,salesCount:0,isVerified:true,joinedAt:""},rating:0,reviewCount:0,stock:1,sold:0,tags:[],specs:p.specs??{}}));setSortBy(v=>v);}catch(e){console.error(e)}})();},[]);
   useEffect(()=>{const token=localStorage.getItem("anpardaz:accessToken");if(!token)return;(async()=>{try{const r=await fetch(MARKET_API+"/api/v1/market/me/favorites",{headers:{authorization:"Bearer "+token}});if(r.ok){const d=await r.json();setFavorites(new Set((d.products??[]).map((p:any)=>String(p.id))))}}catch{}})()},[]);
 
   const filtered = useMemo(() => {
