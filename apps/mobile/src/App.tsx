@@ -9768,6 +9768,37 @@ export default function App() {
   if(subPage==="charge-payment")return <div key="charge-payment" className={`app${lt} app-slide`} dir="rtl"><ChargePaymentScreen data={chargePayData!} user={user!} onUpdate={updateWithTx} onBack={()=>setSubPage(chargePayOrigin)} onDone={goHome}/><SNAV/></div>;
   if(subPage==="cashback")return <div key="cashback" className={`app${lt} app-slide`} dir="rtl"><CashbackScreen user={user!} transactions={transactions} onBack={goBack} onUpdate={(u,tx)=>{setUser(u);const newTxs=[tx,...transactions];setTransactions(newTxs);if(u)DB.saveTx(u.phone,newTxs);DB.saveUser(u);}}/><SNAV/></div>;
   if(subPage==="financial-center")return <div key="financial-center" className={`app${lt} app-slide`} dir="rtl"><FinancialCenterScreen transactions={transactions} onBack={goBack} user={user}/><SNAV/></div>;
+function ComparisonPopup({ids,onClose,onMinimize,minimized,onProduct}:{ids:string[];onClose:()=>void;onMinimize:()=>void;minimized:boolean;onProduct:(pid:string)=>void}){
+  const prods=ids.map(id=>MARKET_PRODUCTS.find(p=>p.id===id)).filter(Boolean) as AnProduct[];
+  const [aiText,setAiText]=useState("");
+  useEffect(()=>{if(prods.length<2)return;void (async()=>{try{const token=localStorage.getItem("anpardaz:accessToken")??"";const input=JSON.stringify(prods.map(p=>({id:p.id,title:p.title,brand:p.brand,priceMin:p.priceMin,priceMax:p.priceMax,specs:p.specs,storeCount:p.storeCount})));const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/ai/assist",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({input:"مقایسه فنی و خرید این محصولات فقط بر اساس داده‌های ارائه‌شده؛ چیزی را حدس نزن و عدم قطعیت را صریح بگو. "+input})});const d=await r.json();if(r.ok)setAiText(d?.result?.text??"");}catch{}})()},[ids.join(",")]);
+  if(minimized)return <div style={{position:"fixed",bottom:70,left:12,right:12,zIndex:300,background:"var(--am-card)",border:"1px solid var(--am-accent-border)",borderRadius:16,padding:12,display:"flex",gap:8,alignItems:"center",boxShadow:"0 8px 30px rgba(0,0,0,.15)"}}><b style={{flex:1,fontSize:12}}>مقایسه {toFaDigits(String(prods.length))} محصول</b><button onClick={onMinimize} style={{background:"var(--am-accent)",color:"#fff",border:0,borderRadius:9,padding:"8px 14px",fontFamily:"Vazirmatn"}}>مشاهده</button><button onClick={onClose} style={{background:"none",border:0,color:"var(--am-muted)"}}>×</button></div>;
+  return <div style={{position:"fixed",inset:0,zIndex:300,background:"var(--am-bg)",overflowY:"auto",padding:16}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}><b style={{fontSize:17,flex:1}}>مقایسه محصولات</b><button onClick={onMinimize}>کوچک</button><button onClick={onClose}>×</button></div>
+    {aiText&&<div style={{background:"var(--am-card)",border:"1px solid var(--am-accent-border)",borderRadius:16,padding:14,marginBottom:14}}><div style={{fontWeight:800,color:"var(--am-accent)",marginBottom:7}}>تحلیل دستیار هوشمند</div><div style={{fontSize:12,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{aiText}</div></div>}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>{prods.map(p=><button key={p.id} onClick={()=>onProduct(p.id)} style={{textAlign:"right",background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:14,padding:12,fontFamily:"Vazirmatn"}}><img src={p.img} alt="" style={{width:"100%",aspectRatio:1,objectFit:"cover",borderRadius:10}}/><div style={{fontWeight:800,fontSize:12,marginTop:8}}>{p.title}</div><div style={{color:"var(--am-accent)",fontWeight:900,marginTop:5}}>{fa(p.priceMin)} تومان</div><div style={{fontSize:10,color:"var(--am-muted)",marginTop:4}}>{toFaDigits(String(p.storeCount))} فروشگاه</div></button>)}</div>
+  </div>;
+}
+function AnMarketMe({onPush}:{onPush:(v:AnView)=>void}){
+  const items:[string,AnView,string][]=[
+    ["خریدهای من",{t:"me-orders"},"فعالیت خروج به فروشگاه‌ها"],
+    ["تیکت‌های پشتیبانی",{t:"me-tickets"},"پیگیری مستقیم با آن مارکت"],
+    ["علاقه‌مندی‌ها",{t:"me-fav"},"محصولات ذخیره‌شده"],
+    ["هشدارهای قیمت",{t:"me-alerts"},"هشدارهای ثبت‌شده"],
+    ["اخیراً مشاهده‌شده",{t:"me-recent"},"تاریخچه مشاهده"],
+    ["مقایسه‌های من",{t:"me-compare"},"مقایسه‌های ذخیره‌شده"],
+  ];
+  return <div style={{padding:16}}><div style={{fontSize:18,fontWeight:900,marginBottom:5}}>آن مارکت من</div><div style={{fontSize:12,color:"var(--am-muted)",marginBottom:16}}>اطلاعات واقعی حساب و فعالیت شما</div>{items.map(([t,v,d])=><button key={t} onClick={()=>onPush(v)} style={{width:"100%",textAlign:"right",background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:15,padding:15,marginBottom:10,fontFamily:"Vazirmatn"}}><div style={{fontWeight:800}}>{t}</div><div style={{fontSize:11,color:"var(--am-muted)",marginTop:4}}>{d}</div></button>)}</div>;
+}
+function AnMeSubPage({view,onProduct,onBack}:{view:AnView;onProduct:(pid:string)=>void;onBack:()=>void}){
+  const [items,setItems]=useState<any[]>([]); const [loading,setLoading]=useState(true);
+  useEffect(()=>{let active=true;(async()=>{try{const token=localStorage.getItem("anpardaz:accessToken")??"";const map:any={"me-fav":"/api/v1/market/me/favorites","me-recent":"/api/v1/market/me/recent","me-alerts":"/api/v1/market/me/alerts","me-orders":"/api/v1/market/me/clickouts","me-compare":"/api/v1/market/me/comparisons"};const u=map[(view as any).t];if(!u){setLoading(false);return;}const r=await fetch(ANMARKET_PLATFORM_API_BASE+u,{headers:{authorization:"Bearer "+token},cache:"no-store"});const d=await r.json();if(active){const k=(view as any).t;setItems(d.products??d.alerts??d.clickouts??d.comparisons??[]);setLoading(false);}}catch{if(active){setItems([]);setLoading(false);}}})();return()=>{active=false}},[(view as any).t]);
+  useBackHandler(onBack);
+  const t=(view as any).t as string;
+  if(t==="me-tickets"||t==="me-support")return <AnTicketsSubPage onBack={onBack}/>;
+  const title:tstring=t==="me-orders"?"فعالیت خرید":t==="me-fav"?"علاقه‌مندی‌ها":t==="me-alerts"?"هشدارهای قیمت":t==="me-recent"?"اخیراً مشاهده‌شده":t==="me-compare"?"مقایسه‌های من":"آن مارکت من";
+  return <div style={{padding:16}}><div style={{fontSize:17,fontWeight:900,marginBottom:14}}>{title}</div>{loading?<div style={{padding:30,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت...</div>:items.length===0?<div style={{padding:30,textAlign:"center",color:"var(--am-muted)"}}>داده‌ای ثبت نشده است.</div>:items.map((it:any,i:number)=>{const pid=String(it.id??it.product_id??it.productId??"");const p=MARKET_PRODUCTS.find(x=>x.id===pid);return <button key={i} onClick={()=>p&&onProduct(p.id)} style={{width:"100%",textAlign:"right",background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:14,padding:13,marginBottom:9,fontFamily:"Vazirmatn"}}>{p&&<img src={p.img} alt="" style={{width:52,height:52,objectFit:"cover",borderRadius:10,float:"right",marginLeft:10}}/>}<div style={{fontWeight:800,fontSize:12}}>{it.title??it.product_title??it.store_name??it.subject??"فعالیت آن مارکت"}</div><div style={{fontSize:11,color:"var(--am-muted)",marginTop:5}}>{it.status??it.mode??it.updated_at??it.created_at??""}</div></button>})}</div>;
+}
 function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;lightTheme?:boolean}){
   const [anStack,setAnStack]=useState<AnView[]>([{t:"home"}]);
   const [compare,setCompare]=useState<CompareState>({active:false,selectedIds:[],minimized:false});
