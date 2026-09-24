@@ -427,11 +427,11 @@ function ChatView({ messages, input, onInputChange, onSend, deepThinking, onTogg
 // ══════════════════════════════════════════════════════════════════
 // HISTORY VIEW
 // ══════════════════════════════════════════════════════════════════
-function HistoryView({ onOpenConv, onNewChat }: { onOpenConv:(c:Conversation)=>void; onNewChat:()=>void }) {
+function HistoryView({ conversations, onOpenConv, onNewChat }: { conversations:Conversation[]; onOpenConv:(c:Conversation)=>void; onNewChat:()=>void }) {
   const [q, setQ] = useState("");
   const [menuId, setMenuId] = useState<string|null>(null);
   const groups = ["today","yesterday","week","older"] as const;
-  const filtered = DEMO_CONVS.filter(c=>q===""||c.title.includes(q)||c.preview.includes(q));
+  const filtered = conversations.filter(c=>q===""||c.title.includes(q)||c.preview.includes(q));
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       {/* Header */}
@@ -509,9 +509,9 @@ function HistoryView({ onOpenConv, onNewChat }: { onOpenConv:(c:Conversation)=>v
 // ══════════════════════════════════════════════════════════════════
 // PROJECTS VIEW
 // ══════════════════════════════════════════════════════════════════
-function ProjectsView({ onOpenProject, onNewProject }: { onOpenProject:(p:Project)=>void; onNewProject:()=>void }) {
+function ProjectsView({ projects, onOpenProject, onNewProject }: { projects:Project[]; onOpenProject:(p:Project)=>void; onNewProject:()=>void }) {
   const [q, setQ] = useState("");
-  const filtered = DEMO_PROJECTS.filter(p=>q===""||p.title.includes(q)||p.description.includes(q));
+  const filtered = projects.filter(p=>q===""||p.title.includes(q)||p.description.includes(q));
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <div style={{padding:"16px 16px 10px",flexShrink:0}}>
@@ -676,7 +676,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const [tab, setTab]               = useState<AhTab>("home");
   const [modelId, setModelId]       = useState("gpt-5.6-luna");
   const [showModels, setShowModels] = useState(false);
-  const [messages, setMessages]     = useState<Message[]>([]);
+  const [messages, setMessages]     = useState<Message[]>([]);\n  const [conversations, setConversations] = useState<Conversation[]>([]);\n  const [projects, setProjects] = useState<Project[]>([]);\n  const [conversationId, setConversationId] = useState<number|null>(null);
   const [input, setInput]           = useState("");
   const [sending, setSending]       = useState(false);
   const [deepThink, setDeepThink]   = useState(false);
@@ -686,7 +686,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const AI_API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")||"";
   const accessToken=localStorage.getItem("anpardaz:accessToken")||"";
   const [,refreshModelCatalog]=useState(0);
-  useEffect(()=>{(async()=>{try{const r=await fetch(AI_API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){AI_MODELS=d.models.map((m:any)=>({id:m.id,name:m.name,provider:m.provider,desc:m.descFa||m.desc||"",providerColor:m.providerId==="openai"?"#10A37F":m.providerId==="gemini"?"#4285F4":m.providerId==="anthropic"?"#C4956A":"#E0E0E0",capabilities:Array.isArray(m.capabilities)?m.capabilities:[],contextWindow:m.contextWindow,badge:m.badge}));PROVIDERS=[...new Set(AI_MODELS.map(m=>m.provider))];setModelId(d.models[0].id);refreshModelCatalog(x=>x+1);}}catch{}})();},[]);
+  useEffect(()=>{(async()=>{try{const h=await fetch(AI_API+"/api/v1/hoosh/me",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const hd=await h.json();if(h.ok){setConversations((hd.conversations??[]).map((c:any)=>({id:String(c.id),title:c.title||"مکالمه",preview:"",messages:[],modelId:c.model||"gpt-5.6-luna",createdAt:c.created_at,updatedAt:c.updated_at,group:"today"})));setProjects((hd.projects??[]).map((p:any)=>({id:String(p.id),title:p.title,description:p.description||"",modelId:p.model_id||"",modeId:p.mode_id,conversationIds:(p.chat_ids??[]).map(String),createdAt:p.created_at,updatedAt:p.updated_at,accentColor:p.accent_color||"#7c3aed"})));}const r=await fetch(AI_API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){AI_MODELS=d.models.map((m:any)=>({id:m.id,name:m.name,provider:m.provider,desc:m.descFa||m.desc||"",providerColor:m.providerId==="openai"?"#10A37F":m.providerId==="gemini"?"#4285F4":m.providerId==="anthropic"?"#C4956A":"#E0E0E0",capabilities:Array.isArray(m.capabilities)?m.capabilities:[],contextWindow:m.contextWindow,badge:m.badge}));PROVIDERS=[...new Set(AI_MODELS.map(m=>m.provider))];setModelId(d.models[0].id);refreshModelCatalog(x=>x+1);}}catch{}})();},[]);
 
   // Device back button: close panels first, then exit to main app
   useBackHandler(() => {
@@ -705,16 +705,16 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
     setMessages(prev=>prev.concat({id:`u${Date.now()}`,role:"user",text,modelId,ts:new Date()}));
     setSending(true);
     try{
-      const r=await fetch(AI_API+"/api/v1/ai/execute",{method:"POST",headers:{"content-type":"application/json",...(accessToken?{authorization:"Bearer "+accessToken}:{})},body:JSON.stringify({workflowCode:"hoosh.chat",input:text,modelId})});
+      const r=await fetch(AI_API+"/api/v1/hoosh/chat",{method:"POST",headers:{"content-type":"application/json",...(accessToken?{authorization:"Bearer "+accessToken}:{})},body:JSON.stringify({conversationId:conversationId||undefined,input:text,modelId,modeId:activeMode?.id})});
       const d=await r.json();
       if(!r.ok) throw new Error(d?.error||"AI_PROVIDER_FAILURE");
-      setMessages(prev=>prev.concat({id:`a${Date.now()}`,role:"ai",text:d?.result?.text||"پاسخی دریافت نشد.",modelId,ts:new Date()}));
+      setConversationId(Number(d.conversationId)||null);setMessages(prev=>prev.concat({id:String(d?.message?.id||("a"+Date.now())),role:"ai",text:d?.result?.text||"پاسخی دریافت نشد.",modelId,ts:new Date()}));
     }catch(e){
       setMessages(prev=>prev.concat({id:`e${Date.now()}`,role:"ai",text:"مدل انتخاب‌شده در حال حاضر از طریق سرور آن پرداز در دسترس نیست.",modelId,ts:new Date()}));
     }finally{setSending(false);}
   }, [input, modelId, sending, AI_API, accessToken]);
 
-  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setTab("home"); }, []);
+  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setConversationId(null); setActiveMode(null); setTab("home"); }, []);
 
   const handleSelectMode = (mode: CreationMode) => {
     if(mode.id==="__clear__"){ setActiveMode(null); return; }
@@ -807,8 +807,8 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
             ? <ChatView messages={messages} input={input} onInputChange={setInput} onSend={send} deepThinking={deepThink} onToggleDeep={()=>setDeepThink(v=>!v)} mode={activeMode}/>
             : <HomeView activeMode={activeMode} onSelectMode={handleSelectMode} onSend={send} input={input} onInputChange={setInput} deepThinking={deepThink} onToggleDeep={()=>setDeepThink(v=>!v)} filterCat={filterCat} onFilterCat={setFilterCat}/>
         )}
-        {tab==="history"  && <HistoryView onOpenConv={c=>{setMessages([{id:"demo",role:"ai",text:c.preview,modelId:c.modelId,ts:new Date()}]);setTab("home");}} onNewChat={newChat}/>}
-        {tab==="projects" && <ProjectsView onOpenProject={()=>setTab("home")} onNewProject={()=>setShowNewProj(true)}/>}
+        {tab==="history"  && <HistoryView conversations={conversations} onOpenConv={async c=>{try{const rr=await fetch(AI_API+"/api/v1/hoosh/conversations/"+c.id,{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const dd=await rr.json();if(rr.ok){setConversationId(Number(c.id));setMessages((dd.messages??[]).map((m:any)=>({id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model||c.modelId,ts:new Date(m.created_at)})));setTab("home");}}catch{}}} onNewChat={newChat}/>}
+        {tab==="projects" && <ProjectsView projects={projects} onOpenProject={()=>setTab("home")} onNewProject={()=>setShowNewProj(true)}/>}
         {tab==="explore"  && <ExploreView currentModelId={modelId} onSelectModel={id=>{setModelId(id);setTab("home");}}/>}
 
         {/* ── BOTTOM NAVIGATION ── */}
