@@ -126,7 +126,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
           </div>
 
           {/* View tabs */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:2, padding:"8px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:2, padding:"8px" }}>
             {([["chat","comment","چت"],["explore","compass","کاوش"],["projects","folder","پروژه"],["account","user","حساب من"],["settings","settings","تنظیم"]] as [HView,string,string][]).map(([v,ic,lb]) => (
               <button key={v} onClick={()=>setView(v)} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, padding:"7px 4px", borderRadius:8, border:"none", background:view===v?"rgba(124,58,237,0.12)":"transparent", color:view===v?"#7c3aed":"var(--w-muted)", cursor:"pointer", fontSize:10, fontWeight:view===v?700:400, fontFamily:"Vazirmatn" }}>
                 <WI n={ic} s={16}/>{lb}
@@ -424,6 +424,10 @@ function ThinkingIndicator() {
       </div>
     </div>
   );
+}
+
+function HooshAccountView({user,usage,tickets,API,token,onCreated}:{user:any;usage:any;tickets:any[];API:string;token:string;onCreated:(t:any)=>void}) {
+ return <div style={{maxWidth:760,margin:"0 auto",padding:"10px 0"}}><h2 style={{fontSize:20,fontWeight:900,marginBottom:4}}>حساب کاربری آن هوش</h2><p style={{fontSize:12,color:"var(--w-muted)",marginBottom:18}}>مدیریت حساب، مصرف و پشتیبانی</p><div className="w-card" style={{padding:18,marginBottom:12}}><div style={{fontWeight:800}}>{user?.display_name||user?.email||"کاربر آن پرداز"}</div><div style={{fontSize:11,color:"var(--w-muted)",marginTop:4}}>{user?.email||"حساب متصل به آن پرداز"}</div></div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:12}}><div className="w-card" style={{padding:14,textAlign:"center"}}><div style={{fontSize:10,color:"var(--w-muted)"}}>درخواست</div><b>{usage?.requests??0}</b></div><div className="w-card" style={{padding:14,textAlign:"center"}}><div style={{fontSize:10,color:"var(--w-muted)"}}>ورودی</div><b>{usage?.input_tokens??0}</b></div><div className="w-card" style={{padding:14,textAlign:"center"}}><div style={{fontSize:10,color:"var(--w-muted)"}}>خروجی</div><b>{usage?.output_tokens??0}</b></div></div><div className="w-card" style={{padding:18,marginBottom:12}}><div style={{fontWeight:800,marginBottom:9}}>پشتیبانی و تیکت</div><TicketComposer API={API} token={token} onCreated={onCreated}/></div><div style={{fontWeight:800,marginBottom:8}}>تیکت‌های من</div>{tickets.length===0?<div style={{color:"var(--w-muted)",fontSize:12}}>تیکتی ثبت نشده است.</div>:tickets.map((t:any)=><div key={t.id} className="w-card" style={{padding:12,marginBottom:7}}><div style={{fontSize:12,fontWeight:700}}>{t.subject}</div><div style={{fontSize:10,color:"var(--w-muted)",marginTop:4}}>{t.status}</div></div>)}</div>;
 }
 
 function TicketComposer({API,token,onCreated}:{API:string;token:string;onCreated:(t:any)=>void}) {
