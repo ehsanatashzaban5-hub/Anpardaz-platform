@@ -81,8 +81,7 @@ export function registerMarketCommunityRoutes(app:FastifyInstance,pool:Pool){
       ...r.rows.map((x:any)=>[x.store_name,x.domain,x.clickouts,x.unique_users,x.unique_products,x.mobile_clickouts,x.web_clickouts,x.commission_type??'',x.commission_value??'',x.estimated_commission??0].map(esc).join(','))
     ];
     await pool.query("INSERT INTO market_merchant_report_exports(store_id,from_at,to_at,format,requested_by) VALUES(NULL,$1,$2,'csv',(SELECT id FROM platform_users WHERE identity_id=$3 LIMIT 1))",[from,to,a(req).auth.sub]);
-    return reply.header('content-type','text/csv; charset=utf-8').header('content-disposition','attachment; filename="an-market-merchant-report.csv"').send("\uFEFF"+lines.join("
-"));
+    return reply.header('content-type','text/csv; charset=utf-8').header('content-disposition','attachment; filename="an-market-merchant-report.csv"').send("\uFEFF"+lines.join("\n"));
   });
 
   app.get('/api/v1/admin/market/reviews',{preHandler:requireAuth},async(req,reply)=>{
