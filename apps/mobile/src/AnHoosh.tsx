@@ -77,7 +77,7 @@ interface Project {
 // ══════════════════════════════════════════════════════════════════
 // AI MODEL CATALOG — scalable, provider-grouped
 // ══════════════════════════════════════════════════════════════════
-const AI_MODELS: AIModel[] = [
+let AI_MODELS: AIModel[] = [
   {id:"gpt-5.6-luna",name:"GPT-5.6 Luna",provider:"OpenAI",desc:"سریع و کم‌هزینه برای استفاده روزمره",providerColor:"#10A37F",capabilities:["fast","writing","coding","reasoning"],contextWindow:"1.05M"},
   {id:"gpt-5.6-terra",name:"GPT-5.6 Terra",provider:"OpenAI",desc:"تعادل هوش و هزینه برای کارهای حرفه‌ای",providerColor:"#10A37F",capabilities:["reasoning","coding","vision"],contextWindow:"1.05M"},
   {id:"gpt-5.6-sol",name:"GPT-5.6 Sol",provider:"OpenAI",desc:"مدل پرچم‌دار برای استدلال و کدنویسی پیچیده",providerColor:"#10A37F",capabilities:["reasoning","coding","vision"],badge:"pro",contextWindow:"1.05M"},
@@ -90,7 +90,7 @@ const AI_MODELS: AIModel[] = [
   {id:"grok-4.7",name:"Grok 4.7",provider:"xAI",desc:"مدل پرچم‌دار Grok برای کدنویسی و استدلال",providerColor:"#E0E0E0",capabilities:["reasoning","coding","vision"],badge:"pro",contextWindow:"500K"}
 ];
 
-const PROVIDERS = [...new Set(AI_MODELS.map(m => m.provider))];
+let PROVIDERS = [...new Set(AI_MODELS.map(m => m.provider))];
 
 const CAPABILITY_LABELS: Record<string, string> = {
   "reasoning": "استدلال", "coding": "کد", "vision": "تصویر",
@@ -675,6 +675,9 @@ const AH_TABS: { id:AhTab; label:string; icon:string }[] = [
 export default function AnHooshScreen({
   const AI_API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")||"";
   const accessToken=localStorage.getItem("anpardaz:accessToken")||"";
+  const [,refreshModelCatalog]=useState(0);
+  useEffect(()=>{(async()=>{try{const r=await fetch(AI_API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){AI_MODELS=d.models.map((m:any)=>({id:m.id,name:m.name,provider:m.provider,desc:m.descFa||m.desc||"",providerColor:m.providerId==="openai"?"#10A37F":m.providerId==="gemini"?"#4285F4":m.providerId==="anthropic"?"#C4956A":"#E0E0E0",capabilities:Array.isArray(m.capabilities)?m.capabilities:[],contextWindow:m.contextWindow,badge:m.badge}));PROVIDERS=[...new Set(AI_MODELS.map(m=>m.provider))];refreshModelCatalog(x=>x+1);}}catch{}})();},[]);
+
  onBack }: { onBack: () => void }) {
   const [tab, setTab]               = useState<AhTab>("home");
   const [modelId, setModelId]       = useState("gpt-4o-mini");
