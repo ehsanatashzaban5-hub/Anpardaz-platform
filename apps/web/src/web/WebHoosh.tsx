@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────
 import { useState, useRef, useEffect, useMemo } from "react";
 import WI from "./WebIcons";
-import { AI_MODELS, AI_PROVIDERS, DEMO_CHATS, DEMO_PROJECTS } from "./mockData";
+import { AI_MODELS, AI_PROVIDERS } from "./mockData";
 import type { WebPage, AiModel, Chat } from "./types";
 import { useIsMobile } from "./useResponsive";
 
@@ -41,19 +41,19 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   const [view, setView]           = useState<HView>("chat");
   const [selectedModel, setMod]   = useState<AiModel>(AI_MODELS[0]);
   const [mode, setMode]           = useState<CreationMode>(MODES[0]);
-  const [chats, setChats]         = useState<Chat[]>(DEMO_CHATS);
-  const [activeChat, setActiveChat] = useState<Chat>(DEMO_CHATS[0]);
+  const [chats, setChats]         = useState<Chat[]>([]);
+  const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [input, setInput]         = useState("");
-  const [thinking, setThinking]   = useState(false);
+  const [thinking, setThinking]   = useState(false);\n  const [apiError, setApiError]   = useState<string | null>(null);
   const [sidebarOpen, setSidebar] = useState(true);
   const [modelPanelOpen, setModelPanel] = useState(true);
   const [searchChat, setSearchChat] = useState("");
   const [providerFilter, setProvFilter] = useState<string>("all");
   const textRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile(900);
+  const isMobile = useIsMobile(900);\n  const platformApi = (import.meta.env.VITE_PLATFORM_API_URL || "/api").replace(/\\/$/, "");\n  const authToken = () => localStorage.getItem("anpardaz:accessToken");\n  const apiFetch = async (path: string, init: RequestInit = {}) => {\n    const token = authToken();\n    if (!token) throw new Error("AUTH_REQUIRED");\n    const headers = new Headers(init.headers);\n    headers.set("Authorization", `Bearer ${token}`);\n    headers.set("Content-Type", "application/json");\n    const res = await fetch(`${platformApi}${path}`, { ...init, headers });\n    if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error || `HTTP_${res.status}`); }\n    return res.json();\n  };\n  const mapConversation = (x: any, messages: any[] = []): Chat => ({\n    id: String(x.id), title: x.title || "مکالمه جدید", preview: messages[messages.length - 1]?.content || "",\n    modelId: x.model || AI_MODELS[0]?.id || "", modeId: x.mode || "chat",\n    messages: messages.map((m:any) => ({ id:String(m.id), role:m.role, content:m.content, modelId:m.metadata?.model, createdAt:m.created_at })),\n    createdAt:x.created_at, updatedAt:x.updated_at,\n  });
 
-  const filteredChats = useMemo(() =>
+  useEffect(() => {\n    if (!authToken()) return;\n    apiFetch("/v1/hoosh/conversations").then((d:any) => {\n      const list = (d.conversations || []).map((x:any) => mapConversation(x));\n      setChats(list);\n      if (list[0]) apiFetch(`/v1/hoosh/conversations/${list[0].id}`).then((full:any) => setActiveChat(mapConversation(full.conversation, full.messages))).catch(() => {});\n    }).catch((e:any) => setApiError(e.message));\n  }, []);\n\n  const filteredChats = useMemo(() =>
     chats.filter(c => searchChat === "" || c.title.includes(searchChat) || c.messages.some(m => m.content.includes(searchChat)))
   , [chats, searchChat]);
 
@@ -183,7 +183,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
           {view === "projects" && (
             <div style={{ flex:1, overflowY:"auto", padding:"4px 8px" }}>
               <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", padding:"6px 4px" }}>پروژه‌های من</div>
-              {DEMO_PROJECTS.map(proj => (
+              {[].map(proj => (
                 <div key={proj.id} style={{ padding:"10px", borderRadius:10, border:"1px solid var(--w-border)", marginBottom:8, background:"var(--w-card)", cursor:"pointer" }}>
                   <div style={{ fontSize:12, fontWeight:700, marginBottom:2 }}>{proj.title}</div>
                   <div style={{ fontSize:10, color:"var(--w-muted)" }}>{proj.chatIds.length} چت</div>
@@ -237,10 +237,10 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
             <ProjectsView/>
           ) : (
             <>
-              {activeChat.messages.length === 0 && (
+              {activeChat && activeChat.messages.length === 0 && (
                 <EmptyState mode={mode} onSuggest={s=>{setInput(s); textRef.current?.focus();}}/>
               )}
-              {activeChat.messages.map(msg => (
+              {activeChat?.messages.map(msg => (
                 <MessageBubble key={msg.id} msg={msg} modelName={msg.modelId ? AI_MODELS.find(m=>m.id===msg.modelId)?.name : undefined}/>
               ))}
               {thinking && <ThinkingIndicator/>}
@@ -261,7 +261,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
                 value={input}
                 onChange={e=>setInput(e.target.value)}
                 onKeyDown={handleKey}
-                placeholder={mode.promptFa}
+                placeholder={mode.promptFa}\n                disabled={!activeChat || thinking}
                 rows={1}
                 style={{ flex:1, background:"transparent", border:"none", outline:"none", resize:"none", color:"var(--w-text)", fontSize:13, fontFamily:"Vazirmatn", lineHeight:1.6, maxHeight:160, overflowY:"auto" }}
                 onInput={e=>{ const t = e.currentTarget; t.style.height="auto"; t.style.height=`${Math.min(t.scrollHeight,160)}px`; }}
@@ -272,7 +272,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
               </button>
             </div>
             <div style={{ textAlign:"center", fontSize:10, color:"var(--w-muted)", marginTop:6 }}>
-              {selectedModel.name} · آن هوش می‌تواند اشتباه کند. اطلاعات مهم را تأیید کنید.
+              {selectedModel.name} · پاسخ‌ها توسط سرویس واقعی آن هوش تولید می‌شوند و ممکن است نیاز به بررسی داشته باشند.
             </div>
           </div>
         )}
