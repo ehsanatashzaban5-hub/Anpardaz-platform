@@ -678,6 +678,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const [showModels, setShowModels] = useState(false);
   const [messages, setMessages]     = useState<Message[]>([]);
   const [input, setInput]           = useState("");
+  const [sending, setSending]       = useState(false);
   const [deepThink, setDeepThink]   = useState(false);
   const [activeMode, setActiveMode] = useState<CreationMode|null>(null);
   const [filterCat, setFilterCat]   = useState("all");
