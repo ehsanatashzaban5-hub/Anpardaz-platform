@@ -29,7 +29,8 @@ export function registerAdminMarketRoutes(app:FastifyInstance,pool:Pool){
     const id=Number((req.params as any).id),b=(req.body??{}) as any;
     if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_store'});
     if(b.feedType!==undefined&&!['manual','json','xml','rss','api','crawler'].includes(b.feedType))return reply.code(400).send({error:'invalid_feed_type'});
-    if(b.iframeMode!==undefined&&!['allowed','blocked','unknown'].includes(b.iframeMode))return reply.code(400).send({error:'invalid_iframe_mode'});\n    if(b.verificationStatus!==undefined&&!['pending','verified','blocked','rejected'].includes(b.verificationStatus))return reply.code(400).send({error:'invalid_verification_status'});
+    if(b.iframeMode!==undefined&&!['allowed','blocked','unknown'].includes(b.iframeMode))return reply.code(400).send({error:'invalid_iframe_mode'});
+    if(b.verificationStatus!==undefined&&!['pending','verified','blocked','rejected'].includes(b.verificationStatus))return reply.code(400).send({error:'invalid_verification_status'});
     const q=await pool.query(`UPDATE market_stores SET active=COALESCE($1,active),feed_type=COALESCE($2,feed_type),feed_url=COALESCE($3,feed_url),iframe_mode=COALESCE($4,iframe_mode),verification_status=COALESCE($5,verification_status),verified_at=CASE WHEN $5='verified' THEN NOW() WHEN $5 IS NOT NULL THEN NULL ELSE verified_at END,updated_at=NOW() WHERE id=$6 RETURNING id,name,domain,active,feed_type,feed_url,iframe_mode,verification_status,verified_at`,
       [typeof b.active==='boolean'?b.active:null,b.feedType??null,typeof b.feedUrl==='string'?b.feedUrl.trim()||null:null,b.iframeMode??null,b.verificationStatus??null,id]);
     if(!q.rows[0])return reply.code(404).send({error:'store_not_found'});
