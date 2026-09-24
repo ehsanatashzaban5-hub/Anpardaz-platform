@@ -297,7 +297,7 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
 ${b.input.trim()}
 </user_input>
 
-VERIFIED_ANK_MARKET_CATALOG_JSON:
+VERIFIED_AN_MARKET_CATALOG_JSON:
 <catalog>
 ${context}
 </catalog>
