@@ -84,6 +84,26 @@ export function registerMarketCommunityRoutes(app:FastifyInstance,pool:Pool){
     return {from,to,stores:r.rows,totals:totals.rows[0],note:'clickout is a tracked outbound purchase-intent event; it is not proof that checkout or payment completed.'};
   });
 
+  app.get('/api/v1/admin/market/commission-report.csv',{preHandler:requireAuth},async(req,reply)=>{
+    if(!(await hasPermission(pool,a(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
+    const q=req.query as any;
+    const from=q.from?new Date(q.from):new Date(Date.now()-30*86400000);
+    const to=q.to?new Date(q.to):new Date();
+    if(Number.isNaN(from.getTime())||Number.isNaN(to.getTime())||from>=to)return reply.code(400).send({error:'invalid_period'});
+    const r=await pool.query(`SELECT s.name store_name,s.domain,COUNT(*)::int clickouts,COUNT(DISTINCT c.user_id)::int unique_users,COUNT(DISTINCT c.product_id)::int unique_products,COUNT(*) FILTER(WHERE c.surface='mobile')::int mobile_clickouts,COUNT(*) FILTER(WHERE c.surface='web')::int web_clickouts,MAX(cr.commission_type) commission_type,MAX(cr.commission_value) commission_value,
+      CASE WHEN MAX(cr.commission_type)='fixed' THEN COUNT(*)*MAX(cr.commission_value) WHEN MAX(cr.commission_type)='percent' THEN COUNT(*)*MAX(cr.commission_value)/100 ELSE 0 END estimated_commission
+      FROM market_clickouts c JOIN market_stores s ON s.id=c.store_id
+      LEFT JOIN market_merchant_commission_rules cr ON cr.store_id=s.id AND cr.active=true AND cr.valid_from<=c.created_at AND (cr.valid_to IS NULL OR cr.valid_to>c.created_at)
+      WHERE c.created_at >= $1 AND c.created_at < $2 GROUP BY s.id ORDER BY clickouts DESC`,[from,to]);
+    const esc=(v:any)=>`"${String(v??'').replace(/"/g,'""')}"`;
+    const lines=[
+      ['store','domain','clickouts','unique_users','unique_products','mobile_clickouts','web_clickouts','commission_type','commission_value','estimated_commission'].join(','),
+      ...r.rows.map((x:any)=>[x.store_name,x.domain,x.clickouts,x.unique_users,x.unique_products,x.mobile_clickouts,x.web_clickouts,x.commission_type??'',x.commission_value??'',x.estimated_commission??0].map(esc).join(','))
+    ];
+    await pool.query("INSERT INTO market_merchant_report_exports(store_id,from_at,to_at,format,requested_by) VALUES(NULL,$1,$2,'csv',(SELECT id FROM platform_users WHERE identity_id=$3 LIMIT 1))",[from,to,a(req).auth.sub]);
+    return reply.header('content-type','text/csv; charset=utf-8').header('content-disposition','attachment; filename="an-market-merchant-report.csv"').send("\uFEFF"+lines.join("\n"));
+  });
+
   app.get('/api/v1/admin/market/reviews',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await hasPermission(pool,a(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
     const status=String((req.query as any)?.status||'pending');
