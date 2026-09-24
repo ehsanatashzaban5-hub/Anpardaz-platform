@@ -73,6 +73,6 @@ INSERT INTO market_stores(name,slug,domain,homepage_url,category_hint,active,ifr
 ('طلاپ','talapp','talapp.ir','https://talapp.ir','jewelry-gold',FALSE,'unknown','manual'),
 ('جواهری حقانی','haghighi-jewelry','haghighijewelry.com','https://haghighijewelry.com','jewelry-gold',FALSE,'unknown','manual'),
 ('نورنگار','noornegar3','noornegar.com','https://noornegar.com','audio-video',FALSE,'unknown','manual')
-ON CONFLICT(slug) DO NOTHING;
+ON CONFLICT(domain) DO NOTHING;
 INSERT INTO schema_migrations(version) VALUES ('041_market_store_registry_wave4') ON CONFLICT(version) DO NOTHING;
 COMMIT;
