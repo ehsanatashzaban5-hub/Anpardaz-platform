@@ -441,7 +441,7 @@ function ExploreView({ models, selectedModel, onSelect, providerFilter }: { mode
       <div style={{ marginBottom:20 }}>
         <h2 style={{ fontSize:20, fontWeight:900, marginBottom:6 }}>کاوش مدل‌های هوش مصنوعی</h2>
         <p style={{ fontSize:13, color:"var(--w-muted)" }}>
-          {providerFilter === "all" ? `${models.length} مدل از ۸ ارائه‌دهنده پیشرو` : `${models.length} مدل از ${AI_PROVIDERS.find(p=>p.id===providerFilter)?.name}`}
+          {providerFilter === "all" ? `${models.length} مدل از ${AI_PROVIDERS.length} ارائه‌دهنده` : `${models.length} مدل از ${AI_PROVIDERS.find(p=>p.id===providerFilter)?.name}`}
         </p>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:14 }}>
