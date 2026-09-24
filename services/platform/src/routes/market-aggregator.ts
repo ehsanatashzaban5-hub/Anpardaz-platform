@@ -79,6 +79,25 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     return{operationId,url,mode};
   });
 
+  app.get('/api/v1/market/products/:id',async(req,reply)=>{
+    const id=Number((req.params as any).id);
+    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_id'});
+    const p=await pool.query(`SELECT p.id,p.title,p.description,p.brand,p.condition,p.specs,p.source_url,p.updated_at,
+      c.slug category_slug,c.name category_name,c.name_fa category_name_fa
+      FROM market_products p LEFT JOIN market_categories c ON c.id=p.category_id
+      WHERE p.id=$1 AND p.status='published' LIMIT 1`,[id]);
+    if(!p.rows[0])return reply.code(404).send({error:'product_not_found'});
+    const [media,offers]=await Promise.all([
+      pool.query(`SELECT id,url,sort_order FROM market_media WHERE product_id=$1 ORDER BY sort_order,id`,[id]),
+      pool.query(`SELECT o.id,o.store_id,o.price,o.currency,o.availability,o.shipping_cost,o.product_url,o.image_url,o.updated_at,
+        s.name store_name,s.domain store_domain,s.iframe_mode,s.homepage_url
+        FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id
+        WHERE o.product_id=$1 AND (s.active IS TRUE OR s.id IS NULL)
+        ORDER BY o.price,o.id`,[id])
+    ]);
+    return{product:p.rows[0],media:media.rows,offers:offers.rows};
+  });
+
   app.get('/api/v1/market/me/favorites',{preHandler:requireAuth},async(req)=>{
     const uid=await ensurePlatformUser(pool,auth(req).auth);
     return{products:(await pool.query(`SELECT p.*,c.slug category_slug,c.name_fa category_name_fa FROM market_favorites f JOIN market_products p ON p.id=f.product_id LEFT JOIN market_categories c ON c.id=p.category_id WHERE f.user_id=$1 ORDER BY f.created_at DESC`,[uid])).rows};
