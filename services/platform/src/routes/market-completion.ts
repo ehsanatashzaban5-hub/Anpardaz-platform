@@ -16,14 +16,6 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return{conversations:cs,messages:ms};
   });
 
-  app.get('/api/v1/market/me/activity',{preHandler:requireAuth},async(req)=>{
-    const uid=await (await import('../auth.js')).ensurePlatformUser(pool,auth(req).auth);
-    const q=req.query as any; const limit=Math.min(500,Math.max(1,Number(q.limit)||200));
-    return{activities:(await pool.query(`SELECT a.id,a.event_type,a.surface,a.product_id,a.offer_id,a.store_id,a.metadata,a.operation_id,a.created_at,p.title product_title,s.name store_name
-      FROM market_activity_log a LEFT JOIN market_products p ON p.id=a.product_id LEFT JOIN market_stores s ON s.id=a.store_id
-      WHERE a.user_id=$1 ORDER BY a.created_at DESC LIMIT $2`,[uid,limit])).rows};
-  });
-
   app.get('/api/v1/market/seo',async(req,reply)=>{
     const q=req.query as any; const type=String(q.type??'home'); const id=q.id?Number(q.id):null;
     if(!['home','category','product','store'].includes(type))return reply.code(400).send({error:'invalid_type'});
