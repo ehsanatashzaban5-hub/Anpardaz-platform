@@ -14,6 +14,16 @@ export function registerAdminMarketRoutes(app:FastifyInstance,pool:Pool){
       GROUP BY s.id ORDER BY s.name`);
     return{stores:q.rows};
   });
+  app.get('/api/v1/admin/market/sources',{preHandler:requireAuth},async(req,reply)=>{
+    if(!(await hasPermission(pool,auth(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
+    const q=await pool.query(`SELECT ss.*,s.name store_name,s.domain FROM market_store_sources ss JOIN market_stores s ON s.id=ss.store_id ORDER BY s.name,ss.source_name`);
+    return{sources:q.rows};
+  });
+  app.get('/api/v1/admin/market/sync-runs',{preHandler:requireAuth},async(req,reply)=>{
+    if(!(await hasPermission(pool,auth(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
+    const q=await pool.query(`SELECT r.*,s.name store_name,ss.source_name FROM market_sync_runs r LEFT JOIN market_stores s ON s.id=r.store_id LEFT JOIN market_store_sources ss ON ss.id=r.source_id ORDER BY r.created_at DESC LIMIT 500`);
+    return{runs:q.rows};
+  });
   app.get('/api/v1/admin/market/events',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await hasPermission(pool,auth(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
     const q=await pool.query(`SELECT e.*,p.title product_title,s.name store_name,u.email
