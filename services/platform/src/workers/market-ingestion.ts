@@ -22,30 +22,57 @@ const tokens=(v:string)=>new Set(normalize(v).split(" ").filter(x=>x.length>1));
 const jaccard=(a:Set<string>,b:Set<string>)=>{if(!a.size||!b.size)return 0;let n=0;for(const x of a)if(b.has(x))n++;return n/(a.size+b.size-n)};
 const canonical=(item:Item,brand:string)=>{const gtin=text(item.gtin||item.ean||item.upc);if(gtin)return "gtin:"+gtin;const model=text(item.mpn||item.model);return "product:"+normalize(brand)+"|"+normalize(model)+"|"+normalize(text(item.name||item.title));};
 
-async function fetchJson(url:string,headers:Record<string,string>={}){
+async function fetchText(url:string,headers:Record<string,string>={}){
  const c=new AbortController();const t=setTimeout(()=>c.abort(),timeoutMs);
- try{const r=await fetch(url,{signal:c.signal,headers:{"accept":"application/json","user-agent":"AnPardaz-AnMarketSync/2.0",...headers}});const body=await r.text();if(!r.ok)throw Object.assign(new Error("HTTP "+r.status),{status:r.status});let data:any;try{data=JSON.parse(body)}catch{throw new Error("INVALID_JSON")};return{data,headers:r.headers,hash:createHash("sha256").update(body).digest("hex")};}
+ try{const r=await fetch(url,{signal:c.signal,headers:{"accept":"text/html,application/json,application/xml,text/xml","user-agent":"AnPardaz-AnMarketSync/3.0",...headers}});const body=await r.text();if(!r.ok)throw Object.assign(new Error("HTTP "+r.status),{status:r.status});return{body,headers:r.headers,hash:createHash("sha256").update(body).digest("hex")};}
  finally{clearTimeout(t)}
 }
+async function fetchJson(url:string,headers:Record<string,string>={}){
+ const x=await fetchText(url,headers);let data:any;try{data=JSON.parse(x.body)}catch{throw new Error("INVALID_JSON")};return{data,headers:x.headers,hash:x.hash};
+}
+const getPath=(obj:any,path:string)=>path.split(".").filter(Boolean).reduce((v:any,k:string)=>v?.[k],obj);
 
 function mappedItems(data:any,mapping:any):Item[]{
  const path=typeof mapping?.itemsPath==="string"?mapping.itemsPath:"";
- const root=path.split(".").filter(Boolean).reduce((v:any,k:string)=>v?.[k],data);
+ const root=path?getPath(data,path):data;
  const raw=Array.isArray(root)?root:Array.isArray(data)?data:Array.isArray(data?.products)?data.products:Array.isArray(data?.items)?data.items:[];
  return raw.map((x:any)=>({
-   id:x?.[mapping?.idField||"id"],sku:x?.[mapping?.skuField||"sku"],
-   name:x?.[mapping?.titleField||"name"]??x?.title,title:x?.title,
-   description:x?.[mapping?.descriptionField||"description"],short_description:x?.short_description,
-   permalink:x?.[mapping?.urlField||"permalink"]??x?.url,
-   price:x?.[mapping?.priceField||"price"],regular_price:x?.regular_price,
+   id:getPath(x,mapping?.idField||"id"),sku:getPath(x,mapping?.skuField||"sku"),
+   name:getPath(x,mapping?.titleField||"name")??x?.title,title:x?.title,
+   description:getPath(x,mapping?.descriptionField||"description"),short_description:x?.short_description,
+   permalink:getPath(x,mapping?.urlField||"permalink")??x?.url,
+   price:getPath(x,mapping?.priceField||"price"),regular_price:x?.regular_price,
    stock_status:x?.stock_status,in_stock:x?.in_stock,
-   gtin:x?.[mapping?.gtinField||"gtin"]??x?.ean,mpn:x?.[mapping?.mpnField||"mpn"],model:x?.[mapping?.modelField||"model"],
+   gtin:getPath(x,mapping?.gtinField||"gtin")??x?.ean,mpn:getPath(x,mapping?.mpnField||"mpn"),model:getPath(x,mapping?.modelField||"model"),
    images:Array.isArray(x?.images)?x.images.map((i:any)=>({src:i?.src??i?.url})):[],
    categories:Array.isArray(x?.categories)?x.categories.map((c:any)=>({id:c?.id,name:c?.name})):[],
    brands:Array.isArray(x?.brands)?x.brands.map((b:any)=>({name:b?.name??b})):[],
    attributes:Array.isArray(x?.attributes)?x.attributes.map((a:any)=>({name:a?.name,options:a?.options})):[],
    prices:x?.prices
  }));
+}
+
+function jsonLdItems(html:string):Item[]{
+ const out:Item[]=[];
+ const re=/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi;let m;
+ while((m=re.exec(html))){
+   try{
+     const parsed=JSON.parse(m[1].trim()); const nodes=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.["@graph"])?parsed["@graph"]:[parsed]);
+     for(const n of nodes){
+       const t=Array.isArray(n?.["@type"])?n["@type"]:[n?.["@type"]];
+       if(t.includes("Product")) out.push({
+         id:n.sku||n.mpn||n.gtin||n.url,name:n.name,title:n.name,description:n.description,permalink:n.url,
+         price:n.offers?.price??(Array.isArray(n.offers)?n.offers[0]?.price:undefined),
+         prices:{price:n.offers?.price,currency_code:n.offers?.priceCurrency},
+         gtin:n.gtin,mpn:n.mpn,model:n.model,
+         images:(Array.isArray(n.image)?n.image:[n.image]).filter(Boolean).map((src:any)=>({src})),
+         brands:n.brand?[{name:typeof n.brand==="string"?n.brand:n.brand.name}]:[],
+         categories:[],attributes:[]
+       });
+     }
+   }catch{}
+ }
+ return out;
 }
 
 async function resolveCategory(item:Item,store:Store){
@@ -86,7 +113,14 @@ async function syncSource(store:Store,source:Source){
  const runId=Number(run.rows[0].id);let discovered=0,upserted=0,errors=0;
  try{
    const headers:Record<string,string>={};if(source.etag)headers["if-none-match"]=source.etag;if(source.last_modified)headers["if-modified-since"]=source.last_modified;
-   const fetched=await fetchJson(source.endpoint_url,headers);const items=mappedItems(fetched.data,source.mapping);discovered=items.length;
+   let fetched:{data:any;headers:Headers;hash:string};
+   let items:Item[]=[];
+   if(source.adapter==='jsonld'){
+     const html=await fetchText(source.endpoint_url,headers);fetched={data:null,headers:html.headers,hash:html.hash};items=jsonLdItems(html.body);
+   }else{
+     fetched=await fetchJson(source.endpoint_url,headers);items=mappedItems(fetched.data,source.mapping);
+   }
+   discovered=items.length;
    const categories=(await pool.query("SELECT id,slug,name_fa FROM market_categories WHERE active=true ORDER BY sort_order,id")).rows;
    const seen=new Set<number>();
    for(const item of items){
