@@ -482,48 +482,15 @@ function ExploreView({ models, selectedModel, onSelect, providerFilter }: { mode
   );
 }
 
-function ProjectsView() {
-  return (
-    <div>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
-        <div>
-          <h2 style={{ fontSize:20, fontWeight:900, marginBottom:4 }}>پروژه‌های من</h2>
-          <p style={{ fontSize:13, color:"var(--w-muted)" }}>فایل‌ها، خروجی‌ها و ورک‌فلوهای هوش مصنوعی</p>
-        </div>
-        <button className="w-btn w-btn-primary" style={{ padding:"9px 18px", fontSize:13, background:"#7c3aed" }}>
-          <WI n="plus" s={14}/> پروژه جدید
-        </button>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:14 }}>
-        {DEMO_PROJECTS.map(proj => (
-          <div key={proj.id} className="w-card" style={{ padding:"20px", cursor:"pointer", transition:"transform 0.1s" }}
-            onMouseEnter={e=>(e.currentTarget as HTMLDivElement).style.transform="translateY(-2px)"}
-            onMouseLeave={e=>(e.currentTarget as HTMLDivElement).style.transform="none"}
-          >
-            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-              <div style={{ width:40, height:40, borderRadius:12, background:"rgba(124,58,237,0.12)", display:"flex", alignItems:"center", justifyContent:"center", color:"#7c3aed" }}>
-                <WI n="folder" s={20}/>
-              </div>
-              <div>
-                <div style={{ fontSize:14, fontWeight:800 }}>{proj.title}</div>
-                <div style={{ fontSize:11, color:"var(--w-muted)" }}>{proj.chatIds.length} چت</div>
-              </div>
-            </div>
-            <div style={{ fontSize:12, color:"var(--w-muted)", lineHeight:1.6, marginBottom:12 }}>{proj.description}</div>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              <span style={{ fontSize:10, padding:"3px 8px", borderRadius:5, background:"var(--w-card2)", border:"1px solid var(--w-border)", color:"var(--w-muted)" }}>{proj.chatIds.length} مکالمه</span>
-              <span style={{ fontSize:10, padding:"3px 8px", borderRadius:5, background:proj.accentColor+"20", border:`1px solid ${proj.accentColor}30`, color:proj.accentColor }}>{models.find(m=>m.id===proj.modelId)?.name || proj.modelId}</span>
-            </div>
-          </div>
-        ))}
-        <div style={{ padding:"20px", borderRadius:14, border:"2px dashed var(--w-border)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:8, cursor:"pointer", minHeight:160, color:"var(--w-muted)", transition:"border-color 0.12s" }}
-          onMouseEnter={e=>(e.currentTarget as HTMLDivElement).style.borderColor="rgba(124,58,237,0.4)"}
-          onMouseLeave={e=>(e.currentTarget as HTMLDivElement).style.borderColor="var(--w-border)"}
-        >
-          <WI n="plus" s={28} style={{ opacity:0.3 }}/>
-          <div style={{ fontSize:13, fontWeight:600 }}>پروژه جدید</div>
-        </div>
-      </div>
-    </div>
-  );
+function ProjectsView({projects}:{projects:AiProject[]}) {
+  return <div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}><div><h2 style={{fontSize:20,fontWeight:900,marginBottom:4}}>پروژه‌های من</h2><p style={{fontSize:13,color:"var(--w-muted)"}}>پروژه‌ها و مکالمات ذخیره‌شده روی سرور آن هوش</p></div></div>{projects.length===0?<div className="w-card" style={{padding:28,textAlign:"center",color:"var(--w-muted)"}}>هنوز پروژه‌ای ایجاد نشده است.</div>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>{projects.map(proj=><div key={proj.id} className="w-card" style={{padding:20}}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}><div style={{width:40,height:40,borderRadius:12,background:"rgba(124,58,237,0.12)",display:"flex",alignItems:"center",justifyContent:"center",color:"#7c3aed"}}><WI n="folder" s={20}/></div><div><div style={{fontSize:14,fontWeight:800}}>{proj.title}</div><div style={{fontSize:11,color:"var(--w-muted)"}}>{proj.chatIds.length} چت</div></div></div><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.6,marginBottom:12}}>{proj.description||"بدون توضیح"}</div><span style={{fontSize:10,padding:"3px 8px",borderRadius:5,background:(proj.accentColor||"#7c3aed")+"20",color:proj.accentColor||"#7c3aed"}}>{proj.modelId||"مدل پیش‌فرض سرور"}</span></div>)}</div>}</div>;
+}
+
+function HooshAccountView({user,usage,tickets,API,token,onCreated}:{user:any;usage:any;tickets:any[];API:string;token:string;onCreated:(t:any)=>void}) {
+  return <div style={{maxWidth:760,margin:"0 auto",padding:"10px 0"}}><h2 style={{fontSize:20,fontWeight:900,marginBottom:4}}>حساب کاربری آن هوش</h2><p style={{fontSize:12,color:"var(--w-muted)",marginBottom:18}}>مدیریت حساب، مصرف و پشتیبانی</p><div className="w-card" style={{padding:18,marginBottom:12}}><div style={{fontWeight:800}}>{user?.display_name||user?.email||"کاربر آن پرداز"}</div><div style={{fontSize:11,color:"var(--w-muted)",marginTop:4}}>{user?.email||"حساب متصل به آن پرداز"}</div></div><div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:12}}><div className="w-card" style={{padding:14,textAlign:"center"}}><div style={{fontSize:10,color:"var(--w-muted)"}}>درخواست</div><b>{usage?.requests??0}</b></div><div className="w-card" style={{padding:14,textAlign:"center"}}><div style={{fontSize:10,color:"var(--w-muted)"}}>ورودی</div><b>{usage?.input_tokens??0}</b></div><div className="w-card" style={{padding:14,textAlign:"center"}}><div style={{fontSize:10,color:"var(--w-muted)"}}>خروجی</div><b>{usage?.output_tokens??0}</b></div></div><div className="w-card" style={{padding:18,marginBottom:12}}><div style={{fontWeight:800,marginBottom:9}}>پشتیبانی و تیکت</div><TicketComposer API={API} token={token} onCreated={onCreated}/></div><div style={{fontWeight:800,marginBottom:8}}>تیکت‌های من</div>{tickets.length===0?<div style={{color:"var(--w-muted)",fontSize:12}}>تیکتی ثبت نشده است.</div>:tickets.map((t:any)=><div key={t.id} className="w-card" style={{padding:12,marginBottom:7}}><div style={{fontSize:12,fontWeight:700}}>{t.subject}</div><div style={{fontSize:10,color:"var(--w-muted)",marginTop:4}}>{t.status}</div></div>)}</div>;
+}
+
+function TicketComposer({API,token,onCreated}:{API:string;token:string;onCreated:(t:any)=>void}) {
+ const [subject,setSubject]=useState(""); const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false);
+ return <div><input className="w-input" value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع تیکت" style={{fontSize:12,marginBottom:7}}/><textarea className="w-input" value={message} onChange={e=>setMessage(e.target.value)} placeholder="پیام خود را بنویسید..." rows={3} style={{fontSize:12,resize:"none"}}/><button className="w-btn w-btn-primary" disabled={busy||!subject.trim()||!message.trim()} style={{marginTop:7,width:"100%",background:"#7c3aed"}} onClick={async()=>{setBusy(true);try{const r=await fetch(API+"/api/v1/hoosh/tickets",{method:"POST",headers:{"content-type":"application/json",...(token?{authorization:"Bearer "+token}:{})},body:JSON.stringify({subject:subject.trim(),message:message.trim()})});const d=await r.json();if(r.ok&&d.ticket){onCreated(d.ticket);setSubject("");setMessage("");}}finally{setBusy(false)}}}>{busy?"در حال ارسال…":"ارسال تیکت"}</button></div>;
 }
