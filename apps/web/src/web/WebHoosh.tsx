@@ -10,7 +10,7 @@ import { useIsMobile } from "./useResponsive";
 
 interface HooshProps { onNavigate: (p: WebPage) => void; }
 
-type HView = "chat" | "explore" | "projects" | "settings";
+type HView = "chat" | "explore" | "projects" | "settings" | "account";
 
 type CreationMode = {
   id: string; icon: string; label: string; labelFa: string; color: string;
@@ -42,7 +42,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   const [models, setModels]       = useState<AiModel[]>(AI_MODELS);
   const [selectedModel, setMod]   = useState<AiModel>(models[0]);
   const [mode, setMode]           = useState<CreationMode>(MODES[0]);
-  const [chats, setChats]         = useState<Chat[]>([]);\n  const [projects, setProjects]   = useState<AiProject[]>([]);
+  const [chats, setChats]         = useState<Chat[]>([]);\n  const [projects, setProjects]   = useState<AiProject[]>([]);\n  const [hooshUser,setHooshUser]=useState<any>(null); const [hooshUsage,setHooshUsage]=useState<any>(null); const [hooshTickets,setHooshTickets]=useState<any[]>([]);
   const [activeChat, setActiveChat] = useState<Chat>({id:`chat${Date.now()}`,title:"مکالمه جدید",preview:"",modelId:models[0]?.id||"gpt-5.6-luna",messages:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
   const [input, setInput]         = useState("");
   const [thinking, setThinking]   = useState(false);
@@ -55,7 +55,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   const isMobile = useIsMobile(900);
   const API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")||"";
   const accessToken=localStorage.getItem("anpardaz:accessToken")||"";
-  useEffect(()=>{(async()=>{try{const h=await fetch(API+"/api/v1/hoosh/me",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const hd=await h.json();if(h.ok){setChats((hd.conversations??[]).map((c:any)=>({id:String(c.id),title:c.title||"مکالمه",preview:"",modelId:c.model||"gpt-5.6-luna",messages:[],createdAt:c.created_at,updatedAt:c.updated_at})));setProjects((hd.projects??[]).map((p:any)=>({id:String(p.id),title:p.title,description:p.description||"",modelId:p.model_id||"",chatIds:(p.chat_ids??[]).map(String),accentColor:p.accent_color||"#7c3aed",createdAt:p.created_at,updatedAt:p.updated_at})));}const r=await fetch(API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){setModels(d.models);setMod(d.models[0]);}}catch{}})();},[]);
+  useEffect(()=>{(async()=>{try{const h=await fetch(API+"/api/v1/hoosh/me",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const hd=await h.json();if(h.ok){setHooshUser(hd.user);setHooshUsage(hd.usage);setHooshTickets(hd.tickets??[]);setChats((hd.conversations??[]).map((c:any)=>({id:String(c.id),title:c.title||"مکالمه",preview:"",modelId:c.model||"gpt-5.6-luna",messages:[],createdAt:c.created_at,updatedAt:c.updated_at})));setProjects((hd.projects??[]).map((p:any)=>({id:String(p.id),title:p.title,description:p.description||"",modelId:p.model_id||"",chatIds:(p.chat_ids??[]).map(String),accentColor:p.accent_color||"#7c3aed",createdAt:p.created_at,updatedAt:p.updated_at})));}const r=await fetch(API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){setModels(d.models);setMod(d.models[0]);}}catch{}})();},[]);
 
 
   const filteredChats = useMemo(() =>
@@ -127,7 +127,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
 
           {/* View tabs */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:2, padding:"8px" }}>
-            {([["chat","comment","چت"],["explore","compass","کاوش"],["projects","folder","پروژه"],["settings","settings","تنظیم"]] as [HView,string,string][]).map(([v,ic,lb]) => (
+            {([["chat","comment","چت"],["explore","compass","کاوش"],["projects","folder","پروژه"],["account","user","حساب من"],["settings","settings","تنظیم"]] as [HView,string,string][]).map(([v,ic,lb]) => (
               <button key={v} onClick={()=>setView(v)} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3, padding:"7px 4px", borderRadius:8, border:"none", background:view===v?"rgba(124,58,237,0.12)":"transparent", color:view===v?"#7c3aed":"var(--w-muted)", cursor:"pointer", fontSize:10, fontWeight:view===v?700:400, fontFamily:"Vazirmatn" }}>
                 <WI n={ic} s={16}/>{lb}
               </button>
@@ -180,7 +180,24 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
               ))}
             </div>
           )}
-          {view === "settings" && (
+                    {view === "account" && (
+            <div style={{flex:1,overflowY:"auto",padding:"4px 12px"}}>
+              <div style={{fontSize:16,fontWeight:900,padding:"10px 0 4px"}}>حساب کاربری آن هوش</div>
+              <div style={{fontSize:11,color:"var(--w-muted)",marginBottom:12}}>{hooshUser?.display_name||hooshUser?.email||"حساب متصل به آن پرداز"}</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:12}}>
+                <div className="w-card" style={{padding:10,textAlign:"center"}}><div style={{fontSize:10,color:"var(--w-muted)"}}>درخواست</div><b>{hooshUsage?.requests??0}</b></div>
+                <div className="w-card" style={{padding:10,textAlign:"center"}}><div style={{fontSize:10,color:"var(--w-muted)"}}>ورودی</div><b>{hooshUsage?.input_tokens??0}</b></div>
+                <div className="w-card" style={{padding:10,textAlign:"center"}}><div style={{fontSize:10,color:"var(--w-muted)"}}>خروجی</div><b>{hooshUsage?.output_tokens??0}</b></div>
+              </div>
+              <div className="w-card" style={{padding:12,marginBottom:10}}>
+                <div style={{fontWeight:800,fontSize:13,marginBottom:8}}>تیکت پشتیبانی</div>
+                <TicketComposer API={API} token={accessToken} onCreated={t=>setHooshTickets(prev=>[t,...prev])}/>
+              </div>
+              <div style={{fontWeight:800,fontSize:13,marginBottom:8}}>تیکت‌های من</div>
+              {(hooshTickets??[]).map((t:any)=><div key={t.id} className="w-card" style={{padding:10,marginBottom:6}}><div style={{fontSize:12,fontWeight:700}}>{t.subject}</div><div style={{fontSize:10,color:"var(--w-muted)",marginTop:4}}>{t.status}</div></div>)}
+            </div>
+          )}
+{view === "settings" && (
             <div style={{ flex:1, overflowY:"auto", padding:"4px 12px" }}>
               <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", padding:"8px 0 6px" }}>تنظیمات مدل</div>
               {[["دما (Temperature)","0.7"],["حداکثر توکن","4096"],["زبان پاسخ","فارسی"]].map(([l,v])=>(
@@ -407,6 +424,11 @@ function ThinkingIndicator() {
       </div>
     </div>
   );
+}
+
+function TicketComposer({API,token,onCreated}:{API:string;token:string;onCreated:(t:any)=>void}) {
+ const [subject,setSubject]=useState(""); const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false);
+ return <div><input className="w-input" value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع تیکت" style={{fontSize:12,marginBottom:7}}/><textarea className="w-input" value={message} onChange={e=>setMessage(e.target.value)} placeholder="پیام خود را بنویسید..." rows={3} style={{fontSize:12,resize:"none"}}/><button className="w-btn w-btn-primary" disabled={busy||!subject.trim()||!message.trim()} style={{marginTop:7,width:"100%",background:"#7c3aed"}} onClick={async()=>{setBusy(true);try{const r=await fetch(API+"/api/v1/hoosh/tickets",{method:"POST",headers:{"content-type":"application/json",...(token?{authorization:"Bearer "+token}:{})},body:JSON.stringify({subject:subject.trim(),message:message.trim()})});const d=await r.json();if(r.ok&&d.ticket){onCreated(d.ticket);setSubject("");setMessage("");}}finally{setBusy(false)}}}>{busy?"در حال ارسال…":"ارسال تیکت"}</button></div>;
 }
 
 function ExploreView({ models, selectedModel, onSelect, providerFilter }: { models: AiModel[]; selectedModel: AiModel; onSelect:(m:AiModel)=>void; providerFilter:string; }) {
