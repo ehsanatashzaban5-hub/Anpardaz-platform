@@ -50,7 +50,8 @@ async function processOne(){
     requesterIdentityId:r.identity_id,
     sourceType:'hoosh_request',
     sourceId:String(r.id),
-    idempotencyKey:`hoosh-request:${r.id}`
+    idempotencyKey:`hoosh-request:${r.id}`,
+    requestedModel:r.requested_model??undefined
   });
   const c=await pool.connect();
   try{
