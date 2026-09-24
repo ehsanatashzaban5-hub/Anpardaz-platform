@@ -142,6 +142,24 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     return{ticket:t.rows[0],messages:(await pool.query('SELECT * FROM market_ticket_messages WHERE ticket_id=$1 ORDER BY created_at',[id])).rows};
   });
 
+  app.post('/api/v1/market/me/tickets/:id/messages',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),id=Number((req.params as any).id),b=(req.body??{}) as any;
+    const message=typeof b.message==='string'?b.message.trim():'';
+    if(!Number.isSafeInteger(id)||id<=0||message.length<1||message.length>10000)return reply.code(400).send({error:'invalid_ticket_message'});
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      const t=await client.query('SELECT id,status FROM market_tickets WHERE id=$1 AND user_id=$2 FOR UPDATE',[id,uid]);
+      if(!t.rows[0]){await client.query('ROLLBACK');return reply.code(404).send({error:'ticket_not_found'});}
+      if(t.rows[0].status==='closed'){await client.query('ROLLBACK');return reply.code(409).send({error:'ticket_closed'});}
+      const m=await client.query(`INSERT INTO market_ticket_messages(ticket_id,author_identity_id,author_user_id,author_type,message)
+        VALUES($1,$2,$3,'user',$4) RETURNING *`,[id,a.auth.sub,uid,message]);
+      await client.query("UPDATE market_tickets SET status='open',updated_at=NOW() WHERE id=$1",[id]);
+      await client.query('COMMIT');
+      return reply.code(201).send({message:m.rows[0]});
+    }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+  });
+
   app.post('/api/v1/market/products/:id/view',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),id=Number((req.params as any).id);
     if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_id'});
