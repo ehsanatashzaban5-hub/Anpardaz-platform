@@ -97,7 +97,7 @@ export function registerAdminMarketRoutes(app:FastifyInstance,pool:Pool){
     if(!(await hasPermission(pool,auth(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
     const q=req.query as any;const from=typeof q.from==='string'?q.from:null,to=typeof q.to==='string'?q.to:null,storeId=q.storeId?Number(q.storeId):null;
     const params:any[]=[];const where:string[]=[];
-    if(from){params.push(from);where.push('e.created_at >= $'+params.length);} if(to){params.push(to);where.push('e.created_at < $'+params.length);} if(Number.isSafeInteger(storeId)&&storeId>0){params.push(storeId);where.push('e.store_id = $'+params.length);}
+    if(from){params.push(from);where.push('e.created_at >= $'+params.length);} if(to){params.push(to);where.push('e.created_at < $'+params.length);} if(storeId !== null && Number.isSafeInteger(storeId) && storeId>0){params.push(storeId);where.push('e.store_id = $'+params.length);}
     const w=where.length?'WHERE '+where.join(' AND '):'';
     const sql='SELECT e.store_id,s.name store_name, COUNT(*) FILTER(WHERE e.event_type=\'clickout\')::int clickouts, COUNT(DISTINCT e.user_id) FILTER(WHERE e.event_type=\'clickout\')::int unique_users, COUNT(*) FILTER(WHERE e.event_type=\'checkout_started\')::int checkout_started, COUNT(*) FILTER(WHERE e.event_type=\'purchase_reported\')::int purchases_reported, COALESCE(SUM(CASE WHEN e.event_type=\'purchase_reported\' THEN (e.metadata->>\'amount\')::numeric ELSE 0 END),0)::text purchase_amount FROM market_purchase_events e LEFT JOIN market_stores s ON s.id=e.store_id '+w+' GROUP BY e.store_id,s.name ORDER BY clickouts DESC';
     const rows=(await pool.query(sql,params)).rows;return{from,to,storeId,rows};
