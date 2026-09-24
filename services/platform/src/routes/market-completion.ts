@@ -74,13 +74,13 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
       UNION ALL SELECT '/market/category/'||c.slug,NOW() FROM market_categories c WHERE c.active=true
       UNION ALL SELECT '/market/store/'||s.slug,NOW() FROM market_stores s WHERE s.active=true
       ORDER BY canonical_path LIMIT 50000`);
-    const urls=rows.rows.map((r:any)=>`<url><loc>${base.replace(/\\/$/,'')}${String(r.canonical_path).startsWith('/')?r.canonical_path:'/'+r.canonical_path}</loc><lastmod>${new Date(r.updated_at).toISOString()}</lastmod></url>`).join('');
+    const urls=rows.rows.map((r:any)=>`<url><loc>${base.replace(/\/$/,'')}${String(r.canonical_path).startsWith('/')?r.canonical_path:'/'+r.canonical_path}</loc><lastmod>${new Date(r.updated_at).toISOString()}</lastmod></url>`).join('');
     return reply.type('application/xml; charset=utf-8').send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
   });
 
   app.get('/api/v1/market/robots.txt',async(_req,reply)=>{
     const base=process.env.PUBLIC_WEB_URL||'https://anpardaz.ir';
-    return reply.type('text/plain; charset=utf-8').send(`User-agent: *\\nAllow: /market\\nSitemap: ${base.replace(/\\/$/,'')}/api/v1/market/sitemap.xml\\n`);
+    return reply.type('text/plain; charset=utf-8').send(`User-agent: *\\nAllow: /market\\nSitemap: ${base.replace(/\/$/,'')}/api/v1/market/sitemap.xml\\n`);
   });
 
   app.get('/api/v1/admin/market/activity',{preHandler:requireAuth},async(req,reply)=>{
