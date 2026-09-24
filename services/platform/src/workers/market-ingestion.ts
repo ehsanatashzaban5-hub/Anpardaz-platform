@@ -58,7 +58,7 @@ async function syncStore(store:Store){
        const availability=item.stock_status==="outofstock"?"out_of_stock":"in_stock";
        await pool.query(`INSERT INTO market_offers(product_id,store_id,external_product_id,price,currency,availability,product_url,image_url,raw_metadata,last_seen_at,updated_at)
          VALUES($1,$2,$3,$4,'IRR',$5,$6,$7,$8,NOW(),NOW())
-         ON CONFLICT DO NOTHING`,[productId,store.id,external,price,availability,text(item.permalink),img,JSON.stringify(item)]);
+         ON CONFLICT(store_id,external_product_id) DO UPDATE SET product_id=EXCLUDED.product_id,price=EXCLUDED.price,currency=EXCLUDED.currency,availability=EXCLUDED.availability,product_url=EXCLUDED.product_url,image_url=EXCLUDED.image_url,raw_metadata=EXCLUDED.raw_metadata,last_seen_at=NOW(),updated_at=NOW()`,[productId,store.id,external,price,availability,text(item.permalink),img,JSON.stringify(item)]);
      }
      upserted++;
    }
