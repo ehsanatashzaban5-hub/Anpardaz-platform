@@ -81,8 +81,10 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
  useEffect(()=>{void load();},[search,cat]);
  useEffect(()=>{fetch(API+"/api/v1/market/home?limit=12",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(setHome).catch(()=>{});},[]);
  useEffect(()=>{
-  fetch(API+"/api/v1/market/categories",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>d&&setCats(d.categories||[])).catch(()=>{});
-  if(token())fetch(API+"/api/v1/market/me/favorites",{headers:auth()}).then(r=>r.ok?r.json():null).then(d=>d&&setFavorites(new Set((d.products||[]).map((x:any)=>String(x.id)))).catch(()=>{});
+  void fetch(API+"/api/v1/market/categories",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(d)setCats(d.categories||[]);}).catch(()=>{});
+  if(token()){
+   void fetch(API+"/api/v1/market/me/favorites",{headers:auth()}).then(r=>r.ok?r.json():null).then(d=>{if(d)setFavorites(new Set((d.products||[]).map((x:any)=>String(x.id))));}).catch(()=>{});
+  }
  },[]);
  useEffect(()=>{
   if(selected)fetch(API+"/api/v1/market/seo?type=product&id="+encodeURIComponent(selected.id)).then(r=>r.ok?r.json():null).then(d=>{
