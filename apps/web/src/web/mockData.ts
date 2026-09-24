@@ -435,39 +435,23 @@ export const BANNER_CATEGORIES: BannerCategory[] = [
 
 // ── AI Providers (22 models across 8 providers) ───
 export const AI_PROVIDERS: AiProvider[] = [
-  { id:"openai",    name:"OpenAI",    color:"#10A37F", bgColor:"#0d1a14" },
+  { id:"openai", name:"OpenAI", color:"#10A37F", bgColor:"#0d1a14" },
+  { id:"gemini", name:"Google", color:"#4285F4", bgColor:"#0a0f1a" },
   { id:"anthropic", name:"Anthropic", color:"#C4956A", bgColor:"#1a120a" },
-  { id:"google",    name:"Google",    color:"#4285F4", bgColor:"#0a0f1a" },
-  { id:"xai",       name:"xAI",       color:"#E0E0E0", bgColor:"#111111" },
-  { id:"deepseek",  name:"DeepSeek",  color:"#4FACFE", bgColor:"#070d1a" },
-  { id:"meta",      name:"Meta",      color:"#0668E1", bgColor:"#060e1f" },
-  { id:"mistral",   name:"Mistral",   color:"#FF7000", bgColor:"#1a0d00" },
-  { id:"qwen",      name:"Qwen",      color:"#1677FF", bgColor:"#050d1a" },
+  { id:"xai", name:"xAI", color:"#E0E0E0", bgColor:"#111111" },
 ];
 
 export const AI_MODELS: AiModel[] = [
-  { id:"gpt-4o-mini",   name:"GPT-4o Mini",       providerId:"openai",    descFa:"سریع، مقرون‌به‌صرفه، برای کارهای روزمره",      capabilities:["fast","writing","translation","coding"],  contextWindow:"128K", isAvailable:true },
-  { id:"gpt-4o",        name:"GPT-4o",             providerId:"openai",    descFa:"قوی برای تحلیل تصویر، کدنویسی و تحقیق",        capabilities:["vision","coding","writing","reasoning"],  contextWindow:"128K", isAvailable:true },
-  { id:"o3",            name:"o3",                 providerId:"openai",    descFa:"استدلال عمیق برای مسائل ریاضی و علمی",           capabilities:["reasoning","coding","math"],              contextWindow:"200K", badge:"new", isAvailable:true },
-  { id:"o3-mini",       name:"o3 Mini",            providerId:"openai",    descFa:"استدلال سریع با کیفیت بالا",                     capabilities:["reasoning","coding","fast"],              contextWindow:"200K", badge:"new", isAvailable:true },
-  { id:"claude-haiku",  name:"Claude Haiku 4.5",   providerId:"anthropic", descFa:"سریع‌ترین مدل آنتروپیک برای کارهای عملی",       capabilities:["fast","writing","coding"],                contextWindow:"200K", isAvailable:true },
-  { id:"claude-sonnet", name:"Claude Sonnet 5",    providerId:"anthropic", descFa:"توازن ایده‌آل هوش و سرعت، انتخاب اول",          capabilities:["coding","writing","vision","reasoning"],  contextWindow:"200K", isAvailable:true },
-  { id:"claude-opus",   name:"Claude Opus 5",      providerId:"anthropic", descFa:"قدرتمندترین مدل برای پروژه‌های پیچیده",          capabilities:["coding","reasoning","writing","vision"],  contextWindow:"200K", badge:"pro", isAvailable:true },
-  { id:"gemini-flash",  name:"Gemini 2.0 Flash",   providerId:"google",    descFa:"سریع با کیفیت بالا و توانایی چندمدالی",          capabilities:["fast","vision","coding"],                 contextWindow:"1M",  badge:"new", isAvailable:true },
-  { id:"gemini-pro",    name:"Gemini 2.5 Pro",     providerId:"google",    descFa:"تحقیق عمیق با کانتکست ۱ میلیون توکن",            capabilities:["reasoning","vision","doc-analysis"],     contextWindow:"1M",  isAvailable:true },
-  { id:"gemini-ultra",  name:"Gemini 2.5 Ultra",   providerId:"google",    descFa:"قدرتمندترین مدل گوگل با کانتکست ۲ میلیون",      capabilities:["reasoning","vision","coding","math"],    contextWindow:"2M",  badge:"pro", isAvailable:true },
-  { id:"grok-3",        name:"Grok 3",             providerId:"xai",       descFa:"دسترسی اینترنت زنده، استدلال پیشرفته",           capabilities:["reasoning","vision","search"],            contextWindow:"131K", badge:"new", isAvailable:true },
-  { id:"grok-3-mini",   name:"Grok 3 Mini",        providerId:"xai",       descFa:"سریع با قابلیت استدلال",                         capabilities:["reasoning","fast","coding"],              contextWindow:"131K", isAvailable:true },
-  { id:"deepseek-r2",   name:"DeepSeek R2",        providerId:"deepseek",  descFa:"استدلال عمیق در علوم، ریاضیات و کدنویسی",        capabilities:["reasoning","coding","math"],              contextWindow:"128K", isAvailable:true },
-  { id:"deepseek-v3",   name:"DeepSeek V3",        providerId:"deepseek",  descFa:"مدل قوی چندمنظوره با کارایی بالا",               capabilities:["coding","writing","reasoning"],           contextWindow:"128K", isAvailable:true },
-  { id:"llama-4-scout", name:"Llama 4 Scout",      providerId:"meta",      descFa:"چندمدالی با کانتکست ۱۰ میلیون توکن",             capabilities:["vision","coding","fast"],                 contextWindow:"10M",  badge:"new", isAvailable:true },
-  { id:"llama-4-maverick", name:"Llama 4 Maverick", providerId:"meta",      descFa:"قدرتمند برای کارهای خلاقانه و استدلال",           capabilities:["reasoning","writing","coding"],           contextWindow:"1M",  isAvailable:true } as AiModel,
-  { id:"mistral-large", name:"Mistral Large 2",    providerId:"mistral",   descFa:"قوی در کدنویسی، استدلال و چندزبانه",             capabilities:["coding","reasoning","writing"],           contextWindow:"128K", isAvailable:true },
-  { id:"mistral-small", name:"Mistral Small 3",    providerId:"mistral",   descFa:"سریع و مقرون‌به‌صرفه برای وظایف روزمره",         capabilities:["fast","writing","translation"],           contextWindow:"128K", isAvailable:true },
-  { id:"pixtral",       name:"Pixtral Large",      providerId:"mistral",   descFa:"تخصصی در تحلیل تصویر و چندمدالی",               capabilities:["vision","doc-analysis","writing"],        contextWindow:"128K", isAvailable:true },
-  { id:"qwen-max",      name:"Qwen 2.5 Max",       providerId:"qwen",      descFa:"چندزبانه و چندمدالی قوی از علی‌بابا",            capabilities:["coding","reasoning","vision"],            contextWindow:"1M",  isAvailable:true },
-  { id:"qwen-coder",    name:"Qwen 2.5 Coder",     providerId:"qwen",      descFa:"متخصص کدنویسی با پشتیبانی ۹۲ زبان برنامه‌نویسی", capabilities:["coding","math","reasoning"],              contextWindow:"128K", isAvailable:true },
-  { id:"qwen-vl",       name:"Qwen 2.5 VL",        providerId:"qwen",      descFa:"چندمدالی پیشرفته برای تصویر و ویدیو",            capabilities:["vision","video","doc-analysis"],         contextWindow:"128K", badge:"new", isAvailable:true },
+  { id:"gpt-5.6-luna", name:"GPT-5.6 Luna", providerId:"openai", descFa:"سریع و کم‌هزینه برای استفاده روزمره و حجم بالا", capabilities:["fast","writing","coding","reasoning"], contextWindow:"1.05M", isAvailable:true },
+  { id:"gpt-5.6-terra", name:"GPT-5.6 Terra", providerId:"openai", descFa:"تعادل هوش و هزینه برای کارهای حرفه‌ای", capabilities:["reasoning","coding","vision"], contextWindow:"1.05M", isAvailable:true },
+  { id:"gpt-5.6-sol", name:"GPT-5.6 Sol", providerId:"openai", descFa:"مدل پرچم‌دار برای استدلال و کدنویسی پیچیده", capabilities:["reasoning","coding","vision"], contextWindow:"1.05M", badge:"pro", isAvailable:true },
+  { id:"gemini-3.8-flash", name:"Gemini 3.8 Flash", providerId:"gemini", descFa:"مدل سریع چندمدالی برای کارهای روزمره و عامل‌های هوشمند", capabilities:["fast","vision","coding","reasoning"], contextWindow:"1M", isAvailable:true },
+  { id:"gemini-3.7-flash", name:"Gemini 3.7 Flash", providerId:"gemini", descFa:"نسل قبلی فلش برای کدنویسی و کارهای چندمرحله‌ای", capabilities:["fast","coding","reasoning"], contextWindow:"1M", isAvailable:true },
+  { id:"gemini-3.1-pro", name:"Gemini 3.1 Pro", providerId:"gemini", descFa:"استدلال پیشرفته برای حل مسئله و عامل‌ها", capabilities:["reasoning","vision","coding"], contextWindow:"1M", badge:"pro", isAvailable:true },
+  { id:"claude-sonnet-5", name:"Claude Sonnet 5", providerId:"anthropic", descFa:"تعادل هوش و سرعت برای بیشتر کارهای تولیدی", capabilities:["reasoning","coding","writing","vision"], contextWindow:"1M", isAvailable:true },
+  { id:"claude-opus-5", name:"Claude Opus 5", providerId:"anthropic", descFa:"استدلال عمیق برای تحلیل و کدنویسی پیچیده", capabilities:["reasoning","coding","writing","vision"], contextWindow:"1M", badge:"pro", isAvailable:true },
+  { id:"claude-haiku-4-5", name:"Claude Haiku 4.5", providerId:"anthropic", descFa:"سریع و مناسب پردازش پرتعداد", capabilities:["fast","writing","translation"], contextWindow:"200K", isAvailable:true },
+  { id:"grok-4.7", name:"Grok 4.7", providerId:"xai", descFa:"مدل پرچم‌دار Grok برای کدنویسی و استدلال", capabilities:["reasoning","coding","vision"], contextWindow:"500K", badge:"pro", isAvailable:true },
 ];
 
 // ── Demo chats ─────────────────────────────────────
