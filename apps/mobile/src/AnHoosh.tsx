@@ -77,18 +77,7 @@ interface Project {
 // ══════════════════════════════════════════════════════════════════
 // AI MODEL CATALOG — scalable, provider-grouped
 // ══════════════════════════════════════════════════════════════════
-let AI_MODELS: AIModel[] = [
-  {id:"gpt-5.6-luna",name:"GPT-5.6 Luna",provider:"OpenAI",desc:"سریع و کم‌هزینه برای استفاده روزمره",providerColor:"#10A37F",capabilities:["fast","writing","coding","reasoning"],contextWindow:"1.05M"},
-  {id:"gpt-5.6-terra",name:"GPT-5.6 Terra",provider:"OpenAI",desc:"تعادل هوش و هزینه برای کارهای حرفه‌ای",providerColor:"#10A37F",capabilities:["reasoning","coding","vision"],contextWindow:"1.05M"},
-  {id:"gpt-5.6-sol",name:"GPT-5.6 Sol",provider:"OpenAI",desc:"مدل پرچم‌دار برای استدلال و کدنویسی پیچیده",providerColor:"#10A37F",capabilities:["reasoning","coding","vision"],badge:"pro",contextWindow:"1.05M"},
-  {id:"gemini-3.8-flash",name:"Gemini 3.8 Flash",provider:"Google",desc:"مدل سریع چندمدالی برای کارهای روزمره و عامل‌های هوشمند",providerColor:"#4285F4",capabilities:["fast","vision","coding","reasoning"],contextWindow:"1M"},
-  {id:"gemini-3.7-flash",name:"Gemini 3.7 Flash",provider:"Google",desc:"نسل قبلی فلش برای کدنویسی و کارهای چندمرحله‌ای",providerColor:"#4285F4",capabilities:["fast","coding","reasoning"],contextWindow:"1M"},
-  {id:"gemini-3.1-pro",name:"Gemini 3.1 Pro",provider:"Google",desc:"استدلال پیشرفته برای حل مسئله و عامل‌ها",providerColor:"#4285F4",capabilities:["reasoning","vision","coding"],badge:"pro",contextWindow:"1M"},
-  {id:"claude-sonnet-5",name:"Claude Sonnet 5",provider:"Anthropic",desc:"تعادل هوش و سرعت برای بیشتر کارهای تولیدی",providerColor:"#C4956A",capabilities:["reasoning","coding","writing","vision"],contextWindow:"1M"},
-  {id:"claude-opus-5",name:"Claude Opus 5",provider:"Anthropic",desc:"استدلال عمیق برای تحلیل و کدنویسی پیچیده",providerColor:"#C4956A",capabilities:["reasoning","coding","writing","vision"],badge:"pro",contextWindow:"1M"},
-  {id:"claude-haiku-4-5",name:"Claude Haiku 4.5",provider:"Anthropic",desc:"سریع و مناسب پردازش پرتعداد",providerColor:"#C4956A",capabilities:["fast","writing","translation"],contextWindow:"200K"},
-  {id:"grok-4.7",name:"Grok 4.7",provider:"xAI",desc:"مدل پرچم‌دار Grok برای کدنویسی و استدلال",providerColor:"#E0E0E0",capabilities:["reasoning","coding","vision"],badge:"pro",contextWindow:"500K"}
-];
+let AI_MODELS: AIModel[] = [];
 
 let PROVIDERS = [...new Set(AI_MODELS.map(m => m.provider))];
 
@@ -673,7 +662,7 @@ const AH_TABS: { id:AhTab; label:string; icon:string }[] = [
 // ══════════════════════════════════════════════════════════════════
 export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const [tab, setTab]               = useState<AhTab>("home");
-  const [modelId, setModelId]       = useState("gpt-5.6-luna");
+  const [modelId, setModelId]       = useState("");
   const [showModels, setShowModels] = useState(false);
   const [messages, setMessages]     = useState<Message[]>([]);\n  const [conversations, setConversations] = useState<Conversation[]>([]);\n  const [projects, setProjects] = useState<Project[]>([]);\n  const [hooshUser,setHooshUser]=useState<any>(null);\n  const [hooshUsage,setHooshUsage]=useState<any>(null);\n  const [hooshTickets,setHooshTickets]=useState<any[]>([]);\n  const [conversationId, setConversationId] = useState<number|null>(null);
   const [input, setInput]           = useState("");
@@ -695,7 +684,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   });
 
   const inChat = messages.length > 0;
-  const model = AI_MODELS.find(m=>m.id===modelId)!;
+  const model = AI_MODELS.find(m=>m.id===modelId) ?? {id:"",name:"مدلی در دسترس نیست",provider:"",desc:"",capabilities:[],providerColor:"#8b5cf6"};
 
   const send = useCallback(async () => {
     if(!input.trim() || sending) return;
