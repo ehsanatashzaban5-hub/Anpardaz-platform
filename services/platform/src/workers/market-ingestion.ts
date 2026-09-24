@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { Pool } from "pg";\nimport { AiGateway } from "../services/ai-gateway.js";
+import { Pool } from "pg";
+import { AiGateway } from "../services/ai-gateway.js";
 
 type Store={id:number;name:string;domain:string;homepage_url:string;category_hint?:string|null;verification_status:string};
 type Source={id:number;store_id:number;source_type:string;endpoint_url:string;adapter:string|null;mapping:any;etag:string|null;last_modified:string|null};
@@ -11,7 +12,8 @@ const pool=new Pool({connectionString:databaseUrl,max:4});
 const intervalMs=Math.max(5,Number(process.env.MARKET_SYNC_INTERVAL_MINUTES??30))*60_000;
 const maxStores=Math.max(1,Number(process.env.MARKET_SYNC_MAX_STORES??50));
 const timeoutMs=Math.max(5000,Number(process.env.MARKET_SYNC_TIMEOUT_MS??15000));
-const aiEnabled=process.env.MARKET_CLASSIFICATION_AI!=="false";\nconst ai=new AiGateway(pool);
+const aiEnabled=process.env.MARKET_CLASSIFICATION_AI!=="false";
+const ai=new AiGateway(pool);
 
 const text=(v:unknown)=>typeof v==="string"?v.trim():"";
 const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)&&n>=0?n:null};
