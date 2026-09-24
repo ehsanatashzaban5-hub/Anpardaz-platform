@@ -321,6 +321,9 @@ function ProductDetail({ product:p, onBack, isFav, onToggleFav, onAddCart, inCar
 }) {
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
+  const [offers,setOffers]=useState<any[]>([]);const[frameUrl,setFrameUrl]=useState("");
+  useEffect(()=>{(async()=>{const id=Number(p.id);if(!Number.isSafeInteger(id))return;try{const r=await fetch(MARKET_API+"/api/v1/market/products/"+id);if(r.ok){const d=await r.json();setOffers(d.offers??[])}}catch{}})()},[p.id]);
+  const openOffer=async(o:any)=>{try{const token=localStorage.getItem("anpardaz:accessToken")??"";const r=await fetch(MARKET_API+"/api/v1/market/clickout",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({offerId:Number(o.id),surface:"web"})});const d=await r.json();if(!r.ok)throw new Error();if(d.mode==="iframe")setFrameUrl(d.url);else window.open(d.url,"_blank","noopener,noreferrer")}catch{}};
   const [activeTab, setActiveTab] = useState<"description"|"specs"|"reviews">("description");
 
   const catName = PRODUCT_CATEGORIES.find(c=>c.id===p.category)?.nameFa;
@@ -410,6 +413,8 @@ function ProductDetail({ product:p, onBack, isFav, onToggleFav, onAddCart, inCar
           )}
         </div>
       </div>
+
+      {offers.length>0&&<div className="w-card" style={{padding:"18px",marginBottom:20}}><div style={{fontSize:15,fontWeight:900,marginBottom:12}}>فروشگاه‌ها و قیمت‌های واقعی</div>{offers.map((o:any)=><div key={o.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:"1px solid var(--w-border)"}}><div style={{flex:1}}><div style={{fontWeight:800}}>{o.store_name??o.seller_name??"فروشگاه"}</div><div style={{fontSize:11,color:"var(--w-muted)",marginTop:3}}>{o.availability}</div></div><div style={{fontWeight:900,color:"#d97706"}}>{fmtIRT(Number(o.price??0))}</div><button onClick={()=>void openOffer(o)} className="w-btn w-btn-primary" style={{padding:"8px 14px"}}>مشاهده و خرید</button></div>)}</div>}{frameUrl&&<div style={{position:"fixed",inset:0,zIndex:1000,background:"#fff",display:"flex",flexDirection:"column"}}><div style={{height:54,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 16px",borderBottom:"1px solid var(--w-border)"}}><b>فروشگاه</b><button onClick={()=>setFrameUrl("")} className="w-btn w-btn-ghost">بستن</button></div><iframe src={frameUrl} title="فروشگاه اینترنتی" style={{flex:1,border:0}} sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"/></div>}
 
       {/* Tabs */}
       <div className="w-card" style={{ overflow:"hidden" }}>
