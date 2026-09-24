@@ -4,9 +4,9 @@
 // ─────────────────────────────────────────────────
 import { useState, useRef, useEffect, useMemo } from "react";
 import WI from "./WebIcons";
-import { AI_MODELS, AI_PROVIDERS, DEMO_CHATS, DEMO_PROJECTS } from "./mockData";
+
 import type { WebPage, AiModel, Chat } from "./types";
-import { useIsMobile } from "./useResponsive";
+import { useIsMobile } from "./useResponsive";\n\nlet AI_MODELS: AiModel[] = [];\nlet AI_PROVIDERS: any[] = [];
 
 interface HooshProps { onNavigate: (p: WebPage) => void; }
 
@@ -39,12 +39,13 @@ const THINKING_MSGS = [
 
 export default function WebHoosh({ onNavigate }: HooshProps) {
   const [view, setView]           = useState<HView>("chat");
-  const [selectedModel, setMod]   = useState<AiModel>(AI_MODELS[0]);
+  const EMPTY_MODEL: AiModel = {id:"",name:"مدل پیکربندی نشده",providerId:"",descFa:"مدل فعال توسط سرور آن هوش ارائه می‌شود.",capabilities:[],contextWindow:"—"};\n  const [aiModels, setAiModels] = useState<AiModel[]>([]);\n  const [aiProviders, setAiProviders] = useState<any[]>([]);\n  const [selectedModel, setMod]   = useState<AiModel>(EMPTY_MODEL);
   const [mode, setMode]           = useState<CreationMode>(MODES[0]);
-  const [chats, setChats]         = useState<Chat[]>(DEMO_CHATS);
-  const [activeChat, setActiveChat] = useState<Chat>(DEMO_CHATS[0]);
+  const [chats, setChats]         = useState<Chat[]>([]);
+  const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [input, setInput]         = useState("");
   const [thinking, setThinking]   = useState(false);
+  const [apiError, setApiError]   = useState<string | null>(null);
   const [sidebarOpen, setSidebar] = useState(true);
   const [modelPanelOpen, setModelPanel] = useState(true);
   const [searchChat, setSearchChat] = useState("");
@@ -52,64 +53,74 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   const textRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile(900);
+  const platformApi = (import.meta.env.VITE_PLATFORM_API_URL || "/api").replace(//$/, "");
+  const authToken = () => localStorage.getItem("anpardaz:accessToken");
+  const apiFetch = async (path: string, init: RequestInit = {}) => {
+    const token = authToken();
+    if (!token) throw new Error("AUTH_REQUIRED");
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${token}`);
+    headers.set("Content-Type", "application/json");
+    const res = await fetch(`${platformApi}${path}`, { ...init, headers });
+    if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error || `HTTP_${res.status}`); }
+    return res.json();
+  };
+  const mapConversation = (x: any, messages: any[] = []): Chat => ({
+    id: String(x.id), title: x.title || "مکالمه جدید", preview: messages[messages.length - 1]?.content || "",
+    modelId: x.model || aiModels[0]?.id || "", modeId: x.mode || "chat",
+    messages: messages.map((m:any) => ({ id:String(m.id), role:m.role, content:m.content, modelId:m.metadata?.model, createdAt:m.created_at })),
+    createdAt:x.created_at, updatedAt:x.updated_at,
+  });
+
+  useEffect(() => {
+    if (!authToken()) return;
+    apiFetch("/v1/hoosh/conversations").then((d:any) => {
+      const list = (d.conversations || []).map((x:any) => mapConversation(x));
+      setChats(list);
+      if (list[0]) apiFetch(`/v1/hoosh/conversations/${list[0].id}`).then((full:any) => setActiveChat(mapConversation(full.conversation, full.messages))).catch(() => {});
+    }).catch((e:any) => setApiError(e.message));
+  }, []);
 
   const filteredChats = useMemo(() =>
     chats.filter(c => searchChat === "" || c.title.includes(searchChat) || c.messages.some(m => m.content.includes(searchChat)))
   , [chats, searchChat]);
 
   const filteredModels = useMemo(() =>
-    AI_MODELS.filter(m => providerFilter === "all" || m.providerId === providerFilter)
-  , [providerFilter]);
+    aiModels.filter(m => providerFilter === "all" || m.providerId === providerFilter)
+  , [aiModels, providerFilter]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior:"smooth" });
-  }, [activeChat.messages, thinking]);
+  }, [activeChat?.messages, thinking]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     const text = input.trim();
-    if (!text || thinking) return;
-    setInput("");
-
-    const now = new Date().toISOString();
-    const userMsg = { id:`u${Date.now()}`, role:"user" as const, content:text, createdAt:now };
-    const updatedChat: Chat = { ...activeChat, messages:[...activeChat.messages, userMsg] };
-    setActiveChat(updatedChat);
-    setChats(prev => prev.map(c => c.id === updatedChat.id ? updatedChat : c));
-    setThinking(true);
-
-    setTimeout(() => {
-      const replies: Record<string, string> = {
-        chat:       "مکالمه شما دریافت شد. چطور می‌توانم بیشتر کمک کنم؟",
-        code:       "```python\ndef solution():\n    # پیاده‌سازی\n    pass\n```",
-        write:      "متن خواسته‌شده آماده شد. می‌توانید درخواست ویرایش بدهید.",
-        translate:  "ترجمه انجام شد. متن معادل فارسی آماده است.",
-        summarize:  "خلاصه: این متن شامل نکات کلیدی زیر است...",
-        research:   "بر اساس آخرین داده‌ها، تحقیق زیر انجام شد...",
-        math:       "راه‌حل مسئله: ابتدا معادله را ساده می‌کنیم...",
-        create:     "داستان کوتاه: روزی روزگاری در سرزمینی دور...",
-      };
-      const aiMsg = {
-        id:`a${Date.now()}`,
-        role:"assistant" as const,
-        content: replies[mode.id] || "پاسخ دریافت شد. برای اطلاعات بیشتر می‌توانید سؤال کنید.",
-        createdAt: new Date().toISOString(),
-        modelId: selectedModel.id,
-      };
-      const finalChat: Chat = { ...updatedChat, messages:[...updatedChat.messages, aiMsg], updatedAt:new Date().toISOString() };
-      setActiveChat(finalChat);
-      setChats(prev => prev.map(c => c.id === finalChat.id ? finalChat : c));
-      setThinking(false);
-    }, 1800 + Math.random()*800);
+    if (!text || thinking || !activeChat) return;
+    setInput(""); setThinking(true); setApiError(null);
+    try {
+      const idem = `hoosh-ui-${activeChat.id}-${Date.now()}`;
+      await apiFetch(`/v1/hoosh/conversations/${activeChat.id}/messages`, {
+        method:"POST", headers:{"Idempotency-Key":idem},
+        body:JSON.stringify({ content:text, mode:mode.id, model:selectedModel.id })
+      });
+      for (let i=0;i<30;i++) {
+        await new Promise(r=>setTimeout(r,1000));
+        const full:any = await apiFetch(`/v1/hoosh/conversations/${activeChat.id}`);
+        const mapped = mapConversation(full.conversation, full.messages);
+        setActiveChat(mapped); setChats(prev=>prev.map(x=>x.id===mapped.id?mapped:x));
+        if (mapped.messages.some(m=>m.role==="assistant" && new Date(m.createdAt).getTime() >= Date.now()-35000)) break;
+      }
+    } catch(e:any) { setApiError(e.message); } finally { setThinking(false); }
   };
 
-  const newChat = () => {
-    const nc: Chat = {
-      id:`chat${Date.now()}`, title:"مکالمه جدید", preview:"", modelId:selectedModel.id,
-      messages:[], createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(),
-    };
-    setChats(prev => [nc, ...prev]);
-    setActiveChat(nc);
-    setView("chat");
+  const newChat = async () => {
+    try {
+      const d:any = await apiFetch("/v1/hoosh/conversations", {
+        method:"POST", body:JSON.stringify({title:"مکالمه جدید",model:selectedModel.id,mode:mode.id})
+      });
+      const nc = mapConversation(d.conversation);
+      setChats(prev => [nc, ...prev]); setActiveChat(nc); setView("chat"); setApiError(null);
+    } catch(e:any) { setApiError(e.message); }
   };
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -155,8 +166,8 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
                   <div style={{ textAlign:"center", padding:"20px", color:"var(--w-muted)", fontSize:12 }}>مکالمه‌ای یافت نشد</div>
                 )}
                 {filteredChats.map(c => (
-                  <button key={c.id} onClick={()=>{setActiveChat(c);setView("chat");}} style={{ display:"block", width:"100%", padding:"9px 10px", borderRadius:8, border:"none", background:activeChat.id===c.id?"rgba(124,58,237,0.1)":"transparent", cursor:"pointer", textAlign:"right", marginBottom:2, fontFamily:"Vazirmatn" }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:activeChat.id===c.id?"#7c3aed":"var(--w-text)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.title}</div>
+                  <button key={c.id} onClick={()=>{setActiveChat(c);setView("chat");}} style={{ display:"block", width:"100%", padding:"9px 10px", borderRadius:8, border:"none", background:activeChat?.id===c.id?"rgba(124,58,237,0.1)":"transparent", cursor:"pointer", textAlign:"right", marginBottom:2, fontFamily:"Vazirmatn" }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:activeChat?.id===c.id?"#7c3aed":"var(--w-text)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.title}</div>
                     <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:2 }}>{c.messages.length} پیام · {AI_MODELS.find(m=>m.id===c.modelId)?.name}</div>
                   </button>
                 ))}
@@ -183,7 +194,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
           {view === "projects" && (
             <div style={{ flex:1, overflowY:"auto", padding:"4px 8px" }}>
               <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", padding:"6px 4px" }}>پروژه‌های من</div>
-              {DEMO_PROJECTS.map(proj => (
+              {[].map(proj => (
                 <div key={proj.id} style={{ padding:"10px", borderRadius:10, border:"1px solid var(--w-border)", marginBottom:8, background:"var(--w-card)", cursor:"pointer" }}>
                   <div style={{ fontSize:12, fontWeight:700, marginBottom:2 }}>{proj.title}</div>
                   <div style={{ fontSize:10, color:"var(--w-muted)" }}>{proj.chatIds.length} چت</div>
@@ -237,10 +248,10 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
             <ProjectsView/>
           ) : (
             <>
-              {activeChat.messages.length === 0 && (
+              {activeChat && activeChat.messages.length === 0 && (
                 <EmptyState mode={mode} onSuggest={s=>{setInput(s); textRef.current?.focus();}}/>
               )}
-              {activeChat.messages.map(msg => (
+              {activeChat?.messages.map(msg => (
                 <MessageBubble key={msg.id} msg={msg} modelName={msg.modelId ? AI_MODELS.find(m=>m.id===msg.modelId)?.name : undefined}/>
               ))}
               {thinking && <ThinkingIndicator/>}
@@ -262,6 +273,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
                 onChange={e=>setInput(e.target.value)}
                 onKeyDown={handleKey}
                 placeholder={mode.promptFa}
+                disabled={!activeChat || thinking}
                 rows={1}
                 style={{ flex:1, background:"transparent", border:"none", outline:"none", resize:"none", color:"var(--w-text)", fontSize:13, fontFamily:"Vazirmatn", lineHeight:1.6, maxHeight:160, overflowY:"auto" }}
                 onInput={e=>{ const t = e.currentTarget; t.style.height="auto"; t.style.height=`${Math.min(t.scrollHeight,160)}px`; }}
@@ -272,7 +284,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
               </button>
             </div>
             <div style={{ textAlign:"center", fontSize:10, color:"var(--w-muted)", marginTop:6 }}>
-              {selectedModel.name} · آن هوش می‌تواند اشتباه کند. اطلاعات مهم را تأیید کنید.
+              {selectedModel.name} · پاسخ‌ها توسط سرویس واقعی آن هوش تولید می‌شوند و ممکن است نیاز به بررسی داشته باشند.
             </div>
           </div>
         )}
@@ -426,7 +438,7 @@ function ExploreView({ models, selectedModel, onSelect, providerFilter }: { mode
       <div style={{ marginBottom:20 }}>
         <h2 style={{ fontSize:20, fontWeight:900, marginBottom:6 }}>کاوش مدل‌های هوش مصنوعی</h2>
         <p style={{ fontSize:13, color:"var(--w-muted)" }}>
-          {providerFilter === "all" ? `${models.length} مدل از ۸ ارائه‌دهنده پیشرو` : `${models.length} مدل از ${AI_PROVIDERS.find(p=>p.id===providerFilter)?.name}`}
+          {providerFilter === "all" ? `${models.length} مدل فعال از ${aiProviders.length} ارائه‌دهنده` : `${models.length} مدل از ${AI_PROVIDERS.find(p=>p.id===providerFilter)?.name}`}
         </p>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:14 }}>

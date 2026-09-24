@@ -8,7 +8,7 @@ import WebHome       from "./WebHome";
 import WebSarraf     from "./WebSarraf";
 import WebMarket     from "./WebMarket";
 import WebBanner     from "./WebBanner";
-import WebHoosh      from "./WebHoosh";
+import WebHoosh      from "./WebHooshProduction";
 import WebFinancial  from "./WebFinancial";
 import WebContent, { type ContentSection } from "./WebContent";
 import WebAuthModal, { WebKycModal } from "./WebAuth";
