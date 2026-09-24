@@ -46,24 +46,6 @@ function mappedItems(data:any,mapping:any):Item[]{
  }));
 }
 
-async function classifyWithAi(title:string,brand:string,description:string,categories:Array<{id:number;slug:string;name_fa:string}>){
- if(!aiEnabled||!categories.length)return null;
- const prompt=`Classify this product into exactly one supplied An Market category. Return JSON only: {"slug":"...","confidence":0.0,"reason":"..."}. Never invent a slug.
-Product title: ${title}
-Brand: ${brand}
-Description: ${description}
-Categories: ${JSON.stringify(categories)}`;
- try{
-   const key=process.env.GEMINI_API_KEY;
-   if(key){
-     const model=process.env.MARKET_CLASSIFICATION_GEMINI_MODEL??"gemini-2.5-flash";
-     const r=await fetchJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,{"content-type":"application/json"});
-     void r;
-   }
- }catch{}
- return null;
-}
-
 async function resolveCategory(item:Item,store:Store){
  const sourceKeys=[...(item.categories??[]).flatMap(c=>[text(c.name),normalize(text(c.name))]).filter(Boolean)];
  if(sourceKeys.length){
