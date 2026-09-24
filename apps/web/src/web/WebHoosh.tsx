@@ -172,7 +172,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
           {view === "projects" && (
             <div style={{ flex:1, overflowY:"auto", padding:"4px 8px" }}>
               <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", padding:"6px 4px" }}>پروژه‌های من</div>
-              {DEMO_PROJECTS.map(proj => (
+              {projects.map(proj => (
                 <div key={proj.id} style={{ padding:"10px", borderRadius:10, border:"1px solid var(--w-border)", marginBottom:8, background:"var(--w-card)", cursor:"pointer" }}>
                   <div style={{ fontSize:12, fontWeight:700, marginBottom:2 }}>{proj.title}</div>
                   <div style={{ fontSize:10, color:"var(--w-muted)" }}>{proj.chatIds.length} چت</div>
