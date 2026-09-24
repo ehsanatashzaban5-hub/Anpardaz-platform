@@ -9190,7 +9190,7 @@ function AnSubDetailPage({cid,sid,onProduct,onSearch,compareMode,compareSelected
   const cat=AN_CATS.find(c=>c.id===cid);
   const sub=cat?.subcats.find(s=>s.id===sid);
   const [sort,setSort]=useState<"relevance"|"price-asc"|"price-desc"|"rating">("relevance");
-  const rawProds=MARKET_PRODUCTS.filter(p=>p.subId===sid||(sub?.pids||[]).includes(p.id));
+  const rawProds=MARKET_PRODUCTS.filter(p=>p.subId===sid||p.catId===cid||(sub?.pids||[]).includes(p.id));
   const prods=useMemo(()=>{
     let r=[...rawProds];
     if(sort==="price-asc")r.sort((a,b)=>a.priceMin-b.priceMin);
