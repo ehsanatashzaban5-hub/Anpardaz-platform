@@ -106,6 +106,49 @@ async function matchProduct(item:Item,brand:string,normalizedTitle:string){
  return best&&best.score>=.96?{productId:best.id,method:"title_similarity",confidence:best.score}:null;
 }
 
+
+async function fetchText(url:string,headers:Record<string,string>={}){
+ const ac=new AbortController();const timer=setTimeout(()=>ac.abort(),timeoutMs);
+ try{const r=await fetch(url,{signal:ac.signal,headers:{"accept":"application/xml,text/xml,text/html,application/json;q=0.9,*/*;q=0.1","user-agent":"AnPardaz-AnMarketSync/2.0",...headers}});const body=await r.text();if(!r.ok)throw Object.assign(new Error("HTTP "+r.status),{status:r.status});return{body,headers:r.headers,hash:createHash("sha256").update(body).digest("hex")};}
+ finally{clearTimeout(timer)}
+}
+function shopifyItems(data:any,baseUrl:string):Item[]{
+ const out:Item[]=[];
+ for(const p of Array.isArray(data?.products)?data.products:[]){
+   const images=(p.images??[]).map((i:any)=>({src:i?.src}));
+   for(const v of Array.isArray(p.variants)&&p.variants.length?p.variants:[{}]){
+     out.push({id:v.id??p.id,sku:v.sku,name:p.title,title:p.title,description:p.body_html,permalink:p.handle?new URL("/products/"+p.handle,baseUrl).toString():undefined,price:v.price,regular_price:v.compare_at_price,stock_status:v.available===false?"outofstock":"instock",in_stock:v.available,images,brands:p.vendor?[{name:p.vendor}]:[],attributes:Array.isArray(p.options)?p.options.map((o:any)=>({name:o.name,options:Array.isArray(o.values)?o.values:[]})):[],model:v.sku});
+   }
+ }
+ return out;
+}
+function jsonLdProduct(html:string,pageUrl:string):Item|null{
+ const scripts=[...html.matchAll(/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)];
+ for(const m of scripts){try{
+   const raw=JSON.parse(m[1].trim());const nodes=Array.isArray(raw)?raw:(raw?.["@graph"]??[raw]);
+   const p=nodes.find((x:any)=>x?.["@type"]==="Product"||(Array.isArray(x?.["@type"])&&x["@type"].includes("Product")));if(!p)continue;
+   const offer=Array.isArray(p.offers)?p.offers[0]:p.offers;const image=Array.isArray(p.image)?p.image[0]:p.image;
+   return {id:p.sku??p.mpn??p.gtin13??pageUrl,sku:p.sku,name:p.name,title:p.name,description:p.description,permalink:pageUrl,price:offer?.price,stock_status:offer?.availability?.toLowerCase().includes("outofstock")?"outofstock":"instock",in_stock:!offer?.availability?.toLowerCase().includes("outofstock"),gtin:p.gtin13??p.gtin12??p.gtin8,mpn:p.mpn,model:p.model,images:image?[{src:String(image)}]:[],brands:p.brand?[{name:typeof p.brand==="string"?p.brand:p.brand.name}]:[]};
+ }catch{}}
+ return null;
+}
+async function fetchSourceItems(source:Source,headers:Record<string,string>){
+ if(source.adapter==="shopify_products_json"){
+   const fetched=await fetchJson(source.endpoint_url,headers);return{items:shopifyItems(fetched.data,source.endpoint_url),headers:fetched.headers,hash:fetched.hash};
+ }
+ if(source.adapter==="sitemap_jsonld"||source.source_type==="crawler"){
+   const fetched=await fetchText(source.endpoint_url,headers);
+   const urls=[...fetched.body.matchAll(/<loc>\\s*([^<]+?)\\s*<\\/loc>/gi)].map(m=>m[1].trim()).filter((u:string)=>/^https?:\\/\\//i.test(u)).slice(0,Math.max(1,Number(source.mapping?.maxUrls??300)));
+   const items:Item[]=[];
+   for(let i=0;i<urls.length;i+=4){
+     const batch=urls.slice(i,i+4);const pages=await Promise.all(batch.map(async(u:string)=>{try{const p=await fetchText(u);return jsonLdProduct(p.body,u)}catch{return null}}));
+     for(const item of pages)if(item)items.push(item);
+   }
+   return{items,headers:fetched.headers,hash:fetched.hash};
+ }
+ const fetched=await fetchJson(source.endpoint_url,headers);return{items:mappedItems(fetched.data,source.mapping),headers:fetched.headers,hash:fetched.hash};
+}
+
 async function syncSource(store:Store,source:Source){
  if(store.verification_status!=="verified")return;
  if(!source.endpoint_url)return;
