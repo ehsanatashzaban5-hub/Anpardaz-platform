@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode, type CSSProperties } from "react";
 import type { WebPage } from "./types";
 
 interface Props { onNavigate: (p: WebPage) => void; }
@@ -17,7 +17,7 @@ const token=()=>localStorage.getItem("anpardaz:accessToken")||"";
 const auth=()=>token()?{authorization:"Bearer "+token()}:{};
 const icon=(name:string,size=20)=>({name,size});
 
-function Card({children,style}:{children:React.ReactNode;style?:React.CSSProperties}){
+function Card({children,style}:{children:ReactNode;style?:CSSProperties}){
   return <div style={{background:"var(--am-card,#fff)",border:"1px solid var(--am-border,#e5e7eb)",borderRadius:18,boxShadow:"0 8px 28px rgba(15,23,42,.05)",...style}}>{children}</div>;
 }
 function Btn({children,onClick,active=false,primary=false,disabled=false}:{children:React.ReactNode;onClick?:()=>void;active?:boolean;primary?:boolean;disabled?:boolean}){
@@ -79,7 +79,7 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
   if(selected)return <ProductDetail p={selected} onBack={()=>setSelected(null)} fav={favorites.has(selected.id)} onFav={()=>void toggleFav(selected.id)}/>;
   return <div className="an-market-root" dir="rtl" style={{minHeight:"100%",background:"var(--am-bg,#f8fafc)",color:"var(--am-text,#172033)",fontFamily:"Vazirmatn"}}>
     <div style={{maxWidth:1280,margin:"0 auto",padding:"18px 22px 70px"}}>
-      <header style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,marginBottom:14}}><div><div style={{fontSize:25,fontWeight:950}}>آن مارکت</div><div style={{fontSize:12,color:"var(--am-muted,#64748b)",marginTop:4}}>مقایسه هوشمند محصولات و پیشنهادهای واقعی فروشگاه‌ها</div></div><div style={{display:"flex",gap:8}}><Btn>تعداد فروشگاه‌ها: {fa(roots.length? "": "")}</Btn></div></header>
+      <header style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,marginBottom:14}}><div><div style={{fontSize:25,fontWeight:950}}>آن مارکت</div><div style={{fontSize:12,color:"var(--am-muted,#64748b)",marginTop:4}}>مقایسه هوشمند محصولات و پیشنهادهای واقعی فروشگاه‌ها</div></div><div style={{display:"flex",gap:8}}><div style={{padding:"10px 14px",borderRadius:12,background:"rgba(10,158,140,.07)",color:"#087d70",fontSize:12,fontWeight:800}}>{fa(roots.length)} دسته اصلی</div></div></header>
       <div style={{display:"flex",gap:8,marginBottom:16}}>{nav("home")}{nav("assistant")}{nav("categories")}{nav("me")}</div>
       {tab==="home"&&<><div style={{display:"flex",gap:8,marginBottom:16}}><input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&setSearch(query.trim())} placeholder="جستجوی محصول، برند یا مدل…" style={{flex:1,padding:"13px 16px",borderRadius:14,border:"1px solid var(--am-border,#e5e7eb)",background:"var(--am-card,#fff)",fontFamily:"Vazirmatn",fontSize:13}}/><Btn primary onClick={()=>setSearch(query.trim())}>جستجو</Btn></div>
         <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:18}}><Btn active={cat==="all"} onClick={()=>setCat("all")}>همه</Btn>{roots.map(c=><Btn key={c.id} active={cat===c.slug} onClick={()=>setCat(c.slug)}>{c.name_fa}</Btn>)}</div>
