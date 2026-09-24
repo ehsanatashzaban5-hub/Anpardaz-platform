@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
-import { requireAuth, type AuthClaims } from '../auth.js';
+import { ensurePlatformUser, requireAuth, type AuthClaims } from '../auth.js';
 import { hasPermission } from '../permissions.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
@@ -9,7 +9,7 @@ const admin=async(pool:Pool,r:FastifyRequest,permission='operations.read')=>hasP
 
 export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
   app.get('/api/v1/market/me/ai-history',{preHandler:requireAuth},async(req)=>{
-    const uid=await (await import('../auth.js')).ensurePlatformUser(pool,auth(req).auth);
+    const uid=await ensurePlatformUser(pool,auth(req).auth);
     const cs=(await pool.query('SELECT id,workflow_code,title,created_at,updated_at FROM market_ai_conversations WHERE user_id=$1 ORDER BY updated_at DESC LIMIT 50',[uid])).rows;
     const ids=cs.map((x:any)=>Number(x.id));
     const ms=ids.length?(await pool.query('SELECT conversation_id,role,content,product_ids,created_at FROM market_ai_messages WHERE conversation_id=ANY($1::bigint[]) ORDER BY created_at DESC LIMIT 300',[ids])).rows:[];
@@ -24,7 +24,7 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
       WHERE a.user_id=$1 ORDER BY a.created_at DESC LIMIT $2`,[uid,limit])).rows};
   });
 
-  app.get('/api/v1/market/seo',{preHandler:undefined},async(req,reply)=>{
+  app.get('/api/v1/market/seo',async(req,reply)=>{
     const q=req.query as any; const type=String(q.type??'home'); const id=q.id?Number(q.id):null;
     if(!['home','category','product','store'].includes(type))return reply.code(400).send({error:'invalid_type'});
     const r=await pool.query('SELECT * FROM market_seo_metadata WHERE entity_type=$1 AND (($2::bigint IS NULL AND entity_id IS NULL) OR entity_id=$2) LIMIT 1',[type,id]);
