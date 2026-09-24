@@ -107,6 +107,13 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     catch(e:any){if(e?.code==='23505'){await pool.query('DELETE FROM market_favorites WHERE user_id=$1 AND product_id=$2',[uid,id]);return{favorite:false};}throw e;}
   });
 
+  app.get('/api/v1/market/me/clickouts',{preHandler:requireAuth},async(req)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth);
+    return{clickouts:(await pool.query(`SELECT c.id,c.operation_id,c.product_id,c.offer_id,c.store_id,c.mode,c.destination_url,c.created_at,s.name store_name,p.title product_title
+      FROM market_clickouts c LEFT JOIN market_stores s ON s.id=c.store_id LEFT JOIN market_products p ON p.id=c.product_id
+      WHERE c.user_id=$1 ORDER BY c.created_at DESC LIMIT 100`,[uid])).rows};
+  });
+
   app.get('/api/v1/market/me/tickets',{preHandler:requireAuth},async(req)=>{
     const uid=await ensurePlatformUser(pool,auth(req).auth);
     return{tickets:(await pool.query('SELECT * FROM market_tickets WHERE user_id=$1 ORDER BY updated_at DESC',[uid])).rows};
