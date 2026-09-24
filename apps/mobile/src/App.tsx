@@ -7858,7 +7858,7 @@ type AnView=
   |{t:"me"}|{t:"me-orders"}|{t:"me-tickets"}|{t:"me-fav"}|{t:"me-alerts"}
   |{t:"me-recent"}|{t:"me-compare"}|{t:"me-city"}|{t:"me-support"}|{t:"me-reg"}|{t:"me-panel"};
 
-interface AnProduct{id:string;title:string;brand:string;catId:string;subId:string;img:string;specs:Record<string,string>;priceMin:number;priceMax:number;storeCount:number;desc:string;tags:string[];rating:number;reviews:number;ph:{d:string;p:number}[];}
+interface AnProduct{id:string;title:string;brand:string;catId:string;subId:string;img:string;specs:Record<string,string>;priceMin:number;priceMax:number;storeCount:number;desc:string;tags:string[];rating:number;reviews:number;ph:{d:string;p:number}[];;media?:string[];}
 interface AnOffer{sid:string;price:number;ship:string;warranty:string;inStock:boolean;upd:string;storeName?:string;offerId?:number;productUrl?:string;iframeMode?:"allowed"|"blocked"|"unknown";}
 interface CompareState{active:boolean;selectedIds:string[];minimized:boolean;}
 const ANS:{[k:string]:{n:string;sc:number}}={
@@ -9767,6 +9767,47 @@ export default function App() {
   if(subPage==="charge-payment")return <div key="charge-payment" className={`app${lt} app-slide`} dir="rtl"><ChargePaymentScreen data={chargePayData!} user={user!} onUpdate={updateWithTx} onBack={()=>setSubPage(chargePayOrigin)} onDone={goHome}/><SNAV/></div>;
   if(subPage==="cashback")return <div key="cashback" className={`app${lt} app-slide`} dir="rtl"><CashbackScreen user={user!} transactions={transactions} onBack={goBack} onUpdate={(u,tx)=>{setUser(u);const newTxs=[tx,...transactions];setTransactions(newTxs);if(u)DB.saveTx(u.phone,newTxs);DB.saveUser(u);}}/><SNAV/></div>;
   if(subPage==="financial-center")return <div key="financial-center" className={`app${lt} app-slide`} dir="rtl"><FinancialCenterScreen transactions={transactions} onBack={goBack} user={user}/><SNAV/></div>;
+function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;lightTheme?:boolean}){
+  const [anStack,setAnStack]=useState<AnView[]>([{t:"home"}]);
+  const [compare,setCompare]=useState<CompareState>({active:false,selectedIds:[],minimized:false});
+  const [catSheet,setCatSheet]=useState<{level:{cid?:string;sid?:string}[];open:boolean}>({level:[],open:false});
+  const [loading,setLoading]=useState(true); const [error,setError]=useState("");
+  const cur=anStack[anStack.length-1];
+  const anPush=(v:AnView)=>setAnStack(p=>[...p,v]);
+  const anPop=()=>{if(anStack.length>1)setAnStack(p=>p.slice(0,-1));else onBack();};
+  useBackHandler(()=>{if(catSheet.open){if(catSheet.level.length>1)setCatSheet(p=>({...p,level:p.level.slice(0,-1)}));else setCatSheet({level:[],open:false});return;}anPop();});
+  useEffect(()=>{let active=true;(async()=>{try{
+    if(!ANMARKET_PLATFORM_API_BASE)throw new Error("market_api_unconfigured");
+    const pages=await Promise.all([1,2,3,4,5].map(page=>fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/catalog?limit=100&page="+page,{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(new Error("catalog_failed")))));
+    const rows=pages.flatMap((d:any)=>Array.isArray(d?.products)?d.products:[]);
+    const catMap:Record<string,string>={"mobile-digital":"mobile","laptop-computer":"laptop","home-appliance":"appliance","supermarket":"hypermarket","beauty-health":"beauty","audio-video":"av","automotive":"car","baby-kids":"kids","books-culture":"culture","tools-industrial":"industrial","travel-camping":"travel","pet":"pet","office":"office","jewelry-gold":"gold","other":"other"};
+    MARKET_PRODUCTS=rows.map((p:any)=>{const media=(p.media??[]).map((m:any)=>m.url).filter(Boolean);const imgs=media.concat((p.offers??[]).map((o:any)=>o.image_url).filter(Boolean));return{id:String(p.id),title:p.title??"",brand:p.brand??"",catId:catMap[p.category_slug]??"other",subId:p.category_slug??"other",img:imgs[0]??"",specs:p.specs??{},priceMin:Number(p.priceMin??0),priceMax:Number(p.priceMax??0),storeCount:Number(p.storeCount??0),desc:p.description??"",tags:[],rating:0,reviews:0,ph:[],media:imgs.slice(0,8)} as AnProduct;});
+    if(active){setError("");setLoading(false);}
+  }catch{if(active){MARKET_PRODUCTS=[];setError("اطلاعات واقعی آن مارکت در دسترس نیست.");setLoading(false);}}})();return()=>{active=false}},[]);
+  const handleCompareToggle=(pid:string)=>{if(pid==="__mode__"){setCompare(p=>({...p,active:!p.active,selectedIds:p.active?[]:p.selectedIds}));return;}setCompare(p=>p.selectedIds.includes(pid)?({...p,selectedIds:p.selectedIds.filter(x=>x!==pid)}):p.selectedIds.length<6?({...p,selectedIds:[...p.selectedIds,pid]}):p);};
+  const ct=cur.t as string; const activeTab=(catSheet.open||ct==="cat"||ct==="sub")?"cats":(ct==="me"||ct.startsWith("me-"))?"me":(ct==="assistant"||ct==="chat")?"assistant":"home";
+  return <div className={`an-market-root${lightTheme?"":" dark-theme"}`} style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden",position:"relative"}}>
+    {loading&&<div style={{padding:"10px 16px",background:"var(--am-card)",color:"var(--am-muted)",fontSize:12,textAlign:"center"}}>در حال دریافت محصولات واقعی آن مارکت...</div>}
+    {error&&<div style={{padding:"10px 16px",background:"rgba(239,68,68,.06)",color:"#DC2626",fontSize:12,textAlign:"center"}}>{error}</div>}
+    <div style={{display:"flex",gap:8,padding:"10px 12px",borderBottom:"1px solid var(--am-border)",background:"var(--am-card)",flexShrink:0}}>
+      {(["home","assistant","cats","me"] as const).map(t=><button key={t} onClick={()=>{if(t==="home")setAnStack([{t:"home"}]);else if(t==="assistant")setAnStack([{t:"assistant"}]);else if(t==="cats")setCatSheet({level:[{}],open:true});else setAnStack([{t:"me"}]);}} style={{flex:1,padding:"9px 5px",borderRadius:10,border:"1px solid var(--am-border)",background:activeTab===t?"var(--am-accent-light)":"var(--am-bg)",color:activeTab===t?"var(--am-accent)":"var(--am-muted)",fontFamily:"Vazirmatn",fontWeight:800,fontSize:11}}>{t==="home"?"خانه":t==="assistant"?"دستیار هوشمند":t==="cats"?"دسته‌بندی‌ها":"آن مارکت من"}</button>)}
+    </div>
+    <div style={{flex:1,overflowY:cur.t==="assistant"?"hidden":"auto",overflowX:"hidden"}}>
+      {cur.t==="home"&&<AnMarketHome onProduct={pid=>anPush({t:"product",pid})} onCat={cid=>setCatSheet({level:[{cid}],open:true})} onGoCats={()=>setCatSheet({level:[{}],open:true})} onSearch={q=>anPush({t:"chat",q})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle} onBack={onBack}/>}
+      {cur.t==="assistant"&&<AnAssistantChat onProduct={pid=>anPush({t:"product",pid})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle} onBack={onBack}/>}
+      {cur.t==="chat"&&<AnChatPage q={(cur as {t:"chat";q:string}).q} onProduct={pid=>pid==="__back__"?anPop():anPush({t:"product",pid})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle}/>}
+      {cur.t==="product"&&<AnProductDetail pid={(cur as {t:"product";pid:string}).pid} onProduct={pid=>anPush({t:"product",pid})} onSearch={q=>anPush({t:"chat",q})} onBack={anPop}/>}
+      {cur.t==="cats"&&<AnCatPage onCat={cid=>anPush({t:"cat",cid})} onSub={(cid,sid)=>anPush({t:"sub",cid,sid})} onSearch={q=>anPush({t:"chat",q})}/>}
+      {cur.t==="cat"&&<AnCatDetailPage cid={(cur as {t:"cat";cid:string}).cid} onSub={(cid,sid)=>anPush({t:"sub",cid,sid})} onBack={anPop}/>}
+      {cur.t==="sub"&&<AnSubDetailPage cid={(cur as {t:"sub";cid:string;sid:string}).cid} sid={(cur as {t:"sub";cid:string;sid:string}).sid} onProduct={pid=>anPush({t:"product",pid})} onSearch={q=>anPush({t:"chat",q})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle}/>}
+      {cur.t==="me"&&<AnMarketMe onPush={anPush}/>}
+      {cur.t.startsWith("me-")&&<AnMeSubPage view={cur as any} onProduct={pid=>anPush({t:"product",pid})} onBack={anPop}/>}
+    </div>
+    {compare.active&&compare.selectedIds.length>=2&&<ComparisonPopup ids={compare.selectedIds} minimized={compare.minimized} onMinimize={()=>setCompare(p=>({...p,minimized:!p.minimized}))} onClose={()=>setCompare({active:false,selectedIds:[],minimized:false})} onProduct={pid=>anPush({t:"product",pid})}/>}
+    {catSheet.open&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"flex-end"}} onClick={()=>setCatSheet({level:[],open:false})}><div style={{position:"relative",width:"100%",maxHeight:"75%",background:"var(--am-bg,#fff)",borderRadius:"20px 20px 0 0",padding:16,overflowY:"auto"}} onClick={e=>e.stopPropagation()}><AnCatPage onCat={cid=>{setCatSheet({level:[{cid}],open:false});anPush({t:"cat",cid})}} onSub={(cid,sid)=>{setCatSheet({level:[],open:false});anPush({t:"sub",cid,sid})}} onSearch={q=>{setCatSheet({level:[],open:false});anPush({t:"chat",q})}}/></div></div>}
+  </div>;
+}
+
   if(subPage==="an-market")return(
     <div key="an-market" className={`app${lt} app-slide`} dir="rtl" style={{display:"flex",flexDirection:"column",height:"100dvh",overflow:"hidden"}}>
       <AnMarketScreen onBack={goBack} user={user!} lightTheme={lightTheme}/>
