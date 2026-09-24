@@ -20,7 +20,7 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),b=(req.body??{}) as any;
     const productId=Number(b.productId); const storeId=Number(b.storeId);
     if(!Number.isSafeInteger(productId)||productId<=0)return reply.code(400).send({error:'invalid_product'});
-    const q=await pool.query(`SELECT p.id,p.title,p.description,p.brand,p.product_type,p.specs,p.source_url,p.raw_metadata,
+    const q=await pool.query(`SELECT p.id,p.title,p.description,p.brand,p.product_type,p.specs,p.source_url,
       p.classification_status,p.classification_confidence,p.match_confidence,p.match_method,
       c.name_fa category_name,
       COALESCE((SELECT json_agg(json_build_object('store',s.name,'domain',s.domain,'price',o.price,'currency',o.currency,'availability',o.availability,'raw',o.raw_metadata) ORDER BY o.price)
