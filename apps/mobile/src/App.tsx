@@ -49,6 +49,7 @@ const liveRate = 0;
 const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
 const ANPARDAZ_API_BASE = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
 const KAVENEGAR_KEY = "";
+const ANMARKET_PLATFORM_API_BASE=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")??"";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type AppState = "splash" | "login" | "otp" | "unlock-pin" | "onboard-photo" | "onboard-profile" | "onboard-pin" | "verify-anim" | "ready";
@@ -7857,163 +7858,24 @@ type AnView=
   |{t:"me"}|{t:"me-orders"}|{t:"me-tickets"}|{t:"me-fav"}|{t:"me-alerts"}
   |{t:"me-recent"}|{t:"me-compare"}|{t:"me-city"}|{t:"me-support"}|{t:"me-reg"}|{t:"me-panel"};
 
-interface AnProduct{id:string;title:string;brand:string;catId:string;subId:string;img:string;specs:Record<string,string>;priceMin:number;priceMax:number;storeCount:number;desc:string;tags:string[];rating:number;reviews:number;ph:{d:string;p:number}[];}
-interface AnOffer{sid:string;price:number;ship:string;warranty:string;inStock:boolean;upd:string;}
+interface AnProduct{id:string;title:string;brand:string;catId:string;subId:string;img:string;specs:Record<string,string>;priceMin:number;priceMax:number;storeCount:number;desc:string;tags:string[];rating:number;reviews:number;ph:{d:string;p:number}[];media?:string[];}
+interface AnOffer{sid:string;price:number;ship:string;warranty:string;inStock:boolean;upd:string;storeName?:string;offerId?:number;productUrl?:string;iframeMode?:"allowed"|"blocked"|"unknown";}
 interface CompareState{active:boolean;selectedIds:string[];minimized:boolean;}
-const ANS:{[k:string]:{n:string;sc:number}}={
-  digi:{n:"دیجی‌کالا",sc:4.7},emalls:{n:"ایمالز",sc:4.3},technolife:{n:"تکنولایف",sc:4.5},
-  novingate:{n:"نوین‌گیت",sc:4.1},pichak:{n:"پیچک",sc:3.8},tajhiz:{n:"تجهیزکو",sc:4.2},
-  computex:{n:"کامپیوتکس",sc:4.0},shopnet:{n:"شاپ‌نت",sc:3.7},digistore:{n:"دیجی‌استور",sc:4.4},
-  mobileplus:{n:"موبایل‌پلاس",sc:4.2},gadgetland:{n:"گجت‌لند",sc:4.1},phoneshop:{n:"فون‌شاپ",sc:3.9},
-  techbazar:{n:"تک‌بازار",sc:4.3},arianstore:{n:"آریان‌استور",sc:4.0},bazarpc:{n:"بازار کامپیوتر",sc:3.6},
-  persiashop:{n:"پرشیاشاپ",sc:4.1},digitalplus:{n:"دیجیتال‌پلاس",sc:4.4},eshop:{n:"ای‌شاپ",sc:3.8},
-  mobileking:{n:"موبایل‌کینگ",sc:4.2},techcenter:{n:"تک‌سنتر",sc:4.0},shopazar:{n:"شاپ‌آذر",sc:3.7},
-  computershop:{n:"کامپیوترشاپ",sc:4.3},netshop:{n:"نت‌شاپ",sc:4.1},gadgethouse:{n:"گجت‌هاوس",sc:3.9},
-  digifix:{n:"دیجی‌فیکس",sc:4.5},techworld:{n:"تک‌ورلد",sc:4.2},mobilemart:{n:"موبایل‌مارت",sc:4.0},
-  emarket:{n:"ای‌مارکت",sc:3.8},persiantech:{n:"پرشین‌تک",sc:4.1},cityshop:{n:"سیتی‌شاپ",sc:4.3},
-  techpro:{n:"تک‌پرو",sc:4.0},megashop:{n:"مگاشاپ",sc:3.9},istore:{n:"آی‌استور",sc:4.6},
-  smartshop:{n:"اسمارت‌شاپ",sc:4.2},digitalcity:{n:"دیجیتال‌سیتی",sc:4.1},
-};
-const ANS_KEYS=Object.keys(ANS);
-function mkAnOffers(base:number,count:number):AnOffer[]{
-  const ship=["ارسال رایگان","ارسال رایگان","ارسال رایگان","۱۵ هزار تومان","۲۰ هزار تومان","۲۵ هزار تومان","۳۰ هزار تومان","۳۵ هزار تومان","۴۰ هزار تومان","۴۵ هزار تومان"];
-  const war=["گارانتی ۱۸ ماهه","گارانتی ۱۲ ماهه","گارانتی ۱۲ ماهه","یک‌ساله","گارانتی ۱۸ ماهه"];
-  return ANS_KEYS.slice(0,Math.min(count,ANS_KEYS.length)).map((sid,i)=>({
-    sid,price:Math.round(base*(1+i*0.011+(i%3)*0.003)),
-    ship:ship[Math.min(i,ship.length-1)],
-    warranty:war[i%war.length],inStock:i<count-2,
-    upd:`${i*2+1} دقیقه پیش`,
-  }));
-}
-const AN_PRODS:AnProduct[]=[
-  {id:"asus-vb15",title:"لپ‌تاپ ایسوس VivoBook 15 X1502ZA — Core i5 512GB",brand:"ASUS",catId:"laptop",subId:"laptop-student",img:"https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Intel Core i5-1235U","رم":"16GB DDR4","حافظه":"512GB SSD","صفحه‌نمایش":"15.6″ FHD IPS","گرافیک":"Intel Iris Xe","وزن":"1.7 کیلوگرم","باتری":"تا ۷ ساعت","سیستم‌عامل":"Windows 11"},priceMin:57500000,priceMax:64000000,storeCount:32,desc:"لپ‌تاپ سبک و مناسب دانشجویان با 512 گیگ حافظه",tags:["دانشجویی","سبک","اینتل"],rating:4.3,reviews:2840,ph:[{d:"۳۰ روز",p:59e6},{d:"۲۰ روز",p:58e6},{d:"۱۰ روز",p:57.5e6},{d:"امروز",p:57.5e6}]},
-  {id:"macbook-m2",title:"لپ‌تاپ اپل MacBook Air M2 — 13.6 اینچ 8GB",brand:"Apple",catId:"laptop",subId:"laptop-macbook",img:"https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&h=300&fit=crop&auto=format",specs:{"تراشه":"Apple M2 8-core","رم":"8GB Unified Memory","حافظه":"256GB SSD","صفحه‌نمایش":"13.6″ Liquid Retina","GPU":"10-core","وزن":"1.24 کیلوگرم","باتری":"تا ۱۸ ساعت"},priceMin:89000000,priceMax:105000000,storeCount:18,desc:"سبک‌ترین لپ‌تاپ اپل با تراشه M2 و باتری استثنایی",tags:["اپل","M2","طراحی"],rating:4.8,reviews:5420,ph:[{d:"۶۰ روز",p:95e6},{d:"۳۰ روز",p:92e6},{d:"امروز",p:89e6}]},
-  {id:"lenovo-ip5",title:"لپ‌تاپ لنوو IdeaPad 5 — Ryzen 5 8GB 256GB",brand:"Lenovo",catId:"laptop",subId:"laptop-student",img:"https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"AMD Ryzen 5 5625U","رم":"8GB DDR4","حافظه":"256GB SSD","صفحه‌نمایش":"15.6″ IPS FHD","گرافیک":"AMD Radeon","وزن":"1.68 کیلوگرم"},priceMin:42000000,priceMax:48500000,storeCount:24,desc:"لپ‌تاپ اقتصادی AMD برای استفاده روزانه و دانشگاه",tags:["دانشجویی","AMD","مقرون‌به‌صرفه"],rating:4.2,reviews:1923,ph:[{d:"۳۰ روز",p:43.5e6},{d:"امروز",p:42e6}]},
-  {id:"hp-pav15",title:"لپ‌تاپ اچ‌پی Pavilion 15 — i7 16GB گرافیک MX570",brand:"HP",catId:"laptop",subId:"laptop-office",img:"https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Intel Core i7-1255U","رم":"16GB DDR4","حافظه":"1TB SSD","صفحه‌نمایش":"15.6″ FHD IPS","گرافیک":"NVIDIA MX570 2GB","سیستم‌عامل":"Windows 11"},priceMin:68000000,priceMax:76000000,storeCount:20,desc:"لپ‌تاپ اداری با گرافیک اختصاصی و رم ۱۶ گیگ",tags:["اداری","i7","گرافیک‌دار"],rating:4.4,reviews:1245,ph:[{d:"۳۰ روز",p:71e6},{d:"امروز",p:68e6}]},
-  {id:"asus-rog-g16",title:"لپ‌تاپ گیمینگ ایسوس ROG Zephyrus G16 — RTX4060",brand:"ASUS ROG",catId:"laptop",subId:"laptop-gaming",img:"https://images.unsplash.com/photo-1593640408182-31c228c6f4b7?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Intel Core i9-13900H","رم":"16GB DDR5","حافظه":"1TB PCIe 4.0","صفحه‌نمایش":"16″ QHD 240Hz","گرافیک":"NVIDIA RTX 4060 8GB","وزن":"1.85 کیلوگرم"},priceMin:112000000,priceMax:128000000,storeCount:10,desc:"لپ‌تاپ گیمینگ با RTX 4060 و صفحه QHD 240Hz",tags:["گیمینگ","RTX4060","240Hz"],rating:4.6,reviews:785,ph:[{d:"۳۰ روز",p:120e6},{d:"امروز",p:112e6}]},
-  {id:"iphone15pm",title:"گوشی اپل iPhone 15 Pro Max — 256GB تیتانیوم",brand:"Apple",catId:"mobile",subId:"mobile-iphone",img:"https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=400&h=300&fit=crop&auto=format",specs:{"تراشه":"Apple A17 Pro","رم":"8GB","حافظه":"256GB","صفحه‌نمایش":"6.7″ Super Retina XDR","دوربین":"48MP Pro سه‌گانه","باتری":"4422mAh","سیستم‌عامل":"iOS 17"},priceMin:142000000,priceMax:162000000,storeCount:22,desc:"پرچم‌دار اپل با تراشه A17 Pro و قاب تیتانیوم",tags:["پرمیوم","فیلمبرداری","آیفون"],rating:4.9,reviews:8920,ph:[{d:"۹۰ روز",p:158e6},{d:"۶۰ روز",p:152e6},{d:"۳۰ روز",p:145e6},{d:"امروز",p:142e6}]},
-  {id:"s24ultra",title:"گوشی سامسونگ Galaxy S24 Ultra — 256GB S Pen",brand:"Samsung",catId:"mobile",subId:"mobile-samsung",img:"https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Snapdragon 8 Gen 3","رم":"12GB","حافظه":"256GB","صفحه‌نمایش":"6.8″ Dynamic AMOLED 2X 120Hz","دوربین":"200MP چهارگانه","باتری":"5000mAh","S Pen":"دارد"},priceMin:132000000,priceMax:148000000,storeCount:19,desc:"فلاگشیپ سامسونگ با قلم S Pen و دوربین ۲۰۰ مگاپیکسل",tags:["پرمیوم","S Pen","200MP"],rating:4.7,reviews:6340,ph:[{d:"۹۰ روز",p:145e6},{d:"امروز",p:132e6}]},
-  {id:"galaxy-a54",title:"گوشی سامسونگ Galaxy A54 5G — 8GB 256GB",brand:"Samsung",catId:"mobile",subId:"mobile-mid",img:"https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Exynos 1380","رم":"8GB","حافظه":"256GB","صفحه‌نمایش":"6.4″ Super AMOLED 120Hz","دوربین":"50MP سه‌گانه","باتری":"5000mAh","شارژ":"25W"},priceMin:18500000,priceMax:22000000,storeCount:30,desc:"میان‌رده قوی سامسونگ با دوربین عالی و باتری ۵۰۰۰",tags:["5G","میان‌رده","AMOLED"],rating:4.3,reviews:3870,ph:[{d:"۳۰ روز",p:21e6},{d:"امروز",p:18.5e6}]},
-  {id:"samsung-tv65",title:"تلویزیون سامسونگ 65 اینچ QLED 4K — Q80C",brand:"Samsung",catId:"av",subId:"av-tv",img:"https://images.unsplash.com/photo-1593359677879-a4bb92f4834c?w=400&h=300&fit=crop&auto=format",specs:{"اندازه":"65 اینچ","تکنولوژی":"QLED","رزولوشن":"4K UHD","پردازنده":"Quantum Processor 4K","HDR":"HDR10+","سیستم‌عامل":"Tizen","پورت‌ها":"4×HDMI, 3×USB"},priceMin:58000000,priceMax:69000000,storeCount:15,desc:"تلویزیون QLED با پردازنده کوانتومی و کیفیت تصویر عالی",tags:["QLED","4K","65اینچ"],rating:4.5,reviews:2145,ph:[{d:"۳۰ روز",p:63e6},{d:"امروز",p:58e6}]},
-  {id:"sony-wh1000xm5",title:"هدفون بی‌سیم سونی WH-1000XM5 — حذف نویز",brand:"Sony",catId:"av",subId:"av-headphone",img:"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop&auto=format",specs:{"اتصال":"Bluetooth 5.2","حذف‌نویز":"30dB ANC","باتری":"30 ساعت","میکروفون":"8 میکروفون","کدک":"LDAC, AAC","وزن":"250 گرم"},priceMin:12800000,priceMax:15500000,storeCount:28,desc:"بهترین هدفون حذف‌نویز با کیفیت صدای حرفه‌ای",tags:["حذف‌نویز","سونی","بلوتوث"],rating:4.8,reviews:4210,ph:[{d:"۳۰ روز",p:14.5e6},{d:"امروز",p:12.8e6}]},
-  {id:"apple-watch-s9",title:"ساعت هوشمند اپل Watch Series 9 — 45mm",brand:"Apple",catId:"mobile",subId:"mobile-watch",img:"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop&auto=format",specs:{"تراشه":"S9 SiP","صفحه‌نمایش":"LTPO OLED Always-On","اندازه":"45mm","مقاومت":"WR50","باتری":"تا 18 ساعت","GPS":"دارد","سلامت":"ECG، SpO2"},priceMin:24000000,priceMax:28500000,storeCount:14,desc:"ساعت هوشمند اپل با قابلیت‌های پیشرفته سلامت",tags:["اپل","سلامت","ورزشی"],rating:4.7,reviews:3150,ph:[{d:"۶۰ روز",p:27e6},{d:"امروز",p:24e6}]},
-  {id:"samsung-rf23",title:"یخچال فریزر سامسونگ RF23 — 660 لیتری Family Hub",brand:"Samsung",catId:"appliance",subId:"appliance-fridge",img:"https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?w=400&h=300&fit=crop&auto=format",specs:{"ظرفیت":"660 لیتر","نوع":"فرنچ دور","کلاس انرژی":"A++","No-Frost":"دارد","کمپرسور":"Digital Inverter","صفحه‌نمایش":"Family Hub 21.5″"},priceMin:72000000,priceMax:84000000,storeCount:12,desc:"یخچال هوشمند فرنچ دور با صفحه Family Hub",tags:["هوشمند","فرنچ‌دور","اینورتر"],rating:4.4,reviews:987,ph:[{d:"۳۰ روز",p:78e6},{d:"امروز",p:72e6}]},
-  {id:"lg-washing",title:"ماشین لباسشویی ال‌جی 8 کیلو — F4WV308S اینورتر",brand:"LG",catId:"appliance",subId:"appliance-washing",img:"https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=400&h=300&fit=crop&auto=format",specs:{"ظرفیت":"8 کیلوگرم","موتور":"TrueStream Direct Drive","کلاس انرژی":"A+++","دور":"1400 دور","برنامه‌ها":"14 برنامه","نوع بارگذاری":"از جلو","وزن":"66 کیلوگرم"},priceMin:28500000,priceMax:34000000,storeCount:18,desc:"ماشین لباسشویی اینورتر با موتور مستقیم و کلاس A+++",tags:["اینورتر","کم‌مصرف","بدون‌تسمه"],rating:4.5,reviews:1640,ph:[{d:"۶۰ روز",p:32e6},{d:"۳۰ روز",p:30e6},{d:"امروز",p:28.5e6}]},
-  {id:"dyson-v15",title:"جاروبرقی بی‌سیم دایسون V15 Detect Absolute",brand:"Dyson",catId:"appliance",subId:"appliance-vacuum",img:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop&auto=format",specs:{"نوع":"بی‌سیم","باتری":"60 دقیقه","قدرت مکش":"240 AW","فیلتر":"HEPA","تشخیص ذرات":"لیزر","وزن":"3.1 کیلوگرم","سطح":"تمام سطوح"},priceMin:38000000,priceMax:45000000,storeCount:9,desc:"جاروبرقی بی‌سیم با تشخیص ذرات لیزری و فیلتر HEPA",tags:["بی‌سیم","HEPA","لیزر"],rating:4.7,reviews:823,ph:[{d:"۶۰ روز",p:42e6},{d:"امروز",p:38e6}]},
-  {id:"airpods-pro",title:"ایرپاد پرو Apple AirPods Pro 2nd Gen",brand:"Apple",catId:"mobile",subId:"mobile-earphone",img:"https://images.unsplash.com/photo-1572536147248-ac59a8abfa4b?w=400&h=300&fit=crop&auto=format",specs:{"نوع":"In-Ear بی‌سیم","حذف‌نویز":"فعال ANC","شفافیت":"حالت Transparency","باتری":"30 ساعت (با کیس)","تراشه":"H2","مقاومت":"IP54","اتصال":"Bluetooth 5.3"},priceMin:11500000,priceMax:13800000,storeCount:25,desc:"ایرپاد پرو نسل دوم با حذف نویز پیشرفته و تراشه H2",tags:["اپل","حذف‌نویز","بی‌سیم"],rating:4.8,reviews:5710,ph:[{d:"۶۰ روز",p:13e6},{d:"۳۰ روز",p:12e6},{d:"امروز",p:11.5e6}]},
-  {id:"galaxy-tab-s9",title:"تبلت سامسونگ Galaxy Tab S9 — 256GB WiFi",brand:"Samsung",catId:"mobile",subId:"mobile-tablet",img:"https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Snapdragon 8 Gen 2","رم":"8GB","حافظه":"256GB","صفحه‌نمایش":"11″ Dynamic AMOLED 2X 120Hz","S Pen":"دارد","باتری":"8400mAh","مقاومت":"IP68"},priceMin:49000000,priceMax:56000000,storeCount:14,desc:"تبلت پریمیوم سامسونگ با S Pen و صفحه AMOLED 120Hz",tags:["S Pen","تبلت","AMOLED"],rating:4.6,reviews:1280,ph:[{d:"۳۰ روز",p:53e6},{d:"امروز",p:49e6}]},
-  {id:"canon-r50",title:"دوربین بدون آینه کانن EOS R50 — کیت 18-45",brand:"Canon",catId:"av",subId:"av-camera",img:"https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400&h=300&fit=crop&auto=format",specs:{"سنسور":"24.2MP APS-C CMOS","پردازنده":"DIGIC X","فوکوس":"Dual Pixel II AF","فیلم":"4K 30fps","تثبیت":"IS دیجیتال","صفحه":"3″ لمسی گردان","وزن":"375 گرم"},priceMin:32000000,priceMax:38000000,storeCount:11,desc:"دوربین بدون آینه سبک و هوشمند برای عکاسان مبتدی و میان‌رده",tags:["بدون‌آینه","کانن","4K"],rating:4.5,reviews:672,ph:[{d:"۳۰ روز",p:35e6},{d:"امروز",p:32e6}]},
-  {id:"bosch-drill",title:"دریل بوش GSB 185-LI — 18 ولت بدون برس",brand:"Bosch",catId:"tool",subId:"tool-power",img:"https://images.unsplash.com/photo-1504148455328-c376907d081c?w=400&h=300&fit=crop&auto=format",specs:{"ولتاژ":"18V","موتور":"بدون جاروبک","گشتاور":"55 نیوتون متر","سرعت":"2 دنده","باتری":"2Ah Li-Ion","وزن":"1.4 کیلوگرم","فنچر":"4cm"},priceMin:6800000,priceMax:8500000,storeCount:16,desc:"دریل پیچ‌گوشتی بوش 18 ولت با موتور بی‌جاروبک",tags:["بوش","18V","بدون‌برس"],rating:4.6,reviews:445,ph:[{d:"۳۰ روز",p:7.5e6},{d:"امروز",p:6.8e6}]},
-  {id:"samsung-tv43",title:"تلویزیون سامسونگ 43 اینچ Crystal 4K — AU7000",brand:"Samsung",catId:"av",subId:"av-tv",img:"https://images.unsplash.com/photo-1593359677879-a4bb92f4834c?w=400&h=300&fit=crop&auto=format",specs:{"اندازه":"43 اینچ","تکنولوژی":"Crystal UHD","رزولوشن":"4K UHD","پردازنده":"Crystal Processor 4K","HDR":"HDR10+","سیستم‌عامل":"Tizen","پورت‌ها":"3×HDMI, 2×USB"},priceMin:18500000,priceMax:23000000,storeCount:22,desc:"تلویزیون Crystal 4K سامسونگ با پردازنده کریستال",tags:["Crystal","4K","43اینچ"],rating:4.3,reviews:3120,ph:[{d:"۳۰ روز",p:21e6},{d:"امروز",p:18.5e6}]},
-];
-const AN_OFFERS:Record<string,AnOffer[]>={};
-AN_PRODS.forEach(p=>{AN_OFFERS[p.id]=mkAnOffers(p.priceMin,p.storeCount);});
-
-// Extended mock product database
-const MOCK_BRANDS_BY_CAT:Record<string,string[]>={
-  mobile:["سامسونگ","اپل","شیائومی","هوآوی","وان‌پلاس","ریلمی","اوپو","نوکیا","موتورولا","سونی"],
-  laptop:["ASUS","Lenovo","HP","Dell","Acer","MSI","Apple","Razer","Huawei","Samsung"],
-  appliance:["سامسونگ","ال‌جی","بوش","آریستون","آبسال","اسنوا","امرسان","هایر","پاناسونیک","دایو"],
-  av:["سامسونگ","سونی","ال‌جی","شارپ","هایسنس","TCL","پاناسونیک","فیلیپس","JBL","بوز"],
-  fashion:["زارا","اچ‌اند‌ام","مانگو","لویی","برشکا","پول‌اند‌بر","دیزل","لی‌کوپر","لاکوست","نایک"],
-  beauty:["نیوآ","گارنیه","لورآل","پنتن","داو","آوون","ویشی","لاروش‌پوزه","سواو","بایودرما"],
-  sport:["نایک","آدیداس","پوما","ریباک","آندرآرمور","نیو‌بالانس","سالومون","مرل","هد","ویلسون"],
-  car:["بوش","NGK","کاسترول","موبیل","شل","توتال","مان","فیلیپس","گارمین","پایونیر"],
-  health:["فیلیپس","اومرون","بیورر","برون","مدیسانا","پاناسونیک","وتامیکس","پولار","گارمین","ویترا"],
-  tool:["بوش","دوالت","ماکیتا","استنلی","هیلتی","میلواکی","رایوبی","بلک‌اند‌دکر","مترابو","AEG"],
-  toy:["لگو","پلی‌موبیل","هات‌ویلز","ماتل","هزبرو","مگا‌بلاکس","کینکس","فیشر‌پرایس","برادر","تامی"],
-};
-const MOCK_PREFIXES:Record<string,string[]>={
-  mobile:["گوشی هوشمند","گوشی موبایل","تلفن همراه"],
-  laptop:["لپ‌تاپ","نوت‌بوک","رایانه قابل حمل"],
-  appliance:["لوازم خانگی","دستگاه خانگی","تجهیزات خانه"],
-  av:["تلویزیون","هدفون","اسپیکر","دوربین"],
-  fashion:["پوشاک","لباس","کفش","کیف"],
-  beauty:["محصول مراقبتی","کرم","شامپو","لوسیون"],
-  sport:["تجهیزات ورزشی","کفش ورزشی","پوشاک ورزشی"],
-  car:["لوازم خودرو","روغن موتور","تایر"],
-  health:["تجهیزات پزشکی","دستگاه سلامت","مکمل"],
-  tool:["ابزار برقی","ابزار دستی","دریل","پیچ‌گوشتی"],
-  toy:["اسباب‌بازی","بازی فکری","پازل","بلوک"],
-};
-const UNSPLASH_IDS=["1496181133206-80ce9b88a853","1517336714731-489689fd1ca8","1588872657578-7efd1f1555ed","1505740420928-5e560c06d30e","1593359677879-a4bb92f4834c","1558618666-fcd25c85cd64","1572536147248-ac59a8abfa4b","1544244015-0df4b3ffc6b0"];
-interface AnCat{id:string;title:string;subcats:{id:string;title:string;pids:string[]}[];}
-const AN_CATS:AnCat[]=[
-  {id:"mobile",title:"موبایل و کالای دیجیتال",subcats:[{id:"mobile-iphone",title:"آیفون",pids:["iphone15pm"]},{id:"mobile-samsung",title:"سامسونگ",pids:["s24ultra","galaxy-a54"]},{id:"mobile-mid",title:"میان‌رده",pids:["galaxy-a54"]},{id:"mobile-watch",title:"ساعت هوشمند",pids:["apple-watch-s9"]},{id:"mobile-tablet",title:"تبلت",pids:["galaxy-tab-s9"]},{id:"mobile-earphone",title:"ایرپاد و هندزفری",pids:["airpods-pro"]},{id:"mobile-acc",title:"لوازم جانبی موبایل",pids:[]}]},
-  {id:"laptop",title:"لپ‌تاپ، کامپیوتر، اداری",subcats:[{id:"laptop-gaming",title:"لپ‌تاپ گیمینگ",pids:["asus-rog-g16"]},{id:"laptop-office",title:"لپ‌تاپ اداری",pids:["hp-pav15"]},{id:"laptop-student",title:"لپ‌تاپ دانشجویی",pids:["asus-vb15","lenovo-ip5"]},{id:"laptop-macbook",title:"مک‌بوک",pids:["macbook-m2"]},{id:"laptop-2in1",title:"لپ‌تاپ ۲در۱",pids:[]},{id:"laptop-desktop",title:"کامپیوتر دسکتاپ",pids:[]},{id:"laptop-printer",title:"پرینتر و اسکنر",pids:[]},{id:"laptop-monitor",title:"مانیتور",pids:[]}]},
-  {id:"hypermarket",title:"هایپرمارکت",subcats:[{id:"hyper-food",title:"مواد غذایی",pids:[]},{id:"hyper-cleaning",title:"مواد شستشو",pids:[]},{id:"hyper-kitchen",title:"لوازم آشپزخانه",pids:[]},{id:"hyper-beverage",title:"نوشیدنی",pids:[]},{id:"hyper-hygiene",title:"بهداشت شخصی",pids:[]}]},
-  {id:"appliance",title:"لوازم خانگی",subcats:[{id:"appliance-fridge",title:"یخچال و فریزر",pids:["samsung-rf23"]},{id:"appliance-washing",title:"ماشین لباسشویی",pids:["lg-washing"]},{id:"appliance-vacuum",title:"جاروبرقی",pids:["dyson-v15"]},{id:"appliance-cooker",title:"اجاق گاز",pids:[]},{id:"appliance-dishwash",title:"ماشین ظرفشویی",pids:[]},{id:"appliance-small",title:"لوازم برقی کوچک",pids:[]}]},
-  {id:"fashion",title:"مد و پوشاک",subcats:[{id:"fashion-men",title:"پوشاک مردانه",pids:[]},{id:"fashion-women",title:"پوشاک زنانه",pids:[]},{id:"fashion-shoes",title:"کفش و کتانی",pids:[]},{id:"fashion-bag",title:"کیف و کوله",pids:[]},{id:"fashion-watch",title:"ساعت مچی",pids:[]},{id:"fashion-sunglasses",title:"عینک آفتابی",pids:[]}]},
-  {id:"beauty",title:"زیبایی و بهداشت",subcats:[{id:"beauty-skin",title:"مراقبت پوست",pids:[]},{id:"beauty-hair",title:"مراقبت مو",pids:[]},{id:"beauty-perfume",title:"عطر و ادکلن",pids:[]},{id:"beauty-makeup",title:"آرایشی",pids:[]},{id:"beauty-device",title:"دستگاه‌های زیبایی",pids:[]}]},
-  {id:"av",title:"صوتی و تصویری",subcats:[{id:"av-tv",title:"تلویزیون",pids:["samsung-tv65"]},{id:"av-headphone",title:"هدفون و هدست",pids:["sony-wh1000xm5"]},{id:"av-speaker",title:"اسپیکر",pids:[]},{id:"av-camera",title:"دوربین عکاسی",pids:["canon-r50"]},{id:"av-projector",title:"پروجکتور",pids:[]},{id:"av-gaming-audio",title:"صدا برای گیمینگ",pids:[]}]},
-  {id:"car",title:"خودرو و وسایل نقلیه",subcats:[{id:"car-acc",title:"لوازم خودرو",pids:[]},{id:"car-elec",title:"الکترونیک خودرو",pids:[]},{id:"car-tire",title:"لاستیک و رینگ",pids:[]},{id:"car-oil",title:"روغن و مایعات",pids:[]}]},
-  {id:"health",title:"سلامت و پزشکی",subcats:[{id:"health-device",title:"تجهیزات پزشکی",pids:[]},{id:"health-supp",title:"مکمل‌ها",pids:[]},{id:"health-dental",title:"دهان و دندان",pids:[]},{id:"health-eyes",title:"بینایی",pids:[]}]},
-  {id:"culture",title:"فرهنگی و هنری",subcats:[{id:"culture-book",title:"کتاب",pids:[]},{id:"culture-music",title:"موسیقی",pids:[]},{id:"culture-art",title:"لوازم هنری",pids:[]},{id:"culture-stationary",title:"لوازم‌التحریر",pids:[]}]},
-  {id:"sport",title:"ورزش و تناسب اندام",subcats:[{id:"sport-fitness",title:"تجهیزات بدنسازی",pids:[]},{id:"sport-outdoor",title:"ورزش‌های بیرونی",pids:[]},{id:"sport-clothing",title:"پوشاک ورزشی",pids:[]},{id:"sport-cycling",title:"دوچرخه و اسکوتر",pids:[]},{id:"sport-swimming",title:"شنا و آب‌بازی",pids:[]}]},
-  {id:"toy",title:"اسباب‌بازی و سرگرمی",subcats:[{id:"toy-board",title:"بازی‌های فکری",pids:[]},{id:"toy-console",title:"کنسول بازی",pids:[]},{id:"toy-gaming",title:"لوازم گیمینگ",pids:[]},{id:"toy-remote",title:"کنترلی و ربات",pids:[]},{id:"toy-puzzle",title:"پازل و معما",pids:[]}]},
-  {id:"kids",title:"کودک و نوزاد",subcats:[{id:"kids-clothing",title:"پوشاک کودک",pids:[]},{id:"kids-toy",title:"اسباب‌بازی کودک",pids:[]},{id:"kids-stroller",title:"کالسکه و خواب",pids:[]},{id:"kids-feeding",title:"تغذیه نوزاد",pids:[]}]},
-  {id:"building",title:"تجهیزات ساختمان",subcats:[{id:"building-paint",title:"رنگ و پوشش",pids:[]},{id:"building-tile",title:"کاشی و سرامیک",pids:[]},{id:"building-plumb",title:"لوله‌کشی",pids:[]},{id:"building-elec",title:"تجهیزات برقی ساختمان",pids:[]}]},
-  {id:"tool",title:"ابزارآلات",subcats:[{id:"tool-hand",title:"ابزار دستی",pids:[]},{id:"tool-power",title:"ابزار برقی",pids:["bosch-drill"]},{id:"tool-garden",title:"ابزار باغبانی",pids:[]},{id:"tool-measure",title:"اندازه‌گیری",pids:[]}]},
-  {id:"travel",title:"لوازم سفر و کمپینگ",subcats:[{id:"travel-bag",title:"چمدان و کیف سفر",pids:[]},{id:"travel-camp",title:"کمپینگ و طبیعت‌گردی",pids:[]},{id:"travel-climb",title:"کوهنوردی",pids:[]},{id:"travel-acc",title:"لوازم جانبی سفر",pids:[]}]},
-  {id:"pet",title:"تجهیزات نگهداری حیوانات",subcats:[{id:"pet-dog",title:"سگ",pids:[]},{id:"pet-cat",title:"گربه",pids:[]},{id:"pet-bird",title:"پرنده",pids:[]},{id:"pet-fish",title:"آکواریوم و ماهی",pids:[]}]},
-  {id:"industrial",title:"تجهیزات صنعتی",subcats:[{id:"ind-safety",title:"ایمنی و حفاظت",pids:[]},{id:"ind-machine",title:"ماشین‌آلات",pids:[]},{id:"ind-elec",title:"الکترونیک صنعتی",pids:[]}]},
-  {id:"gold",title:"ارز و طلا",subcats:[{id:"gold-coin",title:"سکه و طلا",pids:[]},{id:"gold-jewel",title:"جواهرات",pids:[]},{id:"gold-silver",title:"نقره",pids:[]}]},
-  {id:"storeEquip",title:"لوازم فروشگاهی",subcats:[{id:"store-display",title:"دیسپلی و قفسه",pids:[]},{id:"store-pos",title:"دستگاه‌های فروشگاهی",pids:[]},{id:"store-pack",title:"بسته‌بندی",pids:[]}]},
-  {id:"other",title:"سایر دسته‌ها",subcats:[{id:"other-office",title:"لوازم اداری",pids:[]},{id:"other-gift",title:"هدایا و تبلیغات",pids:[]},{id:"other-misc",title:"متفرقه",pids:[]}]},
-];
-function generateMockProds():AnProduct[]{
-  const results:AnProduct[]=[];
-  let counter=1000;
-  const cats=AN_CATS.filter(c=>c.id!=="other"&&c.id!=="gold"&&c.id!=="storeEquip");
-  cats.forEach(cat=>{
-    const brands=MOCK_BRANDS_BY_CAT[cat.id]||["برند نامشخص"];
-    const prefixes=MOCK_PREFIXES[cat.id]||["محصول"];
-    cat.subcats.forEach((sub,si)=>{
-      const itemsPerSub=Math.max(2,Math.floor(40/cat.subcats.length));
-      for(let i=0;i<itemsPerSub&&results.length<1000;i++){
-        const brand=brands[(counter+i)%brands.length];
-        const prefix=prefixes[si%prefixes.length];
-        const modelNum=counter;
-        const basePrice=(5+(counter%95))*1000000;
-        const storeCount=3+(counter%47);
-        counter++;
-        results.push({
-          id:`mock-${modelNum}`,
-          title:`${prefix} ${brand} مدل ${modelNum}`,
-          brand,
-          catId:cat.id,
-          subId:sub.id,
-          img:`https://images.unsplash.com/photo-${UNSPLASH_IDS[counter%8]}?w=400&h=300&fit=crop&auto=format`,
-          specs:{"مدل":`${brand} ${modelNum}`,"دسته‌بندی":sub.title},
-          priceMin:basePrice,
-          priceMax:Math.round(basePrice*1.15),
-          storeCount,
-          desc:`${prefix} ${brand} با کیفیت بالا در دسته ${sub.title}`,
-          tags:[brand,cat.title.split(" ")[0],sub.title.split(" ")[0]],
-          rating:parseFloat((3.5+(counter%15)/10).toFixed(1)),
-          reviews:10+(counter*7)%9990,
-          ph:[{d:"۳۰ روز",p:Math.round(basePrice*1.08)},{d:"امروز",p:basePrice}],
-        });
-      }
-    });
-  });
-  return results;
-}
-const ALL_MOCK_PRODS:AnProduct[]=[...AN_PRODS,...generateMockProds()];
+let MARKET_PRODUCTS:AnProduct[]=[];
 function anSearch(q:string):AnProduct[]{
   const lq=q.toLowerCase().replace(/‌/g," ").replace(/\s+/g," ");
-  return ALL_MOCK_PRODS.filter(p=>{
+  return MARKET_PRODUCTS.filter(p=>{
     const text=(p.title+" "+p.brand+" "+p.tags.join(" ")+" "+p.desc).toLowerCase();
     return lq.split(" ").some(w=>w.length>1&&text.includes(w));
   });
 }
 function getAnCatProds(catId:string,limit=20):AnProduct[]{
-  return ALL_MOCK_PRODS.filter(p=>p.catId===catId).slice(0,limit);
+  return MARKET_PRODUCTS.filter(p=>p.catId===catId).slice(0,limit);
 }
 function sortOffers(offers:AnOffer[],mode:"price"|"rating"|"avail"):AnOffer[]{
   const s=[...offers];
   if(mode==="price")s.sort((a,b)=>a.price-b.price);
-  else if(mode==="rating")s.sort((a,b)=>(ANS[b.sid]?.sc||3)-(ANS[a.sid]?.sc||3));
+  else if(mode==="rating")s.sort((a,b)=>0);
   else s.sort((a,b)=>(b.inStock?1:0)-(a.inStock?1:0));
   return s;
 }
@@ -8262,12 +8124,12 @@ function AnMarketHome({onProduct,onCat,onGoCats,onSearch,compareMode,compareSele
   ];
 
   /* ── Product data ── */
-  const deals=ALL_MOCK_PRODS.filter(p=>p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p);
-  const topRated=[...ALL_MOCK_PRODS].sort((a,b)=>b.rating-a.rating).slice(0,30);
-  const mostCompared=[...ALL_MOCK_PRODS].sort((a,b)=>b.storeCount-a.storeCount).slice(0,30);
-  const budget=ALL_MOCK_PRODS.filter(p=>p.priceMin<15000000).slice(0,30);
-  const highValue=[...ALL_MOCK_PRODS].sort((a,b)=>b.reviews-a.reviews).slice(0,30);
-  const mostReviewed=[...ALL_MOCK_PRODS].sort((a,b)=>b.reviews-a.reviews).slice(5,35);
+  const deals=MARKET_PRODUCTS.filter(p=>p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p);
+  const topRated=[...MARKET_PRODUCTS].sort((a,b)=>b.rating-a.rating).slice(0,30);
+  const mostCompared=[...MARKET_PRODUCTS].sort((a,b)=>b.storeCount-a.storeCount).slice(0,30);
+  const budget=MARKET_PRODUCTS.filter(p=>p.priceMin<15000000).slice(0,30);
+  const highValue=[...MARKET_PRODUCTS].sort((a,b)=>b.reviews-a.reviews).slice(0,30);
+  const mostReviewed=[...MARKET_PRODUCTS].sort((a,b)=>b.reviews-a.reviews).slice(5,35);
 
   const TRENDING=["لپ‌تاپ ایسوس","گوشی سامسونگ","تلویزیون ۵۵ اینچ","هدفون بی‌سیم","یخچال سامسونگ","دوربین کانن","ایرپاد اپل","ربات جارو","ماشین ظرفشویی","تبلت سامسونگ","مانیتور گیمینگ","کفش اسپرت","ساعت هوشمند","دستبند فیتنس","کتری هوشمند"];
 
@@ -8527,21 +8389,18 @@ function AnAssistantChat({onProduct,compareMode,compareSelected,onCompareToggle,
     (_q:string,n:number)=>`نتایج آماده‌ست! ${toFaDigits(String(n))} محصول از فروشگاه‌های معتبر پیدا شد. اطلاعات بر اساس داده‌های موجود در آن مارکت است و ممکن است کامل یا به‌روز نباشد.`,
   ];
 
-  const sendMsg=()=>{
+  const sendMsg=async()=>{
     const txt=input.trim();if(!txt||thinking)return;
-    const uid=Date.now().toString();
-    setMsgs(p=>[...p,{id:uid,role:"user",text:txt}]);
-    setInput("");setThinking(true);setLastQ(txt);
-    scrollToBottom();
-    setTimeout(()=>{
-      const found=anSearch(txt).slice(0,30);
-      setResults(found);
-      const replyFn=AI_REPLIES[Math.floor(Math.random()*AI_REPLIES.length)];
-      const reply=found.length>0?replyFn(txt,found.length):`برای این درخواست نتیجه دقیقی پیدا نشد. می‌تونی جزئیات بیشتری بدی یا کلمات دیگری امتحان کنی؟`;
-      setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:reply}]);
-      setThinking(false);setShowResults(false);
-      scrollToBottom();
-    },1400);
+    const uid=Date.now().toString();setMsgs(p=>[...p,{id:uid,role:"user",text:txt}]);setInput("");setThinking(true);setLastQ(txt);scrollToBottom();
+    try{
+      const token=localStorage.getItem("anpardaz:accessToken")??"";
+      const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/ai/assist",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({input:txt})});
+      const d=await r.json();if(!r.ok)throw new Error(d?.error??"ai_unavailable");
+      const text=d?.result?.text??d?.result?.output??d?.result?.content??"پاسخ هوش مصنوعی دریافت نشد.";
+      const found=anSearch(txt).slice(0,30);setResults(found);
+      setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:String(text)}]);setShowResults(found.length>0);
+    }catch{setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:"دستیار هوشمند در حال حاضر در دسترس نیست."}]);setShowResults(false)}
+    finally{setThinking(false);scrollToBottom()}
   };
 
   const newChat=()=>{
@@ -8554,11 +8413,8 @@ function AnAssistantChat({onProduct,compareMode,compareSelected,onCompareToggle,
     const uid=Date.now().toString();
     const url=URL.createObjectURL(f);
     setMsgs(p=>[...p,{id:uid,role:"user",text:"[تصویر پیوست شد]",img:url}]);
-    setThinking(true);scrollToBottom();
-    setTimeout(()=>{
-      setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:"تصویر رو دریافت کردم. می‌تونم محصولات مشابه رو برات پیدا کنم. محصول مورد نظرت رو کمی توضیح بده تا دقیق‌تر جستجو کنم."}]);
-      setThinking(false);scrollToBottom();
-    },1200);
+    setThinking(false);
+    setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:"جستجوی تصویری هنوز به سرویس پردازش تصویر متصل نشده است. برای جلوگیری از پاسخ ساختگی، فعلاً توضیح متنی محصول را وارد کنید."}]);
     e.target.value="";
   };
 
@@ -8724,7 +8580,7 @@ function AnChatPage({q,onProduct,compareMode,compareSelected,onCompareToggle}:{
   const brands=useMemo(()=>[...new Set(rawResults.map(p=>p.brand))].slice(0,12),[rawResults]);
 
   const results=useMemo(()=>{
-    let r=rawResults.length>0?rawResults:ALL_MOCK_PRODS.slice(0,30);
+    let r=rawResults.length>0?rawResults:MARKET_PRODUCTS.slice(0,30);
     if(selectedBrands.length>0) r=r.filter(p=>selectedBrands.includes(p.brand));
     if(sort==="price-asc")r=[...r].sort((a,b)=>a.priceMin-b.priceMin);
     else if(sort==="price-desc")r=[...r].sort((a,b)=>b.priceMin-a.priceMin);
@@ -8876,7 +8732,9 @@ function AnPriceSparkline({ph}:{ph:{d:string;p:number}[]}){
   );
 }
 function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(pid:string)=>void;onSearch:(q:string)=>void;onBack:()=>void}){
-  const p=ALL_MOCK_PRODS.find(x=>x.id===pid);
+  const p=MARKET_PRODUCTS.find(x=>x.id===pid);
+  const [remoteOffers,setRemoteOffers]=useState<AnOffer[]>([]);
+  useEffect(()=>{(async()=>{try{const base=ANMARKET_PLATFORM_API_BASE;const r=await fetch(base+"/api/v1/market/products/"+encodeURIComponent(pid));if(!r.ok)return;const d=await r.json();setRemoteOffers((d.offers??[]).map((o:any)=>({sid:String(o.store_id??o.id),offerId:Number(o.id),storeName:o.store_name??o.seller_name??"فروشگاه",price:Number(o.price??0),ship:o.shipping_cost?String(o.shipping_cost):"",warranty:"",inStock:o.availability!=="out_of_stock",upd:o.updated_at??"",productUrl:o.product_url??o.seller_url??"",iframeMode:o.iframe_mode??"unknown"})));}catch{}})()},[pid]);
   const [tab,setTab]=useState<"sellers"|"specs"|"reviews"|"similar">("sellers");
   const [alert,setAlert]=useState(false);
   const [fav,setFav]=useState(false);
@@ -8884,21 +8742,24 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
   const [imgIdx,setImgIdx]=useState(0);
   const [showZoom,setShowZoom]=useState(false);
   const [aiInput,setAiInput]=useState("");
-  const offers=AN_OFFERS[pid]||(p?mkAnOffers(p.priceMin,p.storeCount):[]);
+  const offers=remoteOffers;
   useBackHandler(onBack);
+  useEffect(()=>{let active=true;(async()=>{try{const token=localStorage.getItem("anpardaz:accessToken")??"";const favRes=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/me/favorites",{headers:{authorization:"Bearer "+token}});void fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/products/"+encodeURIComponent(pid)+"/view",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({surface:"mobile"})});if(active&&favRes.ok){const d=await favRes.json();setFav((d.products??[]).some((x:any)=>String(x.id)===String(pid)));}}catch{}})();return()=>{active=false}},[pid]);
   if(!p)return<div style={{padding:24,textAlign:"center",color:"var(--am-muted)"}}>محصول یافت نشد<br/><button onClick={onBack} style={{marginTop:16,padding:"10px 24px",background:"var(--am-accent)",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"Vazirmatn",fontWeight:700,color:"#FFFFFF"}}>بازگشت</button></div>;
 
   const sortedOffers=sortOffers(offers,sellerSort);
   const avg=Math.round(sortedOffers.reduce((a,o)=>a+o.price,0)/(sortedOffers.length||1));
-  const similar=ALL_MOCK_PRODS.filter(x=>x.catId===p.catId&&x.id!==p.id).slice(0,8);
-  const cheaper=ALL_MOCK_PRODS.filter(x=>x.catId===p.catId&&x.priceMin<p.priceMin&&x.id!==p.id).sort((a,b)=>a.priceMin-b.priceMin).slice(0,4);
-  const pricier=ALL_MOCK_PRODS.filter(x=>x.catId===p.catId&&x.priceMin>p.priceMin&&x.id!==p.id&&x.rating>=p.rating).sort((a,b)=>a.priceMin-b.priceMin).slice(0,3);
+  const similar=MARKET_PRODUCTS.filter(x=>x.catId===p.catId&&x.id!==p.id).slice(0,8);
+  const cheaper=MARKET_PRODUCTS.filter(x=>x.catId===p.catId&&x.priceMin<p.priceMin&&x.id!==p.id).sort((a,b)=>a.priceMin-b.priceMin).slice(0,4);
+  const pricier=MARKET_PRODUCTS.filter(x=>x.catId===p.catId&&x.priceMin>p.priceMin&&x.id!==p.id&&x.rating>=p.rating).sort((a,b)=>a.priceMin-b.priceMin).slice(0,3);
   const strengths=getProductStrengths(p);
   const weaknesses=getProductWeaknesses(p);
+  const [frameUrl,setFrameUrl]=useState("");
+  const openOffer=async(o:AnOffer)=>{if(!o.offerId)return;try{const token=localStorage.getItem("anpardaz:accessToken")??"";const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/clickout",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({offerId:o.offerId,surface:"mobile"})});const d=await r.json();if(!r.ok)throw new Error();if(d.mode==="iframe")setFrameUrl(d.url);else window.open(d.url,"_blank","noopener,noreferrer")}catch{setFrameUrl("")}};
   const drop=p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p?Math.round((p.ph[0].p-p.ph[p.ph.length-1].p)/p.ph[0].p*100):0;
   const TABS=([["sellers","فروشگاه‌ها"],["specs","مشخصات"],["reviews","نظرات"],["similar","گزینه‌ها"]] as const);
   // Simulate 4 gallery images using same URL with different crops
-  const galleryImgs=[p.img,`${p.img.split("?")[0]}?w=600&h=600&fit=crop&q=80&crop=center`,`${p.img.split("?")[0]}?w=600&h=600&fit=crop&q=80&crop=top`,`${p.img.split("?")[0]}?w=600&h=600&fit=crop&q=80&crop=bottom`];
+  const galleryImgs=(p.media&&p.media.length?p.media:[p.img]).filter(Boolean).slice(0,8);
 
   return(
     <div style={{paddingBottom:100}}>
@@ -8912,7 +8773,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
             بزرگ‌نمایی
           </div>
           <div style={{position:"absolute",top:14,left:14,display:"flex",gap:5}}>
-            <button onClick={e=>{e.stopPropagation();setFav(v=>!v);}} style={{width:36,height:36,borderRadius:10,background:"var(--am-card)",border:"1px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:fav?"#DB2777":"var(--am-muted)"}}>
+            <button onClick={e=>{e.stopPropagation();void (async()=>{const token=localStorage.getItem("anpardaz:accessToken")??"";try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/products/"+encodeURIComponent(pid)+"/favorite",{method:"POST",headers:{authorization:"Bearer "+token}});const d=await r.json();if(r.ok)setFav(Boolean(d.favorite));}catch{}})();}} style={{width:36,height:36,borderRadius:10,background:"var(--am-card)",border:"1px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:fav?"#DB2777":"var(--am-muted)"}}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill={fav?"#DB2777":"none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
             </button>
           </div>
@@ -9042,7 +8903,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
             </div>
             <AnSH title={`${toFaDigits(String(sortedOffers.length))} فروشگاه — مقایسه قیمت‌ها`}/>
             {sortedOffers.map((o,i)=>{
-              const store=ANS[o.sid]||{n:o.sid,sc:4.0};
+              const store={n:o.storeName??o.sid,sc:0};
               const best=i===0&&sellerSort==="price";
               const priceDiff=o.price-p.priceMin;
               return(
@@ -9076,7 +8937,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
                       {o.ship&&<span style={{fontSize:11,background:"var(--am-bg)",color:"var(--am-muted)",borderRadius:7,padding:"4px 10px",border:"1px solid var(--am-border)"}}>{o.ship}</span>}
                     </div>
                     {o.inStock&&(
-                      <button style={{width:"100%",padding:"13px",background:"var(--am-accent)",border:"none",borderRadius:12,color:"#FFFFFF",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                      <button onClick={()=>void openOffer(o)} style={{width:"100%",padding:"13px",background:"var(--am-accent)",border:"none",borderRadius:12,color:"#FFFFFF",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                         مشاهده و خرید
                       </button>
@@ -9301,7 +9162,7 @@ function AnSubDetailPage({cid,sid,onProduct,onSearch,compareMode,compareSelected
   const cat=AN_CATS.find(c=>c.id===cid);
   const sub=cat?.subcats.find(s=>s.id===sid);
   const [sort,setSort]=useState<"relevance"|"price-asc"|"price-desc"|"rating">("relevance");
-  const rawProds=ALL_MOCK_PRODS.filter(p=>p.subId===sid||(sub?.pids||[]).includes(p.id));
+  const rawProds=MARKET_PRODUCTS.filter(p=>p.subId===sid||p.catId===cid||(sub?.pids||[]).includes(p.id));
   const prods=useMemo(()=>{
     let r=[...rawProds];
     if(sort==="price-asc")r.sort((a,b)=>a.priceMin-b.priceMin);
@@ -9350,1134 +9211,18 @@ function AnSubDetailPage({cid,sid,onProduct,onSearch,compareMode,compareSelected
   );
 }
 function AnTicketsSubPage({onBack}:{onBack:()=>void}){
-  type TMsg={from:"me"|"support";text:string;date:string};
-  type TTicket={id:string;sub:string;cat:string;date:string;status:string;open:boolean;priority:"بالا"|"متوسط"|"پایین";msgs:TMsg[]};
-  const STATUS_COLORS:Record<string,string>={"باز":"#3B82F6","در حال بررسی":"#F59E0B","پاسخ داده شد":"#10B981","بسته شده":"#6B7280","در انتظار بررسی":"#8B5CF6"};
-  const [selected,setSelected]=useState<string|null>(null);
-  const [reply,setReply]=useState("");
-  const [showNew,setShowNew]=useState(false);
-  const [newSub,setNewSub]=useState("");
-  const [newMsg,setNewMsg]=useState("");
-  const [newCat,setNewCat]=useState("مشکل سفارش");
-  const [tickets,setTickets]=useState<TTicket[]>([
-    {id:"TKT-۰۰۱",sub:"مشکل در تحویل سفارش",cat:"مشکل سفارش",date:"۱۴۰۳/۰۶/۱۲",status:"در حال بررسی",open:true,priority:"بالا",msgs:[
-      {from:"me",text:"سفارشم هنوز نرسیده. لطفاً پیگیری کنید.",date:"۱۴۰۳/۰۶/۱۰"},
-      {from:"support",text:"با عرض پوزش، سفارش شما در مرحله ارسال است و تا ۲ روز آینده تحویل داده می‌شود.",date:"۱۴۰۳/۰۶/۱۱"},
-    ]},
-    {id:"TKT-۰۰۲",sub:"استعلام گارانتی محصول",cat:"سوال فنی",date:"۱۴۰۳/۰۵/۲۰",status:"پاسخ داده شد",open:false,priority:"متوسط",msgs:[
-      {from:"me",text:"گارانتی محصولم چقدر است؟",date:"۱۴۰۳/۰۵/۱۹"},
-      {from:"support",text:"گارانتی این محصول ۱۸ ماه از تاریخ خرید است.",date:"۱۴۰۳/۰۵/۲۰"},
-    ]},
-    {id:"TKT-۰۰۳",sub:"مشکل در پرداخت",cat:"مشکل پرداخت",date:"۱۴۰۳/۰۴/۰۵",status:"بسته شده",open:false,priority:"بالا",msgs:[
-      {from:"me",text:"پرداختم ناموفق شد ولی پول کسر شد.",date:"۱۴۰۳/۰۴/۰۴"},
-      {from:"support",text:"وجه کسر شده ظرف ۷۲ ساعت به حساب شما بازمی‌گردد.",date:"۱۴۰۳/۰۴/۰۵"},
-    ]},
-  ]);
-  useBackHandler(()=>{if(selected){setSelected(null);}else if(showNew){setShowNew(false);}else onBack();});
-
-  const selectedTicket=tickets.find(t=>t.id===selected);
-
-  if(showNew){
-    return(
-      <div style={{paddingBottom:100}}>
-        <div style={{background:"var(--am-card)",borderBottom:"1px solid var(--am-border)",padding:"16px"}}>
-          <div style={{fontSize:16,fontWeight:900,color:"var(--am-text)"}}>ثبت تیکت جدید</div>
-          <div style={{fontSize:12,color:"var(--am-muted)",marginTop:3}}>مشکل یا سوال خود را توضیح دهید</div>
-        </div>
-        <div style={{padding:"16px"}}>
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:12,fontWeight:700,color:"var(--am-muted)",marginBottom:8}}>دسته‌بندی مشکل</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-              {["مشکل سفارش","مشکل پرداخت","سوال فنی","گارانتی","مرجوعی","سایر"].map(cat=>(
-                <button key={cat} onClick={()=>setNewCat(cat)} style={{padding:"9px 16px",borderRadius:11,background:newCat===cat?"var(--am-accent)":"var(--am-bg)",border:`1.5px solid ${newCat===cat?"var(--am-accent)":"var(--am-border)"}`,color:newCat===cat?"#FFFFFF":"var(--am-muted)",fontSize:13,fontFamily:"Vazirmatn",fontWeight:newCat===cat?800:500,cursor:"pointer"}}>{cat}</button>
-              ))}
-            </div>
-          </div>
-          <div style={{marginBottom:16}}>
-            <div style={{fontSize:12,fontWeight:700,color:"var(--am-muted)",marginBottom:8}}>موضوع</div>
-            <input value={newSub} onChange={e=>setNewSub(e.target.value)} placeholder="موضوع مشکل یا سوال..." style={{width:"100%",background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:12,padding:"14px 16px",color:"var(--am-text)",fontSize:14,fontFamily:"Vazirmatn",direction:"rtl",outline:"none",boxSizing:"border-box"}}/>
-          </div>
-          <div style={{marginBottom:20}}>
-            <div style={{fontSize:12,fontWeight:700,color:"var(--am-muted)",marginBottom:8}}>شرح مشکل</div>
-            <textarea value={newMsg} onChange={e=>setNewMsg(e.target.value)} rows={6} placeholder="مشکل یا سوال خود را با جزئیات کامل توضیح دهید..." style={{width:"100%",background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:12,padding:"14px 16px",resize:"none",color:"var(--am-text)",fontSize:14,fontFamily:"Vazirmatn",direction:"rtl",outline:"none",boxSizing:"border-box"}}/>
-          </div>
-          <div style={{display:"flex",gap:10}}>
-            <button onClick={()=>setShowNew(false)} style={{flex:1,padding:"14px",background:"var(--am-bg)",border:"1.5px solid var(--am-border)",borderRadius:13,color:"var(--am-muted)",fontSize:14,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:700}}>انصراف</button>
-            <button onClick={()=>{if(!newSub.trim()||!newMsg.trim())return;const id=`TKT-${String(Date.now()).slice(-3)}`;setTickets(prev=>[{id,sub:newSub.trim(),cat:newCat,date:"۱۴۰۳/۰۶/۱۶",status:"باز",open:true,priority:"متوسط" as const,msgs:[{from:"me" as const,text:newMsg.trim(),date:"۱۴۰۳/۰۶/۱۶"}]},...prev]);setNewSub("");setNewMsg("");setShowNew(false);}} style={{flex:2,padding:"14px",background:"var(--am-accent)",border:"none",borderRadius:13,color:"#FFFFFF",fontSize:14,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:900}}>ارسال تیکت</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if(selected&&selectedTicket){
-    const sc=STATUS_COLORS[selectedTicket.status]||"#6B7280";
-    return(
-      <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-        <div style={{background:"var(--am-card)",borderBottom:"1px solid var(--am-border)",padding:"14px 16px",flexShrink:0}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-            <button onClick={()=>setSelected(null)} style={{width:36,height:36,borderRadius:11,background:"var(--am-bg)",border:"1.5px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--am-text)",flexShrink:0}}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            </button>
-            <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:800,color:"var(--am-text)"}}>{selectedTicket.sub}</div>
-              <div style={{fontSize:11,color:"var(--am-muted)",marginTop:2}}>{selectedTicket.id} · {selectedTicket.cat} · {selectedTicket.date}</div>
-            </div>
-            <span style={{fontSize:11,background:`${sc}14`,color:sc,borderRadius:9,padding:"5px 12px",fontWeight:700,flexShrink:0}}>{selectedTicket.status}</span>
-          </div>
-        </div>
-        <div style={{flex:1,overflowY:"auto",padding:"16px",display:"flex",flexDirection:"column",gap:12}}>
-          {selectedTicket.msgs.map((m,i)=>(
-            <div key={i} style={{display:"flex",flexDirection:m.from==="me"?"row-reverse":"row",gap:10,alignItems:"flex-start"}}>
-              <div style={{width:32,height:32,borderRadius:10,background:m.from==="me"?"var(--am-accent)":"var(--am-bg)",border:"1.5px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:10,fontWeight:700,color:m.from==="me"?"#FFFFFF":"var(--am-muted)"}}>
-                {m.from==="me"?"من":"پش"}
-              </div>
-              <div style={{maxWidth:"78%"}}>
-                <div style={{background:m.from==="me"?"var(--am-accent)":"var(--am-card2)",border:m.from==="me"?"none":"1.5px solid var(--am-border)",borderRadius:m.from==="me"?"4px 16px 16px 16px":"16px 4px 16px 16px",padding:"12px 14px",boxShadow:"var(--am-shadow)"}}>
-                  <div style={{fontSize:13,color:m.from==="me"?"#FFFFFF":"var(--am-text)",lineHeight:1.7,direction:"rtl"}}>{m.text}</div>
-                </div>
-                <div style={{fontSize:10,color:"var(--am-faint)",marginTop:4,textAlign:m.from==="me"?"left":"right"}}>{m.date}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        {selectedTicket.open&&(
-          <div style={{flexShrink:0,padding:"12px 16px",background:"var(--am-card)",borderTop:"1px solid var(--am-border)"}}>
-            <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
-              <textarea value={reply} onChange={e=>setReply(e.target.value)} rows={2} placeholder="پاسخ خود را بنویسید..." style={{flex:1,background:"var(--am-bg)",border:"1.5px solid var(--am-border)",borderRadius:12,padding:"12px 14px",resize:"none",color:"var(--am-text)",fontSize:13,fontFamily:"Vazirmatn",direction:"rtl",outline:"none"}}/>
-              <button onClick={()=>{if(!reply.trim())return;const now="۱۴۰۳/۰۶/۱۶";setTickets(prev=>prev.map(t=>t.id===selected?{...t,msgs:[...t.msgs,{from:"me" as const,text:reply.trim(),date:now}]}:t));setReply("");}} style={{width:44,height:44,borderRadius:12,background:"var(--am-accent)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0}}>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return(
-    <div style={{paddingBottom:100}}>
-      <div style={{padding:"16px",background:"var(--am-card)",borderBottom:"1px solid var(--am-border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div>
-          <div style={{fontSize:16,fontWeight:900,color:"var(--am-text)"}}>تیکت‌های پشتیبانی</div>
-          <div style={{fontSize:12,color:"var(--am-muted)",marginTop:2}}>{toFaDigits(String(tickets.filter(t=>t.open).length))} تیکت باز</div>
-        </div>
-        <button onClick={()=>setShowNew(true)} style={{display:"flex",alignItems:"center",gap:8,padding:"11px 18px",background:"var(--am-accent)",border:"none",borderRadius:12,color:"#FFFFFF",fontSize:13,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:800}}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          تیکت جدید
-        </button>
-      </div>
-      <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
-        {tickets.map(t=>{
-          const sc=STATUS_COLORS[t.status]||"#6B7280";
-          return(
-            <button key={t.id} onClick={()=>setSelected(t.id)} style={{display:"block",width:"100%",background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:16,padding:"16px",cursor:"pointer",fontFamily:"Vazirmatn",textAlign:"right",boxShadow:"var(--am-shadow)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-                <div style={{flex:1,marginLeft:10}}>
-                  <div style={{fontSize:14,fontWeight:800,color:"var(--am-text)",lineHeight:1.4}}>{t.sub}</div>
-                  <div style={{fontSize:11,color:"var(--am-muted)",marginTop:3}}>{t.id} · {t.cat}</div>
-                </div>
-                <span style={{fontSize:11,background:`${sc}14`,color:sc,borderRadius:9,padding:"5px 11px",fontWeight:700,flexShrink:0}}>{t.status}</span>
-              </div>
-              <div style={{borderTop:"1px solid var(--am-border)",paddingTop:10,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:11,color:"var(--am-muted)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"70%"}}>{t.msgs[t.msgs.length-1].text.slice(0,45)}…</span>
-                <span style={{fontSize:10,color:"var(--am-faint)",flexShrink:0,marginRight:8}}>{t.date}</span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  type Ticket={id:number;subject:string;status:string;priority:string;updated_at:string;created_at:string};
+  const [tickets,setTickets]=useState<Ticket[]>([]);const[selected,setSelected]=useState<Ticket|null>(null);const[messages,setMessages]=useState<any[]>([]);const[subject,setSubject]=useState("");const[message,setMessage]=useState("");const[reply,setReply]=useState("");const[loading,setLoading]=useState(true);const[sending,setSending]=useState(false);
+  const token=()=>localStorage.getItem("anpardaz:accessToken")??"";
+  const load=async()=>{setLoading(true);try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/me/tickets",{headers:{authorization:"Bearer "+token()}});if(r.ok){const d=await r.json();setTickets(d.tickets??[])}}catch{}finally{setLoading(false)}};
+  useEffect(()=>{void load()},[]);
+  const open=async(t:Ticket)=>{setSelected(t);try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/me/tickets/"+t.id,{headers:{authorization:"Bearer "+token()}});if(r.ok){const d=await r.json();setMessages(d.messages??[])}}catch{}};
+  const sendReply=async()=>{if(!selected||!reply.trim()||sending||selected.status==="closed")return;setSending(true);try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/me/tickets/"+selected.id+"/messages",{method:"POST",headers:{authorization:"Bearer "+token(),"content-type":"application/json"},body:JSON.stringify({message:reply.trim()})});if(r.ok){setReply("");await open(selected);await load()}}catch{}finally{setSending(false)}};
+  const create=async()=>{if(!subject.trim()||!message.trim())return;setSending(true);try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/tickets",{method:"POST",headers:{authorization:"Bearer "+token(),"content-type":"application/json"},body:JSON.stringify({subject:subject.trim(),message:message.trim()})});if(r.ok){setSubject("");setMessage("");await load()}}catch{}finally{setSending(false)}};
+  useBackHandler(()=>{if(selected){setSelected(null);setMessages([])}else onBack()});
+  if(selected)return <div style={{display:"flex",flexDirection:"column",height:"100%"}}><div style={{padding:"14px 16px",background:"#fff",borderBottom:"1px solid var(--am-border)",display:"flex",gap:10,alignItems:"center"}}><button onClick={()=>{setSelected(null);setMessages([]);setReply("")}} style={{background:"none",border:"none",fontSize:22}}>‹</button><div style={{fontWeight:900}}>{selected.subject}<div style={{fontSize:10,color:"var(--am-muted)",marginTop:3}}>#{selected.id} · {selected.status}</div></div></div><div style={{flex:1,overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:10}}>{messages.map((m,i)=><div key={i} style={{alignSelf:m.author_type==="user"?"flex-start":"flex-end",maxWidth:"80%",padding:12,borderRadius:14,background:m.author_type==="user"?"var(--am-accent)":"#fff",color:m.author_type==="user"?"#fff":"var(--am-text)",border:"1px solid var(--am-border)"}}>{m.message}</div>)}</div>{selected.status!=="closed"&&<div style={{padding:12,background:"#fff",borderTop:"1px solid var(--am-border)"}}><textarea value={reply} onChange={e=>setReply(e.target.value)} placeholder="پاسخ شما..." rows={3} style={{width:"100%",boxSizing:"border-box",padding:10,border:"1px solid var(--am-border)",borderRadius:10,fontFamily:"Vazirmatn",resize:"vertical"}}/><button disabled={sending||!reply.trim()} onClick={()=>void sendReply()} style={{width:"100%",marginTop:8,padding:12,border:0,borderRadius:10,background:"var(--am-accent)",color:"#fff",fontFamily:"Vazirmatn",fontWeight:800}}>{sending?"در حال ارسال...":"ارسال پاسخ"}</button></div>}</div>;
+  return <div style={{paddingBottom:110}}><div style={{padding:"16px",background:"#fff",borderBottom:"1px solid var(--am-border)"}}><div style={{fontSize:17,fontWeight:900}}>تیکت‌های پشتیبانی</div><div style={{fontSize:12,color:"var(--am-muted)",marginTop:4}}>ثبت و پیگیری مستقیم در سیستم پشتیبانی آن مارکت</div></div><div style={{padding:16}}>{loading?<div style={{padding:30,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت...</div>:tickets.map(t=><button key={t.id} onClick={()=>void open(t)} style={{width:"100%",textAlign:"right",background:"#fff",border:"1px solid var(--am-border)",borderRadius:14,padding:14,marginBottom:10,fontFamily:"Vazirmatn"}}><div style={{fontWeight:800}}>{t.subject}</div><div style={{fontSize:11,color:"var(--am-muted)",marginTop:5}}>#{t.id} · {t.status} · {t.updated_at}</div></button>)}{!loading&&tickets.length===0&&<div style={{padding:24,textAlign:"center",color:"var(--am-muted)"}}>تیکتی ثبت نشده است.</div>}<div style={{marginTop:18,background:"#fff",border:"1px solid var(--am-border)",borderRadius:16,padding:16}}><div style={{fontWeight:900,marginBottom:10}}>تیکت جدید</div><input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع" style={{width:"100%",boxSizing:"border-box",padding:12,border:"1px solid var(--am-border)",borderRadius:10,marginBottom:10,fontFamily:"Vazirmatn"}}/><textarea value={message} onChange={e=>setMessage(e.target.value)} placeholder="شرح مشکل یا سؤال" rows={5} style={{width:"100%",boxSizing:"border-box",padding:12,border:"1px solid var(--am-border)",borderRadius:10,fontFamily:"Vazirmatn",resize:"vertical"}}/><button disabled={sending||!subject.trim()||!message.trim()} onClick={()=>void create()} style={{width:"100%",marginTop:10,padding:13,border:0,borderRadius:11,background:"var(--am-accent)",color:"#fff",fontFamily:"Vazirmatn",fontWeight:800}}>{sending?"در حال ارسال...":"ثبت تیکت"}</button></div></div></div>;
 }
-
-
-function AnCitySubPage({onBack}:{onBack:()=>void}){
-  void onBack;
-  const PROVINCES:{name:string;cities:string[]}[]=[
-    {name:"تهران",cities:["تهران","کرج","ری","شهریار","اسلامشهر","پاکدشت","ورامین","دماوند","فیروزکوه","ملارد","نظرآباد"]},
-    {name:"اصفهان",cities:["اصفهان","کاشان","خمینی‌شهر","نجف‌آباد","زاینده‌رود","شاهین‌شهر","فلاورجان","آران و بیدگل","گلپایگان","تیران و کرون"]},
-    {name:"خراسان رضوی",cities:["مشهد","نیشابور","سبزوار","قوچان","کاشمر","گناباد","فریمان","تربت حیدریه","تربت جام","رشتخوار"]},
-    {name:"فارس",cities:["شیراز","مرودشت","جهرم","فسا","لار","آباده","داراب","اقلید","نورآباد ممسنی","کازرون"]},
-    {name:"آذربایجان شرقی",cities:["تبریز","مراغه","مرند","بناب","اهر","میانه","ملکان","سراب","شبستر","هشترود"]},
-    {name:"خوزستان",cities:["اهواز","آبادان","خرمشهر","دزفول","ماهشهر","بهبهان","اندیمشک","ایذه","شوش","رامهرمز"]},
-    {name:"مازندران",cities:["ساری","بابل","آمل","قائم‌شهر","نوشهر","چالوس","بابلسر","تنکابن","جویبار","رامسر"]},
-    {name:"البرز",cities:["کرج","فردیس","گوهردشت","هشتگرد","نظرآباد","ساوجبلاغ","طالقان"]},
-    {name:"گیلان",cities:["رشت","انزلی","لاهیجان","لنگرود","صومعه‌سرا","شفت","رودبار","تالش","فومن","آستانه"]},
-    {name:"کرمان",cities:["کرمان","زاهدان","جیرفت","بم","رفسنجان","سیرجان","بردسیر","شهربابک","انار","زرند"]},
-    {name:"گلستان",cities:["گرگان","گنبد کاووس","علی‌آباد","کردکوی","آزادشهر","مینودشت","بندر ترکمن"]},
-    {name:"همدان",cities:["همدان","ملایر","نهاوند","تویسرکان","اسدآباد","بهار","رزن","کبودرآهنگ"]},
-    {name:"کرمانشاه",cities:["کرمانشاه","اسلام‌آباد غرب","هرسین","سنقر","صحنه","کنگاور","سرپل ذهاب"]},
-    {name:"آذربایجان غربی",cities:["ارومیه","خوی","مهاباد","بوکان","میاندوآب","سلماس","نقده","پیرانشهر"]},
-    {name:"سیستان و بلوچستان",cities:["زاهدان","زابل","خاش","ایرانشهر","چابهار","سراوان","نیکشهر"]},
-    {name:"قم",cities:["قم"]},
-    {name:"سمنان",cities:["سمنان","شاهرود","دامغان","گرمسار","ایوانکی","آرادان"]},
-    {name:"بوشهر",cities:["بوشهر","گناوه","دیلم","خارک","کنگان","جم"]},
-    {name:"زنجان",cities:["زنجان","ابهر","خرمدره","قیدار","ایجرود","ماه‌نشان"]},
-    {name:"مرکزی",cities:["اراک","ساوه","خمین","محلات","شازند","آشتیان","تفرش"]},
-    {name:"قزوین",cities:["قزوین","تاکستان","آبیک","بوئین‌زهرا","الموت"]},
-    {name:"اردبیل",cities:["اردبیل","مشگین‌شهر","پارس‌آباد","خلخال","بیله‌سوار","نمین","سرعین"]},
-    {name:"یزد",cities:["یزد","میبد","اردکان","ابرکوه","تفت","بافق","مهریز"]},
-    {name:"ایلام",cities:["ایلام","دهلران","مهران","آبدانان","دره‌شهر","شیروان","ایوان"]},
-    {name:"لرستان",cities:["خرم‌آباد","بروجرد","کوهدشت","الیگودرز","دورود","ازنا","نورآباد"]},
-    {name:"چهارمحال و بختیاری",cities:["شهرکرد","بروجن","فارسان","اردل","لردگان","اردال"]},
-    {name:"کهگیلویه و بویراحمد",cities:["یاسوج","دهدشت","سی‌سخت","دوگنبدان","بهمئی"]},
-    {name:"خراسان شمالی",cities:["بجنورد","شیروان","اسفراین","مانه و سملقان","جاجرم"]},
-    {name:"خراسان جنوبی",cities:["بیرجند","قاین","فردوس","طبس","سربیشه","بشرویه"]},
-    {name:"هرمزگان",cities:["بندرعباس","بندرلنگه","قشم","کیش","میناب","حاجی‌آباد"]},
-  ];
-  const [search,setSearch]=useState("");
-  const [selected,setSelected]=useState(()=>localStorage.getItem("anp_am_city")||"تهران");
-  const [tab,setTab]=useState<"search"|"map">("search");
-  const [expandedProvince,setExpandedProvince]=useState<string|null>("تهران");
-  const selectCity=(city:string)=>{setSelected(city);localStorage.setItem("anp_am_city",city);};
-
-  const allCities=PROVINCES.flatMap(p=>p.cities);
-  const filtered=search.trim()
-    ?allCities.filter(c=>c.includes(search.trim()))
-    :[];
-
-  const IranMapSVG=()=>(
-    <svg viewBox="0 0 400 320" style={{width:"100%",maxHeight:280}} xmlns="http://www.w3.org/2000/svg">
-      {/* Simplified Iran shape */}
-      <path d="M180 20 L200 18 L220 22 L245 30 L265 35 L280 30 L295 40 L310 55 L320 70 L330 90 L335 110 L340 130 L338 150 L330 165 L315 175 L300 185 L290 200 L280 215 L270 230 L255 240 L240 250 L225 258 L210 265 L200 270 L185 268 L170 260 L155 248 L140 235 L125 220 L110 205 L95 195 L80 185 L70 175 L60 160 L55 145 L50 130 L52 110 L58 92 L68 75 L80 60 L95 50 L110 42 L125 35 L140 28 L155 22 L170 20 Z" fill="rgba(10,158,140,0.08)" stroke="var(--am-accent)" strokeWidth="1.5" strokeLinejoin="round"/>
-      {/* Province dots */}
-      {[
-        {name:"تهران",x:218,y:105},{name:"اصفهان",x:195,y:150},{name:"مشهد",x:295,y:75},
-        {name:"شیراز",x:185,y:210},{name:"تبریز",x:110,y:60},{name:"اهواز",x:130,y:175},
-        {name:"کرمان",x:250,y:190},{name:"رشت",x:165,y:72},{name:"قم",x:205,y:120},
-        {name:"اردبیل",x:115,y:48},{name:"کرمانشاه",x:110,y:120},{name:"ارومیه",x:88,y:58},
-        {name:"زاهدان",x:295,y:220},{name:"سمنان",x:245,y:100},{name:"یزد",x:232,y:170},
-        {name:"بوشهر",x:168,y:230},{name:"گرگان",x:258,y:65},{name:"بیرجند",x:285,y:158},
-        {name:"بندرعباس",x:230,y:255},{name:"ایلام",x:100,y:140},{name:"زنجان",x:145,y:78},
-        {name:"خرم‌آباد",x:130,y:148},{name:"شهرکرد",x:168,y:168},{name:"همدان",x:145,y:108},
-        {name:"اراک",x:168,y:122},{name:"قزوین",x:172,y:88},{name:"یاسوج",x:158,y:198},
-      ].map(city=>(
-        <g key={city.name} onClick={()=>selectCity(city.name)} style={{cursor:"pointer"}}>
-          <circle cx={city.x} cy={city.y} r={city.name===selected?7:4} fill={city.name===selected?"var(--am-accent)":"rgba(10,158,140,0.5)"} stroke={city.name===selected?"#FFFFFF":"transparent"} strokeWidth="1.5"/>
-          <text x={city.x} y={city.y-10} textAnchor="middle" fontSize="7" fill={city.name===selected?"var(--am-accent)":"var(--am-muted)"} fontFamily="Vazirmatn" fontWeight={city.name===selected?"800":"400"}>{city.name}</text>
-        </g>
-      ))}
-      {/* Caspian Sea label */}
-      <text x="165" y="45" textAnchor="middle" fontSize="7" fill="rgba(99,102,241,0.6)" fontFamily="Vazirmatn">دریای خزر</text>
-      {/* Persian Gulf label */}
-      <text x="165" y="285" textAnchor="middle" fontSize="7" fill="rgba(99,102,241,0.6)" fontFamily="Vazirmatn">خلیج فارس</text>
-    </svg>
-  );
-
-  return(
-    <div style={{paddingBottom:100}}>
-      {/* Current city card */}
-      <div style={{background:"linear-gradient(135deg,rgba(10,158,140,0.1),rgba(10,158,140,0.03))",borderBottom:"1px solid var(--am-border)",padding:"18px 16px"}}>
-        <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <div style={{width:46,height:46,borderRadius:13,background:"var(--am-accent)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
-          </div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:11,color:"var(--am-muted)",fontWeight:600}}>شهر فعلی شما</div>
-            <div style={{fontSize:20,fontWeight:900,color:"var(--am-accent)",marginTop:2}}>{selected}</div>
-            <div style={{fontSize:11,color:"var(--am-muted)",marginTop:2,lineHeight:1.5}}>قیمت‌ها، موجودی و هزینه ارسال بر اساس این شهر نمایش داده می‌شود</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div style={{display:"flex",background:"var(--am-card)",borderBottom:"1px solid var(--am-border)"}}>
-        {([["search","جستجوی شهر"],["map","نقشه ایران"]] as const).map(([t,l])=>(
-          <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"14px",background:"none",border:"none",borderBottom:`2.5px solid ${tab===t?"var(--am-accent)":"transparent"}`,color:tab===t?"var(--am-accent)":"var(--am-muted)",fontFamily:"Vazirmatn",fontSize:14,fontWeight:tab===t?800:500,cursor:"pointer",transition:"all .15s"}}>{l}</button>
-        ))}
-      </div>
-
-      {tab==="search"&&(
-        <div style={{padding:"14px 16px"}}>
-          {/* Search input */}
-          <div style={{display:"flex",gap:10,alignItems:"center",background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:16,padding:"13px 16px",marginBottom:16,boxShadow:"var(--am-shadow)"}}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="نام شهر را جستجو کنید..." style={{flex:1,background:"none",border:"none",outline:"none",color:"var(--am-text)",fontSize:15,fontFamily:"Vazirmatn",direction:"rtl"}}/>
-            {search&&<button onClick={()=>setSearch("")} style={{background:"none",border:"none",color:"var(--am-faint)",cursor:"pointer",fontSize:20,lineHeight:1,padding:0}}>×</button>}
-          </div>
-
-          {search.trim()?(
-            /* Search results */
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
-              {filtered.length===0
-                ?<div style={{textAlign:"center",padding:"32px",color:"var(--am-muted)",fontSize:14}}>شهری با این نام یافت نشد</div>
-                :filtered.map(city=>(
-                  <button key={city} onClick={()=>selectCity(city)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",textAlign:"right",background:city===selected?"var(--am-accent-light)":"var(--am-card)",border:`1.5px solid ${city===selected?"var(--am-accent)":"var(--am-border)"}`,borderRadius:13,padding:"15px 16px",cursor:"pointer",fontFamily:"Vazirmatn",fontSize:14,color:city===selected?"var(--am-accent)":"var(--am-text)",fontWeight:city===selected?800:500,boxShadow:"var(--am-shadow)"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>
-                      {city}
-                    </div>
-                    {city===selected&&<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>}
-                  </button>
-                ))
-              }
-            </div>
-          ):(
-            /* Province accordion */
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {PROVINCES.filter((p,i,arr)=>arr.findIndex(q=>q.name===p.name)===i).map(prov=>(
-                <div key={prov.name} style={{background:"var(--am-card)",border:`1.5px solid ${expandedProvince===prov.name?"var(--am-accent)":"var(--am-border)"}`,borderRadius:14,overflow:"hidden",boxShadow:"var(--am-shadow)"}}>
-                  <button onClick={()=>setExpandedProvince(expandedProvince===prov.name?null:prov.name)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"14px 16px",background:"none",border:"none",cursor:"pointer",fontFamily:"Vazirmatn",color:expandedProvince===prov.name?"var(--am-accent)":"var(--am-text)",fontWeight:700,fontSize:14}}>
-                    <span>{prov.name}</span>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{transform:expandedProvince===prov.name?"rotate(-90deg)":"rotate(0deg)",transition:"transform .2s"}}><path d="M15 18l-6-6 6-6"/></svg>
-                  </button>
-                  {expandedProvince===prov.name&&(
-                    <div style={{borderTop:"1px solid var(--am-border)",display:"flex",flexWrap:"wrap",gap:6,padding:"12px 14px"}}>
-                      {prov.cities.map(city=>(
-                        <button key={city} onClick={()=>selectCity(city)} style={{padding:"8px 14px",borderRadius:10,background:city===selected?"var(--am-accent)":"var(--am-bg)",border:`1px solid ${city===selected?"var(--am-accent)":"var(--am-border)"}`,color:city===selected?"#FFFFFF":"var(--am-text)",fontSize:13,fontFamily:"Vazirmatn",fontWeight:city===selected?800:500,cursor:"pointer"}}>
-                          {city}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {tab==="map"&&(
-        <div style={{padding:"16px"}}>
-          <div style={{background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:18,padding:"16px",boxShadow:"var(--am-shadow)",marginBottom:14}}>
-            <div style={{fontSize:12,color:"var(--am-muted)",marginBottom:10,textAlign:"center"}}>روی هر شهر تپ کنید تا انتخاب شود</div>
-            <IranMapSVG/>
-          </div>
-          <div style={{background:"rgba(10,158,140,0.06)",border:"1px solid rgba(10,158,140,0.2)",borderRadius:14,padding:"13px 16px",textAlign:"center"}}>
-            <div style={{fontSize:13,color:"var(--am-muted)"}}>شهر انتخابی:</div>
-            <div style={{fontSize:18,fontWeight:900,color:"var(--am-accent)",marginTop:4}}>{selected}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirm button */}
-      <div style={{padding:"0 16px 16px",position:"sticky",bottom:80}}>
-        <button style={{width:"100%",padding:"16px",background:"var(--am-accent)",border:"none",borderRadius:16,color:"#FFFFFF",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn",boxShadow:"0 4px 16px rgba(10,158,140,0.3)"}}>
-          تأیید — {selected}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-
-function AnMeSubPage({view,onProduct,onBack}:{view:AnView;onProduct:(pid:string)=>void;onBack:()=>void}){
-  useBackHandler(onBack);
-  const [selOrder,setSelOrder]=useState<null|{id:string;date:string;status:string;sc:string;product:string;price:number;qty:number;seller:string;orderNum:string;img:string}>(null);
-  const MOCK_ORDERS=[
-    {id:"ORD-۱۲۳۴",date:"۱۴۰۳/۰۶/۱۵",status:"تحویل داده شده",sc:"#10B981",product:"لپ‌تاپ ایسوس VivoBook 15",price:57500000,qty:1,seller:"دیجی‌کالا",orderNum:"#DK-8821",img:"https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=200&h=200&fit=crop"},
-    {id:"ORD-۱۲۳۳",date:"۱۴۰۳/۰۵/۲۸",status:"در حال ارسال",sc:"#3B82F6",product:"هدفون سونی WH-1000XM5",price:12800000,qty:1,seller:"تکنولایف",orderNum:"#TL-5503",img:"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200&h=200&fit=crop"},
-    {id:"ORD-۱۲۳۲",date:"۱۴۰۳/۰۵/۱۰",status:"تحویل داده شده",sc:"#10B981",product:"گوشی Galaxy A54",price:18500000,qty:1,seller:"ایمالز",orderNum:"#IM-3317",img:"https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=200&h=200&fit=crop"},
-    {id:"ORD-۱۲۳۱",date:"۱۴۰۳/۰۴/۰۲",status:"در انتظار ارسال",sc:"#F59E0B",product:"ماوس لاجیتک MX Master 3",price:4200000,qty:2,seller:"دیجی‌کالا",orderNum:"#DK-7703",img:"https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=200&h=200&fit=crop"},
-    {id:"ORD-۱۲۳۰",date:"۱۴۰۳/۰۳/۱۸",status:"لغو شده",sc:"#EF4444",product:"کیبورد مکانیکال Keychron K2",price:3800000,qty:1,seller:"پی‌استور",orderNum:"#PS-2201",img:"https://images.unsplash.com/photo-1541140532154-b024d705b90a?w=200&h=200&fit=crop"},
-  ];
-  const MOCK_ALERTS=[
-    {pid:"iphone15pm",title:"آیفون ۱۵ پرو مکس ۲۵۶ گیگ",target:135000000,current:142000000,enabled:true,lastUpdate:"دیروز",img:"https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=200&h=200&fit=crop"},
-    {pid:"macbook-m2",title:"مک‌بوک ایر M2 ۸ گیگ",target:85000000,current:89000000,enabled:true,lastUpdate:"۳ روز پیش",img:"https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200&h=200&fit=crop"},
-    {pid:"samsung-tv65",title:"تلویزیون سامسونگ ۶۵ اینچ UHD",target:52000000,current:58000000,enabled:false,lastUpdate:"امروز",img:"https://images.unsplash.com/photo-1593359677879-a4bb92f4834c?w=200&h=200&fit=crop"},
-    {pid:"dyson-v15",title:"جاروبرقی دایسون V15 Detect",target:32000000,current:34500000,enabled:true,lastUpdate:"۱ ساعت پیش",img:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200&h=200&fit=crop"},
-  ];
-  const [alertStates,setAlertStates]=useState<Record<string,boolean>>(()=>Object.fromEntries(MOCK_ALERTS.map(a=>[a.pid,a.enabled])));
-  const favProds=AN_PRODS.slice(0,6);
-  const recentProds=AN_PRODS.slice(2,10);
-  const compareProds=AN_PRODS.slice(0,3);
-  const wrap=(content:React.ReactNode)=>(
-    <div style={{paddingBottom:100}}>{content}</div>
-  );
-
-  if(view.t==="me-orders")return wrap(
-    <div style={{padding:"14px 16px",position:"relative"}}>
-      {/* Order detail overlay */}
-      {selOrder&&(
-        <div style={{position:"fixed",inset:0,zIndex:800,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={()=>setSelOrder(null)}>
-          <div style={{background:"rgba(0,0,0,0.5)",position:"absolute",inset:0}}/>
-          <div style={{position:"relative",background:"var(--am-card)",borderRadius:"24px 24px 0 0",padding:"24px",zIndex:1,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-            <div style={{width:44,height:4,borderRadius:2,background:"var(--am-border)",margin:"0 auto 20px",flexShrink:0}}/>
-            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-              <img src={selOrder.img} alt={selOrder.product} style={{width:72,height:72,borderRadius:14,objectFit:"cover",flexShrink:0,border:"1px solid var(--am-border)"}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:800,color:"var(--am-text)",lineHeight:1.4,marginBottom:6}}>{selOrder.product}</div>
-                <div style={{display:"inline-block",background:`${selOrder.sc}14`,border:`1px solid ${selOrder.sc}40`,borderRadius:8,padding:"4px 10px",fontSize:12,fontWeight:700,color:selOrder.sc}}>{selOrder.status}</div>
-              </div>
-            </div>
-            {/* Details grid */}
-            <div style={{background:"var(--am-bg)",borderRadius:16,overflow:"hidden",marginBottom:16}}>
-              {[
-                {label:"شماره سفارش",val:selOrder.orderNum},
-                {label:"فروشگاه",val:selOrder.seller},
-                {label:"تاریخ ثبت",val:selOrder.date},
-                {label:"تعداد",val:toFaDigits(String(selOrder.qty))+" عدد"},
-                {label:"مبلغ کل",val:fa(selOrder.price*selOrder.qty)+" تومان"},
-              ].map((row,i,arr)=>(
-                <div key={row.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 16px",borderBottom:i<arr.length-1?"1px solid var(--am-border)":"none"}}>
-                  <span style={{fontSize:13,color:"var(--am-muted)"}}>{row.label}</span>
-                  <span style={{fontSize:13,fontWeight:700,color:"var(--am-text)"}}>{row.val}</span>
-                </div>
-              ))}
-            </div>
-            {/* Timeline */}
-            <div style={{fontSize:13,fontWeight:800,color:"var(--am-text)",marginBottom:12}}>وضعیت سفارش</div>
-            <div style={{position:"relative",paddingRight:24,marginBottom:20}}>
-              <div style={{position:"absolute",right:8,top:6,bottom:6,width:2,background:"var(--am-border)"}}/>
-              {[
-                {label:"ثبت سفارش",done:true,date:selOrder.date},
-                {label:"تأیید و پردازش",done:selOrder.status!=="در انتظار ارسال"&&selOrder.status!=="لغو شده",date:""},
-                {label:"ارسال",done:selOrder.status==="تحویل داده شده"||selOrder.status==="در حال ارسال",date:""},
-                {label:"تحویل",done:selOrder.status==="تحویل داده شده",date:""},
-              ].map((step,i)=>(
-                <div key={i} style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:14,position:"relative"}}>
-                  <div style={{width:16,height:16,borderRadius:"50%",background:step.done?selOrder.sc:"var(--am-border)",flexShrink:0,marginTop:2,border:`2px solid ${step.done?selOrder.sc:"var(--am-border)"}`,position:"relative",zIndex:1}}/>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:step.done?700:400,color:step.done?"var(--am-text)":"var(--am-muted)"}}>{step.label}</div>
-                    {step.date&&<div style={{fontSize:11,color:"var(--am-muted)",marginTop:2}}>{step.date}</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button onClick={()=>setSelOrder(null)} style={{width:"100%",padding:"15px",background:"var(--am-bg)",border:"1.5px solid var(--am-border)",borderRadius:14,color:"var(--am-muted)",fontSize:14,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:700}}>بستن</button>
-          </div>
-        </div>
-      )}
-      <div style={{fontSize:16,fontWeight:900,color:"var(--am-text)",marginBottom:4}}>خریدهای من</div>
-      <div style={{fontSize:12,color:"var(--am-muted)",marginBottom:16}}>{toFaDigits(String(MOCK_ORDERS.length))} سفارش</div>
-      {MOCK_ORDERS.map(o=>(
-        <div key={o.id} style={{background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:18,marginBottom:14,overflow:"hidden",boxShadow:"var(--am-shadow)"}}>
-          {/* Status bar */}
-          <div style={{padding:"10px 16px",background:`${o.sc}0A`,borderBottom:"1px solid var(--am-border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:12,fontWeight:800,color:o.sc}}>{o.status}</span>
-            <span style={{fontSize:11,color:"var(--am-muted)"}}>{o.orderNum}</span>
-          </div>
-          {/* Product row */}
-          <div style={{padding:"14px 16px",display:"flex",gap:14,alignItems:"flex-start"}}>
-            <div style={{width:72,height:72,borderRadius:13,overflow:"hidden",flexShrink:0,background:"var(--am-bg)"}}>
-              <img src={o.img} alt={o.product} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-            </div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:800,color:"var(--am-text)",lineHeight:1.4,marginBottom:5}}>{o.product}</div>
-              <div style={{fontSize:12,color:"var(--am-muted)",marginBottom:4}}>فروشگاه: {o.seller}</div>
-              <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                <div style={{fontSize:15,fontWeight:900,color:"var(--am-accent)"}}>{fa(o.price)} تومان</div>
-                <div style={{fontSize:11,color:"var(--am-muted)"}}>× {toFaDigits(String(o.qty))}</div>
-              </div>
-            </div>
-          </div>
-          {/* Footer */}
-          <div style={{padding:"10px 16px",borderTop:"1px solid var(--am-border)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{fontSize:11,color:"var(--am-muted)"}}>{o.date}</span>
-            <button onClick={()=>setSelOrder(o)} style={{padding:"8px 16px",background:"var(--am-accent-light)",border:"1px solid var(--am-accent-border)",borderRadius:10,color:"var(--am-accent)",fontSize:12,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:700}}>جزئیات سفارش</button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  if(view.t==="me-fav")return wrap(
-    <div style={{padding:"14px 16px"}}>
-      <div style={{fontSize:16,fontWeight:900,color:"var(--am-text)",marginBottom:16}}>علاقه‌مندی‌ها</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        {favProds.map(p=>(
-          <button key={p.id} onClick={()=>onProduct(p.id)} style={{background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:16,overflow:"hidden",cursor:"pointer",padding:0,fontFamily:"Vazirmatn",textAlign:"right",boxShadow:"var(--am-shadow)"}}>
-            <div style={{width:"100%",aspectRatio:"1",background:"var(--am-bg)",overflow:"hidden"}}>
-              <img src={p.img} alt={p.title} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-            </div>
-            <div style={{padding:"10px 11px 12px"}}>
-              <div style={{fontSize:10,color:"var(--am-accent)",fontWeight:700,marginBottom:3}}>{p.brand}</div>
-              <div style={{fontSize:12,fontWeight:700,color:"var(--am-text)",lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",marginBottom:6}}>{p.title}</div>
-              <div style={{fontSize:13,fontWeight:900,color:"var(--am-accent)"}}>از {fa(p.priceMin)}<span style={{fontSize:10,fontWeight:400}}> ت</span></div>
-              <div style={{fontSize:10,color:"var(--am-muted)",marginTop:2}}>{toFaDigits(String(p.storeCount))} فروشگاه</div>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  if(view.t==="me-alerts")return wrap(
-    <div style={{padding:"14px 16px"}}>
-      <div style={{fontSize:16,fontWeight:900,color:"var(--am-text)",marginBottom:4}}>هشدارهای قیمت</div>
-      <div style={{fontSize:12,color:"var(--am-muted)",marginBottom:16}}>{toFaDigits(String(MOCK_ALERTS.filter(a=>alertStates[a.pid]).length))} هشدار فعال</div>
-      {MOCK_ALERTS.map(a=>{
-        const diff=a.current-a.target;
-        const pct=Math.round(diff/a.target*100);
-        const achieved=diff<=0;
-        return(
-          <div key={a.pid} style={{background:"var(--am-card)",border:`1.5px solid ${achieved?"rgba(16,185,129,0.3)":"var(--am-border)"}`,borderRadius:18,marginBottom:14,overflow:"hidden",boxShadow:"var(--am-shadow)"}}>
-            <div style={{display:"flex",gap:14,padding:"14px 16px",alignItems:"flex-start"}}>
-              <div style={{width:66,height:66,borderRadius:13,overflow:"hidden",flexShrink:0,background:"var(--am-bg)"}}>
-                <img src={a.img} alt={a.title} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                  <div style={{fontSize:13,fontWeight:800,color:"var(--am-text)",lineHeight:1.4,flex:1,marginLeft:8}}>{a.title}</div>
-                  <button onClick={()=>setAlertStates(p=>({...p,[a.pid]:!p[a.pid]}))} style={{width:38,height:22,borderRadius:11,background:alertStates[a.pid]?"var(--am-accent)":"var(--am-bg)",border:`1.5px solid ${alertStates[a.pid]?"var(--am-accent)":"var(--am-border)"}`,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:alertStates[a.pid]?"flex-end":"flex-start",padding:"2px 3px",transition:"all .15s"}}>
-                    <div style={{width:16,height:16,borderRadius:"50%",background:"var(--am-card)",boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}}/>
-                  </button>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}>
-                  <span style={{color:"var(--am-muted)"}}>قیمت هدف</span>
-                  <span style={{fontWeight:700,color:"var(--am-text)"}}>{fa(a.target)} ت</span>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
-                  <span style={{color:"var(--am-muted)"}}>قیمت فعلی</span>
-                  <span style={{fontWeight:800,color:achieved?"#10B981":"#F59E0B"}}>{fa(a.current)} ت</span>
-                </div>
-              </div>
-            </div>
-            <div style={{padding:"10px 16px",borderTop:"1px solid var(--am-border)",display:"flex",justifyContent:"space-between",alignItems:"center",background:achieved?"rgba(16,185,129,0.04)":"transparent"}}>
-              {achieved
-                ?<span style={{fontSize:12,fontWeight:800,color:"#10B981"}}>هشدار فعال شد — قیمت به هدف رسید</span>
-                :<span style={{fontSize:11,color:"var(--am-muted)"}}>بالاتر از هدف: +{fa(diff)} ت (+{toFaDigits(String(pct))}٪)</span>
-              }
-              <span style={{fontSize:10,color:"var(--am-faint)"}}>{a.lastUpdate}</span>
-            </div>
-          </div>
-        );
-      })}
-      <button style={{width:"100%",padding:"16px",background:"rgba(10,158,140,0.06)",border:"2px dashed rgba(10,158,140,0.3)",borderRadius:16,color:"var(--am-accent)",fontSize:14,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        افزودن هشدار قیمت جدید
-      </button>
-    </div>
-  );
-
-  if(view.t==="me-recent")return wrap(
-    <div style={{padding:"14px 16px"}}>
-      <div style={{fontSize:16,fontWeight:900,color:"var(--am-text)",marginBottom:16}}>اخیراً مشاهده‌شده</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-        {recentProds.map(p=>(
-          <button key={p.id} onClick={()=>onProduct(p.id)} style={{background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:16,overflow:"hidden",cursor:"pointer",padding:0,fontFamily:"Vazirmatn",textAlign:"right",boxShadow:"var(--am-shadow)"}}>
-            <div style={{width:"100%",aspectRatio:"1",background:"var(--am-bg)",overflow:"hidden"}}>
-              <img src={p.img} alt={p.title} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-            </div>
-            <div style={{padding:"10px 11px 12px"}}>
-              <div style={{fontSize:10,color:"var(--am-accent)",fontWeight:700,marginBottom:3}}>{p.brand}</div>
-              <div style={{fontSize:12,fontWeight:700,color:"var(--am-text)",lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",marginBottom:6}}>{p.title}</div>
-              <div style={{fontSize:13,fontWeight:900,color:"var(--am-accent)"}}>از {fa(p.priceMin)}<span style={{fontSize:10,fontWeight:400}}> ت</span></div>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  if(view.t==="me-compare")return wrap(
-    <div style={{padding:"14px 16px"}}>
-      <div style={{fontSize:16,fontWeight:900,color:"var(--am-text)",marginBottom:4}}>مقایسه‌های من</div>
-      <div style={{fontSize:12,color:"var(--am-muted)",marginBottom:16}}>مقایسه‌های ذخیره‌شده</div>
-      <div style={{background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:18,padding:"16px",boxShadow:"var(--am-shadow)"}}>
-        <div style={{fontSize:13,fontWeight:700,color:"var(--am-muted)",marginBottom:14}}>مقایسه اخیر — {toFaDigits(String(compareProds.length))} محصول</div>
-        <div style={{display:"grid",gridTemplateColumns:`repeat(${compareProds.length},1fr)`,gap:12}}>
-          {compareProds.map(p=>(
-            <button key={p.id} onClick={()=>onProduct(p.id)} style={{background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:"Vazirmatn",textAlign:"right"}}>
-              <div style={{width:"100%",aspectRatio:"1",borderRadius:11,overflow:"hidden",background:"var(--am-bg)"}}>
-                <img src={p.img} alt={p.title} style={{width:"100%",height:"100%",objectFit:"cover"}} loading="lazy"/>
-              </div>
-              <div style={{fontSize:11,fontWeight:700,color:"var(--am-text)",marginTop:8,lineHeight:1.4}}>{p.title.split("—")[0].slice(0,30)}</div>
-              <div style={{fontSize:12,color:"var(--am-accent)",fontWeight:800,marginTop:3}}>از {fa(p.priceMin)}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  if(view.t==="me-tickets")return <AnTicketsSubPage onBack={onBack}/>;
-  if(view.t==="me-city")return <AnCitySubPage onBack={onBack}/>;
-
-  if(view.t==="me-support")return wrap(
-    <div style={{padding:"14px 16px"}}>
-      <div style={{fontSize:16,fontWeight:900,color:"var(--am-text)",marginBottom:4}}>مرکز پشتیبانی</div>
-      <div style={{fontSize:12,color:"var(--am-muted)",marginBottom:18}}>چطور می‌توانیم کمک کنیم؟</div>
-      {/* Quick help options */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-        {[
-          {label:"راهنمای خرید",desc:"چطور خرید کنم",icon:"M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zM11 11V7h2v4h4v2h-4v4h-2v-4H7v-2h4z",color:"#10B981"},
-          {label:"راهنمای سفارش",desc:"پیگیری ارسال",icon:"M5 8h14M5 8a2 2 0 1 0 0-4h14a2 2 0 1 0 0 4M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8m-9 4h4",color:"#F59E0B"},
-        ].map(item=>(
-          <button key={item.label} style={{background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:16,padding:"16px",cursor:"pointer",fontFamily:"Vazirmatn",textAlign:"right",boxShadow:"var(--am-shadow)"}}>
-            <div style={{width:40,height:40,borderRadius:12,background:`${item.color}14`,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:10}}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={item.color} strokeWidth="1.8" strokeLinecap="round"><path d={item.icon}/></svg>
-            </div>
-            <div style={{fontSize:13,fontWeight:800,color:"var(--am-text)"}}>{item.label}</div>
-            <div style={{fontSize:11,color:"var(--am-muted)",marginTop:3}}>{item.desc}</div>
-          </button>
-        ))}
-      </div>
-      {/* FAQ */}
-      <div style={{fontSize:13,fontWeight:800,color:"var(--am-text)",marginBottom:12}}>سوالات متداول</div>
-      <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:20}}>
-        {[
-          {q:"چطور سفارش بدم؟",a:"در هر صفحه محصول روی «مشاهده و خرید» کلیک کنید و به فروشگاه مورد نظر هدایت می‌شوید."},
-          {q:"چطور هشدار قیمت بسازم؟",a:"در صفحه محصول روی «هشدار قیمت» کلیک کنید و قیمت هدف را تنظیم کنید."},
-          {q:"آیا مرجوعی امکان‌پذیر است؟",a:"مرجوعی بر اساس قوانین فروشگاه مربوطه انجام می‌شود. آن مارکت یک پلتفرم مقایسه قیمت است."},
-          {q:"چطور قیمت‌ها آپدیت می‌شوند؟",a:"قیمت‌ها به صورت منظم از فروشگاه‌های عضو دریافت می‌شوند و ممکن است با تأخیر همراه باشند."},
-          {q:"چطور با پشتیبانی تماس بگیرم؟",a:"از طریق ثبت تیکت یا تماس با ۰۲۱-۱۲۳۴۵۶۷۸ (شنبه تا پنجشنبه ۹ تا ۱۸)."},
-        ].map((item,i)=>(
-          <div key={i} style={{background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:14,padding:"14px 16px",boxShadow:"var(--am-shadow)"}}>
-            <div style={{fontSize:13,fontWeight:700,color:"var(--am-text)",marginBottom:7}}>{item.q}</div>
-            <div style={{fontSize:12,color:"var(--am-muted)",lineHeight:1.7}}>{item.a}</div>
-          </div>
-        ))}
-      </div>
-      {/* Contact box */}
-      <div style={{background:"rgba(10,158,140,0.05)",border:"1.5px solid rgba(10,158,140,0.2)",borderRadius:18,padding:"18px"}}>
-        <div style={{fontSize:14,fontWeight:800,color:"var(--am-accent)",marginBottom:6}}>تماس مستقیم با پشتیبانی</div>
-        <div style={{fontSize:12,color:"var(--am-muted)",marginBottom:6,lineHeight:1.6}}>۰۲۱-۱۲۳۴۵۶۷۸ · شنبه تا پنجشنبه ۹ تا ۱۸</div>
-        <div style={{fontSize:12,color:"var(--am-muted)",lineHeight:1.6}}>برای ثبت تیکت از بخش «تیکت‌های من» در منوی حساب استفاده کنید.</div>
-      </div>
-    </div>
-  );
-
-  if(view.t==="me-reg")return wrap(
-    <div style={{paddingBottom:20}}>
-      {/* Hero */}
-      <div style={{background:"var(--am-card2)",padding:"28px 20px 24px",borderBottom:"1px solid var(--am-border)"}}>
-        <div style={{width:56,height:56,borderRadius:16,background:"var(--am-accent)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:16,boxShadow:"0 4px 16px rgba(10,158,140,0.3)"}}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        </div>
-        <div style={{fontSize:22,fontWeight:900,color:"var(--am-text)",marginBottom:8}}>فروشگاه خود را در آن مارکت ثبت کنید</div>
-        <div style={{fontSize:13,color:"var(--am-muted)",lineHeight:1.8}}>به شبکه‌ای از صدها فروشگاه معتبر بپیوندید و محصولات خود را به میلیون‌ها کاربر ارائه دهید.</div>
-      </div>
-      {/* Benefits */}
-      <div style={{padding:"20px 16px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:24}}>
-          {[
-            {icon:"M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z",label:"مدیریت محصولات",desc:"لیست، ویرایش، موجودی"},
-            {icon:"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",label:"سفارش و پرداخت",desc:"مدیریت آسان سفارشات"},
-            {icon:"M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z",label:"گزارش فروش",desc:"تحلیل و آمار"},
-            {icon:"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",label:"پشتیبانی فروشنده",desc:"تیم اختصاصی"},
-          ].map(b=>(
-            <div key={b.label} style={{background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:16,padding:"16px",boxShadow:"var(--am-shadow)"}}>
-              <div style={{width:36,height:36,borderRadius:10,background:"rgba(10,158,140,0.08)",display:"flex",alignItems:"center",justifyContent:"center",marginBottom:10}}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="1.8" strokeLinecap="round"><path d={b.icon}/></svg>
-              </div>
-              <div style={{fontSize:12,fontWeight:800,color:"var(--am-text)",marginBottom:3}}>{b.label}</div>
-              <div style={{fontSize:10,color:"var(--am-muted)"}}>{b.desc}</div>
-            </div>
-          ))}
-        </div>
-        {/* Form */}
-        <div style={{fontSize:15,fontWeight:900,color:"var(--am-text)",marginBottom:16}}>اطلاعات فروشگاه</div>
-        {[{label:"نام فروشگاه",ph:"مثلاً: فروشگاه نوین الکترونیک"},{label:"شماره تماس",ph:"۰۲۱-XXXXXXXX"},{label:"ایمیل",ph:"info@mystore.com"},{label:"نوع کسب‌وکار",ph:"فروشگاه آنلاین / حضوری / هر دو"},{label:"آدرس",ph:"استان، شهر، خیابان..."},{label:"کد اقتصادی / شناسه ملی",ph:"۱۰..."}].map(f=>(
-          <div key={f.label} style={{marginBottom:14}}>
-            <div style={{fontSize:12,fontWeight:700,color:"var(--am-muted)",marginBottom:7}}>{f.label}</div>
-            <input placeholder={f.ph} style={{width:"100%",background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:13,padding:"14px 16px",color:"var(--am-text)",fontSize:14,fontFamily:"Vazirmatn",outline:"none",direction:"rtl",boxSizing:"border-box"}}/>
-          </div>
-        ))}
-        <button style={{width:"100%",padding:"17px",background:"var(--am-accent)",border:"none",borderRadius:16,color:"#FFFFFF",fontSize:15,fontWeight:900,cursor:"pointer",fontFamily:"Vazirmatn",marginTop:12,boxShadow:"0 4px 16px rgba(10,158,140,0.3)"}}>ادامه ثبت‌نام فروشگاه</button>
-        <div style={{fontSize:11,color:"var(--am-muted)",textAlign:"center",marginTop:12,lineHeight:1.6}}>با ثبت‌نام، با قوانین و مقررات آن مارکت موافقت می‌کنید</div>
-      </div>
-    </div>
-  );
-
-  if(view.t==="me-panel")return wrap(
-    <div style={{padding:"14px 16px"}}>
-      {/* Store header */}
-      <div style={{background:"var(--am-card2)",border:"1px solid var(--am-accent-border)",borderRadius:18,padding:"20px",marginBottom:18,position:"relative",overflow:"hidden"}}>
-        <div style={{position:"absolute",top:-30,right:-30,width:100,height:100,borderRadius:"50%",background:"radial-gradient(circle,var(--am-accent-glow) 0%,transparent 70%)",pointerEvents:"none"}}/>
-        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:16,position:"relative"}}>
-          <div style={{width:50,height:50,borderRadius:14,background:"var(--am-accent-light)",border:"1px solid var(--am-accent-border)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-          </div>
-          <div>
-            <div style={{fontSize:17,fontWeight:900,color:"var(--am-text)"}}>فروشگاه نمونه</div>
-            <div style={{fontSize:12,color:"var(--am-muted)",marginTop:2}}>امتیاز: ۴.۶ ★</div>
-          </div>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,position:"relative"}}>
-          {[["۲۳م","فروش"],["۷","سفارش"],["۴۳","محصول"]].map(([v,l])=>(
-            <div key={l} style={{background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:12,padding:"10px 6px",textAlign:"center"}}>
-              <div style={{fontSize:18,fontWeight:900,color:"var(--am-accent)"}}>{v}</div>
-              <div style={{fontSize:10,color:"var(--am-muted)",marginTop:2}}>{l}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {/* Modules */}
-      <div style={{fontSize:13,fontWeight:700,color:"var(--am-muted)",marginBottom:12}}>ماژول‌های مدیریت</div>
-      <div style={{background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:16,overflow:"hidden",boxShadow:"var(--am-shadow)"}}>
-        {[
-          {label:"محصولات من",desc:"مدیریت موجودی و لیست",icon:"M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",color:"#3B82F6"},
-          {label:"سفارشات",desc:"مشاهده و پردازش سفارشات",icon:"M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2",color:"#10B981"},
-          {label:"مدیریت قیمت‌ها",desc:"تنظیم و آپدیت قیمت",icon:"M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",color:"#F59E0B"},
-          {label:"گزارش‌های فروش",desc:"تحلیل درآمد و سود",icon:"M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10",color:"#8B5CF6"},
-          {label:"تیکت‌های فروش",desc:"پشتیبانی مشتریان",icon:"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",color:"#EC4899"},
-          {label:"اطلاعات فروشگاه",desc:"پروفایل و مشخصات",icon:"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",color:"#14B8A6"},
-        ].map(item=>(
-          <button key={item.label} className="am-me-list-btn">
-            <div className="am-me-list-icon" style={{background:`${item.color}14`,color:item.color}}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={item.icon}/></svg>
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:700,color:"var(--am-text)"}}>{item.label}</div>
-              <div style={{fontSize:11,color:"var(--am-muted)",marginTop:2}}>{item.desc}</div>
-            </div>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--am-faint)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  return wrap(<div style={{textAlign:"center",padding:"48px 24px",color:"var(--am-muted)",fontSize:14}}>محتوای این بخش در حال توسعه است.</div>);
-}
-
-function ComparisonPopup({ids,onClose,onMinimize,minimized,onProduct}:{ids:string[];onClose:()=>void;onMinimize:()=>void;minimized:boolean;onProduct:(pid:string)=>void}){
-  const prods=ids.map(id=>ALL_MOCK_PRODS.find(p=>p.id===id)).filter(Boolean) as AnProduct[];
-  if(ids.length===0)return null;
-  const winner=prods.reduce((best,p)=>p.rating>best.rating?p:best,prods[0]);
-  if(minimized){
-    return(
-      <div style={{position:"fixed",bottom:70,left:0,right:0,zIndex:200,padding:"0 16px"}}>
-        <div style={{background:"var(--am-card)",border:"1.5px solid var(--am-accent)",borderRadius:18,padding:"14px 18px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 8px 32px rgba(10,158,140,0.2)"}}>
-          <div style={{width:36,height:36,borderRadius:10,background:"rgba(10,158,140,0.1)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2" strokeLinecap="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
-          </div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:13,fontWeight:700,color:"var(--am-accent)",marginBottom:2}}>حالت مقایسه فعال</div>
-            <div style={{fontSize:11,color:"var(--am-muted)"}}>{toFaDigits(String(ids.length))} محصول انتخابی</div>
-          </div>
-          <button onClick={onMinimize} style={{padding:"8px 16px",background:"var(--am-accent)",border:"none",borderRadius:10,color:"#FFFFFF",fontSize:12,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:700}}>مشاهده</button>
-          <button onClick={onClose} style={{padding:"8px 12px",background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",borderRadius:10,color:"#ef4444",fontSize:12,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:700}}>بستن</button>
-        </div>
-      </div>
-    );
-  }
-  return(
-    <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",flexDirection:"column",background:"var(--am-bg)"}}>
-      <div className="am-popup-header">
-        <div style={{flex:1}}>
-          <div style={{fontSize:16,fontWeight:800,color:"var(--am-text)"}}>مقایسه محصولات</div>
-          <div style={{fontSize:12,color:"var(--am-muted)",marginTop:2}}>ما فقط از لحاظ فنی برات مقایسه می‌کنیم.</div>
-        </div>
-        <button onClick={onMinimize} style={{padding:"8px 16px",background:"rgba(10,158,140,0.08)",border:"1.5px solid rgba(10,158,140,0.25)",borderRadius:11,color:"var(--am-accent)",fontSize:13,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:700}}>کوچک‌تر</button>
-        <button onClick={onClose} style={{width:38,height:38,borderRadius:11,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#ef4444"}}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-      <div style={{flex:1,overflowY:"auto",padding:"16px"}}>
-        {winner&&(
-          <div style={{background:"linear-gradient(135deg,rgba(10,158,140,0.07),rgba(10,158,140,0.03))",border:"1.5px solid rgba(10,158,140,0.2)",borderRadius:18,padding:"18px",marginBottom:18}}>
-            <div style={{fontSize:12,fontWeight:800,color:"var(--am-accent)",marginBottom:10}}>پیشنهاد دستیار هوشمند</div>
-            <div style={{display:"flex",gap:14,alignItems:"center",marginBottom:12}}>
-              <img src={winner.img} alt={winner.title} style={{width:60,height:60,borderRadius:12,objectFit:"cover",flexShrink:0}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:14,fontWeight:800,color:"var(--am-text)",lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{winner.title}</div>
-                <div style={{fontSize:13,color:"var(--am-accent)",fontWeight:700,marginTop:4}}>از {fa(winner.priceMin)} تومان</div>
-              </div>
-              <div style={{flexShrink:0,textAlign:"center",background:"var(--am-card)",borderRadius:12,padding:"8px 12px",border:"1px solid var(--am-border)"}}>
-                <div style={{fontSize:10,color:"var(--am-muted)"}}>امتیاز</div>
-                <div style={{fontSize:18,fontWeight:900,color:"var(--am-accent)"}}>{toFaDigits(String(winner.rating))}</div>
-              </div>
-            </div>
-            <div style={{fontSize:12,color:"var(--am-muted)",lineHeight:1.8}}>از نظر امتیاز کاربران ({toFaDigits(String(winner.rating))} از ۵) و موجودی در {toFaDigits(String(winner.storeCount))} فروشگاه، این مدل پیشنهاد دستیار هوشمند است.</div>
-          </div>
-        )}
-        <div style={{fontSize:13,fontWeight:700,color:"var(--am-muted)",marginBottom:14}}>{toFaDigits(String(prods.length))} محصول در مقایسه</div>
-        <div style={{overflowX:"auto",marginBottom:18}}>
-          <div style={{display:"flex",gap:12,minWidth:prods.length*176+"px"}}>
-            {prods.map(p=>(
-              <div key={p.id} style={{width:164,flexShrink:0,background:"var(--am-card)",border:`1.5px solid ${p.id===winner?.id?"rgba(10,158,140,0.4)":"var(--am-border)"}`,borderRadius:16,overflow:"hidden",boxShadow:"var(--am-shadow)"}}>
-                {p.id===winner?.id&&<div style={{padding:"5px",background:"var(--am-accent)",textAlign:"center",fontSize:10,fontWeight:800,color:"#FFFFFF"}}>پیشنهاد دستیار</div>}
-                <button onClick={()=>onProduct(p.id)} style={{display:"block",width:"100%",background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:"Vazirmatn",textAlign:"right"}}>
-                  <img src={p.img} alt={p.title} style={{width:"100%",height:116,objectFit:"cover"}} loading="lazy"/>
-                  <div style={{padding:"12px"}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"var(--am-text)",lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{p.title}</div>
-                    <div style={{fontSize:14,fontWeight:800,color:"var(--am-accent)",marginTop:6}}>{fa(p.priceMin)}<span style={{fontSize:10,fontWeight:400}}> ت</span></div>
-                  </div>
-                </button>
-                {[["امتیاز",`${toFaDigits(String(p.rating))} / ۵`],["فروشگاه‌ها",toFaDigits(String(p.storeCount))],["نظرات",toFaDigits(String(p.reviews))]].map(([k,v])=>(
-                  <div key={k} style={{padding:"7px 12px",borderTop:"1px solid var(--am-border)",display:"flex",justifyContent:"space-between"}}>
-                    <span style={{fontSize:11,color:"var(--am-muted)"}}>{k}</span>
-                    <span style={{fontSize:11,fontWeight:700,color:"var(--am-text)"}}>{v}</span>
-                  </div>
-                ))}
-                {Object.entries(p.specs).slice(0,3).map(([k,v])=>(
-                  <div key={k} style={{padding:"6px 12px",borderTop:"1px solid var(--am-border)",display:"flex",justifyContent:"space-between"}}>
-                    <span style={{fontSize:10,color:"var(--am-muted)",flexShrink:0,maxWidth:"45%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{k}</span>
-                    <span style={{fontSize:10,fontWeight:600,color:"var(--am-text)",maxWidth:"50%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textAlign:"left"}}>{v}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={{padding:"14px 16px",background:"rgba(10,158,140,0.04)",borderRadius:14,border:"1px solid var(--am-border)"}}>
-          <div style={{fontSize:11,color:"var(--am-muted)",lineHeight:1.8}}>این مقایسه بر اساس داده‌های فنی موجود است. اطلاعات ممکن است کامل یا به‌روز نباشد.</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-function AnMarketMe({onPush}:{onPush:(v:AnView)=>void}){
-  const MAIN_ITEMS:[string,AnView,string,string,string][]=[
-    ["خریدهای من",{t:"me-orders"},"M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z","#3B82F6","یک سفارش در حال ارسال"],
-    ["تیکت‌های من",{t:"me-tickets"},"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z","#8B5CF6","۱ تیکت باز"],
-    ["علاقه‌مندی‌ها",{t:"me-fav"},"M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z","#EC4899","۶ محصول ذخیره‌شده"],
-    ["هشدارهای قیمت",{t:"me-alerts"},"M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0","#F59E0B","۳ هشدار فعال"],
-    ["اخیراً مشاهده‌شده",{t:"me-recent"},"M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z","#6366F1","۸ محصول مشاهده‌شده"],
-    ["مقایسه‌های من",{t:"me-compare"},"M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z","#10B981","۱ مقایسه ذخیره‌شده"],
-  ];
-  const STORE_ITEMS:[string,AnView,string,string][]=[
-    ["ثبت‌نام فروشگاه",{t:"me-reg"},"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z","#F97316"],
-    ["پنل فروشگاه",{t:"me-panel"},"M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z","#14B8A6"],
-  ];
-  const SUPPORT_ITEMS:[string,AnView,string,string][]=[
-    ["شهر من",{t:"me-city"},"M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z","#84CC16"],
-    ["پشتیبانی",{t:"me-support"},"M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.6 19.79 19.79 0 0 1 1.61 5 2 2 0 0 1 3.6 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 10.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17.92","#6B7280"],
-  ];
-  const listSection=(items:[string,AnView,string,string][])=>(
-    <div style={{background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:16,overflow:"hidden",boxShadow:"var(--am-shadow)"}}>
-      {items.map(([label,view,iconPath,color])=>(
-        <button key={label} onClick={()=>onPush(view)} className="am-me-list-btn">
-          <div className="am-me-list-icon" style={{background:`${color}14`,color}}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={iconPath}/></svg>
-          </div>
-          <div style={{flex:1,fontSize:15,fontWeight:700,color:"var(--am-text)"}}>{label}</div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--am-faint)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-      ))}
-    </div>
-  );
-  const listSectionFull=(items:[string,AnView,string,string,string][])=>(
-    <div style={{background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:16,overflow:"hidden",boxShadow:"var(--am-shadow)"}}>
-      {items.map(([label,view,iconPath,color,desc])=>(
-        <button key={label} onClick={()=>onPush(view)} className="am-me-list-btn">
-          <div className="am-me-list-icon" style={{background:`${color}14`,color}}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={iconPath}/></svg>
-          </div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:15,fontWeight:700,color:"var(--am-text)"}}>{label}</div>
-            <div style={{fontSize:12,color:"var(--am-muted)",marginTop:2}}>{desc}</div>
-          </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--am-faint)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-      ))}
-    </div>
-  );
-  return(
-    <div style={{paddingBottom:100}}>
-      {/* Profile banner */}
-      <div className="am-me-profile">
-        <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:20}}>
-          <div style={{width:60,height:60,borderRadius:"50%",background:"var(--am-accent-light)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:"2px solid var(--am-accent-border)"}}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.582-7 8-7s8 3 8 7"/></svg>
-          </div>
-          <div>
-            <div style={{fontSize:18,fontWeight:900,color:"var(--am-text)"}}>کاربر آن مارکت</div>
-            <div style={{fontSize:13,color:"var(--am-text2)",marginTop:3}}>خوش آمدید به مارکت من</div>
-          </div>
-        </div>
-        {/* Quick stats */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-          {[["۳","خرید"],["۶","علاقه‌مندی"],["۳","هشدار قیمت"]].map(([v,l])=>(
-            <div key={l} style={{background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:12,padding:"12px 8px",textAlign:"center",boxShadow:"var(--am-shadow)"}}>
-              <div style={{fontSize:22,fontWeight:900,color:"var(--am-accent)"}}>{toFaDigits(v)}</div>
-              <div style={{fontSize:11,color:"var(--am-muted)",marginTop:3}}>{l}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {/* Activity section */}
-      <div className="am-section-header">فعالیت‌های من</div>
-      <div style={{padding:"0 16px"}}>{listSectionFull(MAIN_ITEMS)}</div>
-      {/* Store section */}
-      <div className="am-section-header">فروشگاه</div>
-      <div style={{padding:"0 16px"}}>{listSection(STORE_ITEMS)}</div>
-      {/* Support section */}
-      <div className="am-section-header">پشتیبانی و تنظیمات</div>
-      <div style={{padding:"0 16px"}}>{listSection(SUPPORT_ITEMS)}</div>
-    </div>
-  );
-}
-function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;lightTheme?:boolean}){
-  const [anStack,setAnStack]=useState<AnView[]>([{t:"home"}]);
-  const [compare,setCompare]=useState<CompareState>({active:false,selectedIds:[],minimized:false});
-  const [catSheet,setCatSheet]=useState<{level:{cid?:string;sid?:string}[];open:boolean}>({level:[],open:false});
-  const cur=anStack[anStack.length-1];
-  const anPush=(v:AnView)=>setAnStack(p=>[...p,v]);
-  const anPop=()=>{if(anStack.length>1)setAnStack(p=>p.slice(0,-1));else onBack();};
-  useBackHandler(()=>{
-    if(catSheet.open){
-      if(catSheet.level.length>1)setCatSheet(p=>({...p,level:p.level.slice(0,-1)}));
-      else setCatSheet({level:[],open:false});
-      return;
-    }
-    anPop();
-  });
-  const ct=cur.t as string;
-  const activeTab=(catSheet.open||ct==="cat"||ct==="sub")?"cats":(ct==="me"||(ct!=="home"&&ct!=="assistant"&&ct!=="chat"&&ct!=="product"&&ct!=="cats"&&ct!=="cat"&&ct!=="sub"))?"me":(ct==="assistant"||ct==="chat")?"assistant":"home";
-  const handleCompareToggle=(pid:string)=>{
-    if(pid==="__mode__"){setCompare(prev=>({...prev,active:!prev.active,selectedIds:prev.active?[]:prev.selectedIds}));return;}
-    setCompare(prev=>{const sel=prev.selectedIds.includes(pid)?prev.selectedIds.filter(id=>id!==pid):[...prev.selectedIds,pid];return {...prev,selectedIds:sel};});
-  };
-  const getTitle=()=>{
-    if(cur.t==="chat")return "نتایج جستجو";
-    if(cur.t==="product")return "جزئیات محصول";
-    if(cur.t==="cat"){const c=AN_CATS.find(x=>x.id===(cur as {t:"cat";cid:string}).cid);return c?.title||"دسته‌بندی";}
-    if(cur.t==="sub"){const v=cur as {t:"sub";cid:string;sid:string};const cat=AN_CATS.find(x=>x.id===v.cid);const sub=cat?.subcats.find(s=>s.id===v.sid);return sub?.title||"محصولات";}
-    if(cur.t==="me-orders")return "خریدهای من";
-    if(cur.t==="me-tickets")return "تیکت‌های من";
-    if(cur.t==="me-fav")return "علاقه‌مندی‌ها";
-    if(cur.t==="me-alerts")return "هشدارهای قیمت";
-    if(cur.t==="me-recent")return "اخیراً مشاهده‌شده";
-    if(cur.t==="me-compare")return "مقایسه‌های من";
-    if(cur.t==="me-city")return "شهر من";
-    if(cur.t==="me-support")return "پشتیبانی";
-    if(cur.t==="me-reg")return "ثبت‌نام فروشگاه";
-    if(cur.t==="me-panel")return "پنل فروشگاه";
-    return "آن مارکت";
-  };
-  const isInner=anStack.length>1;
-  void user;
-
-  const AM_NAV_TABS=[
-    {id:"home" as const,label:"خانه",icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>},
-    {id:"assistant" as const,label:"دستیار هوشمند",icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2z"/></svg>},
-    {id:"cats" as const,label:"دسته‌بندی‌ها",icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>},
-    {id:"me" as const,label:"آن مارکت من",icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>},
-  ] as const;
-
-  const BackToPardazBtn=()=>(
-    <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:5,background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:20,padding:"5px 12px 5px 10px",cursor:"pointer",fontFamily:"Vazirmatn",fontSize:11,fontWeight:700,color:"var(--am-text2)",boxShadow:"var(--am-shadow)",flexShrink:0,whiteSpace:"nowrap" as const}}>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--am-muted)" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-      بازگشت به آن‌پرداز
-    </button>
-  );
-
-  return(
-    <div className={`an-market-root${lightTheme?"":" dark-theme"}`} style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden",position:"relative"}}>
-
-      {/* Back button strip — for tabs without their own header (cats / me) */}
-      {!isInner&&(cur.t==="cats"||cur.t==="me")&&(
-        <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",padding:"12px 16px 8px",flexShrink:0,borderBottom:"1px solid var(--am-border)"}}>
-          <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:5,background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:20,padding:"5px 12px 5px 10px",cursor:"pointer",fontFamily:"Vazirmatn",fontSize:11,fontWeight:700,color:"var(--am-text2)",boxShadow:"var(--am-shadow)",whiteSpace:"nowrap" as const}}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--am-muted)" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-            بازگشت به آن‌پرداز
-          </button>
-        </div>
-      )}
-
-      {/* Header — inner page title only */}
-      {isInner&&(
-        <div className="am-header" style={{flexShrink:0}}>
-          <div style={{display:"flex",alignItems:"center",padding:"14px 16px 10px",gap:12}}>
-            <button onClick={anPop} style={{width:38,height:38,borderRadius:12,background:"var(--am-bg)",border:"1.5px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--am-text)",flexShrink:0}}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            </button>
-            <div style={{flex:1,fontSize:15,fontWeight:800,color:"var(--am-text)",textAlign:"center"}}>{getTitle()}</div>
-            <BackToPardazBtn/>
-          </div>
-        </div>
-      )}
-      {compare.active&&compare.selectedIds.length>=2&&(
-        <div style={{padding:"10px 16px",borderBottom:"1px solid var(--am-border)",display:"flex",alignItems:"center",gap:10,background:"rgba(10,158,140,0.05)",flexShrink:0}}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2" strokeLinecap="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
-          <span style={{fontSize:12,color:"var(--am-accent)",fontWeight:700,flex:1}}>{toFaDigits(String(compare.selectedIds.length))} محصول انتخابی برای مقایسه</span>
-          <button onClick={()=>setCompare(p=>({...p,minimized:false}))} style={{padding:"7px 16px",background:"var(--am-accent)",border:"none",borderRadius:10,color:"#FFFFFF",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn"}}>مشاهده مقایسه</button>
-        </div>
-      )}
-
-      {/* Content area */}
-      <div style={{flex:1,overflowY:cur.t==="assistant"?"hidden":"auto",overflowX:"hidden",display:cur.t==="assistant"?"flex":"block",flexDirection:cur.t==="assistant"?"column":"row",minHeight:0}}>
-        {cur.t==="home"&&<AnMarketHome onProduct={pid=>anPush({t:"product",pid})} onCat={cid=>{setCatSheet({level:[{cid}],open:true});}} onGoCats={()=>setCatSheet({level:[{}],open:true})} onSearch={q=>anPush({t:"chat",q})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle} onBack={!isInner?onBack:undefined}/>}
-        {cur.t==="assistant"&&<AnAssistantChat onProduct={pid=>anPush({t:"product",pid})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle} onBack={!isInner?onBack:undefined}/>}
-        {cur.t==="chat"&&<AnChatPage q={(cur as {t:"chat";q:string}).q} onProduct={pid=>{if(pid==="__back__"){anPop();return;}anPush({t:"product",pid});}} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle}/>}
-        {cur.t==="product"&&<AnProductDetail pid={(cur as {t:"product";pid:string}).pid} onProduct={pid=>anPush({t:"product",pid})} onSearch={q=>anPush({t:"chat",q})} onBack={anPop}/>}
-        {cur.t==="cats"&&<AnCatPage onCat={cid=>anPush({t:"cat",cid})} onSub={(cid,sid)=>anPush({t:"sub",cid,sid})} onSearch={q=>anPush({t:"chat",q})}/>}
-        {cur.t==="cat"&&<AnCatDetailPage cid={(cur as {t:"cat";cid:string}).cid} onSub={(cid,sid)=>anPush({t:"sub",cid,sid})} onBack={anPop}/>}
-        {cur.t==="sub"&&<AnSubDetailPage cid={(cur as {t:"sub";cid:string;sid:string}).cid} sid={(cur as {t:"sub";cid:string;sid:string}).sid} onProduct={pid=>anPush({t:"product",pid})} onSearch={q=>anPush({t:"chat",q})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle}/>}
-        {cur.t==="me"&&<AnMarketMe onPush={anPush}/>}
-        {(cur.t==="me-orders"||cur.t==="me-tickets"||cur.t==="me-fav"||cur.t==="me-alerts"||cur.t==="me-recent"||cur.t==="me-compare"||cur.t==="me-city"||cur.t==="me-support"||cur.t==="me-reg"||cur.t==="me-panel")&&<AnMeSubPage view={cur} onProduct={pid=>anPush({t:"product",pid})} onBack={anPop}/>}
-      </div>
-
-      {compare.active&&compare.selectedIds.length>=2&&(
-        <ComparisonPopup ids={compare.selectedIds} minimized={compare.minimized} onMinimize={()=>setCompare(p=>({...p,minimized:!p.minimized}))} onClose={()=>setCompare({active:false,selectedIds:[],minimized:false})} onProduct={pid=>anPush({t:"product",pid})}/>
-      )}
-
-      {/* Category Bottom Sheet */}
-      {catSheet.open&&(
-        <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={()=>setCatSheet({level:[],open:false})}>
-          <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.5)"}}/>
-          <div style={{position:"relative",background:"var(--am-bg,#fff)",borderRadius:"20px 20px 0 0",height:"75%",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
-            {/* Drag handle */}
-            <div style={{display:"flex",justifyContent:"center",paddingTop:10,paddingBottom:6,flexShrink:0}}>
-              <div style={{width:40,height:4,borderRadius:2,background:"var(--am-border,#e0e0e0)"}}/>
-            </div>
-            {/* Sheet header */}
-            <div style={{display:"flex",alignItems:"center",padding:"8px 16px 12px",gap:10,borderBottom:"1px solid var(--am-border)",flexShrink:0}}>
-              {catSheet.level.length>1&&(
-                <button onClick={()=>setCatSheet(p=>({...p,level:p.level.slice(0,-1)}))} style={{width:36,height:36,borderRadius:10,background:"var(--am-bg)",border:"1.5px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--am-text)",flexShrink:0}}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                </button>
-              )}
-              <div style={{fontSize:15,fontWeight:800,color:"var(--am-text)",flex:1}}>
-                {catSheet.level.length>1&&catSheet.level[catSheet.level.length-1].cid
-                  ?AN_CATS.find(c=>c.id===catSheet.level[catSheet.level.length-1].cid)?.title||"دسته‌بندی"
-                  :"دسته‌بندی‌ها"}
-              </div>
-              <button onClick={()=>setCatSheet({level:[],open:false})} style={{width:36,height:36,borderRadius:10,background:"var(--am-bg)",border:"1.5px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--am-muted)"}}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-            {/* Search + list */}
-            <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",padding:"10px 16px 0"}}>
-              <CatSheetSearch level={catSheet.level} onNavigate={(cid,sid)=>{
-                if(sid){setCatSheet({level:[],open:false});anPush({t:"sub",cid,sid});}
-                else{setCatSheet(p=>({...p,level:[...p.level,{cid}]}));}
-              }}/>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Footer Navigation */}
-      <nav className="am-footer-nav">
-        {AM_NAV_TABS.map(tab=>(
-          <button key={tab.id} onClick={()=>{
-            if(tab.id==="cats"){setCatSheet({level:[{}],open:true});return;}
-            setAnStack([{t:tab.id} as AnView]);
-          }} className={`am-footer-tab${activeTab===tab.id?" active":""}`}>
-            {tab.icon}
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </nav>
-    </div>
-  );
-}
-
-const CAT_ICONS:Record<string,React.ReactElement>={
-  mobile:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18" strokeWidth="2.5"/></svg>,
-  laptop:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="13" rx="2"/><path d="M2 20h20"/></svg>,
-  hypermarket:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
-  appliance:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/><path d="M12 9V5M12 19v-4M5 12H9M15 12h4"/></svg>,
-  fashion:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.13z"/></svg>,
-  beauty:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
-  av:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>,
-  car:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l2-4h10l2 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>,
-  health:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>,
-  culture:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>,
-  sport:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24"/></svg>,
-  toy:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/></svg>,
-  kids:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M6 21v-2a6 6 0 0 1 12 0v2"/></svg>,
-  food:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>,
-};
-function getCatIcon(id:string):React.ReactElement{return CAT_ICONS[id]||<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>;}
-
-function CatSheetSearch({level,onNavigate}:{level:{cid?:string;sid?:string}[];onNavigate:(cid:string,sid?:string)=>void}){
-  const [q,setQ]=useState("");
-  const curLevel=level[level.length-1]||{};
-  const curCat=curLevel.cid?AN_CATS.find(c=>c.id===curLevel.cid):null;
-  const isRoot=!curLevel.cid;
-  const filtered=isRoot
-    ?(q.trim()?AN_CATS.filter(c=>c.title.includes(q.trim())||c.subcats.some(s=>s.title.includes(q.trim()))):AN_CATS)
-    :(curCat?curCat.subcats.filter(s=>!q.trim()||s.title.includes(q.trim())):[]);
-  return(
-    <>
-      <div style={{display:"flex",alignItems:"center",background:"var(--am-card2)",borderRadius:12,padding:"9px 14px",gap:8,border:"1.5px solid var(--am-border)"}}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--am-muted)" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder={isRoot?"جستجو در دسته‌بندی‌ها...":"جستجو در زیردسته‌ها..."} style={{flex:1,border:"none",background:"transparent",fontFamily:"Vazirmatn",fontSize:13,color:"var(--am-text)",outline:"none"}}/>
-        {q&&<button onClick={()=>setQ("")} style={{border:"none",background:"none",cursor:"pointer",color:"#aaa",padding:0,display:"flex"}}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>}
-      </div>
-      <div style={{overflowY:"auto",flex:1,padding:"8px 0 80px"}}>
-        <div style={{display:"flex",flexDirection:"column",gap:2}}>
-          {isRoot?filtered.map(cat=>(
-            <button key={cat.id} onClick={()=>onNavigate(cat.id)}
-              style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",borderRadius:12,background:"transparent",border:"none",cursor:"pointer",fontFamily:"Vazirmatn",textAlign:"right",width:"100%",color:"var(--am-text)",fontSize:14,fontWeight:600,transition:"background .15s"}}>
-              <span style={{width:40,height:40,borderRadius:12,background:"var(--am-accent-light)",border:"1.5px solid var(--am-accent-border)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--am-accent)",flexShrink:0}}>
-                {getCatIcon(cat.id)}
-              </span>
-              <span style={{flex:1}}>{cat.title}</span>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--am-muted)" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
-            </button>
-          )):filtered.map(sub=>(
-            <button key={sub.id} onClick={()=>onNavigate(curLevel.cid!,sub.id)}
-              style={{display:"flex",alignItems:"center",gap:14,padding:"14px 16px",borderRadius:12,background:"transparent",border:"none",cursor:"pointer",fontFamily:"Vazirmatn",textAlign:"right",width:"100%",color:"var(--am-text)",fontSize:14,fontWeight:600}}>
-              <span style={{flex:1}}>{sub.title}</span>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--am-muted)" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
-            </button>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-}
-
-
-// ─── All Services Screen ───────────────────────────────────────────────────────
-function AllServicesScreen({onBack,onServiceTap,homeServices,setHomeServices,homePlatforms,setHomePlatforms,showCashback,setShowCashback}:{onBack:()=>void;onServiceTap:(id:string,label:string)=>void;homeServices:string[];setHomeServices:(v:string[])=>void;homePlatforms:string[];setHomePlatforms:(v:string[])=>void;showCashback:boolean;setShowCashback:(v:boolean)=>void}){
-  const notOnHome=SERVICES.filter(s=>!homeServices.includes(s.id));
-  const platformsNotOnHome=PLATFORMS.filter(p=>!homePlatforms.includes(p.id));
-  const addSvcToHome=(id:string)=>setHomeServices([...homeServices,id]);
-  const addPlatToHome=(id:string)=>setHomePlatforms([...homePlatforms,id]);
-  const plusBtn=(onClick:(e:React.MouseEvent)=>void)=>(
-    <span role="button" onPointerDown={e=>e.stopPropagation()} onClick={onClick}
-      style={{position:"absolute",top:-12,left:-12,width:44,height:44,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:2,userSelect:"none"}}>
-      <span style={{width:30,height:30,borderRadius:"50%",background:"#00D6B0",color:"#031522",fontSize:20,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 10px rgba(0,214,176,0.5)",lineHeight:1}}>+</span>
-    </span>
-  );
-  useBackHandler(onBack);
-  return <div className="anp-full-page" dir="rtl">
-    <div className="anp-page-header">
-      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
-      <h2 className="subscreen-title">همه خدمات</h2>
-      <div style={{width:36}}/>
-    </div>
-    <div className="anp-page-body">
-      {/* — Services section — */}
-      <div style={{fontSize:13,fontWeight:700,color:"var(--text-muted)",marginBottom:12}}>خدمات</div>
-      {notOnHome.length>0||!showCashback?(
-        <div className="services-grid" style={{marginBottom:24}}>
-          {notOnHome.map(s=>{
-            const ill=ServiceIllustration({id:s.id,color:s.color});
-            return <div key={s.id} style={{position:"relative"}}>
-              <button className="service-btn" style={{width:"100%",opacity:s.action==="soon"?0.8:1}} onClick={()=>onServiceTap(s.action,s.label)}>
-                <div className="service-icon" style={{background:s.bg,color:s.color}}>{ill||<Icon name={s.icon} size={22}/>}</div>
-                <span className="service-label">{s.label}</span>
-              </button>
-              {s.action==="soon"&&<span style={{position:"absolute",bottom:-5,left:-4,background:"rgba(124,58,237,0.9)",color:"#fff",fontSize:8,fontWeight:800,fontFamily:"Vazirmatn",padding:"1px 6px",borderRadius:8,pointerEvents:"none",whiteSpace:"nowrap",letterSpacing:0.2,boxShadow:"0 1px 6px rgba(124,58,237,0.45)",lineHeight:"16px",zIndex:2}}>بزودی</span>}
-              {s.action!=="soon"&&plusBtn(e=>{e.stopPropagation();addSvcToHome(s.id);})}
-            </div>;
-          })}
-          {/* Cashback restore item */}
-          {!showCashback&&(
-            <div style={{position:"relative"}}>
-              <button className="service-btn" style={{width:"100%"}} onClick={()=>{setShowCashback(true);}}>
-                <div className="service-icon" style={{background:"rgba(0,214,176,0.12)",color:"#00D6B0"}}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00D6B0" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
-                </div>
-                <span className="service-label">بازگشت هزینه</span>
-              </button>
-              {plusBtn(e=>{e.stopPropagation();setShowCashback(true);})}
-            </div>
-          )}
-        </div>
-      ):(
-        <div style={{background:"var(--card-bg)",border:"1px solid var(--border-color)",borderRadius:14,padding:"16px",textAlign:"center",marginBottom:24}}>
-          <div style={{fontSize:13,color:"var(--text-muted)"}}>همه خدمات در صفحه اصلی هستند</div>
-        </div>
-      )}
-      {/* — Platforms not on Home — (no section title per spec) */}
-      {platformsNotOnHome.length>0&&(
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          {platformsNotOnHome.map(p=>(
-            <div key={p.id} style={{position:"relative"}}>
-              <button onClick={()=>onServiceTap(p.action,p.label)} style={{width:"100%",background:p.bg,border:`1.5px solid ${p.border}`,borderRadius:14,padding:"14px 10px",cursor:"pointer",fontFamily:"Vazirmatn",display:"flex",flexDirection:"column",alignItems:"center",gap:4,boxSizing:"border-box",textAlign:"center"}}>
-                <div style={{fontSize:13,fontWeight:800,color:p.color}}>{p.label}</div>
-                <div style={{fontSize:11,color:"var(--text-muted)",lineHeight:1.4}}>{p.desc}</div>
-              </button>
-              {plusBtn(e=>{e.stopPropagation();addPlatToHome(p.id);})}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>;
-}
-
-// ─── Camera Card Scan Modal ───────────────────────────────────────────────────
 function CameraCardScanModal({onClose,onDetect}:{onClose:()=>void;onDetect:(num:string)=>void}){
   const videoRef=useRef<HTMLVideoElement>(null);
   const canvasRef=useRef<HTMLCanvasElement>(null);
@@ -10996,6 +9741,78 @@ export default function App() {
   if(subPage==="charge-payment")return <div key="charge-payment" className={`app${lt} app-slide`} dir="rtl"><ChargePaymentScreen data={chargePayData!} user={user!} onUpdate={updateWithTx} onBack={()=>setSubPage(chargePayOrigin)} onDone={goHome}/><SNAV/></div>;
   if(subPage==="cashback")return <div key="cashback" className={`app${lt} app-slide`} dir="rtl"><CashbackScreen user={user!} transactions={transactions} onBack={goBack} onUpdate={(u,tx)=>{setUser(u);const newTxs=[tx,...transactions];setTransactions(newTxs);if(u)DB.saveTx(u.phone,newTxs);DB.saveUser(u);}}/><SNAV/></div>;
   if(subPage==="financial-center")return <div key="financial-center" className={`app${lt} app-slide`} dir="rtl"><FinancialCenterScreen transactions={transactions} onBack={goBack} user={user}/><SNAV/></div>;
+function ComparisonPopup({ids,onClose,onMinimize,minimized,onProduct}:{ids:string[];onClose:()=>void;onMinimize:()=>void;minimized:boolean;onProduct:(pid:string)=>void}){
+  const prods=ids.map(id=>MARKET_PRODUCTS.find(p=>p.id===id)).filter(Boolean) as AnProduct[];
+  const [aiText,setAiText]=useState("");
+  useEffect(()=>{if(prods.length<2)return;void (async()=>{try{const token=localStorage.getItem("anpardaz:accessToken")??"";const input=JSON.stringify(prods.map(p=>({id:p.id,title:p.title,brand:p.brand,priceMin:p.priceMin,priceMax:p.priceMax,specs:p.specs,storeCount:p.storeCount})));const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/ai/assist",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({workflowCode:"market.compare",input:"مقایسه فنی و خرید این محصولات فقط بر اساس داده‌های ارائه‌شده؛ چیزی را حدس نزن و عدم قطعیت را صریح بگو. "+input,compareIds:ids})});const d=await r.json();if(r.ok)setAiText(d?.result?.text??"");}catch{}})()},[ids.join(",")]);
+  if(minimized)return <div style={{position:"fixed",bottom:70,left:12,right:12,zIndex:300,background:"var(--am-card)",border:"1px solid var(--am-accent-border)",borderRadius:16,padding:12,display:"flex",gap:8,alignItems:"center",boxShadow:"0 8px 30px rgba(0,0,0,.15)"}}><b style={{flex:1,fontSize:12}}>مقایسه {toFaDigits(String(prods.length))} محصول</b><button onClick={onMinimize} style={{background:"var(--am-accent)",color:"#fff",border:0,borderRadius:9,padding:"8px 14px",fontFamily:"Vazirmatn"}}>مشاهده</button><button onClick={onClose} style={{background:"none",border:0,color:"var(--am-muted)"}}>×</button></div>;
+  return <div style={{position:"fixed",inset:0,zIndex:300,background:"var(--am-bg)",overflowY:"auto",padding:16}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}><b style={{fontSize:17,flex:1}}>مقایسه محصولات</b><button onClick={onMinimize}>کوچک</button><button onClick={onClose}>×</button></div>
+    {aiText&&<div style={{background:"var(--am-card)",border:"1px solid var(--am-accent-border)",borderRadius:16,padding:14,marginBottom:14}}><div style={{fontWeight:800,color:"var(--am-accent)",marginBottom:7}}>تحلیل دستیار هوشمند</div><div style={{fontSize:12,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{aiText}</div></div>}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>{prods.map(p=><button key={p.id} onClick={()=>onProduct(p.id)} style={{textAlign:"right",background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:14,padding:12,fontFamily:"Vazirmatn"}}><img src={p.img} alt="" style={{width:"100%",aspectRatio:1,objectFit:"cover",borderRadius:10}}/><div style={{fontWeight:800,fontSize:12,marginTop:8}}>{p.title}</div><div style={{color:"var(--am-accent)",fontWeight:900,marginTop:5}}>{fa(p.priceMin)} تومان</div><div style={{fontSize:10,color:"var(--am-muted)",marginTop:4}}>{toFaDigits(String(p.storeCount))} فروشگاه</div></button>)}</div>
+  </div>;
+}
+function AnMarketMe({onPush}:{onPush:(v:AnView)=>void}){
+  const items:[string,AnView,string][]=[
+    ["خریدهای من",{t:"me-orders"},"فعالیت خروج به فروشگاه‌ها"],
+    ["تیکت‌های پشتیبانی",{t:"me-tickets"},"پیگیری مستقیم با آن مارکت"],
+    ["علاقه‌مندی‌ها",{t:"me-fav"},"محصولات ذخیره‌شده"],
+    ["هشدارهای قیمت",{t:"me-alerts"},"هشدارهای ثبت‌شده"],
+    ["اخیراً مشاهده‌شده",{t:"me-recent"},"تاریخچه مشاهده"],
+    ["مقایسه‌های من",{t:"me-compare"},"مقایسه‌های ذخیره‌شده"],
+  ];
+  return <div style={{padding:16}}><div style={{fontSize:18,fontWeight:900,marginBottom:5}}>آن مارکت من</div><div style={{fontSize:12,color:"var(--am-muted)",marginBottom:16}}>اطلاعات واقعی حساب و فعالیت شما</div>{items.map(([t,v,d])=><button key={t} onClick={()=>onPush(v)} style={{width:"100%",textAlign:"right",background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:15,padding:15,marginBottom:10,fontFamily:"Vazirmatn"}}><div style={{fontWeight:800}}>{t}</div><div style={{fontSize:11,color:"var(--am-muted)",marginTop:4}}>{d}</div></button>)}</div>;
+}
+function AnMeSubPage({view,onProduct,onBack}:{view:AnView;onProduct:(pid:string)=>void;onBack:()=>void}){
+  const [items,setItems]=useState<any[]>([]); const [loading,setLoading]=useState(true);
+  useEffect(()=>{let active=true;(async()=>{try{const token=localStorage.getItem("anpardaz:accessToken")??"";const map:any={"me-fav":"/api/v1/market/me/favorites","me-recent":"/api/v1/market/me/recent","me-alerts":"/api/v1/market/me/alerts","me-orders":"/api/v1/market/me/clickouts","me-compare":"/api/v1/market/me/comparisons"};const u=map[(view as any).t];if(!u){setLoading(false);return;}const r=await fetch(ANMARKET_PLATFORM_API_BASE+u,{headers:{authorization:"Bearer "+token},cache:"no-store"});const d=await r.json();if(active){const k=(view as any).t;setItems(d.products??d.alerts??d.clickouts??d.comparisons??[]);setLoading(false);}}catch{if(active){setItems([]);setLoading(false);}}})();return()=>{active=false}},[(view as any).t]);
+  useBackHandler(onBack);
+  const t=(view as any).t as string;
+  if(t==="me-tickets"||t==="me-support")return <AnTicketsSubPage onBack={onBack}/>;
+  const title:string=t==="me-orders"?"فعالیت خرید":t==="me-fav"?"علاقه‌مندی‌ها":t==="me-alerts"?"هشدارهای قیمت":t==="me-recent"?"اخیراً مشاهده‌شده":t==="me-compare"?"مقایسه‌های من":"آن مارکت من";
+  return <div style={{padding:16}}><div style={{fontSize:17,fontWeight:900,marginBottom:14}}>{title}</div>{loading?<div style={{padding:30,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت...</div>:items.length===0?<div style={{padding:30,textAlign:"center",color:"var(--am-muted)"}}>داده‌ای ثبت نشده است.</div>:items.map((it:any,i:number)=>{const pid=String(it.id??it.product_id??it.productId??"");const p=MARKET_PRODUCTS.find(x=>x.id===pid);return <button key={i} onClick={()=>p&&onProduct(p.id)} style={{width:"100%",textAlign:"right",background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:14,padding:13,marginBottom:9,fontFamily:"Vazirmatn"}}>{p&&<img src={p.img} alt="" style={{width:52,height:52,objectFit:"cover",borderRadius:10,float:"right",marginLeft:10}}/>}<div style={{fontWeight:800,fontSize:12}}>{it.title??it.product_title??it.store_name??it.subject??"فعالیت آن مارکت"}</div><div style={{fontSize:11,color:"var(--am-muted)",marginTop:5}}>{it.status??it.mode??it.updated_at??it.created_at??""}</div></button>})}</div>;
+}
+function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;lightTheme?:boolean}){
+  const [anStack,setAnStack]=useState<AnView[]>([{t:"home"}]);
+  const [compare,setCompare]=useState<CompareState>({active:false,selectedIds:[],minimized:false});
+  const [catSheet,setCatSheet]=useState<{level:{cid?:string;sid?:string}[];open:boolean}>({level:[],open:false});
+  const [loading,setLoading]=useState(true); const [error,setError]=useState("");
+  const cur=anStack[anStack.length-1];
+  const anPush=(v:AnView)=>setAnStack(p=>[...p,v]);
+  const anPop=()=>{if(anStack.length>1)setAnStack(p=>p.slice(0,-1));else onBack();};
+  useBackHandler(()=>{if(catSheet.open){if(catSheet.level.length>1)setCatSheet(p=>({...p,level:p.level.slice(0,-1)}));else setCatSheet({level:[],open:false});return;}anPop();});
+  useEffect(()=>{let active=true;(async()=>{try{
+    if(!ANMARKET_PLATFORM_API_BASE)throw new Error("market_api_unconfigured");
+    const pages=await Promise.all([1,2,3,4,5].map(page=>fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/catalog?limit=100&page="+page,{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(new Error("catalog_failed")))));
+    const rows=pages.flatMap((d:any)=>Array.isArray(d?.products)?d.products:[]);
+    const catMap:Record<string,string>={"mobile-digital":"mobile","laptop-computer":"laptop","home-appliance":"appliance","supermarket":"hypermarket","beauty-health":"beauty","audio-video":"av","automotive":"car","baby-kids":"kids","books-culture":"culture","tools-industrial":"industrial","travel-camping":"travel","pet":"pet","office":"office","jewelry-gold":"gold","other":"other"};
+    MARKET_PRODUCTS=rows.map((p:any)=>{const media=(p.media??[]).map((m:any)=>m.url).filter(Boolean);const imgs=media.concat((p.offers??[]).map((o:any)=>o.image_url).filter(Boolean));return{id:String(p.id),title:p.title??"",brand:p.brand??"",catId:catMap[p.category_slug]??"other",subId:p.category_slug??"other",img:imgs[0]??"",specs:p.specs??{},priceMin:Number(p.priceMin??0),priceMax:Number(p.priceMax??0),storeCount:Number(p.storeCount??0),desc:p.description??"",tags:[],rating:0,reviews:0,ph:[],media:imgs.slice(0,8)} as AnProduct;});
+    if(active){setError("");setLoading(false);}
+  }catch{if(active){MARKET_PRODUCTS=[];setError("اطلاعات واقعی آن مارکت در دسترس نیست.");setLoading(false);}}})();return()=>{active=false}},[]);
+  const handleCompareToggle=(pid:string)=>{if(pid==="__mode__"){setCompare(p=>({...p,active:!p.active,selectedIds:p.active?[]:p.selectedIds}));return;}setCompare(p=>p.selectedIds.includes(pid)?({...p,selectedIds:p.selectedIds.filter(x=>x!==pid)}):p.selectedIds.length<6?({...p,selectedIds:[...p.selectedIds,pid]}):p);};
+  const ct=cur.t as string; const activeTab=(catSheet.open||ct==="cat"||ct==="sub")?"cats":(ct==="me"||ct.startsWith("me-"))?"me":(ct==="assistant"||ct==="chat")?"assistant":"home";
+  return <div className={`an-market-root${lightTheme?"":" dark-theme"}`} style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden",position:"relative"}}>
+    {loading&&<div style={{padding:"10px 16px",background:"var(--am-card)",color:"var(--am-muted)",fontSize:12,textAlign:"center"}}>در حال دریافت محصولات واقعی آن مارکت...</div>}
+    {error&&<div style={{padding:"10px 16px",background:"rgba(239,68,68,.06)",color:"#DC2626",fontSize:12,textAlign:"center"}}>{error}</div>}
+    <div style={{display:"flex",gap:8,padding:"10px 12px",borderBottom:"1px solid var(--am-border)",background:"var(--am-card)",flexShrink:0}}>
+      {(["home","assistant","cats","me"] as const).map(t=><button key={t} onClick={()=>{if(t==="home")setAnStack([{t:"home"}]);else if(t==="assistant")setAnStack([{t:"assistant"}]);else if(t==="cats")setCatSheet({level:[{}],open:true});else setAnStack([{t:"me"}]);}} style={{flex:1,padding:"9px 5px",borderRadius:10,border:"1px solid var(--am-border)",background:activeTab===t?"var(--am-accent-light)":"var(--am-bg)",color:activeTab===t?"var(--am-accent)":"var(--am-muted)",fontFamily:"Vazirmatn",fontWeight:800,fontSize:11}}>{t==="home"?"خانه":t==="assistant"?"دستیار هوشمند":t==="cats"?"دسته‌بندی‌ها":"آن مارکت من"}</button>)}
+    </div>
+    <div style={{flex:1,overflowY:cur.t==="assistant"?"hidden":"auto",overflowX:"hidden"}}>
+      {cur.t==="home"&&<AnMarketHome onProduct={pid=>anPush({t:"product",pid})} onCat={cid=>setCatSheet({level:[{cid}],open:true})} onGoCats={()=>setCatSheet({level:[{}],open:true})} onSearch={q=>anPush({t:"chat",q})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle} onBack={onBack}/>}
+      {cur.t==="assistant"&&<AnAssistantChat onProduct={pid=>anPush({t:"product",pid})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle} onBack={onBack}/>}
+      {cur.t==="chat"&&<AnChatPage q={(cur as {t:"chat";q:string}).q} onProduct={pid=>pid==="__back__"?anPop():anPush({t:"product",pid})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle}/>}
+      {cur.t==="product"&&<AnProductDetail pid={(cur as {t:"product";pid:string}).pid} onProduct={pid=>anPush({t:"product",pid})} onSearch={q=>anPush({t:"chat",q})} onBack={anPop}/>}
+      {cur.t==="cats"&&<AnCatPage onCat={cid=>anPush({t:"cat",cid})} onSub={(cid,sid)=>anPush({t:"sub",cid,sid})} onSearch={q=>anPush({t:"chat",q})}/>}
+      {cur.t==="cat"&&<AnCatDetailPage cid={(cur as {t:"cat";cid:string}).cid} onSub={(cid,sid)=>anPush({t:"sub",cid,sid})} onBack={anPop}/>}
+      {cur.t==="sub"&&<AnSubDetailPage cid={(cur as {t:"sub";cid:string;sid:string}).cid} sid={(cur as {t:"sub";cid:string;sid:string}).sid} onProduct={pid=>anPush({t:"product",pid})} onSearch={q=>anPush({t:"chat",q})} compareMode={compare.active} compareSelected={compare.selectedIds} onCompareToggle={handleCompareToggle}/>}
+      {cur.t==="me"&&<AnMarketMe onPush={anPush}/>}
+      {cur.t.startsWith("me-")&&<AnMeSubPage view={cur as any} onProduct={pid=>anPush({t:"product",pid})} onBack={anPop}/>}
+    </div>
+    {compare.active&&compare.selectedIds.length>=2&&<ComparisonPopup ids={compare.selectedIds} minimized={compare.minimized} onMinimize={()=>setCompare(p=>({...p,minimized:!p.minimized}))} onClose={()=>setCompare({active:false,selectedIds:[],minimized:false})} onProduct={pid=>anPush({t:"product",pid})}/>}
+    {catSheet.open&&<div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.45)",display:"flex",alignItems:"flex-end"}} onClick={()=>setCatSheet({level:[],open:false})}><div style={{position:"relative",width:"100%",maxHeight:"75%",background:"var(--am-bg,#fff)",borderRadius:"20px 20px 0 0",padding:16,overflowY:"auto"}} onClick={e=>e.stopPropagation()}><AnCatPage onCat={cid=>{setCatSheet({level:[{cid}],open:false});anPush({t:"cat",cid})}} onSub={(cid,sid)=>{setCatSheet({level:[],open:false});anPush({t:"sub",cid,sid})}} onSearch={q=>{setCatSheet({level:[],open:false});anPush({t:"chat",q})}}/></div></div>}
+  </div>;
+}
+
   if(subPage==="an-market")return(
     <div key="an-market" className={`app${lt} app-slide`} dir="rtl" style={{display:"flex",flexDirection:"column",height:"100dvh",overflow:"hidden"}}>
       <AnMarketScreen onBack={goBack} user={user!} lightTheme={lightTheme}/>
