@@ -146,7 +146,8 @@ const CATEGORIES = [
 const DEMO_CONVS: Conversation[] = [
   { id:"c1", title:"تحلیل بازار کریپتو Q3 1403",         preview:"بیت‌کوین در هفته جاری با فشار فروش مواجه شد...",          messages:[], modelId:"gemini-pro",   modeId:"analyze",   createdAt:"1403/06/15", updatedAt:"1403/06/15", group:"today" },
   { id:"c2", title:"اسکریپت تبلیغاتی برند پوشاک",        preview:"بسیار خوب! اسکریپت ۳۰ ثانیه‌ای آماده شد...",             messages:[], modelId:"claude-sonnet",modeId:"write",     createdAt:"1403/06/14", updatedAt:"1403/06/14", group:"yesterday" },
-  { id:"c3", title:"API پرداخت با Python",                preview:"import requests\nbase_url = 'https://api.example.com'...", messages:[], modelId:"claude-opus",  modeId:"code",      createdAt:"1403/06/13", updatedAt:"1403/06/13", group:"yesterday" },
+  { id:"c3", title:"API پرداخت با Python",                preview:"import requests
+base_url = 'https://api.example.com'...", messages:[], modelId:"claude-opus",  modeId:"code",      createdAt:"1403/06/13", updatedAt:"1403/06/13", group:"yesterday" },
   { id:"c4", title:"ترجمه قرارداد همکاری",               preview:"این قرارداد بین طرف اول و طرف دوم منعقد می‌گردد...",      messages:[], modelId:"gpt-4o",       modeId:"translate", createdAt:"1403/06/10", updatedAt:"1403/06/10", group:"week" },
   { id:"c5", title:"طراحی معماری میکروسرویس",            preview:"برای سیستم شما معماری event-driven پیشنهاد می‌شود...",   messages:[], modelId:"claude-opus",  modeId:"code",      createdAt:"1403/06/08", updatedAt:"1403/06/08", group:"week" },
   { id:"c6", title:"پیش‌نویس پروپوزال سرمایه‌گذاری",    preview:"خلاصه اجرایی: این طرح با هدف ورود به بازار...",          messages:[], modelId:"gpt-4o",       modeId:"write",     createdAt:"1403/06/01", updatedAt:"1403/06/01", group:"older" },
@@ -701,7 +702,19 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const [deepThink, setDeepThink]   = useState(false);
   const [activeMode, setActiveMode] = useState<CreationMode|null>(null);
   const [filterCat, setFilterCat]   = useState("all");
-  const [showNewProj, setShowNewProj] = useState(false);\n  const [conversationId, setConversationId] = useState<number|null>(null);\n  const [aiError, setAiError] = useState<string|null>(null);\n  const platformApi = ((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"") ?? "";\n  const hooshApi = useCallback(async (path:string, init:RequestInit={}) => {\n    const token=window.localStorage.getItem("anpardaz:accessToken")??"";\n    if(!platformApi) throw new Error("anpardaz_api_unconfigured");\n    if(!token) throw new Error("auth_required");\n    const headers=new Headers(init.headers); headers.set("accept","application/json"); headers.set("authorization",`Bearer ${token}`);\n    if(init.body&&!headers.has("content-type")) headers.set("content-type","application/json");\n    const res=await fetch(`${platformApi}${path}`,{...init,headers,cache:"no-store"});\n    const data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(String(data?.error??"hoosh_request_failed")); return data;\n  },[platformApi]);
+  const [showNewProj, setShowNewProj] = useState(false);
+  const [conversationId, setConversationId] = useState<number|null>(null);
+  const [aiError, setAiError] = useState<string|null>(null);
+  const platformApi = ((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"") ?? "";
+  const hooshApi = useCallback(async (path:string, init:RequestInit={}) => {
+    const token=window.localStorage.getItem("anpardaz:accessToken")??"";
+    if(!platformApi) throw new Error("anpardaz_api_unconfigured");
+    if(!token) throw new Error("auth_required");
+    const headers=new Headers(init.headers); headers.set("accept","application/json"); headers.set("authorization",`Bearer ${token}`);
+    if(init.body&&!headers.has("content-type")) headers.set("content-type","application/json");
+    const res=await fetch(`${platformApi}${path}`,{...init,headers,cache:"no-store"});
+    const data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(String(data?.error??"hoosh_request_failed")); return data;
+  },[platformApi]);
 
   // Device back button: close panels first, then exit to main app
   useBackHandler(() => {
