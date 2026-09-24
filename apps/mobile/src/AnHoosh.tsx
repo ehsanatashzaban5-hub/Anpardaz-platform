@@ -710,7 +710,7 @@ export default function AnHooshScreen({
     }catch(e){
       setMessages(prev=>prev.concat({id:`e${Date.now()}`,role:"ai",text:"مدل انتخاب‌شده در حال حاضر از طریق سرور آن پرداز در دسترس نیست.",modelId,ts:new Date()}));
     }finally{setSending(false);}
-  }, [input, modelId, deepThink]);
+  }, [input, modelId, sending, AI_API, accessToken]);
 
   const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setTab("home"); }, []);
 
