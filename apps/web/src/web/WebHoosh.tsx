@@ -39,10 +39,11 @@ const THINKING_MSGS = [
 
 export default function WebHoosh({ onNavigate }: HooshProps) {
   const [view, setView]           = useState<HView>("chat");
-  const [selectedModel, setMod]   = useState<AiModel>(AI_MODELS[0]);
+  const [models, setModels]       = useState<AiModel[]>(models);
+  const [selectedModel, setMod]   = useState<AiModel>(models[0]);
   const [mode, setMode]           = useState<CreationMode>(MODES[0]);
   const [chats, setChats]         = useState<Chat[]>([]);
-  const [activeChat, setActiveChat] = useState<Chat>({id:`chat${Date.now()}`,title:"مکالمه جدید",preview:"",modelId:AI_MODELS[0]?.id||"gpt-5.6-luna",messages:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+  const [activeChat, setActiveChat] = useState<Chat>({id:`chat${Date.now()}`,title:"مکالمه جدید",preview:"",modelId:models[0]?.id||"gpt-5.6-luna",messages:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
   const [input, setInput]         = useState("");
   const [thinking, setThinking]   = useState(false);
   const [sidebarOpen, setSidebar] = useState(true);
@@ -54,7 +55,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   const isMobile = useIsMobile(900);
   const API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")||"";
   const accessToken=localStorage.getItem("anpardaz:accessToken")||"";
-  useEffect(()=>{ if(!AI_MODELS.length)return; setMod(prev=>AI_MODELS.find(m=>m.id===prev.id)||AI_MODELS[0]); },[]);
+  useEffect(()=>{(async()=>{try{const r=await fetch(API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){setModels(d.models);setMod(d.models[0]);}}catch{}})();},[]);
 
 
   const filteredChats = useMemo(() =>
@@ -62,7 +63,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   , [chats, searchChat]);
 
   const filteredModels = useMemo(() =>
-    AI_MODELS.filter(m => providerFilter === "all" || m.providerId === providerFilter)
+    models.filter(m => providerFilter === "all" || m.providerId === providerFilter)
   , [providerFilter]);
 
   useEffect(() => {
@@ -145,7 +146,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
                 {filteredChats.map(c => (
                   <button key={c.id} onClick={()=>{setActiveChat(c);setView("chat");}} style={{ display:"block", width:"100%", padding:"9px 10px", borderRadius:8, border:"none", background:activeChat.id===c.id?"rgba(124,58,237,0.1)":"transparent", cursor:"pointer", textAlign:"right", marginBottom:2, fontFamily:"Vazirmatn" }}>
                     <div style={{ fontSize:12, fontWeight:700, color:activeChat.id===c.id?"#7c3aed":"var(--w-text)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.title}</div>
-                    <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:2 }}>{c.messages.length} پیام · {AI_MODELS.find(m=>m.id===c.modelId)?.name}</div>
+                    <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:2 }}>{c.messages.length} پیام · {models.find(m=>m.id===c.modelId)?.name}</div>
                   </button>
                 ))}
               </div>
@@ -155,14 +156,14 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
             <div style={{ flex:1, overflowY:"auto", padding:"4px 8px" }}>
               <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", padding:"6px 4px" }}>ارائه‌دهندگان</div>
               <button onClick={()=>setProvFilter("all")} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"8px", borderRadius:8, border:`1.5px solid ${providerFilter==="all"?"rgba(124,58,237,0.4)":"transparent"}`, background:providerFilter==="all"?"rgba(124,58,237,0.08)":"transparent", cursor:"pointer", fontFamily:"Vazirmatn", marginBottom:4 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:"var(--w-text)" }}>همه ({AI_MODELS.length} مدل)</div>
+                <div style={{ fontSize:12, fontWeight:700, color:"var(--w-text)" }}>همه ({models.length} مدل)</div>
               </button>
               {AI_PROVIDERS.map(prov => (
                 <button key={prov.id} onClick={()=>setProvFilter(prov.id)} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"8px", borderRadius:8, border:`1.5px solid ${providerFilter===prov.id?"rgba(124,58,237,0.4)":"transparent"}`, background:providerFilter===prov.id?"rgba(124,58,237,0.08)":"transparent", cursor:"pointer", marginBottom:4, fontFamily:"Vazirmatn" }}>
                   <div style={{ width:28, height:28, borderRadius:8, background:prov.color+"20", border:`1px solid ${prov.color}30`, display:"flex", alignItems:"center", justifyContent:"center", color:prov.color, fontSize:11, fontWeight:900, flexShrink:0 }}>{prov.name.slice(0,2)}</div>
                   <div style={{ textAlign:"right" }}>
                     <div style={{ fontSize:12, fontWeight:700, color:"var(--w-text)" }}>{prov.name}</div>
-                    <div style={{ fontSize:10, color:"var(--w-muted)" }}>{AI_MODELS.filter(m=>m.providerId===prov.id).length} مدل</div>
+                    <div style={{ fontSize:10, color:"var(--w-muted)" }}>{models.filter(m=>m.providerId===prov.id).length} مدل</div>
                   </div>
                 </button>
               ))}
@@ -229,7 +230,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
                 <EmptyState mode={mode} onSuggest={s=>{setInput(s); textRef.current?.focus();}}/>
               )}
               {activeChat.messages.map(msg => (
-                <MessageBubble key={msg.id} msg={msg} modelName={msg.modelId ? AI_MODELS.find(m=>m.id===msg.modelId)?.name : undefined}/>
+                <MessageBubble key={msg.id} msg={msg} modelName={msg.modelId ? models.find(m=>m.id===msg.modelId)?.name : undefined}/>
               ))}
               {thinking && <ThinkingIndicator/>}
               <div ref={messagesEndRef}/>
@@ -485,7 +486,7 @@ function ProjectsView() {
             <div style={{ fontSize:12, color:"var(--w-muted)", lineHeight:1.6, marginBottom:12 }}>{proj.description}</div>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
               <span style={{ fontSize:10, padding:"3px 8px", borderRadius:5, background:"var(--w-card2)", border:"1px solid var(--w-border)", color:"var(--w-muted)" }}>{proj.chatIds.length} مکالمه</span>
-              <span style={{ fontSize:10, padding:"3px 8px", borderRadius:5, background:proj.accentColor+"20", border:`1px solid ${proj.accentColor}30`, color:proj.accentColor }}>{AI_MODELS.find(m=>m.id===proj.modelId)?.name || proj.modelId}</span>
+              <span style={{ fontSize:10, padding:"3px 8px", borderRadius:5, background:proj.accentColor+"20", border:`1px solid ${proj.accentColor}30`, color:proj.accentColor }}>{models.find(m=>m.id===proj.modelId)?.name || proj.modelId}</span>
             </div>
           </div>
         ))}
