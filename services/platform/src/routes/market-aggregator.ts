@@ -219,7 +219,9 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     const catalog=ids.length?await pool.query(`SELECT p.id,p.title,p.brand,p.description,p.specs,p.condition,
       c.name_fa category_name,
       COALESCE(json_agg(json_build_object('offerId',o.id,'store',s.name,'price',o.price,'currency',o.currency,'availability',o.availability,'shippingCost',o.shipping_cost,'productUrl',o.product_url) ORDER BY o.price)
-        FILTER (WHERE o.id IS NOT NULL AND s.active=true),'[]'::json) offers
+        FILTER (WHERE o.id IS NOT NULL AND s.active=true),'[]'::json) offers,
+      COALESCE((SELECT json_agg(json_build_object('rating',rv.rating,'title',rv.title,'body',rv.body,'createdAt',rv.created_at) ORDER BY rv.created_at DESC)
+        FROM market_reviews rv WHERE rv.product_id=p.id AND rv.status='published'),'[]'::json) reviews
       FROM market_products p
       LEFT JOIN market_categories c ON c.id=p.category_id
       LEFT JOIN market_offers o ON o.product_id=p.id
