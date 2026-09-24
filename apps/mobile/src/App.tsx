@@ -7885,130 +7885,16 @@ function mkAnOffers(base:number,count:number):AnOffer[]{
     upd:`${i*2+1} دقیقه پیش`,
   }));
 }
-const AN_PRODS:AnProduct[]=[
-  {id:"asus-vb15",title:"لپ‌تاپ ایسوس VivoBook 15 X1502ZA — Core i5 512GB",brand:"ASUS",catId:"laptop",subId:"laptop-student",img:"https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Intel Core i5-1235U","رم":"16GB DDR4","حافظه":"512GB SSD","صفحه‌نمایش":"15.6″ FHD IPS","گرافیک":"Intel Iris Xe","وزن":"1.7 کیلوگرم","باتری":"تا ۷ ساعت","سیستم‌عامل":"Windows 11"},priceMin:57500000,priceMax:64000000,storeCount:32,desc:"لپ‌تاپ سبک و مناسب دانشجویان با 512 گیگ حافظه",tags:["دانشجویی","سبک","اینتل"],rating:4.3,reviews:2840,ph:[{d:"۳۰ روز",p:59e6},{d:"۲۰ روز",p:58e6},{d:"۱۰ روز",p:57.5e6},{d:"امروز",p:57.5e6}]},
-  {id:"macbook-m2",title:"لپ‌تاپ اپل MacBook Air M2 — 13.6 اینچ 8GB",brand:"Apple",catId:"laptop",subId:"laptop-macbook",img:"https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=400&h=300&fit=crop&auto=format",specs:{"تراشه":"Apple M2 8-core","رم":"8GB Unified Memory","حافظه":"256GB SSD","صفحه‌نمایش":"13.6″ Liquid Retina","GPU":"10-core","وزن":"1.24 کیلوگرم","باتری":"تا ۱۸ ساعت"},priceMin:89000000,priceMax:105000000,storeCount:18,desc:"سبک‌ترین لپ‌تاپ اپل با تراشه M2 و باتری استثنایی",tags:["اپل","M2","طراحی"],rating:4.8,reviews:5420,ph:[{d:"۶۰ روز",p:95e6},{d:"۳۰ روز",p:92e6},{d:"امروز",p:89e6}]},
-  {id:"lenovo-ip5",title:"لپ‌تاپ لنوو IdeaPad 5 — Ryzen 5 8GB 256GB",brand:"Lenovo",catId:"laptop",subId:"laptop-student",img:"https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"AMD Ryzen 5 5625U","رم":"8GB DDR4","حافظه":"256GB SSD","صفحه‌نمایش":"15.6″ IPS FHD","گرافیک":"AMD Radeon","وزن":"1.68 کیلوگرم"},priceMin:42000000,priceMax:48500000,storeCount:24,desc:"لپ‌تاپ اقتصادی AMD برای استفاده روزانه و دانشگاه",tags:["دانشجویی","AMD","مقرون‌به‌صرفه"],rating:4.2,reviews:1923,ph:[{d:"۳۰ روز",p:43.5e6},{d:"امروز",p:42e6}]},
-  {id:"hp-pav15",title:"لپ‌تاپ اچ‌پی Pavilion 15 — i7 16GB گرافیک MX570",brand:"HP",catId:"laptop",subId:"laptop-office",img:"https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Intel Core i7-1255U","رم":"16GB DDR4","حافظه":"1TB SSD","صفحه‌نمایش":"15.6″ FHD IPS","گرافیک":"NVIDIA MX570 2GB","سیستم‌عامل":"Windows 11"},priceMin:68000000,priceMax:76000000,storeCount:20,desc:"لپ‌تاپ اداری با گرافیک اختصاصی و رم ۱۶ گیگ",tags:["اداری","i7","گرافیک‌دار"],rating:4.4,reviews:1245,ph:[{d:"۳۰ روز",p:71e6},{d:"امروز",p:68e6}]},
-  {id:"asus-rog-g16",title:"لپ‌تاپ گیمینگ ایسوس ROG Zephyrus G16 — RTX4060",brand:"ASUS ROG",catId:"laptop",subId:"laptop-gaming",img:"https://images.unsplash.com/photo-1593640408182-31c228c6f4b7?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Intel Core i9-13900H","رم":"16GB DDR5","حافظه":"1TB PCIe 4.0","صفحه‌نمایش":"16″ QHD 240Hz","گرافیک":"NVIDIA RTX 4060 8GB","وزن":"1.85 کیلوگرم"},priceMin:112000000,priceMax:128000000,storeCount:10,desc:"لپ‌تاپ گیمینگ با RTX 4060 و صفحه QHD 240Hz",tags:["گیمینگ","RTX4060","240Hz"],rating:4.6,reviews:785,ph:[{d:"۳۰ روز",p:120e6},{d:"امروز",p:112e6}]},
-  {id:"iphone15pm",title:"گوشی اپل iPhone 15 Pro Max — 256GB تیتانیوم",brand:"Apple",catId:"mobile",subId:"mobile-iphone",img:"https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?w=400&h=300&fit=crop&auto=format",specs:{"تراشه":"Apple A17 Pro","رم":"8GB","حافظه":"256GB","صفحه‌نمایش":"6.7″ Super Retina XDR","دوربین":"48MP Pro سه‌گانه","باتری":"4422mAh","سیستم‌عامل":"iOS 17"},priceMin:142000000,priceMax:162000000,storeCount:22,desc:"پرچم‌دار اپل با تراشه A17 Pro و قاب تیتانیوم",tags:["پرمیوم","فیلمبرداری","آیفون"],rating:4.9,reviews:8920,ph:[{d:"۹۰ روز",p:158e6},{d:"۶۰ روز",p:152e6},{d:"۳۰ روز",p:145e6},{d:"امروز",p:142e6}]},
-  {id:"s24ultra",title:"گوشی سامسونگ Galaxy S24 Ultra — 256GB S Pen",brand:"Samsung",catId:"mobile",subId:"mobile-samsung",img:"https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Snapdragon 8 Gen 3","رم":"12GB","حافظه":"256GB","صفحه‌نمایش":"6.8″ Dynamic AMOLED 2X 120Hz","دوربین":"200MP چهارگانه","باتری":"5000mAh","S Pen":"دارد"},priceMin:132000000,priceMax:148000000,storeCount:19,desc:"فلاگشیپ سامسونگ با قلم S Pen و دوربین ۲۰۰ مگاپیکسل",tags:["پرمیوم","S Pen","200MP"],rating:4.7,reviews:6340,ph:[{d:"۹۰ روز",p:145e6},{d:"امروز",p:132e6}]},
-  {id:"galaxy-a54",title:"گوشی سامسونگ Galaxy A54 5G — 8GB 256GB",brand:"Samsung",catId:"mobile",subId:"mobile-mid",img:"https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Exynos 1380","رم":"8GB","حافظه":"256GB","صفحه‌نمایش":"6.4″ Super AMOLED 120Hz","دوربین":"50MP سه‌گانه","باتری":"5000mAh","شارژ":"25W"},priceMin:18500000,priceMax:22000000,storeCount:30,desc:"میان‌رده قوی سامسونگ با دوربین عالی و باتری ۵۰۰۰",tags:["5G","میان‌رده","AMOLED"],rating:4.3,reviews:3870,ph:[{d:"۳۰ روز",p:21e6},{d:"امروز",p:18.5e6}]},
-  {id:"samsung-tv65",title:"تلویزیون سامسونگ 65 اینچ QLED 4K — Q80C",brand:"Samsung",catId:"av",subId:"av-tv",img:"https://images.unsplash.com/photo-1593359677879-a4bb92f4834c?w=400&h=300&fit=crop&auto=format",specs:{"اندازه":"65 اینچ","تکنولوژی":"QLED","رزولوشن":"4K UHD","پردازنده":"Quantum Processor 4K","HDR":"HDR10+","سیستم‌عامل":"Tizen","پورت‌ها":"4×HDMI, 3×USB"},priceMin:58000000,priceMax:69000000,storeCount:15,desc:"تلویزیون QLED با پردازنده کوانتومی و کیفیت تصویر عالی",tags:["QLED","4K","65اینچ"],rating:4.5,reviews:2145,ph:[{d:"۳۰ روز",p:63e6},{d:"امروز",p:58e6}]},
-  {id:"sony-wh1000xm5",title:"هدفون بی‌سیم سونی WH-1000XM5 — حذف نویز",brand:"Sony",catId:"av",subId:"av-headphone",img:"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=300&fit=crop&auto=format",specs:{"اتصال":"Bluetooth 5.2","حذف‌نویز":"30dB ANC","باتری":"30 ساعت","میکروفون":"8 میکروفون","کدک":"LDAC, AAC","وزن":"250 گرم"},priceMin:12800000,priceMax:15500000,storeCount:28,desc:"بهترین هدفون حذف‌نویز با کیفیت صدای حرفه‌ای",tags:["حذف‌نویز","سونی","بلوتوث"],rating:4.8,reviews:4210,ph:[{d:"۳۰ روز",p:14.5e6},{d:"امروز",p:12.8e6}]},
-  {id:"apple-watch-s9",title:"ساعت هوشمند اپل Watch Series 9 — 45mm",brand:"Apple",catId:"mobile",subId:"mobile-watch",img:"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=300&fit=crop&auto=format",specs:{"تراشه":"S9 SiP","صفحه‌نمایش":"LTPO OLED Always-On","اندازه":"45mm","مقاومت":"WR50","باتری":"تا 18 ساعت","GPS":"دارد","سلامت":"ECG، SpO2"},priceMin:24000000,priceMax:28500000,storeCount:14,desc:"ساعت هوشمند اپل با قابلیت‌های پیشرفته سلامت",tags:["اپل","سلامت","ورزشی"],rating:4.7,reviews:3150,ph:[{d:"۶۰ روز",p:27e6},{d:"امروز",p:24e6}]},
-  {id:"samsung-rf23",title:"یخچال فریزر سامسونگ RF23 — 660 لیتری Family Hub",brand:"Samsung",catId:"appliance",subId:"appliance-fridge",img:"https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?w=400&h=300&fit=crop&auto=format",specs:{"ظرفیت":"660 لیتر","نوع":"فرنچ دور","کلاس انرژی":"A++","No-Frost":"دارد","کمپرسور":"Digital Inverter","صفحه‌نمایش":"Family Hub 21.5″"},priceMin:72000000,priceMax:84000000,storeCount:12,desc:"یخچال هوشمند فرنچ دور با صفحه Family Hub",tags:["هوشمند","فرنچ‌دور","اینورتر"],rating:4.4,reviews:987,ph:[{d:"۳۰ روز",p:78e6},{d:"امروز",p:72e6}]},
-  {id:"lg-washing",title:"ماشین لباسشویی ال‌جی 8 کیلو — F4WV308S اینورتر",brand:"LG",catId:"appliance",subId:"appliance-washing",img:"https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=400&h=300&fit=crop&auto=format",specs:{"ظرفیت":"8 کیلوگرم","موتور":"TrueStream Direct Drive","کلاس انرژی":"A+++","دور":"1400 دور","برنامه‌ها":"14 برنامه","نوع بارگذاری":"از جلو","وزن":"66 کیلوگرم"},priceMin:28500000,priceMax:34000000,storeCount:18,desc:"ماشین لباسشویی اینورتر با موتور مستقیم و کلاس A+++",tags:["اینورتر","کم‌مصرف","بدون‌تسمه"],rating:4.5,reviews:1640,ph:[{d:"۶۰ روز",p:32e6},{d:"۳۰ روز",p:30e6},{d:"امروز",p:28.5e6}]},
-  {id:"dyson-v15",title:"جاروبرقی بی‌سیم دایسون V15 Detect Absolute",brand:"Dyson",catId:"appliance",subId:"appliance-vacuum",img:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop&auto=format",specs:{"نوع":"بی‌سیم","باتری":"60 دقیقه","قدرت مکش":"240 AW","فیلتر":"HEPA","تشخیص ذرات":"لیزر","وزن":"3.1 کیلوگرم","سطح":"تمام سطوح"},priceMin:38000000,priceMax:45000000,storeCount:9,desc:"جاروبرقی بی‌سیم با تشخیص ذرات لیزری و فیلتر HEPA",tags:["بی‌سیم","HEPA","لیزر"],rating:4.7,reviews:823,ph:[{d:"۶۰ روز",p:42e6},{d:"امروز",p:38e6}]},
-  {id:"airpods-pro",title:"ایرپاد پرو Apple AirPods Pro 2nd Gen",brand:"Apple",catId:"mobile",subId:"mobile-earphone",img:"https://images.unsplash.com/photo-1572536147248-ac59a8abfa4b?w=400&h=300&fit=crop&auto=format",specs:{"نوع":"In-Ear بی‌سیم","حذف‌نویز":"فعال ANC","شفافیت":"حالت Transparency","باتری":"30 ساعت (با کیس)","تراشه":"H2","مقاومت":"IP54","اتصال":"Bluetooth 5.3"},priceMin:11500000,priceMax:13800000,storeCount:25,desc:"ایرپاد پرو نسل دوم با حذف نویز پیشرفته و تراشه H2",tags:["اپل","حذف‌نویز","بی‌سیم"],rating:4.8,reviews:5710,ph:[{d:"۶۰ روز",p:13e6},{d:"۳۰ روز",p:12e6},{d:"امروز",p:11.5e6}]},
-  {id:"galaxy-tab-s9",title:"تبلت سامسونگ Galaxy Tab S9 — 256GB WiFi",brand:"Samsung",catId:"mobile",subId:"mobile-tablet",img:"https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400&h=300&fit=crop&auto=format",specs:{"پردازنده":"Snapdragon 8 Gen 2","رم":"8GB","حافظه":"256GB","صفحه‌نمایش":"11″ Dynamic AMOLED 2X 120Hz","S Pen":"دارد","باتری":"8400mAh","مقاومت":"IP68"},priceMin:49000000,priceMax:56000000,storeCount:14,desc:"تبلت پریمیوم سامسونگ با S Pen و صفحه AMOLED 120Hz",tags:["S Pen","تبلت","AMOLED"],rating:4.6,reviews:1280,ph:[{d:"۳۰ روز",p:53e6},{d:"امروز",p:49e6}]},
-  {id:"canon-r50",title:"دوربین بدون آینه کانن EOS R50 — کیت 18-45",brand:"Canon",catId:"av",subId:"av-camera",img:"https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400&h=300&fit=crop&auto=format",specs:{"سنسور":"24.2MP APS-C CMOS","پردازنده":"DIGIC X","فوکوس":"Dual Pixel II AF","فیلم":"4K 30fps","تثبیت":"IS دیجیتال","صفحه":"3″ لمسی گردان","وزن":"375 گرم"},priceMin:32000000,priceMax:38000000,storeCount:11,desc:"دوربین بدون آینه سبک و هوشمند برای عکاسان مبتدی و میان‌رده",tags:["بدون‌آینه","کانن","4K"],rating:4.5,reviews:672,ph:[{d:"۳۰ روز",p:35e6},{d:"امروز",p:32e6}]},
-  {id:"bosch-drill",title:"دریل بوش GSB 185-LI — 18 ولت بدون برس",brand:"Bosch",catId:"tool",subId:"tool-power",img:"https://images.unsplash.com/photo-1504148455328-c376907d081c?w=400&h=300&fit=crop&auto=format",specs:{"ولتاژ":"18V","موتور":"بدون جاروبک","گشتاور":"55 نیوتون متر","سرعت":"2 دنده","باتری":"2Ah Li-Ion","وزن":"1.4 کیلوگرم","فنچر":"4cm"},priceMin:6800000,priceMax:8500000,storeCount:16,desc:"دریل پیچ‌گوشتی بوش 18 ولت با موتور بی‌جاروبک",tags:["بوش","18V","بدون‌برس"],rating:4.6,reviews:445,ph:[{d:"۳۰ روز",p:7.5e6},{d:"امروز",p:6.8e6}]},
-  {id:"samsung-tv43",title:"تلویزیون سامسونگ 43 اینچ Crystal 4K — AU7000",brand:"Samsung",catId:"av",subId:"av-tv",img:"https://images.unsplash.com/photo-1593359677879-a4bb92f4834c?w=400&h=300&fit=crop&auto=format",specs:{"اندازه":"43 اینچ","تکنولوژی":"Crystal UHD","رزولوشن":"4K UHD","پردازنده":"Crystal Processor 4K","HDR":"HDR10+","سیستم‌عامل":"Tizen","پورت‌ها":"3×HDMI, 2×USB"},priceMin:18500000,priceMax:23000000,storeCount:22,desc:"تلویزیون Crystal 4K سامسونگ با پردازنده کریستال",tags:["Crystal","4K","43اینچ"],rating:4.3,reviews:3120,ph:[{d:"۳۰ روز",p:21e6},{d:"امروز",p:18.5e6}]},
-];
-const AN_OFFERS:Record<string,AnOffer[]>={};
-AN_PRODS.forEach(p=>{AN_OFFERS[p.id]=mkAnOffers(p.priceMin,p.storeCount);});
-
-// Extended mock product database
-const MOCK_BRANDS_BY_CAT:Record<string,string[]>={
-  mobile:["سامسونگ","اپل","شیائومی","هوآوی","وان‌پلاس","ریلمی","اوپو","نوکیا","موتورولا","سونی"],
-  laptop:["ASUS","Lenovo","HP","Dell","Acer","MSI","Apple","Razer","Huawei","Samsung"],
-  appliance:["سامسونگ","ال‌جی","بوش","آریستون","آبسال","اسنوا","امرسان","هایر","پاناسونیک","دایو"],
-  av:["سامسونگ","سونی","ال‌جی","شارپ","هایسنس","TCL","پاناسونیک","فیلیپس","JBL","بوز"],
-  fashion:["زارا","اچ‌اند‌ام","مانگو","لویی","برشکا","پول‌اند‌بر","دیزل","لی‌کوپر","لاکوست","نایک"],
-  beauty:["نیوآ","گارنیه","لورآل","پنتن","داو","آوون","ویشی","لاروش‌پوزه","سواو","بایودرما"],
-  sport:["نایک","آدیداس","پوما","ریباک","آندرآرمور","نیو‌بالانس","سالومون","مرل","هد","ویلسون"],
-  car:["بوش","NGK","کاسترول","موبیل","شل","توتال","مان","فیلیپس","گارمین","پایونیر"],
-  health:["فیلیپس","اومرون","بیورر","برون","مدیسانا","پاناسونیک","وتامیکس","پولار","گارمین","ویترا"],
-  tool:["بوش","دوالت","ماکیتا","استنلی","هیلتی","میلواکی","رایوبی","بلک‌اند‌دکر","مترابو","AEG"],
-  toy:["لگو","پلی‌موبیل","هات‌ویلز","ماتل","هزبرو","مگا‌بلاکس","کینکس","فیشر‌پرایس","برادر","تامی"],
-};
-const MOCK_PREFIXES:Record<string,string[]>={
-  mobile:["گوشی هوشمند","گوشی موبایل","تلفن همراه"],
-  laptop:["لپ‌تاپ","نوت‌بوک","رایانه قابل حمل"],
-  appliance:["لوازم خانگی","دستگاه خانگی","تجهیزات خانه"],
-  av:["تلویزیون","هدفون","اسپیکر","دوربین"],
-  fashion:["پوشاک","لباس","کفش","کیف"],
-  beauty:["محصول مراقبتی","کرم","شامپو","لوسیون"],
-  sport:["تجهیزات ورزشی","کفش ورزشی","پوشاک ورزشی"],
-  car:["لوازم خودرو","روغن موتور","تایر"],
-  health:["تجهیزات پزشکی","دستگاه سلامت","مکمل"],
-  tool:["ابزار برقی","ابزار دستی","دریل","پیچ‌گوشتی"],
-  toy:["اسباب‌بازی","بازی فکری","پازل","بلوک"],
-};
-const UNSPLASH_IDS=["1496181133206-80ce9b88a853","1517336714731-489689fd1ca8","1588872657578-7efd1f1555ed","1505740420928-5e560c06d30e","1593359677879-a4bb92f4834c","1558618666-fcd25c85cd64","1572536147248-ac59a8abfa4b","1544244015-0df4b3ffc6b0"];
-interface AnCat{id:string;title:string;subcats:{id:string;title:string;pids:string[]}[];}
-const AN_CATS:AnCat[]=[
-  {id:"mobile",title:"موبایل و کالای دیجیتال",subcats:[{id:"mobile-iphone",title:"آیفون",pids:["iphone15pm"]},{id:"mobile-samsung",title:"سامسونگ",pids:["s24ultra","galaxy-a54"]},{id:"mobile-mid",title:"میان‌رده",pids:["galaxy-a54"]},{id:"mobile-watch",title:"ساعت هوشمند",pids:["apple-watch-s9"]},{id:"mobile-tablet",title:"تبلت",pids:["galaxy-tab-s9"]},{id:"mobile-earphone",title:"ایرپاد و هندزفری",pids:["airpods-pro"]},{id:"mobile-acc",title:"لوازم جانبی موبایل",pids:[]}]},
-  {id:"laptop",title:"لپ‌تاپ، کامپیوتر، اداری",subcats:[{id:"laptop-gaming",title:"لپ‌تاپ گیمینگ",pids:["asus-rog-g16"]},{id:"laptop-office",title:"لپ‌تاپ اداری",pids:["hp-pav15"]},{id:"laptop-student",title:"لپ‌تاپ دانشجویی",pids:["asus-vb15","lenovo-ip5"]},{id:"laptop-macbook",title:"مک‌بوک",pids:["macbook-m2"]},{id:"laptop-2in1",title:"لپ‌تاپ ۲در۱",pids:[]},{id:"laptop-desktop",title:"کامپیوتر دسکتاپ",pids:[]},{id:"laptop-printer",title:"پرینتر و اسکنر",pids:[]},{id:"laptop-monitor",title:"مانیتور",pids:[]}]},
-  {id:"hypermarket",title:"هایپرمارکت",subcats:[{id:"hyper-food",title:"مواد غذایی",pids:[]},{id:"hyper-cleaning",title:"مواد شستشو",pids:[]},{id:"hyper-kitchen",title:"لوازم آشپزخانه",pids:[]},{id:"hyper-beverage",title:"نوشیدنی",pids:[]},{id:"hyper-hygiene",title:"بهداشت شخصی",pids:[]}]},
-  {id:"appliance",title:"لوازم خانگی",subcats:[{id:"appliance-fridge",title:"یخچال و فریزر",pids:["samsung-rf23"]},{id:"appliance-washing",title:"ماشین لباسشویی",pids:["lg-washing"]},{id:"appliance-vacuum",title:"جاروبرقی",pids:["dyson-v15"]},{id:"appliance-cooker",title:"اجاق گاز",pids:[]},{id:"appliance-dishwash",title:"ماشین ظرفشویی",pids:[]},{id:"appliance-small",title:"لوازم برقی کوچک",pids:[]}]},
-  {id:"fashion",title:"مد و پوشاک",subcats:[{id:"fashion-men",title:"پوشاک مردانه",pids:[]},{id:"fashion-women",title:"پوشاک زنانه",pids:[]},{id:"fashion-shoes",title:"کفش و کتانی",pids:[]},{id:"fashion-bag",title:"کیف و کوله",pids:[]},{id:"fashion-watch",title:"ساعت مچی",pids:[]},{id:"fashion-sunglasses",title:"عینک آفتابی",pids:[]}]},
-  {id:"beauty",title:"زیبایی و بهداشت",subcats:[{id:"beauty-skin",title:"مراقبت پوست",pids:[]},{id:"beauty-hair",title:"مراقبت مو",pids:[]},{id:"beauty-perfume",title:"عطر و ادکلن",pids:[]},{id:"beauty-makeup",title:"آرایشی",pids:[]},{id:"beauty-device",title:"دستگاه‌های زیبایی",pids:[]}]},
-  {id:"av",title:"صوتی و تصویری",subcats:[{id:"av-tv",title:"تلویزیون",pids:["samsung-tv65"]},{id:"av-headphone",title:"هدفون و هدست",pids:["sony-wh1000xm5"]},{id:"av-speaker",title:"اسپیکر",pids:[]},{id:"av-camera",title:"دوربین عکاسی",pids:["canon-r50"]},{id:"av-projector",title:"پروجکتور",pids:[]},{id:"av-gaming-audio",title:"صدا برای گیمینگ",pids:[]}]},
-  {id:"car",title:"خودرو و وسایل نقلیه",subcats:[{id:"car-acc",title:"لوازم خودرو",pids:[]},{id:"car-elec",title:"الکترونیک خودرو",pids:[]},{id:"car-tire",title:"لاستیک و رینگ",pids:[]},{id:"car-oil",title:"روغن و مایعات",pids:[]}]},
-  {id:"health",title:"سلامت و پزشکی",subcats:[{id:"health-device",title:"تجهیزات پزشکی",pids:[]},{id:"health-supp",title:"مکمل‌ها",pids:[]},{id:"health-dental",title:"دهان و دندان",pids:[]},{id:"health-eyes",title:"بینایی",pids:[]}]},
-  {id:"culture",title:"فرهنگی و هنری",subcats:[{id:"culture-book",title:"کتاب",pids:[]},{id:"culture-music",title:"موسیقی",pids:[]},{id:"culture-art",title:"لوازم هنری",pids:[]},{id:"culture-stationary",title:"لوازم‌التحریر",pids:[]}]},
-  {id:"sport",title:"ورزش و تناسب اندام",subcats:[{id:"sport-fitness",title:"تجهیزات بدنسازی",pids:[]},{id:"sport-outdoor",title:"ورزش‌های بیرونی",pids:[]},{id:"sport-clothing",title:"پوشاک ورزشی",pids:[]},{id:"sport-cycling",title:"دوچرخه و اسکوتر",pids:[]},{id:"sport-swimming",title:"شنا و آب‌بازی",pids:[]}]},
-  {id:"toy",title:"اسباب‌بازی و سرگرمی",subcats:[{id:"toy-board",title:"بازی‌های فکری",pids:[]},{id:"toy-console",title:"کنسول بازی",pids:[]},{id:"toy-gaming",title:"لوازم گیمینگ",pids:[]},{id:"toy-remote",title:"کنترلی و ربات",pids:[]},{id:"toy-puzzle",title:"پازل و معما",pids:[]}]},
-  {id:"kids",title:"کودک و نوزاد",subcats:[{id:"kids-clothing",title:"پوشاک کودک",pids:[]},{id:"kids-toy",title:"اسباب‌بازی کودک",pids:[]},{id:"kids-stroller",title:"کالسکه و خواب",pids:[]},{id:"kids-feeding",title:"تغذیه نوزاد",pids:[]}]},
-  {id:"building",title:"تجهیزات ساختمان",subcats:[{id:"building-paint",title:"رنگ و پوشش",pids:[]},{id:"building-tile",title:"کاشی و سرامیک",pids:[]},{id:"building-plumb",title:"لوله‌کشی",pids:[]},{id:"building-elec",title:"تجهیزات برقی ساختمان",pids:[]}]},
-  {id:"tool",title:"ابزارآلات",subcats:[{id:"tool-hand",title:"ابزار دستی",pids:[]},{id:"tool-power",title:"ابزار برقی",pids:["bosch-drill"]},{id:"tool-garden",title:"ابزار باغبانی",pids:[]},{id:"tool-measure",title:"اندازه‌گیری",pids:[]}]},
-  {id:"travel",title:"لوازم سفر و کمپینگ",subcats:[{id:"travel-bag",title:"چمدان و کیف سفر",pids:[]},{id:"travel-camp",title:"کمپینگ و طبیعت‌گردی",pids:[]},{id:"travel-climb",title:"کوهنوردی",pids:[]},{id:"travel-acc",title:"لوازم جانبی سفر",pids:[]}]},
-  {id:"pet",title:"تجهیزات نگهداری حیوانات",subcats:[{id:"pet-dog",title:"سگ",pids:[]},{id:"pet-cat",title:"گربه",pids:[]},{id:"pet-bird",title:"پرنده",pids:[]},{id:"pet-fish",title:"آکواریوم و ماهی",pids:[]}]},
-  {id:"industrial",title:"تجهیزات صنعتی",subcats:[{id:"ind-safety",title:"ایمنی و حفاظت",pids:[]},{id:"ind-machine",title:"ماشین‌آلات",pids:[]},{id:"ind-elec",title:"الکترونیک صنعتی",pids:[]}]},
-  {id:"gold",title:"ارز و طلا",subcats:[{id:"gold-coin",title:"سکه و طلا",pids:[]},{id:"gold-jewel",title:"جواهرات",pids:[]},{id:"gold-silver",title:"نقره",pids:[]}]},
-  {id:"storeEquip",title:"لوازم فروشگاهی",subcats:[{id:"store-display",title:"دیسپلی و قفسه",pids:[]},{id:"store-pos",title:"دستگاه‌های فروشگاهی",pids:[]},{id:"store-pack",title:"بسته‌بندی",pids:[]}]},
-  {id:"other",title:"سایر دسته‌ها",subcats:[{id:"other-office",title:"لوازم اداری",pids:[]},{id:"other-gift",title:"هدایا و تبلیغات",pids:[]},{id:"other-misc",title:"متفرقه",pids:[]}]},
-];
-function generateMockProds():AnProduct[]{
-  const results:AnProduct[]=[];
-  let counter=1000;
-  const cats=AN_CATS.filter(c=>c.id!=="other"&&c.id!=="gold"&&c.id!=="storeEquip");
-  cats.forEach(cat=>{
-    const brands=MOCK_BRANDS_BY_CAT[cat.id]||["برند نامشخص"];
-    const prefixes=MOCK_PREFIXES[cat.id]||["محصول"];
-    cat.subcats.forEach((sub,si)=>{
-      const itemsPerSub=Math.max(2,Math.floor(40/cat.subcats.length));
-      for(let i=0;i<itemsPerSub&&results.length<1000;i++){
-        const brand=brands[(counter+i)%brands.length];
-        const prefix=prefixes[si%prefixes.length];
-        const modelNum=counter;
-        const basePrice=(5+(counter%95))*1000000;
-        const storeCount=3+(counter%47);
-        counter++;
-        results.push({
-          id:`mock-${modelNum}`,
-          title:`${prefix} ${brand} مدل ${modelNum}`,
-          brand,
-          catId:cat.id,
-          subId:sub.id,
-          img:`https://images.unsplash.com/photo-${UNSPLASH_IDS[counter%8]}?w=400&h=300&fit=crop&auto=format`,
-          specs:{"مدل":`${brand} ${modelNum}`,"دسته‌بندی":sub.title},
-          priceMin:basePrice,
-          priceMax:Math.round(basePrice*1.15),
-          storeCount,
-          desc:`${prefix} ${brand} با کیفیت بالا در دسته ${sub.title}`,
-          tags:[brand,cat.title.split(" ")[0],sub.title.split(" ")[0]],
-          rating:parseFloat((3.5+(counter%15)/10).toFixed(1)),
-          reviews:10+(counter*7)%9990,
-          ph:[{d:"۳۰ روز",p:Math.round(basePrice*1.08)},{d:"امروز",p:basePrice}],
-        });
-      }
-    });
-  });
-  return results;
-}
-const ALL_MOCK_PRODS:AnProduct[]=[...AN_PRODS,...generateMockProds()];
+let MARKET_PRODUCTS:AnProduct[]=[];
 function anSearch(q:string):AnProduct[]{
   const lq=q.toLowerCase().replace(/‌/g," ").replace(/\s+/g," ");
-  return ALL_MOCK_PRODS.filter(p=>{
+  return MARKET_PRODUCTS.filter(p=>{
     const text=(p.title+" "+p.brand+" "+p.tags.join(" ")+" "+p.desc).toLowerCase();
     return lq.split(" ").some(w=>w.length>1&&text.includes(w));
   });
 }
 function getAnCatProds(catId:string,limit=20):AnProduct[]{
-  return ALL_MOCK_PRODS.filter(p=>p.catId===catId).slice(0,limit);
+  return MARKET_PRODUCTS.filter(p=>p.catId===catId).slice(0,limit);
 }
 function sortOffers(offers:AnOffer[],mode:"price"|"rating"|"avail"):AnOffer[]{
   const s=[...offers];
@@ -8262,12 +8148,12 @@ function AnMarketHome({onProduct,onCat,onGoCats,onSearch,compareMode,compareSele
   ];
 
   /* ── Product data ── */
-  const deals=ALL_MOCK_PRODS.filter(p=>p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p);
-  const topRated=[...ALL_MOCK_PRODS].sort((a,b)=>b.rating-a.rating).slice(0,30);
-  const mostCompared=[...ALL_MOCK_PRODS].sort((a,b)=>b.storeCount-a.storeCount).slice(0,30);
-  const budget=ALL_MOCK_PRODS.filter(p=>p.priceMin<15000000).slice(0,30);
-  const highValue=[...ALL_MOCK_PRODS].sort((a,b)=>b.reviews-a.reviews).slice(0,30);
-  const mostReviewed=[...ALL_MOCK_PRODS].sort((a,b)=>b.reviews-a.reviews).slice(5,35);
+  const deals=MARKET_PRODUCTS.filter(p=>p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p);
+  const topRated=[...MARKET_PRODUCTS].sort((a,b)=>b.rating-a.rating).slice(0,30);
+  const mostCompared=[...MARKET_PRODUCTS].sort((a,b)=>b.storeCount-a.storeCount).slice(0,30);
+  const budget=MARKET_PRODUCTS.filter(p=>p.priceMin<15000000).slice(0,30);
+  const highValue=[...MARKET_PRODUCTS].sort((a,b)=>b.reviews-a.reviews).slice(0,30);
+  const mostReviewed=[...MARKET_PRODUCTS].sort((a,b)=>b.reviews-a.reviews).slice(5,35);
 
   const TRENDING=["لپ‌تاپ ایسوس","گوشی سامسونگ","تلویزیون ۵۵ اینچ","هدفون بی‌سیم","یخچال سامسونگ","دوربین کانن","ایرپاد اپل","ربات جارو","ماشین ظرفشویی","تبلت سامسونگ","مانیتور گیمینگ","کفش اسپرت","ساعت هوشمند","دستبند فیتنس","کتری هوشمند"];
 
@@ -8724,7 +8610,7 @@ function AnChatPage({q,onProduct,compareMode,compareSelected,onCompareToggle}:{
   const brands=useMemo(()=>[...new Set(rawResults.map(p=>p.brand))].slice(0,12),[rawResults]);
 
   const results=useMemo(()=>{
-    let r=rawResults.length>0?rawResults:ALL_MOCK_PRODS.slice(0,30);
+    let r=rawResults.length>0?rawResults:MARKET_PRODUCTS.slice(0,30);
     if(selectedBrands.length>0) r=r.filter(p=>selectedBrands.includes(p.brand));
     if(sort==="price-asc")r=[...r].sort((a,b)=>a.priceMin-b.priceMin);
     else if(sort==="price-desc")r=[...r].sort((a,b)=>b.priceMin-a.priceMin);
@@ -8876,7 +8762,7 @@ function AnPriceSparkline({ph}:{ph:{d:string;p:number}[]}){
   );
 }
 function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(pid:string)=>void;onSearch:(q:string)=>void;onBack:()=>void}){
-  const p=ALL_MOCK_PRODS.find(x=>x.id===pid);
+  const p=MARKET_PRODUCTS.find(x=>x.id===pid);
   const [tab,setTab]=useState<"sellers"|"specs"|"reviews"|"similar">("sellers");
   const [alert,setAlert]=useState(false);
   const [fav,setFav]=useState(false);
@@ -8890,9 +8776,9 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
 
   const sortedOffers=sortOffers(offers,sellerSort);
   const avg=Math.round(sortedOffers.reduce((a,o)=>a+o.price,0)/(sortedOffers.length||1));
-  const similar=ALL_MOCK_PRODS.filter(x=>x.catId===p.catId&&x.id!==p.id).slice(0,8);
-  const cheaper=ALL_MOCK_PRODS.filter(x=>x.catId===p.catId&&x.priceMin<p.priceMin&&x.id!==p.id).sort((a,b)=>a.priceMin-b.priceMin).slice(0,4);
-  const pricier=ALL_MOCK_PRODS.filter(x=>x.catId===p.catId&&x.priceMin>p.priceMin&&x.id!==p.id&&x.rating>=p.rating).sort((a,b)=>a.priceMin-b.priceMin).slice(0,3);
+  const similar=MARKET_PRODUCTS.filter(x=>x.catId===p.catId&&x.id!==p.id).slice(0,8);
+  const cheaper=MARKET_PRODUCTS.filter(x=>x.catId===p.catId&&x.priceMin<p.priceMin&&x.id!==p.id).sort((a,b)=>a.priceMin-b.priceMin).slice(0,4);
+  const pricier=MARKET_PRODUCTS.filter(x=>x.catId===p.catId&&x.priceMin>p.priceMin&&x.id!==p.id&&x.rating>=p.rating).sort((a,b)=>a.priceMin-b.priceMin).slice(0,3);
   const strengths=getProductStrengths(p);
   const weaknesses=getProductWeaknesses(p);
   const drop=p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p?Math.round((p.ph[0].p-p.ph[p.ph.length-1].p)/p.ph[0].p*100):0;
@@ -9301,7 +9187,7 @@ function AnSubDetailPage({cid,sid,onProduct,onSearch,compareMode,compareSelected
   const cat=AN_CATS.find(c=>c.id===cid);
   const sub=cat?.subcats.find(s=>s.id===sid);
   const [sort,setSort]=useState<"relevance"|"price-asc"|"price-desc"|"rating">("relevance");
-  const rawProds=ALL_MOCK_PRODS.filter(p=>p.subId===sid||(sub?.pids||[]).includes(p.id));
+  const rawProds=MARKET_PRODUCTS.filter(p=>p.subId===sid||(sub?.pids||[]).includes(p.id));
   const prods=useMemo(()=>{
     let r=[...rawProds];
     if(sort==="price-asc")r.sort((a,b)=>a.priceMin-b.priceMin);
@@ -10024,7 +9910,7 @@ function AnMeSubPage({view,onProduct,onBack}:{view:AnView;onProduct:(pid:string)
 }
 
 function ComparisonPopup({ids,onClose,onMinimize,minimized,onProduct}:{ids:string[];onClose:()=>void;onMinimize:()=>void;minimized:boolean;onProduct:(pid:string)=>void}){
-  const prods=ids.map(id=>ALL_MOCK_PRODS.find(p=>p.id===id)).filter(Boolean) as AnProduct[];
+  const prods=ids.map(id=>MARKET_PRODUCTS.find(p=>p.id===id)).filter(Boolean) as AnProduct[];
   if(ids.length===0)return null;
   const winner=prods.reduce((best,p)=>p.rating>best.rating?p:best,prods[0]);
   if(minimized){
@@ -10192,6 +10078,8 @@ function AnMarketMe({onPush}:{onPush:(v:AnView)=>void}){
   );
 }
 function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;lightTheme?:boolean}){
+  const [,setMarketDataVersion]=useState(0);
+  useEffect(()=>{(async()=>{try{const base=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")??"";const r=await fetch(base+"/api/v1/market/catalog?limit=100");const d=await r.json();MARKET_PRODUCTS=(d.products??[]).map((p:any)=>({id:String(p.id),title:p.title??"",brand:p.brand??"",catId:p.category_slug??"other",subId:p.category_slug??"other",img:p.image_url??"",specs:p.specs??{},priceMin:Number(p.priceMin??p.price_min??0),priceMax:Number(p.priceMax??p.price_max??0),storeCount:Number(p.storeCount??p.store_count??0),desc:p.description??"",tags:[],rating:0,reviews:0,ph:[]}));setMarketDataVersion(v=>v+1)}catch(e){console.error("an_market_catalog_failed",e)}})()},[]);
   const [anStack,setAnStack]=useState<AnView[]>([{t:"home"}]);
   const [compare,setCompare]=useState<CompareState>({active:false,selectedIds:[],minimized:false});
   const [catSheet,setCatSheet]=useState<{level:{cid?:string;sid?:string}[];open:boolean}>({level:[],open:false});
