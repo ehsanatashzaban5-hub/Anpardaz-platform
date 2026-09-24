@@ -53,6 +53,11 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
       const keywords=[p.title,p.brand,p.category_name,'قیمت','مقایسه قیمت','خرید'].filter(Boolean);
       return{seo:{entity_type:type,entity_id:id,canonical_path:`/market/product/${id}`,title,description,keywords,hashtags:keywords.map((x:string)=>'#'+x.replace(/\\s+/g,'')),robots:'index,follow'}};
     }
+    if(type==='store'&&id){
+      const s=(await pool.query('SELECT id,name,domain,slug FROM market_stores WHERE id=$1 AND active=true',[id])).rows[0];
+      if(!s)return reply.code(404).send({error:'not_found'});
+      return{seo:{entity_type:type,entity_id:id,canonical_path:`/market/store/${s.slug}`,title:`${s.name} | فروشگاه آن مارکت`,description:`مشاهده پیشنهادهای ${s.name} در آن مارکت.`,keywords:[s.name,'فروشگاه آنلاین','آن مارکت'],hashtags:['#آن_مارکت','#'+s.slug],robots:'index,follow'}};
+    }
     if(type==='category'&&id){
       const c=(await pool.query('SELECT id,name_fa,slug FROM market_categories WHERE id=$1 AND active=true',[id])).rows[0];
       if(!c)return reply.code(404).send({error:'not_found'});
@@ -64,7 +69,11 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
   app.get('/api/v1/market/sitemap.xml',async(_req,reply)=>{
     const base=process.env.PUBLIC_WEB_URL||'https://anpardaz.ir';
     const rows=await pool.query(`SELECT canonical_path,updated_at FROM market_seo_metadata WHERE robots='index,follow'
-      UNION ALL SELECT '/market',NOW() ORDER BY canonical_path LIMIT 50000`);
+      UNION ALL SELECT '/market',NOW()
+      UNION ALL SELECT '/market/product/'||p.id,NOW() FROM market_products p WHERE p.status='published'
+      UNION ALL SELECT '/market/category/'||c.slug,NOW() FROM market_categories c WHERE c.active=true
+      UNION ALL SELECT '/market/store/'||s.slug,NOW() FROM market_stores s WHERE s.active=true
+      ORDER BY canonical_path LIMIT 50000`);
     const urls=rows.rows.map((r:any)=>`<url><loc>${base.replace(/\\/$/,'')}${String(r.canonical_path).startsWith('/')?r.canonical_path:'/'+r.canonical_path}</loc><lastmod>${new Date(r.updated_at).toISOString()}</lastmod></url>`).join('');
     return reply.type('application/xml; charset=utf-8').send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
   });
