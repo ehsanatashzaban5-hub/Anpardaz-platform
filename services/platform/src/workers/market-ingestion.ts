@@ -76,7 +76,7 @@ async function matchProduct(item:Item,brand:string,normalizedTitle:string){
  const q=await pool.query("SELECT id,normalized_title,brand,model FROM market_products WHERE status='published' AND normalized_title IS NOT NULL ORDER BY updated_at DESC LIMIT 250",[ ]);
  let best:{id:number;score:number}|null=null;const nt=tokens(normalizedTitle);
  for(const row of q.rows){const score=jaccard(nt,tokens(String(row.normalized_title)));if(normalize(brand)&&normalize(String(row.brand??""))===normalize(brand))best=score>(best?.score??0)?{id:Number(row.id),score:Math.min(1,score+.12)}:best;else best=score>(best?.score??0)?{id:Number(row.id),score}:best;}
- return best&&best.score>=.92?{productId:best.id,method:"title_similarity",confidence:best.score}:null;
+ return best&&best.score>=.96?{productId:best.id,method:"title_similarity",confidence:best.score}:null;
 }
 
 async function syncSource(store:Store,source:Source){
