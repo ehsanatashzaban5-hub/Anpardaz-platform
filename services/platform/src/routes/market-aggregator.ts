@@ -58,12 +58,80 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     return{store:{...r.rows[0],homepage_url:safe}};
   });
 
+  app.post('/api/v1/market/search',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),b=(req.body??{}) as any;
+    const query=typeof b.query==='string'?b.query.trim().slice(0,300):'';
+    if(!query)return reply.code(400).send({error:'invalid_search'});
+    const surfaceValue=surface(b.surface);
+    const params:any[]=['published']; const parts:string[]=[];
+    for(const term of query.split(/\\s+/).filter((v:string)=>v.length>1).slice(0,8)){
+      params.push('%'+term.replace(/[%_]/g,'')+'%'); const n=params.length;
+      parts.push(`(p.title ILIKE ${n} OR COALESCE(p.brand,'') ILIKE ${n} OR COALESCE(p.description,'') ILIKE ${n} OR COALESCE(p.normalized_title,'') ILIKE ${n})`);
+    }
+    const where=parts.length?parts.join(' OR '):'TRUE';
+    const count=await pool.query(`SELECT COUNT(*)::int count FROM market_products p WHERE p.status=$1 AND (${where})`,params);
+    await pool.query(`INSERT INTO market_user_searches(identity_id,user_id,query_text,filters,result_count,surface) VALUES($1,$2,$3,$4,$5,$6)`,[a.auth.sub,uid,query,JSON.stringify(b.filters??{}),count.rows[0].count,surfaceValue]);
+    await pool.query(`INSERT INTO market_activity_log(identity_id,user_id,event_type,surface,metadata) VALUES($1,$2,'search',$3,$4)`,[a.auth.sub,uid,surfaceValue,JSON.stringify({query,resultCount:count.rows[0].count})]);
+    return{query,resultCount:count.rows[0].count};
+  });
+
+  app.get('/api/v1/market/me/profile',{preHandler:requireAuth},async(req)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth);
+    const u=(await pool.query('SELECT id,identity_id,email,display_name,status,profile_photo_id,created_at,updated_at FROM platform_users WHERE id=$1',[uid])).rows[0];
+    return{user:u,avatarUrl:u?.profile_photo_id?`/api/v1/market/me/profile/avatar`:null};
+  });
+
+  app.put('/api/v1/market/me/profile',{preHandler:requireAuth},async(req,reply)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth),b=(req.body??{}) as any;
+    const displayName=typeof b.displayName==='string'?b.displayName.trim().slice(0,120):null;
+    const q=await pool.query('UPDATE platform_users SET display_name=COALESCE($1,display_name),updated_at=NOW() WHERE id=$2 RETURNING id,identity_id,email,display_name,status,profile_photo_id,updated_at',[displayName,uid]);
+    if(!q.rows[0])return reply.code(404).send({error:'user_not_found'});
+    return{user:q.rows[0]};
+  });
+
+  app.put('/api/v1/market/me/profile/avatar',{preHandler:requireAuth},async(req,reply)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth),b=(req.body??{}) as any;
+    const mime=String(b.mimeType??''); if(!['image/jpeg','image/png','image/webp'].includes(mime))return reply.code(400).send({error:'invalid_image_type'});
+    if(typeof b.data!=='string'||b.data.length>1400000)return reply.code(413).send({error:'image_too_large'});
+    let data:Buffer; try{data=Buffer.from(b.data.replace(/^data:[^;]+;base64,/,'').replace(/\\s/g,''),'base64');}catch{return reply.code(400).send({error:'invalid_image'});}
+    if(data.length<1||data.length>1048576)return reply.code(413).send({error:'image_too_large'});
+    const crypto=(await import('node:crypto')).createHash('sha256').update(data).digest('hex');
+    const q=await pool.query(`INSERT INTO market_profile_avatars(user_id,mime_type,data,sha256,byte_size) VALUES($1,$2,$3,$4,$5)
+      ON CONFLICT(user_id) DO UPDATE SET mime_type=EXCLUDED.mime_type,data=EXCLUDED.data,sha256=EXCLUDED.sha256,byte_size=EXCLUDED.byte_size,updated_at=NOW()
+      RETURNING id`,[uid,mime,data,crypto,data.length]);
+    await pool.query('UPDATE platform_users SET profile_photo_id=$1,updated_at=NOW() WHERE id=$2',[q.rows[0].id,uid]);
+    await pool.query(`INSERT INTO market_activity_log(user_id,event_type,metadata) VALUES($1,'profile_photo_updated',$2)`,[uid,JSON.stringify({bytes:data.length,mimeType:mime})]);
+    return{avatarUrl:'/api/v1/market/me/profile/avatar'};
+  });
+
+  app.get('/api/v1/market/me/profile/avatar',{preHandler:requireAuth},async(req,reply)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth);
+    const q=await pool.query('SELECT mime_type,data FROM market_profile_avatars WHERE user_id=$1',[uid]);
+    if(!q.rows[0])return reply.code(404).send({error:'avatar_not_found'});
+    return reply.type(q.rows[0].mime_type).send(q.rows[0].data);
+  });
+
+  app.delete('/api/v1/market/me/profile/avatar',{preHandler:requireAuth},async(req)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth);
+    await pool.query('DELETE FROM market_profile_avatars WHERE user_id=$1',[uid]);
+    await pool.query('UPDATE platform_users SET profile_photo_id=NULL,updated_at=NOW() WHERE id=$1',[uid]);
+    await pool.query(`INSERT INTO market_activity_log(user_id,event_type) VALUES($1,'profile_photo_removed')`,[uid]);
+    return{deleted:true};
+  });
+
+  app.get('/api/v1/market/me/search-history',{preHandler:requireAuth},async(req)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth);
+    return{searches:(await pool.query('SELECT id,query_text,filters,result_count,surface,created_at FROM market_user_searches WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100',[uid])).rows};
+  });
+
   app.post('/api/v1/market/events',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),b=(req.body??{}) as any;
     if(typeof b.eventType!=='string'||b.eventType.length<2||b.eventType.length>80)return reply.code(400).send({error:'invalid_event'});
     const operationId=typeof b.operationId==='string'&&b.operationId.length>0?b.operationId:randomUUID();
+    const s=surface(b.surface),meta=b.metadata??{};
     await pool.query(`INSERT INTO market_user_events(identity_id,user_id,event_type,surface,product_id,offer_id,store_id,metadata,operation_id)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[a.auth.sub,uid,b.eventType,surface(b.surface),b.productId??null,b.offerId??null,b.storeId??null,JSON.stringify(b.metadata??{}),operationId]);
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[a.auth.sub,uid,b.eventType,s,b.productId??null,b.offerId??null,b.storeId??null,JSON.stringify(meta),operationId]);
+    await pool.query(`INSERT INTO market_activity_log(identity_id,user_id,event_type,surface,product_id,offer_id,store_id,metadata,operation_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[a.auth.sub,uid,b.eventType,s,b.productId??null,b.offerId??null,b.storeId??null,JSON.stringify(meta),operationId]);
     return{operationId};
   });
 
@@ -333,5 +401,16 @@ GROUNDING_RULES:
       workflowCode,input:groundedInput,sourceType:'market',sourceId:String(ids.join(',')||'search')
     }});
     if(result.statusCode>=400)return reply.code(502).send({error:'market_ai_unavailable'});
-    return result.json();
+    const aiJson=result.json() as any;
+    const uid=await ensurePlatformUser(pool,a.auth);
+    const conversationId=Number(b.conversationId)||null;
+    const conv=conversationId
+      ? (await pool.query('SELECT id FROM market_ai_conversations WHERE id=$1 AND user_id=$2',[conversationId,uid])).rows[0]
+      : null;
+    const created=conv?.id?Number(conv.id):Number((await pool.query('INSERT INTO market_ai_conversations(identity_id,user_id,workflow_code,title) VALUES($1,$2,$3,$4) RETURNING id',[a.auth.sub,uid,workflowCode,b.input.trim().slice(0,120)])).rows[0].id);
+    const executionId=aiJson.execution?.id??aiJson.run?.id??null;
+    await pool.query('INSERT INTO market_ai_messages(conversation_id,role,content,product_ids,execution_id) VALUES($1,\'user\',$2,$3,$4),($1,\'assistant\',$5,$3,$4)',[created,b.input.trim(),ids,executionId,String(aiJson.output?.text??aiJson.output??'')]);
+    await pool.query('UPDATE market_ai_conversations SET updated_at=NOW() WHERE id=$1',[created]);
+    await pool.query('INSERT INTO market_activity_log(identity_id,user_id,event_type,metadata) VALUES($1,$2,\'ai_assistant\',$3)',[a.auth.sub,uid,JSON.stringify({workflowCode,conversationId:created,productIds:ids,inputChars:b.input.length})]);
+    return {...aiJson,conversationId:created};
   });}
