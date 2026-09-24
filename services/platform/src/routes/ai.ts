@@ -10,16 +10,16 @@ export function registerAiRoutes(app:FastifyInstance,pool:Pool){const gateway=ne
  app.get('/api/v1/ai/models',{preHandler:requireAuth},async(req,reply)=>{
   const a=r(req);if(!(await hasPermission(pool,a.auth,'ai.execute')))return deny(reply);
   const catalog:any[]=[
-    {id:'gpt-5.6-luna',name:'GPT-5.6 Luna',providerId:'openai',provider:'OpenAI',descFa:'مدل سریع و کم‌هزینه برای استفاده روزمره و حجم بالا',capabilities:['fast','writing','coding','reasoning'],contextWindow:'1.05M'},
-    {id:'gpt-5.6-terra',name:'GPT-5.6 Terra',providerId:'openai',provider:'OpenAI',descFa:'تعادل هوش و هزینه برای کارهای حرفه‌ای',capabilities:['reasoning','coding','vision'],contextWindow:'1.05M'},
-    {id:'gpt-5.6-sol',name:'GPT-5.6 Sol',providerId:'openai',provider:'OpenAI',descFa:'مدل پرچم‌دار برای استدلال و کدنویسی پیچیده',capabilities:['reasoning','coding','vision'],contextWindow:'1.05M',badge:'pro'},
-    {id:'gemini-3.8-flash',name:'Gemini 3.8 Flash',providerId:'gemini',provider:'Google',descFa:'مدل سریع چندمدالی برای کارهای روزمره و عامل‌های هوشمند',capabilities:['fast','vision','coding','reasoning'],contextWindow:'1M'},
-    {id:'gemini-3.7-flash',name:'Gemini 3.7 Flash',providerId:'gemini',provider:'Google',descFa:'نسل قبلی فلش برای کدنویسی و کارهای چندمرحله‌ای',capabilities:['fast','coding','reasoning'],contextWindow:'1M'},
-    {id:'gemini-3.1-pro',name:'Gemini 3.1 Pro',providerId:'gemini',provider:'Google',descFa:'استدلال پیشرفته برای حل مسئله و عامل‌ها',capabilities:['reasoning','vision','coding'],contextWindow:'1M',badge:'pro'},
-    {id:'claude-sonnet-5',name:'Claude Sonnet 5',providerId:'anthropic',provider:'Anthropic',descFa:'تعادل هوش و سرعت برای بیشتر کارهای تولیدی',capabilities:['reasoning','coding','writing','vision'],contextWindow:'1M'},
-    {id:'claude-opus-5',name:'Claude Opus 5',providerId:'anthropic',provider:'Anthropic',descFa:'استدلال عمیق برای تحلیل و کدنویسی پیچیده',capabilities:['reasoning','coding','writing','vision'],contextWindow:'1M',badge:'pro'},
-    {id:'claude-haiku-4-5',name:'Claude Haiku 4.5',providerId:'anthropic',provider:'Anthropic',descFa:'سریع و مناسب پردازش پرتعداد',capabilities:['fast','writing','translation'],contextWindow:'200K'},
-    {id:'grok-4.7',name:'Grok 4.7',providerId:'xai',provider:'xAI',descFa:'مدل پرچم‌دار Grok برای کدنویسی و استدلال',capabilities:['reasoning','coding','vision'],contextWindow:'500K',badge:'pro'}
+    {id:'gpt-5.6-luna',name:'GPT-5.6 Luna',providerId:'openai',provider:'OpenAI',descFa:'مدل سریع و کم‌هزینه برای استفاده روزمره و حجم بالا',capabilities:['fast','writing','coding','reasoning'],contextWindow:'1.05M',isAvailable:true},
+    {id:'gpt-5.6-terra',name:'GPT-5.6 Terra',providerId:'openai',provider:'OpenAI',descFa:'تعادل هوش و هزینه برای کارهای حرفه‌ای',capabilities:['reasoning','coding','vision'],contextWindow:'1.05M',isAvailable:true},
+    {id:'gpt-5.6-sol',name:'GPT-5.6 Sol',providerId:'openai',provider:'OpenAI',descFa:'مدل پرچم‌دار برای استدلال و کدنویسی پیچیده',capabilities:['reasoning','coding','vision'],contextWindow:'1.05M',badge:'pro',isAvailable:true},
+    {id:'gemini-3.8-flash',name:'Gemini 3.8 Flash',providerId:'gemini',provider:'Google',descFa:'مدل سریع چندمدالی برای کارهای روزمره و عامل‌های هوشمند',capabilities:['fast','vision','coding','reasoning'],contextWindow:'1M',isAvailable:true},
+    {id:'gemini-3.7-flash',name:'Gemini 3.7 Flash',providerId:'gemini',provider:'Google',descFa:'نسل قبلی فلش برای کدنویسی و کارهای چندمرحله‌ای',capabilities:['fast','coding','reasoning'],contextWindow:'1M',isAvailable:true},
+    {id:'gemini-3.1-pro',name:'Gemini 3.1 Pro',providerId:'gemini',provider:'Google',descFa:'استدلال پیشرفته برای حل مسئله و عامل‌ها',capabilities:['reasoning','vision','coding'],contextWindow:'1M',badge:'pro',isAvailable:true},
+    {id:'claude-sonnet-5',name:'Claude Sonnet 5',providerId:'anthropic',provider:'Anthropic',descFa:'تعادل هوش و سرعت برای بیشتر کارهای تولیدی',capabilities:['reasoning','coding','writing','vision'],contextWindow:'1M',isAvailable:true},
+    {id:'claude-opus-5',name:'Claude Opus 5',providerId:'anthropic',provider:'Anthropic',descFa:'استدلال عمیق برای تحلیل و کدنویسی پیچیده',capabilities:['reasoning','coding','writing','vision'],contextWindow:'1M',badge:'pro',isAvailable:true},
+    {id:'claude-haiku-4-5',name:'Claude Haiku 4.5',providerId:'anthropic',provider:'Anthropic',descFa:'سریع و مناسب پردازش پرتعداد',capabilities:['fast','writing','translation'],contextWindow:'200K',isAvailable:true},
+    {id:'grok-4.7',name:'Grok 4.7',providerId:'xai',provider:'xAI',descFa:'مدل پرچم‌دار Grok برای کدنویسی و استدلال',capabilities:['reasoning','coding','vision'],contextWindow:'500K',badge:'pro',isAvailable:true}
   ];
   const configured=new Set<string>();
   for(const p of ['openai','gemini','anthropic','xai'])if(process.env[p==='openai'?'OPENAI_API_KEY':p==='gemini'?'GEMINI_API_KEY':p==='anthropic'?'ANTHROPIC_API_KEY':'XAI_API_KEY'])configured.add(p);
