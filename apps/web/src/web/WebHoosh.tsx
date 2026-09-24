@@ -63,53 +63,36 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior:"smooth" });
-  }, [activeChat.messages, thinking]);
+  }, [activeChat?.messages, thinking]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     const text = input.trim();
-    if (!text || thinking) return;
-    setInput("");
-
-    const now = new Date().toISOString();
-    const userMsg = { id:`u${Date.now()}`, role:"user" as const, content:text, createdAt:now };
-    const updatedChat: Chat = { ...activeChat, messages:[...activeChat.messages, userMsg] };
-    setActiveChat(updatedChat);
-    setChats(prev => prev.map(c => c.id === updatedChat.id ? updatedChat : c));
-    setThinking(true);
-
-    setTimeout(() => {
-      const replies: Record<string, string> = {
-        chat:       "مکالمه شما دریافت شد. چطور می‌توانم بیشتر کمک کنم؟",
-        code:       "```python\ndef solution():\n    # پیاده‌سازی\n    pass\n```",
-        write:      "متن خواسته‌شده آماده شد. می‌توانید درخواست ویرایش بدهید.",
-        translate:  "ترجمه انجام شد. متن معادل فارسی آماده است.",
-        summarize:  "خلاصه: این متن شامل نکات کلیدی زیر است...",
-        research:   "بر اساس آخرین داده‌ها، تحقیق زیر انجام شد...",
-        math:       "راه‌حل مسئله: ابتدا معادله را ساده می‌کنیم...",
-        create:     "داستان کوتاه: روزی روزگاری در سرزمینی دور...",
-      };
-      const aiMsg = {
-        id:`a${Date.now()}`,
-        role:"assistant" as const,
-        content: replies[mode.id] || "پاسخ دریافت شد. برای اطلاعات بیشتر می‌توانید سؤال کنید.",
-        createdAt: new Date().toISOString(),
-        modelId: selectedModel.id,
-      };
-      const finalChat: Chat = { ...updatedChat, messages:[...updatedChat.messages, aiMsg], updatedAt:new Date().toISOString() };
-      setActiveChat(finalChat);
-      setChats(prev => prev.map(c => c.id === finalChat.id ? finalChat : c));
-      setThinking(false);
-    }, 1800 + Math.random()*800);
+    if (!text || thinking || !activeChat) return;
+    setInput(""); setThinking(true); setApiError(null);
+    try {
+      const idem = `hoosh-ui-${activeChat.id}-${Date.now()}`;
+      await apiFetch(`/v1/hoosh/conversations/${activeChat.id}/messages`, {
+        method:"POST", headers:{"Idempotency-Key":idem},
+        body:JSON.stringify({ content:text, mode:mode.id, model:selectedModel.id })
+      });
+      for (let i=0;i<30;i++) {
+        await new Promise(r=>setTimeout(r,1000));
+        const full:any = await apiFetch(`/v1/hoosh/conversations/${activeChat.id}`);
+        const mapped = mapConversation(full.conversation, full.messages);
+        setActiveChat(mapped); setChats(prev=>prev.map(x=>x.id===mapped.id?mapped:x));
+        if (mapped.messages.some(m=>m.role==="assistant" && new Date(m.createdAt).getTime() >= Date.now()-35000)) break;
+      }
+    } catch(e:any) { setApiError(e.message); } finally { setThinking(false); }
   };
 
-  const newChat = () => {
-    const nc: Chat = {
-      id:`chat${Date.now()}`, title:"مکالمه جدید", preview:"", modelId:selectedModel.id,
-      messages:[], createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(),
-    };
-    setChats(prev => [nc, ...prev]);
-    setActiveChat(nc);
-    setView("chat");
+  const newChat = async () => {
+    try {
+      const d:any = await apiFetch("/v1/hoosh/conversations", {
+        method:"POST", body:JSON.stringify({title:"مکالمه جدید",model:selectedModel.id,mode:mode.id})
+      });
+      const nc = mapConversation(d.conversation);
+      setChats(prev => [nc, ...prev]); setActiveChat(nc); setView("chat"); setApiError(null);
+    } catch(e:any) { setApiError(e.message); }
   };
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -155,8 +138,8 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
                   <div style={{ textAlign:"center", padding:"20px", color:"var(--w-muted)", fontSize:12 }}>مکالمه‌ای یافت نشد</div>
                 )}
                 {filteredChats.map(c => (
-                  <button key={c.id} onClick={()=>{setActiveChat(c);setView("chat");}} style={{ display:"block", width:"100%", padding:"9px 10px", borderRadius:8, border:"none", background:activeChat.id===c.id?"rgba(124,58,237,0.1)":"transparent", cursor:"pointer", textAlign:"right", marginBottom:2, fontFamily:"Vazirmatn" }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:activeChat.id===c.id?"#7c3aed":"var(--w-text)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.title}</div>
+                  <button key={c.id} onClick={()=>{setActiveChat(c);setView("chat");}} style={{ display:"block", width:"100%", padding:"9px 10px", borderRadius:8, border:"none", background:activeChat?.id===c.id?"rgba(124,58,237,0.1)":"transparent", cursor:"pointer", textAlign:"right", marginBottom:2, fontFamily:"Vazirmatn" }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:activeChat?.id===c.id?"#7c3aed":"var(--w-text)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.title}</div>
                     <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:2 }}>{c.messages.length} پیام · {AI_MODELS.find(m=>m.id===c.modelId)?.name}</div>
                   </button>
                 ))}
