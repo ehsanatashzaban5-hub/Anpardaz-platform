@@ -8772,6 +8772,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
   const [aiInput,setAiInput]=useState("");
   const offers=remoteOffers;
   useBackHandler(onBack);
+  useEffect(()=>{let active=true;(async()=>{try{const token=localStorage.getItem("anpardaz:accessToken")??"";const favRes=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/me/favorites",{headers:{authorization:"Bearer "+token}});void fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/products/"+encodeURIComponent(pid)+"/view",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({surface:"mobile"})});if(active&&favRes.ok){const d=await favRes.json();setFav((d.products??[]).some((x:any)=>String(x.id)===String(pid)));}}catch{}})();return()=>{active=false}},[pid]);
   if(!p)return<div style={{padding:24,textAlign:"center",color:"var(--am-muted)"}}>محصول یافت نشد<br/><button onClick={onBack} style={{marginTop:16,padding:"10px 24px",background:"var(--am-accent)",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"Vazirmatn",fontWeight:700,color:"#FFFFFF"}}>بازگشت</button></div>;
 
   const sortedOffers=sortOffers(offers,sellerSort);
@@ -8786,7 +8787,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
   const drop=p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p?Math.round((p.ph[0].p-p.ph[p.ph.length-1].p)/p.ph[0].p*100):0;
   const TABS=([["sellers","فروشگاه‌ها"],["specs","مشخصات"],["reviews","نظرات"],["similar","گزینه‌ها"]] as const);
   // Simulate 4 gallery images using same URL with different crops
-  const galleryImgs=[p.img,`${p.img.split("?")[0]}?w=600&h=600&fit=crop&q=80&crop=center`,`${p.img.split("?")[0]}?w=600&h=600&fit=crop&q=80&crop=top`,`${p.img.split("?")[0]}?w=600&h=600&fit=crop&q=80&crop=bottom`];
+  const galleryImgs=(p.media&&p.media.length?p.media:[p.img]).filter(Boolean).slice(0,8);
 
   return(
     <div style={{paddingBottom:100}}>
@@ -8800,7 +8801,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
             بزرگ‌نمایی
           </div>
           <div style={{position:"absolute",top:14,left:14,display:"flex",gap:5}}>
-            <button onClick={e=>{e.stopPropagation();setFav(v=>!v);}} style={{width:36,height:36,borderRadius:10,background:"var(--am-card)",border:"1px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:fav?"#DB2777":"var(--am-muted)"}}>
+            <button onClick={e=>{e.stopPropagation();void (async()=>{const token=localStorage.getItem("anpardaz:accessToken")??"";try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/products/"+encodeURIComponent(pid)+"/favorite",{method:"POST",headers:{authorization:"Bearer "+token}});const d=await r.json();if(r.ok)setFav(Boolean(d.favorite));}catch{}})();}} style={{width:36,height:36,borderRadius:10,background:"var(--am-card)",border:"1px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:fav?"#DB2777":"var(--am-muted)"}}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill={fav?"#DB2777":"none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
             </button>
           </div>
