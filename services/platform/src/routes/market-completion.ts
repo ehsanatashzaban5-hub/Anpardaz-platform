@@ -108,6 +108,29 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return{conversations:(await pool.query(`SELECT c.*,u.email,COUNT(m.id)::int message_count FROM market_ai_conversations c LEFT JOIN platform_users u ON u.id=c.user_id LEFT JOIN market_ai_messages m ON m.conversation_id=c.id GROUP BY c.id,u.email ORDER BY c.updated_at DESC LIMIT $1`,[limit])).rows};
   });
 
+  app.post('/api/v1/admin/market/categories',{preHandler:requireAuth},async(req,reply)=>{
+    if(!(await admin(pool,req,'approvals.write')))return reply.code(403).send({error:'forbidden'});
+    const b=(req.body??{}) as any; const name=String(b.name??'').trim(),nameFa=String(b.nameFa??'').trim(),slug=String(b.slug??'').trim();
+    if(!name||!nameFa||!slug)return reply.code(400).send({error:'invalid_category'});
+    const parentId=b.parentId?Number(b.parentId):null;
+    const q=await pool.query('INSERT INTO market_categories(parent_id,slug,name,name_fa,icon,sort_order,active) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[Number.isSafeInteger(parentId)?parentId:null,slug,name,nameFa,typeof b.icon==='string'?b.icon:null,Number(b.sortOrder)||0,b.active!==false]);
+    return reply.code(201).send({category:q.rows[0]});
+  });
+
+  app.patch('/api/v1/admin/market/categories/:id',{preHandler:requireAuth},async(req,reply)=>{
+    if(!(await admin(pool,req,'approvals.write')))return reply.code(403).send({error:'forbidden'});
+    const id=Number((req.params as any).id),b=(req.body??{}) as any;
+    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_category'});
+    const q=await pool.query('UPDATE market_categories SET parent_id=COALESCE($1,parent_id),name=COALESCE($2,name),name_fa=COALESCE($3,name_fa),icon=COALESCE($4,icon),sort_order=COALESCE($5,sort_order),active=COALESCE($6,active) WHERE id=$7 RETURNING *',[b.parentId===null?null:(Number.isSafeInteger(Number(b.parentId))?Number(b.parentId):null),typeof b.name==='string'?b.name.trim():null,typeof b.nameFa==='string'?b.nameFa.trim():null,typeof b.icon==='string'?b.icon:null,Number.isFinite(Number(b.sortOrder))?Number(b.sortOrder):null,typeof b.active==='boolean'?b.active:null,id]);
+    if(!q.rows[0])return reply.code(404).send({error:'category_not_found'});
+    return{category:q.rows[0]};
+  });
+
+  app.get('/api/v1/admin/market/product-types',{preHandler:requireAuth},async(req,reply)=>{
+    if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
+    return{types:(await pool.query('SELECT t.*,c.name_fa category_name FROM market_product_types t LEFT JOIN market_categories c ON c.id=t.category_id ORDER BY t.sort_order,t.id')).rows};
+  });
+
   app.get('/api/v1/admin/market/categories',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     return{categories:(await pool.query(`SELECT c.*,COUNT(p.id)::int product_count FROM market_categories c LEFT JOIN market_products p ON p.category_id=c.id GROUP BY c.id ORDER BY c.parent_id NULLS FIRST,c.sort_order,c.id`)).rows};
