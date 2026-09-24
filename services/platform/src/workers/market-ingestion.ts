@@ -95,6 +95,25 @@ async function resolveCategory(item:Item,store:Store){
  return{categoryId:null,method:"review",confidence:0};
 }
 
+async function resolveProductType(title:string,categoryHint:string){
+  const t=normalize(title+" "+categoryHint);
+  const rules:[RegExp,string][]=[
+    [/\\biphone|galaxy|pixel|redmi|poco|smartphone|گوشی|موبایل\\b/i,"smartphone"],
+    [/\\blaptop|macbook|thinkpad|notebook|لپ.?تاپ|نوت.?بوک\\b/i,"laptop"],
+    [/\\bipad|tablet|تبلت\\b/i,"tablet"],
+    [/\\btv|television|oled|qled|تلویزیون\\b/i,"television"],
+    [/\\bheadphone|earbud|airpods|هدفون|هندزفری\\b/i,"headphone"],
+    [/\\bcamera|دوربین\\b/i,"camera"],
+    [/\\btoy|اسباب.?بازی\\b/i,"toy"],
+    [/\\bbook|کتاب\\b/i,"book"],
+    [/\\btool|ابزار\\b/i,"tool"],
+    [/\\bsport|ورزشی\\b/i,"sport-equipment"]
+  ];
+  for(const [re,slug] of rules)if(re.test(t))return{slug,confidence:.9};
+  const q=await pool.query("SELECT slug FROM market_product_types WHERE active=true AND (slug=$1 OR name_fa ILIKE $2) LIMIT 1",[categoryHint,"%"+categoryHint+"%"]);
+  return q.rows[0]?{slug:String(q.rows[0].slug),confidence:.7}:null;
+}
+
 async function matchProduct(item:Item,brand:string,normalizedTitle:string){
  const gtin=text(item.gtin||item.ean||item.upc);
  if(gtin){const q=await pool.query("SELECT id FROM market_products WHERE gtin=$1 LIMIT 1",[gtin]);if(q.rows[0])return{productId:Number(q.rows[0].id),method:"gtin",confidence:1};}
@@ -169,6 +188,7 @@ async function syncSource(store:Store,source:Source){
        const currency=(text(item.prices?.currency_code)||"IRR").toUpperCase().slice(0,3);
        const img=text(item.images?.[0]?.src);const specs:Record<string,string>={};for(const a of item.attributes??[])if(text(a.name)&&Array.isArray(a.options))specs[text(a.name)]=a.options.map(String).join("، ");
        const cls=await resolveCategory(item,store);
+       const productType=await resolveProductType(title,String(item.categories?.[0]?.name??store.category_hint??""));
        let productId:number;
        const matched=await matchProduct(item,brand,normalizedTitle);
        if(matched){
@@ -182,6 +202,7 @@ async function syncSource(store:Store,source:Source){
            RETURNING id`,[title,text(item.short_description||item.description),cls.categoryId,key,brand,JSON.stringify(specs),text(item.permalink),normalizedTitle,text(item.gtin||item.ean||item.upc)||null,text(item.mpn)||null,text(item.model)||null,cls.categoryId?"rule":"review",cls.confidence,null,null]);
          productId=Number(ins.rows[0].id);
        }
+       if(productType)await pool.query("UPDATE market_products SET product_type=COALESCE(product_type,$1),product_type_confidence=COALESCE(product_type_confidence,$2),updated_at=NOW() WHERE id=$3",[productType.slug,productType.confidence,productId]);
        if(cls.categoryId)await pool.query("INSERT INTO market_category_classifications(product_id,category_id,method,confidence,evidence) VALUES($1,$2,$3,$4,$5) ON CONFLICT(product_id,category_id,method) WHERE active=true DO UPDATE SET confidence=EXCLUDED.confidence,evidence=EXCLUDED.evidence,created_at=NOW()",[productId,cls.categoryId,cls.method,cls.confidence,JSON.stringify({store:store.domain,source:source.id})]);
        if(img)await pool.query("INSERT INTO market_media(product_id,url,sort_order) VALUES($1,$2,0) ON CONFLICT DO NOTHING",[productId,img]);
        if(price!==null){
