@@ -7859,7 +7859,7 @@ type AnView=
   |{t:"me-recent"}|{t:"me-compare"}|{t:"me-city"}|{t:"me-support"}|{t:"me-reg"}|{t:"me-panel"};
 
 interface AnProduct{id:string;title:string;brand:string;catId:string;subId:string;img:string;specs:Record<string,string>;priceMin:number;priceMax:number;storeCount:number;desc:string;tags:string[];rating:number;reviews:number;ph:{d:string;p:number}[];}
-interface AnOffer{sid:string;price:number;ship:string;warranty:string;inStock:boolean;upd:string;}
+interface AnOffer{sid:string;price:number;ship:string;warranty:string;inStock:boolean;upd:string;storeName?:string;offerId?:number;productUrl?:string;iframeMode?:"allowed"|"blocked"|"unknown";}
 interface CompareState{active:boolean;selectedIds:string[];minimized:boolean;}
 const ANS:{[k:string]:{n:string;sc:number}}={
   digi:{n:"دیجی‌کالا",sc:4.7},emalls:{n:"ایمالز",sc:4.3},technolife:{n:"تکنولایف",sc:4.5},
@@ -8761,6 +8761,8 @@ function AnPriceSparkline({ph}:{ph:{d:string;p:number}[]}){
 }
 function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(pid:string)=>void;onSearch:(q:string)=>void;onBack:()=>void}){
   const p=MARKET_PRODUCTS.find(x=>x.id===pid);
+  const [remoteOffers,setRemoteOffers]=useState<AnOffer[]>([]);
+  useEffect(()=>{(async()=>{try{const base=ANMARKET_PLATFORM_API_BASE;const r=await fetch(base+"/api/v1/market/products/"+encodeURIComponent(pid));if(!r.ok)return;const d=await r.json();setRemoteOffers((d.offers??[]).map((o:any)=>({sid:String(o.store_id??o.id),offerId:Number(o.id),storeName:o.store_name??o.seller_name??"فروشگاه",price:Number(o.price??0),ship:o.shipping_cost?String(o.shipping_cost):"",warranty:"",inStock:o.availability!=="out_of_stock",upd:o.updated_at??"",productUrl:o.product_url??o.seller_url??"",iframeMode:o.iframe_mode??"unknown"})));}catch{}})()},[pid]);
   const [tab,setTab]=useState<"sellers"|"specs"|"reviews"|"similar">("sellers");
   const [alert,setAlert]=useState(false);
   const [fav,setFav]=useState(false);
@@ -8768,7 +8770,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
   const [imgIdx,setImgIdx]=useState(0);
   const [showZoom,setShowZoom]=useState(false);
   const [aiInput,setAiInput]=useState("");
-  const offers=AN_OFFERS[pid]||(p?mkAnOffers(p.priceMin,p.storeCount):[]);
+  const offers=remoteOffers;
   useBackHandler(onBack);
   if(!p)return<div style={{padding:24,textAlign:"center",color:"var(--am-muted)"}}>محصول یافت نشد<br/><button onClick={onBack} style={{marginTop:16,padding:"10px 24px",background:"var(--am-accent)",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"Vazirmatn",fontWeight:700,color:"#FFFFFF"}}>بازگشت</button></div>;
 
