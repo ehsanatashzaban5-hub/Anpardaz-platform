@@ -108,6 +108,6 @@ INSERT INTO market_stores(name,slug,domain,homepage_url,category_hint,active,ifr
 ('مالتینا','malltina2','malltina.com','https://malltina.com','general',FALSE,'unknown','manual'),
 ('پیندو','pindo2','pindo.ir','https://pindo.ir','general',FALSE,'unknown','manual'),
 ('شهرکتاب آنلاین','shahreketab2','shahreketabonline.com','https://shahreketabonline.com','books-culture',FALSE,'unknown','manual')
-ON CONFLICT(slug) DO NOTHING;
+ON CONFLICT(domain) DO NOTHING;
 INSERT INTO schema_migrations(version) VALUES ('040_market_store_registry_wave3') ON CONFLICT(version) DO NOTHING;
 COMMIT;
