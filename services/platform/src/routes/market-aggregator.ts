@@ -45,23 +45,6 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
 
   app.get('/api/v1/market/stores',async()=>({stores:(await pool.query(`SELECT id,name,slug,domain,homepage_url,category_hint,iframe_mode,active FROM market_stores WHERE active=true ORDER BY name`)).rows}));
 
-  app.get('/api/v1/market/products/:id',async(req,reply)=>{
-    const id=Number((req.params as any).id);
-    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_id'});
-    const p=await pool.query(`SELECT p.*,c.slug category_slug,c.name category_name,c.name_fa category_name_fa
-      FROM market_products p LEFT JOIN market_categories c ON c.id=p.category_id
-      WHERE p.id=$1 AND p.status<>'archived'`,[id]);
-    if(!p.rows[0])return reply.code(404).send({error:'product_not_found'});
-    const [media,offers]=await Promise.all([
-      pool.query('SELECT id,url,sort_order FROM market_media WHERE product_id=$1 ORDER BY sort_order,id',[id]),
-      pool.query(`SELECT o.id,o.seller_name,o.seller_url,o.price,o.currency,o.availability,o.shipping_cost,o.updated_at,
-        o.store_id,o.external_product_id,o.product_url,o.image_url,s.name store_name,s.domain store_domain,s.iframe_mode
-        FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id
-        WHERE o.product_id=$1 ORDER BY o.price,o.id`,[id])
-    ]);
-    return{product:p.rows[0],media:media.rows,offers:offers.rows};
-  });
-
   app.get('/api/v1/market/stores/:id/frame',async(req,reply)=>{
     const id=Number((req.params as any).id);
     const r=await pool.query('SELECT id,name,homepage_url,iframe_mode,active FROM market_stores WHERE id=$1',[id]);
@@ -99,12 +82,6 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
   app.get('/api/v1/market/me/favorites',{preHandler:requireAuth},async(req)=>{
     const uid=await ensurePlatformUser(pool,auth(req).auth);
     return{products:(await pool.query(`SELECT p.*,c.slug category_slug,c.name_fa category_name_fa FROM market_favorites f JOIN market_products p ON p.id=f.product_id LEFT JOIN market_categories c ON c.id=p.category_id WHERE f.user_id=$1 ORDER BY f.created_at DESC`,[uid])).rows};
-  });
-
-  app.post('/api/v1/market/products/:id/favorite',{preHandler:requireAuth},async(req)=>{
-    const uid=await ensurePlatformUser(pool,auth(req).auth),id=Number((req.params as any).id);
-    try{await pool.query('INSERT INTO market_favorites(user_id,product_id) VALUES($1,$2)',[uid,id]);return{favorite:true};}
-    catch(e:any){if(e?.code==='23505'){await pool.query('DELETE FROM market_favorites WHERE user_id=$1 AND product_id=$2',[uid,id]);return{favorite:false};}throw e;}
   });
 
   app.get('/api/v1/market/me/clickouts',{preHandler:requireAuth},async(req)=>{
