@@ -287,12 +287,13 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
 
   app.get('/api/v1/market/me/activity',{preHandler:requireAuth},async(req)=>{
     const uid=await ensurePlatformUser(pool,auth(req).auth);
-    const [clickouts,purchases,events]=await Promise.all([
+    const [clickouts,purchases,events,activities]=await Promise.all([
       pool.query("SELECT c.*,p.title product_title,s.name store_name FROM market_clickouts c LEFT JOIN market_products p ON p.id=c.product_id LEFT JOIN market_stores s ON s.id=c.store_id WHERE c.user_id=$1 ORDER BY c.created_at DESC LIMIT 100",[uid]),
       pool.query("SELECT e.*,p.title product_title,s.name store_name FROM market_purchase_events e LEFT JOIN market_products p ON p.id=e.product_id LEFT JOIN market_stores s ON s.id=e.store_id WHERE e.user_id=$1 ORDER BY e.created_at DESC LIMIT 100",[uid]),
-      pool.query("SELECT * FROM market_user_events WHERE user_id=$1 ORDER BY created_at DESC LIMIT 200",[uid])
+      pool.query("SELECT * FROM market_user_events WHERE user_id=$1 ORDER BY created_at DESC LIMIT 200",[uid]),
+      pool.query("SELECT a.*,p.title product_title,s.name store_name FROM market_activity_log a LEFT JOIN market_products p ON p.id=a.product_id LEFT JOIN market_stores s ON s.id=a.store_id WHERE a.user_id=$1 ORDER BY a.created_at DESC LIMIT 300",[uid])
     ]);
-    return{clickouts:clickouts.rows,purchases:purchases.rows,events:events.rows};
+    return{clickouts:clickouts.rows,purchases:purchases.rows,events:events.rows,activities:activities.rows};
   });
 
   app.get('/api/v1/market/products/:id/reviews',async(req,reply)=>{
