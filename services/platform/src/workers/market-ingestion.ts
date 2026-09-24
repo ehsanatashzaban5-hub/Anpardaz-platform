@@ -136,7 +136,7 @@ function shopifyItems(data:any,baseUrl:string):Item[]{
  return out;
 }
 function jsonLdProduct(html:string,pageUrl:string):Item|null{
- const scripts=[...html.matchAll(/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)];
+ const scripts=[...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
  for(const m of scripts){try{
    const raw=JSON.parse(m[1].trim());const nodes=Array.isArray(raw)?raw:(raw?.["@graph"]??[raw]);
    const p=nodes.find((x:any)=>x?.["@type"]==="Product"||(Array.isArray(x?.["@type"])&&x["@type"].includes("Product")));if(!p)continue;
