@@ -64,8 +64,8 @@ export default function WebMarket({ onNavigate }: Props) {
   const navItems: {id:MarketSection;icon:string;label:string;badge?:number}[] = [
     { id:"shop",      icon:"market",   label:"فروشگاه" },
     { id:"favorites", icon:"heart",    label:"علاقه‌مندی‌ها" },
-    { id:"orders",    icon:"package",  label:"سفارش‌ها", badge:2 },
-    { id:"alerts",    icon:"bell",     label:"هشدار قیمت", badge:1 },
+    { id:"orders",    icon:"package",  label:"فعالیت خرید" },
+    { id:"alerts",    icon:"bell",     label:"هشدار قیمت" },
     { id:"ai",        icon:"sparkle",  label:"دستیار هوشمند" },
     { id:"account",   icon:"user",     label:"حساب کاربری" },
     { id:"tickets",   icon:"document", label:"پشتیبانی" },
@@ -322,7 +322,7 @@ function ProductDetail({ product:p, onBack, isFav, onToggleFav, onAddCart, inCar
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
   const [offers,setOffers]=useState<any[]>([]);const[frameUrl,setFrameUrl]=useState("");
-  useEffect(()=>{(async()=>{const id=Number(p.id);if(!Number.isSafeInteger(id))return;try{const r=await fetch(MARKET_API+"/api/v1/market/products/"+id);if(r.ok){const d=await r.json();setOffers(d.offers??[])}}catch{}})()},[p.id]);
+  useEffect(()=>{(async()=>{const id=Number(p.id);if(!Number.isSafeInteger(id))return;try{const r=await fetch(MARKET_API+"/api/v1/market/products/"+id);if(r.ok){const d=await r.json();setOffers(d.offers??[])}}catch{}})();const token=localStorage.getItem("anpardaz:accessToken")??"";if(token){void fetch(MARKET_API+"/api/v1/market/products/"+encodeURIComponent(p.id)+"/view",{method:"POST",headers:{"authorization":"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({surface:"web"})}).catch(()=>{})}},[p.id]);
   const openOffer=async(o:any)=>{try{const token=localStorage.getItem("anpardaz:accessToken")??"";const r=await fetch(MARKET_API+"/api/v1/market/clickout",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({offerId:Number(o.id),surface:"web"})});const d=await r.json();if(!r.ok)throw new Error();if(d.mode==="iframe")setFrameUrl(d.url);else window.open(d.url,"_blank","noopener,noreferrer")}catch{}};
   const [activeTab, setActiveTab] = useState<"description"|"specs"|"reviews">("description");
 
@@ -487,8 +487,8 @@ function ComparePopup({ products, onClose }: { products:Product[]; onClose:()=>v
     if (k==="قیمت") return fmtIRT(p.price);
     if (k==="امتیاز") return p.rating ? `${p.rating.toFixed(1)} ★` : "—";
     if (k==="دسته‌بندی") return PRODUCT_CATEGORIES.find(c=>c.id===p.category)?.nameFa ?? "—";
-    if (k==="گارانتی") return "۱۲ ماه";
-    if (k==="ارسال") return "رایگان";
+    if (k==="گارانتی") return String((p.specs as any)?.warranty??(p.specs as any)?.گارانتی??"—");
+    if (k==="ارسال") return String((p.specs as any)?.shipping??(p.specs as any)?.ارسال??"—");
     return "—";
   };
   return (
