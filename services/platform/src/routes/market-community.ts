@@ -72,8 +72,13 @@ export function registerMarketCommunityRoutes(app:FastifyInstance,pool:Pool){
       COUNT(DISTINCT c.user_id)::int unique_users,
       COUNT(DISTINCT c.product_id)::int unique_products,
       COUNT(*) FILTER(WHERE c.surface='mobile')::int mobile_clickouts,
-      COUNT(*) FILTER(WHERE c.surface='web')::int web_clickouts
+      COUNT(*) FILTER(WHERE c.surface='web')::int web_clickouts,
+      MAX(r.commission_type) commission_type,MAX(r.commission_value) commission_value,
+      CASE WHEN MAX(r.commission_type)='fixed' THEN COUNT(*)*MAX(r.commission_value)
+           WHEN MAX(r.commission_type)='percent' THEN COUNT(*)*MAX(r.commission_value)/100 ELSE 0 END estimated_commission
       FROM market_clickouts c JOIN market_stores s ON s.id=c.store_id
+      LEFT JOIN market_merchant_commission_rules r ON r.store_id=s.id AND r.active=true
+        AND r.valid_from<=c.created_at AND (r.valid_to IS NULL OR r.valid_to>c.created_at)
       WHERE ${filter} GROUP BY s.id ORDER BY clickout_count DESC`,params);
     const totals=await pool.query(`SELECT COUNT(*)::int clickouts,COUNT(DISTINCT user_id)::int users,COUNT(DISTINCT product_id)::int products FROM market_clickouts c WHERE ${filter}`,params);
     return {from,to,stores:r.rows,totals:totals.rows[0],note:'clickout is a tracked outbound purchase-intent event; it is not proof that checkout or payment completed.'};
