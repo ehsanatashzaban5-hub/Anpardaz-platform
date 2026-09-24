@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────
 import { useState, useRef, useEffect, useMemo } from "react";
 import WI from "./WebIcons";
-import { AI_MODELS, AI_PROVIDERS } from "./mockData";
+
 import type { WebPage, AiModel, Chat } from "./types";
 import { useIsMobile } from "./useResponsive";
 
@@ -39,7 +39,7 @@ const THINKING_MSGS = [
 
 export default function WebHoosh({ onNavigate }: HooshProps) {
   const [view, setView]           = useState<HView>("chat");
-  const [selectedModel, setMod]   = useState<AiModel>(AI_MODELS[0]);
+  const EMPTY_MODEL: AiModel = {id:"",name:"مدل پیکربندی نشده",providerId:"",descFa:"مدل فعال توسط سرور آن هوش ارائه می‌شود.",capabilities:[],contextWindow:"—"};\n  const [aiModels, setAiModels] = useState<AiModel[]>([]);\n  const [aiProviders, setAiProviders] = useState<any[]>([]);\n  const [selectedModel, setMod]   = useState<AiModel>(EMPTY_MODEL);
   const [mode, setMode]           = useState<CreationMode>(MODES[0]);
   const [chats, setChats]         = useState<Chat[]>([]);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
@@ -67,7 +67,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   };
   const mapConversation = (x: any, messages: any[] = []): Chat => ({
     id: String(x.id), title: x.title || "مکالمه جدید", preview: messages[messages.length - 1]?.content || "",
-    modelId: x.model || AI_MODELS[0]?.id || "", modeId: x.mode || "chat",
+    modelId: x.model || aiModels[0]?.id || "", modeId: x.mode || "chat",
     messages: messages.map((m:any) => ({ id:String(m.id), role:m.role, content:m.content, modelId:m.metadata?.model, createdAt:m.created_at })),
     createdAt:x.created_at, updatedAt:x.updated_at,
   });
@@ -86,8 +86,8 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   , [chats, searchChat]);
 
   const filteredModels = useMemo(() =>
-    AI_MODELS.filter(m => providerFilter === "all" || m.providerId === providerFilter)
-  , [providerFilter]);
+    aiModels.filter(m => providerFilter === "all" || m.providerId === providerFilter)
+  , [aiModels, providerFilter]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior:"smooth" });
@@ -438,7 +438,7 @@ function ExploreView({ models, selectedModel, onSelect, providerFilter }: { mode
       <div style={{ marginBottom:20 }}>
         <h2 style={{ fontSize:20, fontWeight:900, marginBottom:6 }}>کاوش مدل‌های هوش مصنوعی</h2>
         <p style={{ fontSize:13, color:"var(--w-muted)" }}>
-          {providerFilter === "all" ? `${models.length} مدل از ۸ ارائه‌دهنده پیشرو` : `${models.length} مدل از ${AI_PROVIDERS.find(p=>p.id===providerFilter)?.name}`}
+          {providerFilter === "all" ? `${models.length} مدل فعال از ${aiProviders.length} ارائه‌دهنده` : `${models.length} مدل از ${AI_PROVIDERS.find(p=>p.id===providerFilter)?.name}`}
         </p>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:14 }}>
