@@ -209,6 +209,52 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     return{clickouts:clickouts.rows,purchases:purchases.rows,events:events.rows};
   });
 
+  app.get('/api/v1/market/products/:id/reviews',async(req,reply)=>{
+    const id=Number((req.params as any).id);
+    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_id'});
+    const product=await pool.query("SELECT 1 FROM market_products WHERE id=$1 AND status='published'",[id]);
+    if(!product.rows[0])return reply.code(404).send({error:'product_not_found'});
+    const reviews=await pool.query(`SELECT r.id,r.rating,r.title,r.body,r.helpful_count,r.verified_purchase,r.created_at,
+      u.id user_id
+      FROM market_reviews r JOIN platform_users u ON u.id=r.user_id
+      WHERE r.product_id=$1 AND r.status='published'
+      ORDER BY r.created_at DESC LIMIT 100`,[id]);
+    return {reviews:reviews.rows};
+  });
+
+  app.post('/api/v1/market/products/:id/reviews',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),id=Number((req.params as any).id),b=(req.body??{}) as any;
+    const rating=Number(b.rating),body=typeof b.body==='string'?b.body.trim():'';
+    if(!Number.isSafeInteger(id)||id<=0||!Number.isInteger(rating)||rating<1||rating>5||body.length<3||body.length>5000)return reply.code(400).send({error:'invalid_review'});
+    const product=await pool.query("SELECT 1 FROM market_products WHERE id=$1 AND status='published'",[id]);
+    if(!product.rows[0])return reply.code(404).send({error:'product_not_found'});
+    const existing=await pool.query('SELECT id FROM market_reviews WHERE product_id=$1 AND user_id=$2',[id,uid]);
+    if(existing.rows[0])return reply.code(409).send({error:'review_already_exists'});
+    const r=await pool.query(`INSERT INTO market_reviews(product_id,user_id,rating,title,body,status)
+      VALUES($1,$2,$3,$4,$5,'pending') RETURNING id,rating,title,body,status,created_at`,
+      [id,uid,rating,typeof b.title==='string'?b.title.trim().slice(0,200):null,body]);
+    await pool.query("INSERT INTO market_user_events(identity_id,user_id,event_type,product_id,metadata) VALUES($1,$2,'review_created',$3,$4)",[a.auth.sub,uid,id,JSON.stringify({status:'pending'})]);
+    return reply.code(201).send({review:r.rows[0]});
+  });
+
+  app.post('/api/v1/market/reviews/:id/helpful',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),id=Number((req.params as any).id),b=(req.body??{}) as any;
+    if(!Number.isSafeInteger(id)||id<=0||typeof b.helpful!=='boolean')return reply.code(400).send({error:'invalid_vote'});
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      const r=await client.query('SELECT id FROM market_reviews WHERE id=$1 AND status=\'published\' FOR UPDATE',[id]);
+      if(!r.rows[0]){await client.query('ROLLBACK');return reply.code(404).send({error:'review_not_found'});}
+      const old=await client.query('SELECT helpful FROM market_review_votes WHERE review_id=$1 AND user_id=$2',[id,uid]);
+      if(old.rows[0]) await client.query('UPDATE market_review_votes SET helpful=$3 WHERE review_id=$1 AND user_id=$2',[id,uid,b.helpful]);
+      else await client.query('INSERT INTO market_review_votes(review_id,user_id,helpful) VALUES($1,$2,$3)',[id,uid,b.helpful]);
+      const count=await client.query("SELECT COUNT(*)::int count FROM market_review_votes WHERE review_id=$1 AND helpful=true",[id]);
+      await client.query('UPDATE market_reviews SET helpful_count=$2,updated_at=NOW() WHERE id=$1',[id,count.rows[0].count]);
+      await client.query('COMMIT');
+      return {helpful:b.helpful,helpfulCount:count.rows[0].count};
+    }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+  });
+
   app.post('/api/v1/market/ai/assist',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),b=(req.body??{}) as any;
     if(typeof b.input!=='string'||!b.input.trim()||b.input.length>12000)return reply.code(400).send({error:'invalid_ai_input'});
