@@ -7858,7 +7858,7 @@ type AnView=
   |{t:"me"}|{t:"me-orders"}|{t:"me-tickets"}|{t:"me-fav"}|{t:"me-alerts"}
   |{t:"me-recent"}|{t:"me-compare"}|{t:"me-city"}|{t:"me-support"}|{t:"me-reg"}|{t:"me-panel"};
 
-interface AnProduct{id:string;title:string;brand:string;catId:string;subId:string;img:string;specs:Record<string,string>;priceMin:number;priceMax:number;storeCount:number;desc:string;tags:string[];rating:number;reviews:number;ph:{d:string;p:number}[];;media?:string[];}
+interface AnProduct{id:string;title:string;brand:string;catId:string;subId:string;img:string;specs:Record<string,string>;priceMin:number;priceMax:number;storeCount:number;desc:string;tags:string[];rating:number;reviews:number;ph:{d:string;p:number}[];media?:string[];}
 interface AnOffer{sid:string;price:number;ship:string;warranty:string;inStock:boolean;upd:string;storeName?:string;offerId?:number;productUrl?:string;iframeMode?:"allowed"|"blocked"|"unknown";}
 interface CompareState{active:boolean;selectedIds:string[];minimized:boolean;}
 const ANS:{[k:string]:{n:string;sc:number}}={
