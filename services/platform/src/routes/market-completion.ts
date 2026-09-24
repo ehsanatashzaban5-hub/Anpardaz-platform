@@ -16,6 +16,30 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return{conversations:cs,messages:ms};
   });
 
+  app.post('/api/v1/market/ai/audit',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),b=(req.body??{}) as any;
+    const productId=Number(b.productId); const storeId=Number(b.storeId);
+    if(!Number.isSafeInteger(productId)||productId<=0)return reply.code(400).send({error:'invalid_product'});
+    const q=await pool.query(`SELECT p.id,p.title,p.description,p.brand,p.product_type,p.specs,p.source_url,p.raw_metadata,
+      p.classification_status,p.classification_confidence,p.match_confidence,p.match_method,
+      c.name_fa category_name,
+      COALESCE((SELECT json_agg(json_build_object('store',s.name,'domain',s.domain,'price',o.price,'currency',o.currency,'availability',o.availability,'raw',o.raw_metadata) ORDER BY o.price)
+        FROM market_offers o JOIN market_stores s ON s.id=o.store_id WHERE o.product_id=p.id AND s.active=true),'[]'::json) offers,
+      COALESCE((SELECT json_agg(json_build_object('rating',r.rating,'title',r.title,'body',r.body) ORDER BY r.created_at DESC)
+        FROM market_reviews r WHERE r.product_id=p.id AND r.status='published'),'[]'::json) reviews
+      FROM market_products p LEFT JOIN market_categories c ON c.id=p.category_id WHERE p.id=$1 AND p.status='published'`,[productId]);
+    if(!q.rows[0])return reply.code(404).send({error:'product_not_found'});
+    const sourceRows=storeId
+      ? (await pool.query('SELECT s.name,s.domain,ss.source_name,ss.source_type,ss.adapter,ss.last_status,ss.last_item_count,ss.last_error FROM market_stores s LEFT JOIN market_store_sources ss ON ss.store_id=s.id WHERE s.id=$1',[storeId])).rows
+      : [];
+    const input=JSON.stringify({product:q.rows[0],storeSources:sourceRows});
+    const result=await app.inject({method:'POST',url:'/api/v1/ai/execute',headers:{authorization:req.headers.authorization??''},payload:{workflowCode:'market.audit',input,sourceType:'market',sourceId:String(productId)}});
+    if(result.statusCode>=400)return reply.code(502).send({error:'market_ai_unavailable'});
+    const out=result.json() as any;
+    await pool.query('INSERT INTO market_activity_log(identity_id,user_id,event_type,product_id,store_id,metadata) VALUES($1,$2,\'ai_audit\',$3,$4,$5)',[a.auth.sub,uid,productId,storeId||null,JSON.stringify({workflowCode:'market.audit'})]);
+    return out;
+  });
+
   app.get('/api/v1/market/seo',async(req,reply)=>{
     const q=req.query as any; const type=String(q.type??'home'); const id=q.id?Number(q.id):null;
     if(!['home','category','product','store'].includes(type))return reply.code(400).send({error:'invalid_type'});
