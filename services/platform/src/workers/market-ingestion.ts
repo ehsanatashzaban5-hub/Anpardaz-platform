@@ -97,7 +97,7 @@ async function syncSource(store:Store,source:Source){
        }else{
          const ins=await pool.query(`INSERT INTO market_products(title,description,category_id,canonical_key,brand,condition,specs,source_url,source_type,status,normalized_title,gtin,mpn,model,classification_status,classification_confidence,match_confidence,match_method,updated_at)
            VALUES($1,$2,$3,$4,$5,'new',$6,$7,'store_feed','published',$8,$9,$10,$11,$12,$13,$14,$15,NOW())
-           ON CONFLICT(canonical_key) DO UPDATE SET updated_at=NOW()
+           ON CONFLICT(canonical_key) WHERE canonical_key IS NOT NULL DO UPDATE SET updated_at=NOW()
            RETURNING id`,[title,text(item.short_description||item.description),cls.categoryId,key,brand,JSON.stringify(specs),text(item.permalink),normalizedTitle,text(item.gtin||item.ean||item.upc)||null,text(item.mpn)||null,text(item.model)||null,cls.categoryId?"rule":"review",cls.confidence,null,null]);
          productId=Number(ins.rows[0].id);
        }
@@ -108,7 +108,7 @@ async function syncSource(store:Store,source:Source){
          const ext=String(item.id??item.sku??key);
          await pool.query(`INSERT INTO market_offers(product_id,store_id,external_product_id,price,currency,availability,product_url,image_url,raw_metadata,last_seen_at,updated_at)
            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW())
-           ON CONFLICT(store_id,external_product_id) DO UPDATE SET product_id=EXCLUDED.product_id,price=EXCLUDED.price,currency=EXCLUDED.currency,availability=EXCLUDED.availability,product_url=EXCLUDED.product_url,image_url=EXCLUDED.image_url,raw_metadata=EXCLUDED.raw_metadata,last_seen_at=NOW(),updated_at=NOW()`,
+           ON CONFLICT(store_id,external_product_id) WHERE external_product_id IS NOT NULL DO UPDATE SET product_id=EXCLUDED.product_id,price=EXCLUDED.price,currency=EXCLUDED.currency,availability=EXCLUDED.availability,product_url=EXCLUDED.product_url,image_url=EXCLUDED.image_url,raw_metadata=EXCLUDED.raw_metadata,last_seen_at=NOW(),updated_at=NOW()`,
            [productId,store.id,ext,price,currency,availability,text(item.permalink),img,JSON.stringify(item)]);
          seen.add(productId);
        }
