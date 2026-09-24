@@ -39,7 +39,7 @@ const THINKING_MSGS = [
 
 export default function WebHoosh({ onNavigate }: HooshProps) {
   const [view, setView]           = useState<HView>("chat");
-  const [models, setModels]       = useState<AiModel[]>(models);
+  const [models, setModels]       = useState<AiModel[]>(AI_MODELS);
   const [selectedModel, setMod]   = useState<AiModel>(models[0]);
   const [mode, setMode]           = useState<CreationMode>(MODES[0]);
   const [chats, setChats]         = useState<Chat[]>([]);
