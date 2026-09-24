@@ -7900,7 +7900,7 @@ function getAnCatProds(catId:string,limit=20):AnProduct[]{
 function sortOffers(offers:AnOffer[],mode:"price"|"rating"|"avail"):AnOffer[]{
   const s=[...offers];
   if(mode==="price")s.sort((a,b)=>a.price-b.price);
-  else if(mode==="rating")s.sort((a,b)=>(ANS[b.sid]?.sc||3)-(ANS[a.sid]?.sc||3));
+  else if(mode==="rating")s.sort((a,b)=>0);
   else s.sort((a,b)=>(b.inStock?1:0)-(a.inStock?1:0));
   return s;
 }
@@ -8931,7 +8931,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
             </div>
             <AnSH title={`${toFaDigits(String(sortedOffers.length))} فروشگاه — مقایسه قیمت‌ها`}/>
             {sortedOffers.map((o,i)=>{
-              const store=ANS[o.sid]||{n:o.sid,sc:4.0};
+              const store={n:o.storeName??o.sid,sc:0};
               const best=i===0&&sellerSort==="price";
               const priceDiff=o.price-p.priceMin;
               return(
