@@ -24,41 +24,7 @@ export function registerMarketCommunityRoutes(app:FastifyInstance,pool:Pool){
     return {sections:sections.rows,categories:categories.rows,products:products.rows,stores:stores.rows,generatedAt:new Date().toISOString()};
   });
 
-  app.get('/api/v1/market/products/:id/reviews',async(req,reply)=>{
-    const id=Number((req.params as any).id);
-    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_id'});
-    const q=await pool.query(`SELECT r.id,r.product_id,r.rating,r.title,r.body,r.helpful_count,r.created_at,u.display_name
-      FROM market_reviews r JOIN platform_users u ON u.id=r.user_id
-      WHERE r.product_id=$1 AND r.status='published' ORDER BY r.created_at DESC LIMIT 200`,[id]);
-    const summary=await pool.query("SELECT COUNT(*)::int count,COALESCE(AVG(rating),0)::numeric(4,2) average FROM market_reviews WHERE product_id=$1 AND status='published'",[id]);
-    return {reviews:q.rows,summary:summary.rows[0]};
-  });
-
-  app.post('/api/v1/market/products/:id/reviews',{preHandler:requireAuth},async(req,reply)=>{
-    const uid=await ensurePlatformUser(pool,a(req).auth),id=Number((req.params as any).id),b=(req.body??{}) as any;
-    const rating=Number(b.rating);
-    if(!Number.isSafeInteger(id)||id<=0||!Number.isInteger(rating)||rating<1||rating>5||typeof b.body!=='string'||b.body.trim().length<2||b.body.length>10000)return reply.code(400).send({error:'invalid_review'});
-    const exists=await pool.query("SELECT 1 FROM market_products WHERE id=$1 AND status='published'",[id]);
-    if(!exists.rows[0])return reply.code(404).send({error:'product_not_found'});
-    const q=await pool.query(`INSERT INTO market_reviews(product_id,user_id,rating,title,body,status)
-      VALUES($1,$2,$3,$4,$5,'pending') ON CONFLICT(product_id,user_id) DO UPDATE SET rating=EXCLUDED.rating,title=EXCLUDED.title,body=EXCLUDED.body,status='pending',updated_at=NOW() RETURNING *`,
-      [id,uid,rating,typeof b.title==='string'?b.title.trim().slice(0,200):null,b.body.trim()]);
-    return reply.code(201).send({review:q.rows[0],status:'pending'});
-  });
-
-  app.post('/api/v1/market/reviews/:id/like',{preHandler:requireAuth},async(req,reply)=>{
-    const uid=await ensurePlatformUser(pool,a(req).auth),id=Number((req.params as any).id);
-    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_id'});
-    const existing=await pool.query("SELECT 1 FROM market_review_likes WHERE review_id=$1 AND user_id=$2",[id,uid]);
-    if(existing.rows[0]){await pool.query("DELETE FROM market_review_likes WHERE review_id=$1 AND user_id=$2",[id,uid]);await pool.query("UPDATE market_reviews SET helpful_count=GREATEST(0,helpful_count-1) WHERE id=$1",[id]);return {liked:false};}
-    const r=await pool.query("SELECT id FROM market_reviews WHERE id=$1 AND status='published'",[id]);
-    if(!r.rows[0])return reply.code(404).send({error:'review_not_found'});
-    await pool.query("INSERT INTO market_review_likes(review_id,user_id) VALUES($1,$2)",[id,uid]);
-    await pool.query("UPDATE market_reviews SET helpful_count=helpful_count+1 WHERE id=$1",[id]);
-    return {liked:true};
-  });
-
-  app.get('/api/v1/admin/market/commission-report',{preHandler:requireAuth},async(req,reply)=>{
+  // Product review read/write routes live in market-aggregator.ts to avoid duplicate Fastify routes.\n\n  app.post('/api/v1/market/reviews/:id/like',{preHandler:requireAuth},async(req,reply)=>{\n    const uid=await ensurePlatformUser(pool,a(req).auth),id=Number((req.params as any).id);\n    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_review'});\n    const r=await pool.query("SELECT id FROM market_reviews WHERE id=$1 AND status='published'",[id]);\n    if(!r.rows[0])return reply.code(404).send({error:'review_not_found'});\n    const old=await pool.query("SELECT helpful FROM market_review_votes WHERE review_id=$1 AND user_id=$2",[id,uid]);\n    if(old.rows[0]){await pool.query("DELETE FROM market_review_votes WHERE review_id=$1 AND user_id=$2",[id,uid]);await pool.query("UPDATE market_reviews SET helpful_count=GREATEST(0,helpful_count-1),updated_at=NOW() WHERE id=$1",[id]);return {liked:false};}\n    await pool.query("INSERT INTO market_review_votes(review_id,user_id,helpful) VALUES($1,$2,true)",[id,uid]);\n    await pool.query("UPDATE market_reviews SET helpful_count=helpful_count+1,updated_at=NOW() WHERE id=$1",[id]);\n    return {liked:true};\n  });\n\n  app.get('/api/v1/admin/market/commission-report',{preHandler:requireAuth},async(req,reply)=>{
     const x=a(req);if(!(await hasPermission(pool,x.auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
     const q=req.query as any;
     const from=q.from?new Date(q.from):new Date(Date.now()-30*86400000);
