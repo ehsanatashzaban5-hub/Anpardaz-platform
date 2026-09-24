@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────
 import { useState, useMemo, useRef, useEffect } from "react";
 import WI from "./WebIcons";
-import { PRODUCTS, PRODUCT_CATEGORIES } from "./mockData";
+import { PRODUCT_CATEGORIES } from "./mockData";
 import type { WebPage, Product } from "./types";
 
 interface Props { onNavigate: (p: WebPage) => void; }
@@ -13,6 +13,9 @@ interface Props { onNavigate: (p: WebPage) => void; }
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 const fmtIRT = (n: number) => `${FA(Math.round(n/10000).toLocaleString())} هزار تومان`;
 const fmtUSD = (n: number) => `$${n.toLocaleString("en-US", { maximumFractionDigits:0 })}`;
+
+const MARKET_API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")??"";
+let MARKET_MARKET_PRODUCTS:Product[]=[];
 
 const SORT_OPTIONS = [
   { id:"newest",    label:"جدیدترین" },
@@ -29,14 +32,17 @@ export default function WebMarket({ onNavigate }: Props) {
   const [search, setSearch]       = useState("");
   const [sortBy, setSortBy]       = useState("newest");
   const [selectedProduct, setProduct] = useState<Product|null>(null);
-  const [favorites, setFavorites] = useState<Set<string>>(new Set(["p1","p3"]));
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode]   = useState<"grid"|"list">("grid");
   const [cart, setCart]           = useState<string[]>([]);
   const [compareList, setCompareList] = useState<string[]>([]);
   const [showCompare, setShowCompare] = useState(false);
 
+  useEffect(()=>{(async()=>{try{const r=await fetch(MARKET_API+"/api/v1/market/catalog?limit=100");const d=await r.json();MARKET_MARKET_PRODUCTS=(d.products??[]).map((p:any)=>({id:String(p.id),title:p.title??"",titleFa:p.title??"",description:p.description??"",price:Number(p.priceMin??0),originalPrice:Number(p.priceMax??0)>Number(p.priceMin??0)?Number(p.priceMax):undefined,images:[],category:p.category_slug??"other",subcategory:p.category_name_fa,seller:{id:String(p.offers?.[0]?.store_id??"store"),name:p.offers?.[0]?.store_name??"فروشگاه",nameFa:p.offers?.[0]?.store_name??"فروشگاه",rating:0,reviewCount:0,salesCount:0,isVerified:true,joinedAt:""},rating:0,reviewCount:0,stock:1,sold:0,tags:[],specs:p.specs??{}}));setSortBy(v=>v);}catch(e){console.error(e)}})();},[]);
+  useEffect(()=>{const token=localStorage.getItem("anpardaz:accessToken");if(!token)return;(async()=>{try{const r=await fetch(MARKET_API+"/api/v1/market/me/favorites",{headers:{authorization:"Bearer "+token}});if(r.ok){const d=await r.json();setFavorites(new Set((d.products??[]).map((p:any)=>String(p.id))))}}catch{}})()},[]);
+
   const filtered = useMemo(() => {
-    let list = PRODUCTS.filter(p =>
+    let list = MARKET_PRODUCTS.filter(p =>
       (selectedCat === "all" || p.category === selectedCat) &&
       (search === "" ||
         p.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -71,8 +77,8 @@ export default function WebMarket({ onNavigate }: Props) {
     return (
       <div dir="rtl">
         <ProductDetail product={selectedProduct} onBack={()=>setProduct(null)} isFav={favorites.has(selectedProduct.id)} onToggleFav={()=>toggleFav(selectedProduct.id)} onAddCart={()=>addToCart(selectedProduct.id)} inCart={cart.includes(selectedProduct.id)} compareList={compareList} onToggleCompare={()=>toggleCompare(selectedProduct.id)}/>
-        {compareList.length > 1 && <CompareBar products={PRODUCTS.filter(p=>compareList.includes(p.id))} onShow={()=>setShowCompare(true)} onRemove={id=>toggleCompare(id)}/>}
-        {showCompare && <ComparePopup products={PRODUCTS.filter(p=>compareList.includes(p.id))} onClose={()=>setShowCompare(false)}/>}
+        {compareList.length > 1 && <CompareBar products={MARKET_PRODUCTS.filter(p=>compareList.includes(p.id))} onShow={()=>setShowCompare(true)} onRemove={id=>toggleCompare(id)}/>}
+        {showCompare && <ComparePopup products={MARKET_PRODUCTS.filter(p=>compareList.includes(p.id))} onClose={()=>setShowCompare(false)}/>}
       </div>
     );
   }
@@ -131,10 +137,10 @@ export default function WebMarket({ onNavigate }: Props) {
                   <div style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", marginBottom:10 }}>دسته‌بندی‌ها</div>
                   <button onClick={()=>setCat("all")} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"8px 10px", borderRadius:8, border:"none", background:selectedCat==="all"?"rgba(217,119,6,0.1)":"transparent", color:selectedCat==="all"?"#d97706":"var(--w-muted)", fontSize:13, fontWeight:selectedCat==="all"?700:500, cursor:"pointer", fontFamily:"Vazirmatn", textAlign:"right", marginBottom:2, borderLeft:selectedCat==="all"?"2px solid #d97706":"2px solid transparent" }}>
                     <WI n="market" s={14}/> همه محصولات
-                    <span style={{ marginRight:"auto", fontSize:11, background:"var(--w-card2)", padding:"1px 6px", borderRadius:4 }}>{FA(PRODUCTS.length)}</span>
+                    <span style={{ marginRight:"auto", fontSize:11, background:"var(--w-card2)", padding:"1px 6px", borderRadius:4 }}>{FA(MARKET_PRODUCTS.length)}</span>
                   </button>
                   {PRODUCT_CATEGORIES.map(cat => {
-                    const count = PRODUCTS.filter(p=>p.category===cat.id).length;
+                    const count = MARKET_PRODUCTS.filter(p=>p.category===cat.id).length;
                     return (
                       <button key={cat.id} onClick={()=>setCat(cat.id)} style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"8px 10px", borderRadius:8, border:"none", background:selectedCat===cat.id?"rgba(217,119,6,0.1)":"transparent", color:selectedCat===cat.id?"#d97706":"var(--w-muted)", fontSize:13, fontWeight:selectedCat===cat.id?700:400, cursor:"pointer", fontFamily:"Vazirmatn", textAlign:"right", marginBottom:2, borderLeft:selectedCat===cat.id?"2px solid #d97706":"2px solid transparent" }}>
                         <WI n={cat.icon} s={14}/> {cat.nameFa}
@@ -202,9 +208,9 @@ export default function WebMarket({ onNavigate }: Props) {
       </div>
 
       {compareList.length >= 2 && section==="shop" && !selectedProduct && (
-        <CompareBar products={PRODUCTS.filter(p=>compareList.includes(p.id))} onShow={()=>setShowCompare(true)} onRemove={id=>toggleCompare(id)}/>
+        <CompareBar products={MARKET_PRODUCTS.filter(p=>compareList.includes(p.id))} onShow={()=>setShowCompare(true)} onRemove={id=>toggleCompare(id)}/>
       )}
-      {showCompare && <ComparePopup products={PRODUCTS.filter(p=>compareList.includes(p.id))} onClose={()=>setShowCompare(false)}/>}
+      {showCompare && <ComparePopup products={MARKET_PRODUCTS.filter(p=>compareList.includes(p.id))} onClose={()=>setShowCompare(false)}/>}
     </div>
   );
 }
@@ -508,7 +514,7 @@ function ComparePopup({ products, onClose }: { products:Product[]; onClose:()=>v
 
 // ── Favorites Section ───────────────────────────────
 function FavoritesSection({ favorites, onSelect, onToggleFav, onAddCart, cart }: { favorites:Set<string>; onSelect:(p:Product)=>void; onToggleFav:(id:string)=>void; onAddCart:(id:string)=>void; cart:string[] }) {
-  const favProducts = PRODUCTS.filter(p=>favorites.has(p.id));
+  const favProducts = MARKET_PRODUCTS.filter(p=>favorites.has(p.id));
   return (
     <div>
       <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>علاقه‌مندی‌ها ({FA(favProducts.length)})</div>
@@ -560,7 +566,7 @@ function OrdersSection({ cart }: { cart:string[] }) {
         <div style={{ marginTop:20 }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:10 }}>سبد خرید ({FA(cart.length)} آیتم)</div>
           <div className="w-card" style={{ padding:"16px" }}>
-            {cart.map((id,i)=>{const p=PRODUCTS.find(x=>x.id===id); if(!p) return null; return (
+            {cart.map((id,i)=>{const p=MARKET_PRODUCTS.find(x=>x.id===id); if(!p) return null; return (
               <div key={`${id}-${i}`} style={{ display:"flex", gap:12, padding:"8px 0", borderBottom:"1px solid var(--w-border)", alignItems:"center" }}>
                 <div style={{ flex:1, fontSize:13 }}>{p.titleFa}</div>
                 <div style={{ fontSize:13, fontWeight:800, color:"#d97706" }}>{fmtIRT(p.price)}</div>
