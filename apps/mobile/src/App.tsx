@@ -8413,11 +8413,8 @@ function AnAssistantChat({onProduct,compareMode,compareSelected,onCompareToggle,
     const uid=Date.now().toString();
     const url=URL.createObjectURL(f);
     setMsgs(p=>[...p,{id:uid,role:"user",text:"[تصویر پیوست شد]",img:url}]);
-    setThinking(true);scrollToBottom();
-    setTimeout(()=>{
-      setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:"تصویر رو دریافت کردم. می‌تونم محصولات مشابه رو برات پیدا کنم. محصول مورد نظرت رو کمی توضیح بده تا دقیق‌تر جستجو کنم."}]);
-      setThinking(false);scrollToBottom();
-    },1200);
+    setThinking(false);
+    setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:"جستجوی تصویری هنوز به سرویس پردازش تصویر متصل نشده است. برای جلوگیری از پاسخ ساختگی، فعلاً توضیح متنی محصول را وارد کنید."}]);
     e.target.value="";
   };
 
