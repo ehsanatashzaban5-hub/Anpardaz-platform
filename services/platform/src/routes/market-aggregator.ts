@@ -161,6 +161,26 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     try{await client.query('BEGIN');const q=await client.query('INSERT INTO market_saved_comparisons(identity_id,user_id,title) VALUES($1,$2,$3) RETURNING *',[a.auth.sub,uid,typeof b.title==='string'&&b.title.trim()?b.title.trim().slice(0,120):'مقایسه ذخیره‌شده']);for(let i=0;i<ids.length;i++)await client.query('INSERT INTO market_saved_comparison_items(comparison_id,product_id,position) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[q.rows[0].id,ids[i],i]);await client.query('COMMIT');return reply.code(201).send({comparison:q.rows[0],productIds:ids});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   });
 
+  app.post('/api/v1/market/products/:id/favorite',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),id=Number((req.params as any).id);
+    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_id'});
+    const exists=await pool.query("SELECT 1 FROM market_products WHERE id=$1 AND status='published' LIMIT 1",[id]);
+    if(!exists.rows[0])return reply.code(404).send({error:'product_not_found'});
+    const q=await pool.query('INSERT INTO market_favorites(user_id,product_id) VALUES($1,$2) ON CONFLICT(user_id,product_id) DO DELETE RETURNING product_id',[uid,id]);
+    await pool.query("INSERT INTO market_user_events(identity_id,user_id,event_type,product_id,metadata) VALUES($1,$2,$3,$4,$5)",[a.auth.sub,uid,q.rows[0]?'favorite_removed':'favorite_added',id,JSON.stringify({surface:'web_or_mobile'})]);
+    return{favorite:!q.rows[0]};
+  });
+
+  app.get('/api/v1/market/me/activity',{preHandler:requireAuth},async(req)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth);
+    const [clickouts,purchases,events]=await Promise.all([
+      pool.query("SELECT c.*,p.title product_title,s.name store_name FROM market_clickouts c LEFT JOIN market_products p ON p.id=c.product_id LEFT JOIN market_stores s ON s.id=c.store_id WHERE c.user_id=$1 ORDER BY c.created_at DESC LIMIT 100",[uid]),
+      pool.query("SELECT e.*,p.title product_title,s.name store_name FROM market_purchase_events e LEFT JOIN market_products p ON p.id=e.product_id LEFT JOIN market_stores s ON s.id=e.store_id WHERE e.user_id=$1 ORDER BY e.created_at DESC LIMIT 100",[uid]),
+      pool.query("SELECT * FROM market_user_events WHERE user_id=$1 ORDER BY created_at DESC LIMIT 200",[uid])
+    ]);
+    return{clickouts:clickouts.rows,purchases:purchases.rows,events:events.rows};
+  });
+
   app.post('/api/v1/market/ai/assist',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),b=(req.body??{}) as any;
     if(typeof b.input!=='string'||!b.input.trim()||b.input.length>12000)return reply.code(400).send({error:'invalid_ai_input'});
