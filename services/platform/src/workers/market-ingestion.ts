@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Pool } from "pg";
 
-type Store={id:number;name:string;domain:string;homepage_url:string;verification_status:string};
+type Store={id:number;name:string;domain:string;homepage_url:string;category_hint?:string|null;verification_status:string};
 type Source={id:number;store_id:number;source_type:string;endpoint_url:string;adapter:string|null;mapping:any;etag:string|null;last_modified:string|null};
 type Item={id?:string|number;sku?:string;name?:string;title?:string;description?:string;short_description?:string;permalink?:string;price?:string|number;regular_price?:string|number;stock_status?:string;in_stock?:boolean;gtin?:string;ean?:string;upc?:string;mpn?:string;model?:string;prices?:{price?:string;currency_code?:string;currency_minor_unit?:number;regular_price?:string};images?:Array<{src?:string}>;categories?:Array<{id?:number;name?:string}>;brands?:Array<{name?:string}>;attributes?:Array<{name?:string;options?:string[]}>};
 
@@ -130,7 +130,7 @@ async function syncSource(store:Store,source:Source){
 
 async function main(){
  while(true){
-   const stores=(await pool.query<Store>(`SELECT id,name,domain,homepage_url,verification_status FROM market_stores WHERE active=true AND verification_status='verified' ORDER BY last_sync_at NULLS FIRST,id LIMIT $1`,[maxStores])).rows;
+   const stores=(await pool.query<Store>(`SELECT id,name,domain,homepage_url,category_hint,verification_status FROM market_stores WHERE active=true AND verification_status='verified' ORDER BY last_sync_at NULLS FIRST,id LIMIT $1`,[maxStores])).rows;
    for(const store of stores){
      const sources=(await pool.query<Source>("SELECT id,store_id,source_type,endpoint_url,adapter,mapping,etag,last_modified FROM market_store_sources WHERE store_id=$1 AND enabled=true AND endpoint_url IS NOT NULL ORDER BY id",[store.id])).rows;
      for(const source of sources)await syncSource(store,source);
