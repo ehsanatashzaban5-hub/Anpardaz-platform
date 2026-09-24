@@ -701,7 +701,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const [deepThink, setDeepThink]   = useState(false);
   const [activeMode, setActiveMode] = useState<CreationMode|null>(null);
   const [filterCat, setFilterCat]   = useState("all");
-  const [showNewProj, setShowNewProj] = useState(false);
+  const [showNewProj, setShowNewProj] = useState(false);\n  const [conversationId, setConversationId] = useState<number|null>(null);\n  const [aiError, setAiError] = useState<string|null>(null);\n  const platformApi = ((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"") ?? "";\n  const hooshApi = useCallback(async (path:string, init:RequestInit={}) => {\n    const token=window.localStorage.getItem("anpardaz:accessToken")??"";\n    if(!platformApi) throw new Error("anpardaz_api_unconfigured");\n    if(!token) throw new Error("auth_required");\n    const headers=new Headers(init.headers); headers.set("accept","application/json"); headers.set("authorization",`Bearer ${token}`);\n    if(init.body&&!headers.has("content-type")) headers.set("content-type","application/json");\n    const res=await fetch(`${platformApi}${path}`,{...init,headers,cache:"no-store"});\n    const data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(String(data?.error??"hoosh_request_failed")); return data;\n  },[platformApi]);
 
   // Device back button: close panels first, then exit to main app
   useBackHandler(() => {
@@ -713,19 +713,38 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const inChat = messages.length > 0;
   const model = AI_MODELS.find(m=>m.id===modelId)!;
 
-  const send = useCallback(() => {
-    if(!input.trim())return;
-    const u: Message = { id:`u${Date.now()}`, role:"user", text:input.trim(), ts:new Date() };
+  const send = useCallback(async () => {
+    const value=input.trim();
+    if(!value)return;
+    setAiError(null);
+    const u: Message = { id:`u${Date.now()}`, role:"user", text:value, ts:new Date() };
     const t: Message = { id:`t${Date.now()}`, role:"ai", text:"", thinking:true, modelId, ts:new Date() };
-    setMessages(prev=>[...prev,u,t]);
-    setInput("");
-    const d = deepThink ? 2400+Math.random()*600 : 900+Math.random()*500;
-    setTimeout(()=>{
-      setMessages(prev=>prev.filter(m=>!m.thinking).concat({ id:`a${Date.now()}`, role:"ai", text:randReply(), modelId, ts:new Date() }));
-    }, d);
-  }, [input, modelId, deepThink]);
-
-  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setTab("home"); }, []);
+    setMessages(prev=>[...prev,u,t]); setInput("");
+    try {
+      let cid=conversationId;
+      if(!cid){
+        const d=await hooshApi("/api/v1/hoosh/conversations",{method:"POST",body:JSON.stringify({title:value.slice(0,80),model:modelId,mode:activeMode?.id??"chat"})});
+        cid=Number(d.conversation.id); setConversationId(cid);
+      }
+      await hooshApi(`/api/v1/hoosh/conversations/${cid}/messages`,{
+        method:"POST",headers:{"Idempotency-Key":`hoosh-mobile-${cid}-${Date.now()}`},
+        body:JSON.stringify({content:value,model:modelId,mode:activeMode?.id??"chat"})
+      });
+      for(let i=0;i<30;i++){
+        await new Promise(r=>setTimeout(r,1000));
+        const d=await hooshApi(`/api/v1/hoosh/conversations/${cid}`);
+        const assistant=(d.messages||[]).filter((m:any)=>m.role==="assistant").at(-1);
+        if(assistant){
+          setMessages((d.messages||[]).map((m:any)=>({id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??modelId,ts:new Date(m.created_at)})));
+          break;
+        }
+      }
+    }catch(err:any){
+      setAiError(err.message);
+      setMessages(prev=>prev.filter(m=>!m.thinking));
+    }
+  },[input,modelId,deepThink,conversationId,hooshApi,activeMode]);
+  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setConversationId(null); setAiError(null); setTab("home"); }, []);
 
   const handleSelectMode = (mode: CreationMode) => {
     if(mode.id==="__clear__"){ setActiveMode(null); return; }
