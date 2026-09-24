@@ -543,16 +543,20 @@ function FavoritesSection({ favorites, onSelect, onToggleFav, onAddCart, cart }:
 
 // ── Orders Section ──────────────────────────────────
 function OrdersSection({cart:_cart}:{cart:string[]}) {
-  const [activity,setActivity]=useState<any>({clickouts:[],purchases:[],events:[]});
-  useEffect(()=>{(async()=>{const token=localStorage.getItem("anpardaz:accessToken")||"";if(!token)return;try{const r=await fetch(MARKET_API+"/api/v1/market/me/activity",{headers:{authorization:"Bearer "+token}});if(r.ok)setActivity(await r.json())}catch{}})()},[]);
-  const rows=[...(activity.clickouts||[]).map((x:any)=>({...x,_kind:"ورود به فروشگاه",_time:x.created_at})),...(activity.purchases||[]).map((x:any)=>({...x,_kind:x.event_type,_time:x.created_at}))].sort((a:any,b:any)=>new Date(b._time).getTime()-new Date(a._time).getTime());
-  return <div><div style={{fontSize:18,fontWeight:900,marginBottom:20}}>فعالیت خرید من</div><div className="w-card" style={{overflow:"hidden"}}>{rows.length===0?<div style={{padding:30,color:"var(--w-muted)",textAlign:"center"}}>هنوز فعالیت خریدی ثبت نشده است.</div>:rows.slice(0,100).map((o:any,i:number)=><div key={String(o.id)+"-"+i} style={{display:"flex",gap:16,padding:16,borderBottom:i<Math.min(rows.length,100)-1?"1px solid var(--w-border)":"none"}}><div style={{flex:1}}><b>{o.product_title||"محصول"}</b><div style={{fontSize:11,color:"var(--w-muted)",marginTop:4}}>{o._kind} · {o.store_name||"فروشگاه"} · {new Date(o._time).toLocaleString("fa-IR")}</div></div></div>)}</div></div>;
-function AiSection(){const[msgs,setMsgs]=useState<{role:"assistant"|"user";text:string}[]>([{role:"assistant",text:"سلام! من دستیار هوشمند آن مارکت هستم. سؤال خریدتان را بپرسید."}]);const[input,setInput]=useState("");const[busy,setBusy]=useState(false);const send=async()=>{const q=input.trim();if(!q||busy)return;setInput("");setMsgs(m=>[...m,{role:"user",text:q}]);setBusy(true);try{const token=localStorage.getItem("anpardaz:accessToken")||"";const r=await fetch(MARKET_API+"/api/v1/market/ai/assist",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({input:q})});const d=await r.json();if(!r.ok)throw new Error();setMsgs(m=>[...m,{role:"assistant",text:d?.result?.text||"پاسخ دریافت نشد."}]);}catch{setMsgs(m=>[...m,{role:"assistant",text:"دستیار هوشمند در حال حاضر در دسترس نیست."}]);}finally{setBusy(false)}};return <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - var(--w-header) - 100px)"}}><div style={{fontSize:18,fontWeight:900,marginBottom:16}}>دستیار هوشمند خرید</div><div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:12}}>{msgs.map((m,i)=><div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-start":"flex-end"}}><div style={{maxWidth:"75%",padding:"12px 16px",borderRadius:12,background:m.role==="user"?"rgba(217,119,6,0.08)":"var(--w-card2)",fontSize:13,lineHeight:1.7}}>{m.text}</div></div>)}</div><div style={{display:"flex",gap:8,paddingTop:12,borderTop:"1px solid var(--w-border)"}}><input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void send()}} placeholder="مثلاً برای یک لپ‌تاپ تا ۵۰ میلیون راهنمایی کن..." className="w-input"/><button onClick={()=>void send()} disabled={busy} className="w-btn w-btn-primary" style={{background:"#8b5cf6"}}>ارسال</button></div></div>}
-
-function MarketAccount() {
-  const [user,setUser]=useState<any>(null);
-  useEffect(()=>{(async()=>{const token=localStorage.getItem("anpardaz:accessToken")||"";if(!token)return;try{const r=await fetch(MARKET_API+"/api/v1/auth/me",{headers:{authorization:"Bearer "+token}});if(r.ok){const d=await r.json();setUser(d.user)}}catch{}})()},[]);
-  return <div style={{maxWidth:600}}><div style={{fontSize:18,fontWeight:900,marginBottom:20}}>حساب کاربری</div><div className="w-card" style={{padding:22}}>{user?<><div style={{display:"flex",alignItems:"center",gap:16}}><div style={{width:60,height:60,borderRadius:"50%",background:"rgba(217,119,6,0.1)",display:"flex",alignItems:"center",justifyContent:"center",color:"#d97706",fontSize:22,fontWeight:800}}>{String(user.display_name||"کاربر").slice(0,1)}</div><div><div style={{fontSize:17,fontWeight:900}}>{user.display_name||"کاربر آن پرداز"}</div><div style={{fontSize:12,color:"var(--w-muted)"}}>{user.email||"حساب متصل به آن پرداز"}</div><div style={{fontSize:11,color:"var(--w-muted)",marginTop:4}}>شناسه: {user.identity_id||"—"}</div></div></div></>:<div style={{textAlign:"center",padding:30,color:"var(--w-muted)"}}>برای مشاهده حساب، ابتدا از طریق آن پرداز وارد شوید.</div>}</div></div>;
+  const [activity,setActivity]=useState<any>({clickouts:[],purchases:[]});
+  useEffect(()=>{(async()=>{const token=localStorage.getItem("anpardaz:accessToken")||"";if(!token)return;try{const r=await fetch(MARKET_API+"/api/v1/market/me/activity",{headers:{authorization:"Bearer "+token}});if(r.ok)setActivity(await r.json());}catch{}})();},[]);
+  const rows=[...(activity.clickouts||[]),...(activity.purchases||[])];
+  return <div>
+    <div style={{fontSize:18,fontWeight:900,marginBottom:20}}>فعالیت خرید من</div>
+    <div className="w-card" style={{overflow:"hidden"}}>
+      {rows.length===0 ? <div style={{padding:30,color:"var(--w-muted)",textAlign:"center"}}>هنوز فعالیت خریدی ثبت نشده است.</div> :
+        rows.slice(0,100).map((o:any,i:number)=><div key={String(o.id||i)} style={{padding:16,borderBottom:i<Math.min(rows.length,100)-1?"1px solid var(--w-border)":"none"}}>
+          <b>{o.product_title||"محصول"}</b>
+          <div style={{fontSize:11,color:"var(--w-muted)",marginTop:4}}>{o.event_type||"ورود به فروشگاه"} · {o.store_name||"فروشگاه"} · {o.created_at||""}</div>
+        </div>)
+      }
+    </div>
+  </div>;
 }
 
 // ── Market Tickets ──────────────────────────────────
