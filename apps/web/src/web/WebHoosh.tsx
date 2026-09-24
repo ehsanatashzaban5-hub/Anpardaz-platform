@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────
 import { useState, useRef, useEffect, useMemo } from "react";
 import WI from "./WebIcons";
-import { AI_MODELS, AI_PROVIDERS } from "./mockData";
+import { AI_PROVIDERS } from "./mockData";
 import type { WebPage, AiModel, Chat, AiProject } from "./types";
 import { useIsMobile } from "./useResponsive";
 
