@@ -187,8 +187,9 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
   app.post('/api/v1/market/ai/assist',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),b=(req.body??{}) as any;
     if(typeof b.input!=='string'||!b.input.trim()||b.input.length>12000)return reply.code(400).send({error:'invalid_ai_input'});
+    const workflowCode=b.workflowCode==='market.compare'?'market.compare':'market.assist';
     const result=await app.inject({method:'POST',url:'/api/v1/ai/execute',headers:{authorization:req.headers.authorization??''},payload:{
-      workflowCode:'market.assist',input:b.input,sourceType:'market',sourceId:String(b.productId??b.compareIds?.join(',')??'')
+      workflowCode,input:b.input,sourceType:'market',sourceId:String(b.productId??b.compareIds?.join(',')??'')
     }});
     if(result.statusCode>=400)return reply.code(502).send({error:'market_ai_unavailable'});
     return result.json();
