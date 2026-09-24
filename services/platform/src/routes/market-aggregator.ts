@@ -53,7 +53,9 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     if(!r.rows[0])return reply.code(404).send({error:'store_not_found'});
     if(!r.rows[0].active)return reply.code(410).send({error:'store_inactive'});
     if(r.rows[0].iframe_mode!=='allowed')return reply.code(409).send({error:'iframe_not_allowed',mode:r.rows[0].iframe_mode});
-    return{store:r.rows[0]};
+    const safe=safeDestination(r.rows[0].homepage_url,r.rows[0].domain);
+    if(!safe)return reply.code(409).send({error:'invalid_store_destination'});
+    return{store:{...r.rows[0],homepage_url:safe}};
   });
 
   app.post('/api/v1/market/events',{preHandler:requireAuth},async(req,reply)=>{
@@ -71,8 +73,10 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     const o=await pool.query(`SELECT o.id,o.product_id,o.store_id,o.product_url,o.seller_url,s.homepage_url,s.domain store_domain,s.iframe_mode,s.active
       FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id WHERE o.id=$1`,[offerId]);
     if(!o.rows[0]||o.rows[0].active===false)return reply.code(404).send({error:'offer_not_found'});
-    const row=o.rows[0],url=row.product_url||row.seller_url||row.homepage_url;
-    if(!url)return reply.code(409).send({error:'offer_destination_missing'});
+    const row=o.rows[0],rawUrl=row.product_url||row.seller_url||row.homepage_url;
+    if(!rawUrl)return reply.code(409).send({error:'offer_destination_missing'});
+    const url=safeDestination(rawUrl,row.store_domain);
+    if(!url)return reply.code(409).send({error:'invalid_offer_destination'});
     const operationId=randomUUID(),mode=row.iframe_mode==='allowed'?'iframe':'external';
     await pool.query(`INSERT INTO market_clickouts(identity_id,user_id,product_id,offer_id,store_id,surface,destination_url,mode,session_id,operation_id)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[a.auth.sub,uid,row.product_id,row.id,row.store_id,surface(b.surface),url,mode,b.sessionId??null,operationId]);
