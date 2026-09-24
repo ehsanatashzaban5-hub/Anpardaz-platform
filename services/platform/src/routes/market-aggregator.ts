@@ -166,9 +166,12 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_id'});
     const exists=await pool.query("SELECT 1 FROM market_products WHERE id=$1 AND status='published' LIMIT 1",[id]);
     if(!exists.rows[0])return reply.code(404).send({error:'product_not_found'});
-    const q=await pool.query('INSERT INTO market_favorites(user_id,product_id) VALUES($1,$2) ON CONFLICT(user_id,product_id) DO DELETE RETURNING product_id',[uid,id]);
-    await pool.query("INSERT INTO market_user_events(identity_id,user_id,event_type,product_id,metadata) VALUES($1,$2,$3,$4,$5)",[a.auth.sub,uid,q.rows[0]?'favorite_removed':'favorite_added',id,JSON.stringify({surface:'web_or_mobile'})]);
-    return{favorite:!q.rows[0]};
+    const existing=await pool.query('SELECT 1 FROM market_favorites WHERE user_id=$1 AND product_id=$2',[uid,id]);
+    const favorite=existing.rows.length===0;
+    if(favorite) await pool.query('INSERT INTO market_favorites(user_id,product_id) VALUES($1,$2)',[uid,id]);
+    else await pool.query('DELETE FROM market_favorites WHERE user_id=$1 AND product_id=$2',[uid,id]);
+    await pool.query("INSERT INTO market_user_events(identity_id,user_id,event_type,product_id,metadata) VALUES($1,$2,$3,$4,$5)",[a.auth.sub,uid,favorite?'favorite_added':'favorite_removed',id,JSON.stringify({surface:'web_or_mobile'})]);
+    return{favorite};
   });
 
   app.get('/api/v1/market/me/activity',{preHandler:requireAuth},async(req)=>{
