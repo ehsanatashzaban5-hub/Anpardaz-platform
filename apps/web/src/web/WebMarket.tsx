@@ -480,6 +480,8 @@ function CompareBar({ products, onShow, onRemove }: { products:Product[]; onShow
 
 // ── Compare Popup ───────────────────────────────────
 function ComparePopup({ products, onClose }: { products:Product[]; onClose:()=>void }) {
+  const [aiText,setAiText]=useState("");const[aiBusy,setAiBusy]=useState(false);
+  const aiCompare=async()=>{setAiBusy(true);try{const token=localStorage.getItem("anpardaz:accessToken")??"";const input=products.map(p=>({id:p.id,title:p.titleFa,price:p.price,specs:p.specs,category:p.category}));const r=await fetch(MARKET_API+"/api/v1/market/ai/assist",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({input:"محصولات زیر را از نظر قیمت، مشخصات، کاربرد و ارزش خرید مقایسه کن و نتیجه را بدون ساختن اطلاعاتی که در داده نیست به فارسی برگردان: "+JSON.stringify(input),compareIds:products.map(p=>p.id)})});const d=await r.json();if(!r.ok)throw new Error();setAiText(String(d?.result?.text??d?.result?.output??"پاسخ دریافت نشد."))}catch{setAiText("مقایسه هوشمند در حال حاضر در دسترس نیست.")}finally{setAiBusy(false)}};
   const KEYS = ["قیمت","امتیاز","دسته‌بندی","گارانتی","ارسال"];
   const getVal = (p:Product, k:string) => {
     if (k==="قیمت") return fmtIRT(p.price);
@@ -496,6 +498,7 @@ function ComparePopup({ products, onClose }: { products:Product[]; onClose:()=>v
           <div style={{ fontSize:16, fontWeight:900 }}>مقایسه محصولات</div>
           <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:20 }}>×</button>
         </div>
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}><button onClick={()=>void aiCompare()} disabled={aiBusy} className="w-btn w-btn-primary" style={{background:"#8b5cf6"}}>{aiBusy?"در حال تحلیل...":"مقایسه هوشمند"}</button></div>{aiText&&<div style={{padding:14,background:"rgba(139,92,246,0.07)",borderRadius:12,lineHeight:1.8,fontSize:13,marginBottom:14}}>{aiText}</div>}
         <div style={{ display:"grid", gridTemplateColumns:`140px ${products.map(()=>"1fr").join(" ")}`, gap:0 }}>
           <div style={{ padding:"10px", fontWeight:700, fontSize:12 }}></div>
           {products.map(p=>(
