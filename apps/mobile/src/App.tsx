@@ -8781,6 +8781,8 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
   const pricier=MARKET_PRODUCTS.filter(x=>x.catId===p.catId&&x.priceMin>p.priceMin&&x.id!==p.id&&x.rating>=p.rating).sort((a,b)=>a.priceMin-b.priceMin).slice(0,3);
   const strengths=getProductStrengths(p);
   const weaknesses=getProductWeaknesses(p);
+  const [frameUrl,setFrameUrl]=useState("");
+  const openOffer=async(o:AnOffer)=>{if(!o.offerId)return;try{const token=localStorage.getItem("anpardaz:accessToken")??"";const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/clickout",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({offerId:o.offerId,surface:"mobile"})});const d=await r.json();if(!r.ok)throw new Error();if(d.mode==="iframe")setFrameUrl(d.url);else window.open(d.url,"_blank","noopener,noreferrer")}catch{setFrameUrl("")}};
   const drop=p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p?Math.round((p.ph[0].p-p.ph[p.ph.length-1].p)/p.ph[0].p*100):0;
   const TABS=([["sellers","فروشگاه‌ها"],["specs","مشخصات"],["reviews","نظرات"],["similar","گزینه‌ها"]] as const);
   // Simulate 4 gallery images using same URL with different crops
@@ -8962,7 +8964,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
                       {o.ship&&<span style={{fontSize:11,background:"var(--am-bg)",color:"var(--am-muted)",borderRadius:7,padding:"4px 10px",border:"1px solid var(--am-border)"}}>{o.ship}</span>}
                     </div>
                     {o.inStock&&(
-                      <button style={{width:"100%",padding:"13px",background:"var(--am-accent)",border:"none",borderRadius:12,color:"#FFFFFF",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                      <button onClick={()=>void openOffer(o)} style={{width:"100%",padding:"13px",background:"var(--am-accent)",border:"none",borderRadius:12,color:"#FFFFFF",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                         مشاهده و خرید
                       </button>
