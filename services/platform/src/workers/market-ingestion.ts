@@ -54,7 +54,7 @@ function mappedItems(data:any,mapping:any):Item[]{
 
 function jsonLdItems(html:string):Item[]{
  const out:Item[]=[];
- const re=/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi;let m;
+ const re=/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;let m;
  while((m=re.exec(html))){
    try{
      const parsed=JSON.parse(m[1].trim()); const nodes=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.["@graph"])?parsed["@graph"]:[parsed]);
@@ -132,7 +132,7 @@ async function fetchSourceItems(source:Source,headers:Record<string,string>){
  }
  if(source.adapter==="sitemap_jsonld"||source.source_type==="crawler"){
    const fetched=await fetchText(source.endpoint_url,headers);
-   const urls=[...fetched.body.matchAll(/<loc>\\s*([^<]+?)\\s*<\\/loc>/gi)].map(m=>m[1].trim()).filter((u:string)=>/^https?:\\/\\//i.test(u)).slice(0,Math.max(1,Number(source.mapping?.maxUrls??300)));
+   const urls=[...fetched.body.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)].map(m=>m[1].trim()).filter((u:string)=>/^https?:\/\//i.test(u)).slice(0,Math.max(1,Number(source.mapping?.maxUrls??300)));
    const items:Item[]=[];
    for(let i=0;i<urls.length;i+=4){
      const batch=urls.slice(i,i+4);const pages=await Promise.all(batch.map(async(u:string)=>{try{const p=await fetchText(u);return jsonLdProduct(p.body,u)}catch{return null}}));
