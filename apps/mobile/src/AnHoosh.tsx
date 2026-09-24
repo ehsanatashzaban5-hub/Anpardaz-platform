@@ -672,15 +672,9 @@ const AH_TABS: { id:AhTab; label:string; icon:string }[] = [
 // ══════════════════════════════════════════════════════════════════
 // MAIN SCREEN
 // ══════════════════════════════════════════════════════════════════
-export default function AnHooshScreen({
-  const AI_API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")||"";
-  const accessToken=localStorage.getItem("anpardaz:accessToken")||"";
-  const [,refreshModelCatalog]=useState(0);
-  useEffect(()=>{(async()=>{try{const r=await fetch(AI_API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){AI_MODELS=d.models.map((m:any)=>({id:m.id,name:m.name,provider:m.provider,desc:m.descFa||m.desc||"",providerColor:m.providerId==="openai"?"#10A37F":m.providerId==="gemini"?"#4285F4":m.providerId==="anthropic"?"#C4956A":"#E0E0E0",capabilities:Array.isArray(m.capabilities)?m.capabilities:[],contextWindow:m.contextWindow,badge:m.badge}));PROVIDERS=[...new Set(AI_MODELS.map(m=>m.provider))];setModelId(d.models[0].id);refreshModelCatalog(x=>x+1);}}catch{}})();},[]);
-
- onBack }: { onBack: () => void }) {
+export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const [tab, setTab]               = useState<AhTab>("home");
-  const [modelId, setModelId]       = useState("gpt-4o-mini");
+  const [modelId, setModelId]       = useState("gpt-5.6-luna");
   const [showModels, setShowModels] = useState(false);
   const [messages, setMessages]     = useState<Message[]>([]);
   const [input, setInput]           = useState("");
@@ -688,6 +682,10 @@ export default function AnHooshScreen({
   const [activeMode, setActiveMode] = useState<CreationMode|null>(null);
   const [filterCat, setFilterCat]   = useState("all");
   const [showNewProj, setShowNewProj] = useState(false);
+  const AI_API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")||"";
+  const accessToken=localStorage.getItem("anpardaz:accessToken")||"";
+  const [,refreshModelCatalog]=useState(0);
+  useEffect(()=>{(async()=>{try{const r=await fetch(AI_API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){AI_MODELS=d.models.map((m:any)=>({id:m.id,name:m.name,provider:m.provider,desc:m.descFa||m.desc||"",providerColor:m.providerId==="openai"?"#10A37F":m.providerId==="gemini"?"#4285F4":m.providerId==="anthropic"?"#C4956A":"#E0E0E0",capabilities:Array.isArray(m.capabilities)?m.capabilities:[],contextWindow:m.contextWindow,badge:m.badge}));PROVIDERS=[...new Set(AI_MODELS.map(m=>m.provider))];setModelId(d.models[0].id);refreshModelCatalog(x=>x+1);}}catch{}})();},[]);
 
   // Device back button: close panels first, then exit to main app
   useBackHandler(() => {
