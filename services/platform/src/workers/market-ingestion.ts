@@ -111,7 +111,7 @@ async function syncSource(store:Store,source:Source){
            RETURNING id`,[title,text(item.short_description||item.description),cls.categoryId,key,brand,JSON.stringify(specs),text(item.permalink),normalizedTitle,text(item.gtin||item.ean||item.upc)||null,text(item.mpn)||null,text(item.model)||null,cls.categoryId?"rule":"review",cls.confidence,null,null]);
          productId=Number(ins.rows[0].id);
        }
-       if(cls.categoryId)await pool.query("INSERT INTO market_category_classifications(product_id,category_id,method,confidence,evidence) VALUES($1,$2,$3,$4,$5)",[productId,cls.categoryId,cls.method,cls.confidence,JSON.stringify({store:store.domain,source:source.id})]);
+       if(cls.categoryId)await pool.query("INSERT INTO market_category_classifications(product_id,category_id,method,confidence,evidence) VALUES($1,$2,$3,$4,$5) ON CONFLICT(product_id,category_id,method) WHERE active=true DO UPDATE SET confidence=EXCLUDED.confidence,evidence=EXCLUDED.evidence,created_at=NOW()",[productId,cls.categoryId,cls.method,cls.confidence,JSON.stringify({store:store.domain,source:source.id})]);
        if(img)await pool.query("INSERT INTO market_media(product_id,url,sort_order) VALUES($1,$2,0) ON CONFLICT DO NOTHING",[productId,img]);
        if(price!==null){
          const availability=item.stock_status==="outofstock"||item.in_stock===false?"out_of_stock":"in_stock";
