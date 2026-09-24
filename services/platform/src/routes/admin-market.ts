@@ -93,4 +93,23 @@ export function registerAdminMarketRoutes(app:FastifyInstance,pool:Pool){
     if(!q.rows[0])return reply.code(404).send({error:'ticket_not_found'});
     return{ticket:q.rows[0]};
   });
+  app.get('/api/v1/admin/market/merchant-report',{preHandler:requireAuth},async(req,reply)=>{
+    if(!(await hasPermission(pool,auth(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
+    const q=req.query as any;const from=typeof q.from==='string'?q.from:null,to=typeof q.to==='string'?q.to:null,storeId=q.storeId?Number(q.storeId):null;
+    const params:any[]=[];const where:string[]=[];
+    if(from){params.push(from);where.push('e.created_at >= $'+params.length);} if(to){params.push(to);where.push('e.created_at < $'+params.length);} if(Number.isSafeInteger(storeId)&&storeId>0){params.push(storeId);where.push('e.store_id = $'+params.length);}
+    const w=where.length?'WHERE '+where.join(' AND '):'';
+    const sql='SELECT e.store_id,s.name store_name, COUNT(*) FILTER(WHERE e.event_type=\'clickout\')::int clickouts, COUNT(DISTINCT e.user_id) FILTER(WHERE e.event_type=\'clickout\')::int unique_users, COUNT(*) FILTER(WHERE e.event_type=\'checkout_started\')::int checkout_started, COUNT(*) FILTER(WHERE e.event_type=\'purchase_reported\')::int purchases_reported, COALESCE(SUM(CASE WHEN e.event_type=\'purchase_reported\' THEN (e.metadata->>\'amount\')::numeric ELSE 0 END),0)::text purchase_amount FROM market_purchase_events e LEFT JOIN market_stores s ON s.id=e.store_id '+w+' GROUP BY e.store_id,s.name ORDER BY clickouts DESC';
+    const rows=(await pool.query(sql,params)).rows;return{from,to,storeId,rows};
+  });
+  app.get('/api/v1/admin/market/merchant-report.csv',{preHandler:requireAuth},async(req,reply)=>{
+    if(!(await hasPermission(pool,auth(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
+    const q=req.query as any;const params:any[]=[];const where:string[]=[];
+    if(typeof q.from==='string'){params.push(q.from);where.push('e.created_at >= $'+params.length);} if(typeof q.to==='string'){params.push(q.to);where.push('e.created_at < $'+params.length);} if(q.storeId&&Number.isSafeInteger(Number(q.storeId))){params.push(Number(q.storeId));where.push('e.store_id = $'+params.length);}
+    const w=where.length?'WHERE '+where.join(' AND '):'';
+    const sql='SELECT e.store_id,s.name store_name,e.event_type,e.product_id,e.offer_id,e.user_id,e.external_reference,e.metadata,e.created_at FROM market_purchase_events e LEFT JOIN market_stores s ON s.id=e.store_id '+w+' ORDER BY e.created_at';
+    const rows=(await pool.query(sql,params)).rows;const esc=(v:any)=>'"'+String(v??'').replace(/"/g,'""')+'"';
+    const csv=['store_id,store_name,event_type,product_id,offer_id,user_id,external_reference,metadata,created_at',...rows.map((r:any)=>[r.store_id,r.store_name,r.event_type,r.product_id,r.offer_id,r.user_id,r.external_reference,JSON.stringify(r.metadata),r.created_at].map(esc).join(','))].join('\n');
+    return reply.type('text/csv; charset=utf-8').send(csv);
+  });
 }
