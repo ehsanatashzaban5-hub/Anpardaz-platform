@@ -167,7 +167,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   });
 
   const inChat = messages.length > 0;
-  const model = AI_MODELS.find(m=>m.id===modelId)!;
+  const model = AI_MODELS.find(m=>m.id===modelId) ?? {id:"",name:"مدل پیکربندی نشده",provider:"",desc:"مدل فعال از سرور آن هوش دریافت می‌شود.",capabilities:[],providerColor:"#8b5cf6"};
 
   const send = useCallback(async () => {
     const value=input.trim();
