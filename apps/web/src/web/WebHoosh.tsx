@@ -4,8 +4,8 @@
 // ─────────────────────────────────────────────────
 import { useState, useRef, useEffect, useMemo } from "react";
 import WI from "./WebIcons";
-import { AI_MODELS, AI_PROVIDERS, DEMO_CHATS, DEMO_PROJECTS } from "./mockData";
-import type { WebPage, AiModel, Chat } from "./types";
+import { AI_MODELS, AI_PROVIDERS } from "./mockData";
+import type { WebPage, AiModel, Chat, AiProject } from "./types";
 import { useIsMobile } from "./useResponsive";
 
 interface HooshProps { onNavigate: (p: WebPage) => void; }
@@ -42,7 +42,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   const [models, setModels]       = useState<AiModel[]>(AI_MODELS);
   const [selectedModel, setMod]   = useState<AiModel>(models[0]);
   const [mode, setMode]           = useState<CreationMode>(MODES[0]);
-  const [chats, setChats]         = useState<Chat[]>([]);
+  const [chats, setChats]         = useState<Chat[]>([]);\n  const [projects, setProjects]   = useState<AiProject[]>([]);
   const [activeChat, setActiveChat] = useState<Chat>({id:`chat${Date.now()}`,title:"مکالمه جدید",preview:"",modelId:models[0]?.id||"gpt-5.6-luna",messages:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
   const [input, setInput]         = useState("");
   const [thinking, setThinking]   = useState(false);
@@ -55,7 +55,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   const isMobile = useIsMobile(900);
   const API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")||"";
   const accessToken=localStorage.getItem("anpardaz:accessToken")||"";
-  useEffect(()=>{(async()=>{try{const r=await fetch(API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){setModels(d.models);setMod(d.models[0]);}}catch{}})();},[]);
+  useEffect(()=>{(async()=>{try{const h=await fetch(API+"/api/v1/hoosh/me",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const hd=await h.json();if(h.ok){setChats((hd.conversations??[]).map((c:any)=>({id:String(c.id),title:c.title||"مکالمه",preview:"",modelId:c.model||"gpt-5.6-luna",messages:[],createdAt:c.created_at,updatedAt:c.updated_at})));setProjects((hd.projects??[]).map((p:any)=>({id:String(p.id),title:p.title,description:p.description||"",modelId:p.model_id||"",chatIds:(p.chat_ids??[]).map(String),accentColor:p.accent_color||"#7c3aed",createdAt:p.created_at,updatedAt:p.updated_at})));}const r=await fetch(API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){setModels(d.models);setMod(d.models[0]);}}catch{}})();},[]);
 
 
   const filteredChats = useMemo(() =>
@@ -79,10 +79,10 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
     const updatedChat={...activeChat,messages:[...activeChat.messages,userMsg],modelId:selectedModel.id};
     setActiveChat(updatedChat);setChats(prev=>prev.some(c=>c.id===updatedChat.id)?prev.map(c=>c.id===updatedChat.id?updatedChat:c):[updatedChat,...prev]);setThinking(true);
     try{
-      const r=await fetch(API+"/api/v1/ai/execute",{method:"POST",headers:{"content-type":"application/json",...(accessToken?{authorization:"Bearer "+accessToken}:{})},body:JSON.stringify({workflowCode:"hoosh.chat",input:text,modelId:selectedModel.id})});
+      const r=await fetch(API+"/api/v1/hoosh/chat",{method:"POST",headers:{"content-type":"application/json",...(accessToken?{authorization:"Bearer "+accessToken}:{})},body:JSON.stringify({conversationId:/^\\d+$/.test(activeChat.id)?Number(activeChat.id):undefined,input:text,modelId:selectedModel.id,modeId:mode.id})});
       const d=await r.json();if(!r.ok)throw new Error(d?.error||"AI_PROVIDER_FAILURE");
-      const aiMsg={id:`a${Date.now()}`,role:"assistant" as const,content:d?.result?.text||"پاسخی دریافت نشد.",createdAt:new Date().toISOString(),modelId:selectedModel.id};
-      const finalChat={...updatedChat,messages:[...updatedChat.messages,aiMsg],preview:aiMsg.content.slice(0,120),updatedAt:new Date().toISOString()};
+      const aiMsg={id:String(d?.message?.id||("a"+Date.now())),role:"assistant" as const,content:d?.result?.text||"پاسخی دریافت نشد.",createdAt:d?.message?.created_at||new Date().toISOString(),modelId:d?.result?.model||selectedModel.id};
+      const finalChat={...updatedChat,id:String(d.conversationId||updatedChat.id),messages:[...updatedChat.messages,aiMsg],preview:aiMsg.content.slice(0,120),updatedAt:new Date().toISOString()};
       setActiveChat(finalChat);setChats(prev=>prev.map(c=>c.id===finalChat.id?finalChat:c));
     }catch{
       const aiMsg={id:`e${Date.now()}`,role:"assistant" as const,content:"مدل انتخاب‌شده در حال حاضر از طریق سرور آن پرداز در دسترس نیست.",createdAt:new Date().toISOString(),modelId:selectedModel.id};
@@ -144,7 +144,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
                   <div style={{ textAlign:"center", padding:"20px", color:"var(--w-muted)", fontSize:12 }}>مکالمه‌ای یافت نشد</div>
                 )}
                 {filteredChats.map(c => (
-                  <button key={c.id} onClick={()=>{setActiveChat(c);setView("chat");}} style={{ display:"block", width:"100%", padding:"9px 10px", borderRadius:8, border:"none", background:activeChat.id===c.id?"rgba(124,58,237,0.1)":"transparent", cursor:"pointer", textAlign:"right", marginBottom:2, fontFamily:"Vazirmatn" }}>
+                  <button key={c.id} onClick={async()=>{if(/^\\d+$/.test(c.id)){try{const rr=await fetch(API+"/api/v1/hoosh/conversations/"+c.id,{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const dd=await rr.json();if(rr.ok&&dd.conversation){setActiveChat({id:String(dd.conversation.id),title:dd.conversation.title,preview:dd.messages?.at(-1)?.content?.slice(0,120)||"",modelId:dd.conversation.model||models[0]?.id||"gpt-5.6-luna",messages:(dd.messages??[]).map((m:any)=>({id:String(m.id),role:m.role==="assistant"?"assistant":"user",content:m.content,createdAt:m.created_at,modelId:dd.conversation.model})),createdAt:dd.conversation.created_at,updatedAt:dd.conversation.updated_at});setView("chat");}}catch{}}else setView("chat");}} style={{ display:"block", width:"100%", padding:"9px 10px", borderRadius:8, border:"none", background:activeChat.id===c.id?"rgba(124,58,237,0.1)":"transparent", cursor:"pointer", textAlign:"right", marginBottom:2, fontFamily:"Vazirmatn" }}>
                     <div style={{ fontSize:12, fontWeight:700, color:activeChat.id===c.id?"#7c3aed":"var(--w-text)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{c.title}</div>
                     <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:2 }}>{c.messages.length} پیام · {models.find(m=>m.id===c.modelId)?.name}</div>
                   </button>
@@ -223,7 +223,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
           {view === "explore" ? (
             <ExploreView models={filteredModels} selectedModel={selectedModel} onSelect={m=>{setMod(m);setView("chat");}} providerFilter={providerFilter}/>
           ) : view === "projects" ? (
-            <ProjectsView/>
+            <ProjectsView projects={projects}/>
           ) : (
             <>
               {activeChat.messages.length === 0 && (
