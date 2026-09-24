@@ -7861,31 +7861,6 @@ type AnView=
 interface AnProduct{id:string;title:string;brand:string;catId:string;subId:string;img:string;specs:Record<string,string>;priceMin:number;priceMax:number;storeCount:number;desc:string;tags:string[];rating:number;reviews:number;ph:{d:string;p:number}[];media?:string[];}
 interface AnOffer{sid:string;price:number;ship:string;warranty:string;inStock:boolean;upd:string;storeName?:string;offerId?:number;productUrl?:string;iframeMode?:"allowed"|"blocked"|"unknown";}
 interface CompareState{active:boolean;selectedIds:string[];minimized:boolean;}
-const ANS:{[k:string]:{n:string;sc:number}}={
-  digi:{n:"دیجی‌کالا",sc:4.7},emalls:{n:"ایمالز",sc:4.3},technolife:{n:"تکنولایف",sc:4.5},
-  novingate:{n:"نوین‌گیت",sc:4.1},pichak:{n:"پیچک",sc:3.8},tajhiz:{n:"تجهیزکو",sc:4.2},
-  computex:{n:"کامپیوتکس",sc:4.0},shopnet:{n:"شاپ‌نت",sc:3.7},digistore:{n:"دیجی‌استور",sc:4.4},
-  mobileplus:{n:"موبایل‌پلاس",sc:4.2},gadgetland:{n:"گجت‌لند",sc:4.1},phoneshop:{n:"فون‌شاپ",sc:3.9},
-  techbazar:{n:"تک‌بازار",sc:4.3},arianstore:{n:"آریان‌استور",sc:4.0},bazarpc:{n:"بازار کامپیوتر",sc:3.6},
-  persiashop:{n:"پرشیاشاپ",sc:4.1},digitalplus:{n:"دیجیتال‌پلاس",sc:4.4},eshop:{n:"ای‌شاپ",sc:3.8},
-  mobileking:{n:"موبایل‌کینگ",sc:4.2},techcenter:{n:"تک‌سنتر",sc:4.0},shopazar:{n:"شاپ‌آذر",sc:3.7},
-  computershop:{n:"کامپیوترشاپ",sc:4.3},netshop:{n:"نت‌شاپ",sc:4.1},gadgethouse:{n:"گجت‌هاوس",sc:3.9},
-  digifix:{n:"دیجی‌فیکس",sc:4.5},techworld:{n:"تک‌ورلد",sc:4.2},mobilemart:{n:"موبایل‌مارت",sc:4.0},
-  emarket:{n:"ای‌مارکت",sc:3.8},persiantech:{n:"پرشین‌تک",sc:4.1},cityshop:{n:"سیتی‌شاپ",sc:4.3},
-  techpro:{n:"تک‌پرو",sc:4.0},megashop:{n:"مگاشاپ",sc:3.9},istore:{n:"آی‌استور",sc:4.6},
-  smartshop:{n:"اسمارت‌شاپ",sc:4.2},digitalcity:{n:"دیجیتال‌سیتی",sc:4.1},
-};
-const ANS_KEYS=Object.keys(ANS);
-function mkAnOffers(base:number,count:number):AnOffer[]{
-  const ship=["ارسال رایگان","ارسال رایگان","ارسال رایگان","۱۵ هزار تومان","۲۰ هزار تومان","۲۵ هزار تومان","۳۰ هزار تومان","۳۵ هزار تومان","۴۰ هزار تومان","۴۵ هزار تومان"];
-  const war=["گارانتی ۱۸ ماهه","گارانتی ۱۲ ماهه","گارانتی ۱۲ ماهه","یک‌ساله","گارانتی ۱۸ ماهه"];
-  return ANS_KEYS.slice(0,Math.min(count,ANS_KEYS.length)).map((sid,i)=>({
-    sid,price:Math.round(base*(1+i*0.011+(i%3)*0.003)),
-    ship:ship[Math.min(i,ship.length-1)],
-    warranty:war[i%war.length],inStock:i<count-2,
-    upd:`${i*2+1} دقیقه پیش`,
-  }));
-}
 let MARKET_PRODUCTS:AnProduct[]=[];
 function anSearch(q:string):AnProduct[]{
   const lq=q.toLowerCase().replace(/‌/g," ").replace(/\s+/g," ");
