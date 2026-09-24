@@ -9,7 +9,7 @@ const page=(q:any)=>{const p=Math.max(1,Number(q.page)||1),l=Math.min(100,Math.m
 const surface=(v:any)=>v==='mobile'||v==='admin'?'mobile':v==='web'?'web':'web';
 
 export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
-  app.get('/api/v1/market/catalog',async(req)=>{
+  const safeDestination=(raw:string,domain:string|null)=>{try{const u=new URL(raw);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return null;if(!domain)return null;const host=u.hostname.toLowerCase(),d=domain.toLowerCase().replace(/^www\\./,'');return host===d||host.endsWith('.'+d)?u.toString():null;}catch{return null;}};\n\n  app.get('/api/v1/market/catalog',async(req)=>{
     const q=req.query as any; const [p,l,o]=page(q);
     const params:any[]=[]; const where:string[]=["p.status='published'"];
     if(q.q){params.push('%'+String(q.q).trim().replace(/[%_]/g,'')+'%');where.push('(p.title ILIKE $'+params.length+' OR COALESCE(p.description,\'\') ILIKE $'+params.length+' OR COALESCE(p.brand,\'\') ILIKE $'+params.length+')');}
@@ -19,11 +19,11 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
       c.slug category_slug,c.name category_name,c.name_fa category_name_fa,
       COALESCE(MIN(o.price) FILTER(WHERE o.availability<>'out_of_stock'),0)::text price_min,
       COALESCE(MAX(o.price) FILTER(WHERE o.availability<>'out_of_stock'),0)::text price_max,
-      COUNT(DISTINCT o.store_id)::int store_count,
-      COUNT(o.id)::int offer_count
+      COUNT(DISTINCT os.id)::int store_count,
+      COUNT(o.id) FILTER(WHERE os.id IS NOT NULL)::int offer_count
       FROM market_products p
       LEFT JOIN market_categories c ON c.id=p.category_id
-      LEFT JOIN market_offers o ON o.product_id=p.id
+      LEFT JOIN market_offers o ON o.product_id=p.id LEFT JOIN market_stores os ON os.id=o.store_id AND os.active=true
       WHERE ${where.join(' AND ')}
       GROUP BY p.id,c.id ORDER BY p.updated_at DESC,p.id DESC LIMIT $${lim} OFFSET $${off}`,params);
     const ids=r.rows.map((x:any)=>Number(x.id));
@@ -31,7 +31,7 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     if(ids.length){
       const [m,o]=await Promise.all([
         pool.query('SELECT id,product_id,url,sort_order FROM market_media WHERE product_id=ANY($1::bigint[]) ORDER BY product_id,sort_order,id',[ids]),
-        pool.query(`SELECT o.id,o.product_id,o.store_id,o.price,o.currency,o.availability,o.shipping_cost,o.product_url,o.image_url,o.updated_at,s.name store_name,s.domain store_domain,s.iframe_mode FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id WHERE o.product_id=ANY($1::bigint[]) ORDER BY o.product_id,o.price,o.id`,[ids]),
+        pool.query(`SELECT o.id,o.product_id,o.store_id,o.price,o.currency,o.availability,o.shipping_cost,o.product_url,o.image_url,o.updated_at,s.name store_name,s.domain store_domain,s.iframe_mode FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id WHERE o.product_id=ANY($1::bigint[]) AND s.active=true ORDER BY o.product_id,o.price,o.id`,[ids]),
       ]);
       media=m.rows; offers=o.rows;
     }
@@ -66,7 +66,7 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
   app.post('/api/v1/market/clickout',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),b=(req.body??{}) as any;
     const offerId=Number(b.offerId); if(!Number.isSafeInteger(offerId)||offerId<=0)return reply.code(400).send({error:'invalid_offer'});
-    const o=await pool.query(`SELECT o.id,o.product_id,o.store_id,o.product_url,o.seller_url,s.homepage_url,s.iframe_mode,s.active
+    const o=await pool.query(`SELECT o.id,o.product_id,o.store_id,o.product_url,o.seller_url,s.homepage_url,s.domain store_domain,s.iframe_mode,s.active
       FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id WHERE o.id=$1`,[offerId]);
     if(!o.rows[0]||o.rows[0].active===false)return reply.code(404).send({error:'offer_not_found'});
     const row=o.rows[0],url=row.product_url||row.seller_url||row.homepage_url;
