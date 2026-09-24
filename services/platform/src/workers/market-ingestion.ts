@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 
 type Store={id:number;name:string;domain:string;homepage_url:string};
-type Item={id?:string|number;name?:string;title?:string;description?:string;short_description?:string;sku?:string;permalink?:string;price?:string|number;regular_price?:string|number;stock_status?:string;images?:Array<{src?:string}>;categories?:Array<{id?:number;name?:string}>;brands?:Array<{name?:string}>;attributes?:Array<{name?:string;options?:string[]}>};
+type Item={id?:string|number;name?:string;title?:string;description?:string;short_description?:string;sku?:string;permalink?:string;price?:string|number;regular_price?:string|number;stock_status?:string;in_stock?:boolean;prices?:{price?:string;currency_code?:string;currency_minor_unit?:number;regular_price?:string};images?:Array<{src?:string}>;categories?:Array<{id?:number;name?:string}>;brands?:Array<{name?:string}>;attributes?:Array<{name?:string;options?:string[]}>};
 
 const databaseUrl=process.env.DATABASE_URL;
 if(!databaseUrl) throw new Error("DATABASE_URL is required");
@@ -43,7 +43,11 @@ async function syncStore(store:Store){
      const title=text(item.name||item.title); if(!title)continue;
      const external=String(item.id??item.sku??title);
      const key=canonical(store.domain,external,title);
-     const price=num(item.price??item.regular_price);
+     const minor=Number.isInteger(item.prices?.currency_minor_unit)?Number(item.prices?.currency_minor_unit):0;
+     const rawPrice=item.prices?.price??item.price??item.regular_price;
+     const basePrice=num(rawPrice);
+     const price=basePrice===null?null:basePrice/Math.pow(10,minor);
+     const currency=(text(item.prices?.currency_code)||"IRR").toUpperCase().slice(0,3);
      const img=text(item.images?.[0]?.src);
      const specs:Record<string,string>={};
      for(const a of item.attributes??[])if(text(a.name)&&Array.isArray(a.options))specs[text(a.name)]=a.options.map(String).join("، ");
@@ -55,10 +59,10 @@ async function syncStore(store:Store){
      if(img)await pool.query(`INSERT INTO market_media(product_id,url,sort_order) VALUES($1,$2,0)
        ON CONFLICT DO NOTHING`,[productId,img]);
      if(price!==null){
-       const availability=item.stock_status==="outofstock"?"out_of_stock":"in_stock";
+       const availability=item.stock_status==="outofstock"||item.in_stock===false?"out_of_stock":"in_stock";
        await pool.query(`INSERT INTO market_offers(product_id,store_id,external_product_id,price,currency,availability,product_url,image_url,raw_metadata,last_seen_at,updated_at)
-         VALUES($1,$2,$3,$4,'IRR',$5,$6,$7,$8,NOW(),NOW())
-         ON CONFLICT(store_id,external_product_id) DO UPDATE SET product_id=EXCLUDED.product_id,price=EXCLUDED.price,currency=EXCLUDED.currency,availability=EXCLUDED.availability,product_url=EXCLUDED.product_url,image_url=EXCLUDED.image_url,raw_metadata=EXCLUDED.raw_metadata,last_seen_at=NOW(),updated_at=NOW()`,[productId,store.id,external,price,availability,text(item.permalink),img,JSON.stringify(item)]);
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW())
+         ON CONFLICT(store_id,external_product_id) DO UPDATE SET product_id=EXCLUDED.product_id,price=EXCLUDED.price,currency=EXCLUDED.currency,availability=EXCLUDED.availability,product_url=EXCLUDED.product_url,image_url=EXCLUDED.image_url,raw_metadata=EXCLUDED.raw_metadata,last_seen_at=NOW(),updated_at=NOW()`,[productId,store.id,external,price,currency,availability,text(item.permalink),img,JSON.stringify(item)]);
      }
      upserted++;
    }
