@@ -121,7 +121,7 @@ async function matchProduct(item:Item,brand:string,normalizedTitle:string){
  if(model&&brand){const q=await pool.query("SELECT id FROM market_products WHERE lower(coalesce(brand,''))=$1 AND (lower(coalesce(mpn,''))=$2 OR lower(coalesce(model,''))=$2) LIMIT 1",[normalize(brand),normalize(model)]);if(q.rows[0])return{productId:Number(q.rows[0].id),method:"brand_model",confidence:.98};}
  const q=await pool.query("SELECT id,normalized_title,brand,model FROM market_products WHERE status='published' AND normalized_title IS NOT NULL ORDER BY updated_at DESC LIMIT 250",[ ]);
  let best:{id:number;score:number}|null=null;const nt=tokens(normalizedTitle);
- for(const row of q.rows){const score=jaccard(nt,tokens(String(row.normalized_title)));if(normalize(brand)&&normalize(String(row.brand??""))===normalize(brand))best=score>(best?.score??0)?{id:Number(row.id),score:Math.min(1,score+.12)}:best;else best=score>(best?.score??0)?{id:Number(row.id),score}:best;}
+ for(const row of q.rows){const score=jaccard(nt,tokens(String(row.normalized_title)));const sameBrand=normalize(brand)&&normalize(String(row.brand??""))===normalize(brand);const candidate=sameBrand?Math.min(1,score+.12):score;const current=best===null?0:best.score;if(candidate>current)best={id:Number(row.id),score:candidate};}
  return best&&best.score>=.96?{productId:best.id,method:"title_similarity",confidence:best.score}:null;
 }
 
