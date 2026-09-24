@@ -6,7 +6,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import WI from "./WebIcons";
 
 import type { WebPage, AiModel, Chat } from "./types";
-import { useIsMobile } from "./useResponsive";
+import { useIsMobile } from "./useResponsive";\n\nlet AI_MODELS: AiModel[] = [];\nlet AI_PROVIDERS: any[] = [];
 
 interface HooshProps { onNavigate: (p: WebPage) => void; }
 
