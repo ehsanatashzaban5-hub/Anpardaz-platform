@@ -44,16 +44,44 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   const [chats, setChats]         = useState<Chat[]>([]);
   const [activeChat, setActiveChat] = useState<Chat | null>(null);
   const [input, setInput]         = useState("");
-  const [thinking, setThinking]   = useState(false);\n  const [apiError, setApiError]   = useState<string | null>(null);
+  const [thinking, setThinking]   = useState(false);
+  const [apiError, setApiError]   = useState<string | null>(null);
   const [sidebarOpen, setSidebar] = useState(true);
   const [modelPanelOpen, setModelPanel] = useState(true);
   const [searchChat, setSearchChat] = useState("");
   const [providerFilter, setProvFilter] = useState<string>("all");
   const textRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile(900);\n  const platformApi = (import.meta.env.VITE_PLATFORM_API_URL || "/api").replace(/\\/$/, "");\n  const authToken = () => localStorage.getItem("anpardaz:accessToken");\n  const apiFetch = async (path: string, init: RequestInit = {}) => {\n    const token = authToken();\n    if (!token) throw new Error("AUTH_REQUIRED");\n    const headers = new Headers(init.headers);\n    headers.set("Authorization", `Bearer ${token}`);\n    headers.set("Content-Type", "application/json");\n    const res = await fetch(`${platformApi}${path}`, { ...init, headers });\n    if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error || `HTTP_${res.status}`); }\n    return res.json();\n  };\n  const mapConversation = (x: any, messages: any[] = []): Chat => ({\n    id: String(x.id), title: x.title || "مکالمه جدید", preview: messages[messages.length - 1]?.content || "",\n    modelId: x.model || AI_MODELS[0]?.id || "", modeId: x.mode || "chat",\n    messages: messages.map((m:any) => ({ id:String(m.id), role:m.role, content:m.content, modelId:m.metadata?.model, createdAt:m.created_at })),\n    createdAt:x.created_at, updatedAt:x.updated_at,\n  });
+  const isMobile = useIsMobile(900);
+  const platformApi = (import.meta.env.VITE_PLATFORM_API_URL || "/api").replace(//$/, "");
+  const authToken = () => localStorage.getItem("anpardaz:accessToken");
+  const apiFetch = async (path: string, init: RequestInit = {}) => {
+    const token = authToken();
+    if (!token) throw new Error("AUTH_REQUIRED");
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", `Bearer ${token}`);
+    headers.set("Content-Type", "application/json");
+    const res = await fetch(`${platformApi}${path}`, { ...init, headers });
+    if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error || `HTTP_${res.status}`); }
+    return res.json();
+  };
+  const mapConversation = (x: any, messages: any[] = []): Chat => ({
+    id: String(x.id), title: x.title || "مکالمه جدید", preview: messages[messages.length - 1]?.content || "",
+    modelId: x.model || AI_MODELS[0]?.id || "", modeId: x.mode || "chat",
+    messages: messages.map((m:any) => ({ id:String(m.id), role:m.role, content:m.content, modelId:m.metadata?.model, createdAt:m.created_at })),
+    createdAt:x.created_at, updatedAt:x.updated_at,
+  });
 
-  useEffect(() => {\n    if (!authToken()) return;\n    apiFetch("/v1/hoosh/conversations").then((d:any) => {\n      const list = (d.conversations || []).map((x:any) => mapConversation(x));\n      setChats(list);\n      if (list[0]) apiFetch(`/v1/hoosh/conversations/${list[0].id}`).then((full:any) => setActiveChat(mapConversation(full.conversation, full.messages))).catch(() => {});\n    }).catch((e:any) => setApiError(e.message));\n  }, []);\n\n  const filteredChats = useMemo(() =>
+  useEffect(() => {
+    if (!authToken()) return;
+    apiFetch("/v1/hoosh/conversations").then((d:any) => {
+      const list = (d.conversations || []).map((x:any) => mapConversation(x));
+      setChats(list);
+      if (list[0]) apiFetch(`/v1/hoosh/conversations/${list[0].id}`).then((full:any) => setActiveChat(mapConversation(full.conversation, full.messages))).catch(() => {});
+    }).catch((e:any) => setApiError(e.message));
+  }, []);
+
+  const filteredChats = useMemo(() =>
     chats.filter(c => searchChat === "" || c.title.includes(searchChat) || c.messages.some(m => m.content.includes(searchChat)))
   , [chats, searchChat]);
 
@@ -244,7 +272,8 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
                 value={input}
                 onChange={e=>setInput(e.target.value)}
                 onKeyDown={handleKey}
-                placeholder={mode.promptFa}\n                disabled={!activeChat || thinking}
+                placeholder={mode.promptFa}
+                disabled={!activeChat || thinking}
                 rows={1}
                 style={{ flex:1, background:"transparent", border:"none", outline:"none", resize:"none", color:"var(--w-text)", fontSize:13, fontFamily:"Vazirmatn", lineHeight:1.6, maxHeight:160, overflowY:"auto" }}
                 onInput={e=>{ const t = e.currentTarget; t.style.height="auto"; t.style.height=`${Math.min(t.scrollHeight,160)}px`; }}
