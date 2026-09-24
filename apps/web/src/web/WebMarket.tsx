@@ -543,85 +543,11 @@ function FavoritesSection({ favorites, onSelect, onToggleFav, onAddCart, cart }:
 // ── Orders Section ──────────────────────────────────
 function OrdersSection({cart}:{cart:string[]}){const[orders,setOrders]=useState<any[]>([]);useEffect(()=>{(async()=>{const token=localStorage.getItem("anpardaz:accessToken")??"";if(!token)return;try{const r=await fetch(MARKET_API+"/api/v1/market/me/orders",{headers:{authorization:"Bearer "+token}});if(r.ok){const d=await r.json();setOrders(d.orders??[])}}catch{}})()},[]);return <div><div style={{fontSize:18,fontWeight:900,marginBottom:20}}>فعالیت خرید من</div><div className="w-card" style={{overflow:"hidden"}}>{orders.length===0?<div style={{padding:30,color:"var(--w-muted)",textAlign:"center"}}>سفارش ثبت‌شده‌ای در آن مارکت وجود ندارد.</div>:orders.map((o:any,i:number)=><div key={o.id} style={{display:"flex",gap:16,padding:16,borderBottom:i<orders.length-1?"1px solid var(--w-border)":"none"}}><div style={{flex:1}}>محصول #{o.product_id}<div style={{fontSize:11,color:"var(--w-muted)"}}>عملیات {o.operation_id??"—"} · {o.status}</div></div><b>{fmtIRT(Number(o.unit_price??0))}</b></div>)}</div>{cart.length>0&&<div className="w-card" style={{marginTop:16,padding:16}}>{cart.map(id=><div key={id}>{MARKET_PRODUCTS.find(p=>p.id===id)?.titleFa??id}</div>)}</div>}</div>}
 
-function AlertsSection() {
-  const [alerts, setAlerts] = useState([
-    { id:"a1", product:"لپ‌تاپ Dell XPS 15", targetPrice:35000000, currentPrice:42000000 },
-    { id:"a2", product:"iPhone 15 Pro", targetPrice:50000000, currentPrice:48000000, triggered:true },
-  ]);
-  const [newProduct, setNewProduct] = useState("");
-  const [newPrice, setNewPrice] = useState("");
-  return (
-    <div style={{ maxWidth:640 }}>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>هشدار قیمت</div>
-      <div className="w-card" style={{ padding:"20px", marginBottom:20 }}>
-        <div style={{ fontSize:13, fontWeight:700, marginBottom:14 }}>هشدار جدید</div>
-        <div style={{ display:"flex", gap:10 }}>
-          <input value={newProduct} onChange={e=>setNewProduct(e.target.value)} placeholder="نام محصول..." className="w-input" style={{ flex:2 }}/>
-          <input value={newPrice} onChange={e=>setNewPrice(e.target.value)} placeholder="قیمت هدف (تومان)" inputMode="numeric" className="w-input" style={{ flex:1 }}/>
-          <button onClick={()=>{ if(newProduct&&newPrice){setAlerts(a=>[...a,{id:`a${Date.now()}`,product:newProduct,targetPrice:parseInt(newPrice),currentPrice:parseInt(newPrice)*1.2}]);setNewProduct("");setNewPrice("");}}} className="w-btn w-btn-primary" style={{ padding:"10px 18px", background:"#d97706", whiteSpace:"nowrap" }}>افزودن</button>
-        </div>
-      </div>
-      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-        {alerts.map(a=>(
-          <div key={a.id} className="w-card" style={{ padding:"16px", display:"flex", alignItems:"center", gap:14, borderRight:(a as any).triggered?"3px solid #10b981":"3px solid var(--w-border)" }}>
-            <div style={{ width:38, height:38, borderRadius:10, background:(a as any).triggered?"rgba(16,185,129,0.1)":"rgba(217,119,6,0.1)", display:"flex", alignItems:"center", justifyContent:"center", color:(a as any).triggered?"#10b981":"#d97706" }}>
-              <WI n="bell" s={17}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{a.product}</div>
-              <div style={{ fontSize:12, color:"var(--w-muted)", marginTop:2 }}>
-                قیمت هدف: <strong>{fmtIRT(a.targetPrice)}</strong> · قیمت کنونی: <strong style={{ color:a.currentPrice<=a.targetPrice?"#10b981":"var(--w-text)" }}>{fmtIRT(a.currentPrice)}</strong>
-              </div>
-              {(a as any).triggered && <div style={{ fontSize:11, color:"#10b981", fontWeight:700, marginTop:3 }}>✓ قیمت به هدف رسید!</div>}
-            </div>
-            <button onClick={()=>setAlerts(p=>p.filter(x=>x.id!==a.id))} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", padding:"4px" }}><WI n="trash" s={15}/></button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+function AlertsSection(){return <div style={{maxWidth:640}}><div style={{fontSize:18,fontWeight:900,marginBottom:20}}>هشدار قیمت</div><div className="w-card" style={{padding:24,color:"var(--w-muted)",lineHeight:1.8}}>هشدار قیمت به زیرساخت واقعی آن مارکت متصل خواهد شد. تا زمانی که محصول و قیمت واقعی از فروشگاه‌ها دریافت نشده، هشدار ساختگی نمایش داده نمی‌شود.</div></div>}
 
-// ── AI Assistant Section ────────────────────────────
 function AiSection(){const[msgs,setMsgs]=useState<{role:"assistant"|"user";text:string}[]>([{role:"assistant",text:"سلام! من دستیار هوشمند آن مارکت هستم. سؤال خریدتان را بپرسید."}]);const[input,setInput]=useState("");const[busy,setBusy]=useState(false);const send=async()=>{const q=input.trim();if(!q||busy)return;setInput("");setMsgs(m=>[...m,{role:"user",text:q}]);setBusy(true);try{const token=localStorage.getItem("anpardaz:accessToken")??"";const r=await fetch(MARKET_API+"/api/v1/market/ai/assist",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({input:q})});const d=await r.json();if(!r.ok)throw new Error();setMsgs(m=>[...m,{role:"assistant",text:d?.result?.text??"پاسخ دریافت نشد."}]);}catch{setMsgs(m=>[...m,{role:"assistant",text:"دستیار هوشمند در حال حاضر در دسترس نیست."}]);}finally{setBusy(false)}};return <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - var(--w-header) - 100px)"}}><div style={{fontSize:18,fontWeight:900,marginBottom:16}}>دستیار هوشمند خرید</div><div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:12}}>{msgs.map((m,i)=><div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-start":"flex-end"}}><div style={{maxWidth:"75%",padding:"12px 16px",borderRadius:12,background:m.role==="user"?"rgba(217,119,6,0.08)":"var(--w-card2)",fontSize:13,lineHeight:1.7}}>{m.text}</div></div>)}</div><div style={{display:"flex",gap:8,paddingTop:12,borderTop:"1px solid var(--w-border)"}}><input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void send()}} placeholder="مثلاً برای یک لپ‌تاپ تا ۵۰ میلیون راهنمایی کن..." className="w-input"/><button onClick={()=>void send()} disabled={busy} className="w-btn w-btn-primary" style={{background:"#8b5cf6"}}>ارسال</button></div></div>}
 
-function MarketAccount() {
-  return (
-    <div style={{ maxWidth:600 }}>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>حساب کاربری</div>
-      <div className="w-card" style={{ padding:"22px", marginBottom:16 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:18 }}>
-          <div style={{ width:60, height:60, borderRadius:"50%", background:"rgba(217,119,6,0.1)", display:"flex", alignItems:"center", justifyContent:"center", color:"#d97706", fontSize:22, fontWeight:800 }}>م</div>
-          <div>
-            <div style={{ fontSize:17, fontWeight:900 }}>محمد احمدی</div>
-            <div style={{ fontSize:12, color:"var(--w-muted)" }}>mohammadahmadi@email.com</div>
-          </div>
-          <button className="w-btn w-btn-ghost" style={{ marginRight:"auto", padding:"7px 16px", fontSize:12 }}>ویرایش</button>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
-          {[["سفارش کل","۱۲","#d97706"],["تکمیل شده","۱۰","#10b981"],["در انتظار","۲","#0891b2"]].map(([l,v,c])=>(
-            <div key={l as string} style={{ padding:"12px", background:"var(--w-card2)", borderRadius:10, textAlign:"center" }}>
-              <div style={{ fontSize:10, color:"var(--w-muted)", marginBottom:5 }}>{l}</div>
-              <div style={{ fontSize:20, fontWeight:900, color:c as string }}>{FA(v as string)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {[{icon:"bell",title:"هشدارهای قیمت",desc:"مدیریت هشدارهای من"},{icon:"map-pin",title:"آدرس‌های ارسال",desc:"مدیریت آدرس‌ها"},{icon:"shield",title:"تغییر رمز عبور",desc:"امنیت حساب"}].map(item=>(
-        <div key={item.title} className="w-card" style={{ padding:"14px 18px", marginBottom:10, display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}>
-          <div style={{ width:36, height:36, borderRadius:10, background:"rgba(217,119,6,0.08)", display:"flex", alignItems:"center", justifyContent:"center", color:"#d97706" }}>
-            <WI n={item.icon} s={17}/>
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:13, fontWeight:700 }}>{item.title}</div>
-            <div style={{ fontSize:11, color:"var(--w-muted)" }}>{item.desc}</div>
-          </div>
-          <WI n="arrow-left" s={13} style={{ color:"var(--w-muted)" }}/>
-        </div>
-      ))}
-    </div>
-  );
-}
+function MarketAccount(){const[me,setMe]=useState<any>(null);useEffect(()=>{(async()=>{const token=localStorage.getItem("anpardaz:accessToken")??"";if(!token)return;try{const r=await fetch(MARKET_API+"/api/v1/auth/me",{headers:{authorization:"Bearer "+token}});if(r.ok){const d=await r.json();setMe(d.user)}}catch{}})()},[]);return <div style={{maxWidth:600}}><div style={{fontSize:18,fontWeight:900,marginBottom:20}}>حساب کاربری</div><div className="w-card" style={{padding:22}}><div style={{fontWeight:900}}>{me?.display_name||me?.email||"کاربر آن پرداز"}</div><div style={{fontSize:12,color:"var(--w-muted)",marginTop:5}}>هویت کاربر از آن پرداز دریافت می‌شود.</div></div></div>}
 
 // ── Market Tickets ──────────────────────────────────
 function MarketTickets(){const[tickets,setTickets]=useState<any[]>([]);const[view,setView]=useState<"list"|"new">("list");const[subject,setSubject]=useState("");const[body,setBody]=useState("");const[busy,setBusy]=useState(false);const load=async()=>{const token=localStorage.getItem("anpardaz:accessToken")??"";if(!token)return;try{const r=await fetch(MARKET_API+"/api/v1/market/me/tickets",{headers:{authorization:"Bearer "+token}});if(r.ok){const d=await r.json();setTickets(d.tickets??[])}}catch{}};useEffect(()=>{void load()},[]);const send=async()=>{if(!subject.trim()||!body.trim())return;setBusy(true);try{const token=localStorage.getItem("anpardaz:accessToken")??"";const r=await fetch(MARKET_API+"/api/v1/market/tickets",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({subject,message:body})});if(!r.ok)throw new Error();setSubject("");setBody("");setView("list");await load()}catch{}finally{setBusy(false)}};if(view==="new")return <div><button onClick={()=>setView("list")} className="w-btn w-btn-ghost">بازگشت</button><h2>تیکت جدید</h2><div className="w-card" style={{padding:22,display:"flex",flexDirection:"column",gap:14}}><input value={subject} onChange={e=>setSubject(e.target.value)} className="w-input" placeholder="موضوع"/><textarea value={body} onChange={e=>setBody(e.target.value)} rows={6} className="w-input" placeholder="شرح مشکل..."/><button disabled={busy||!subject.trim()||!body.trim()} onClick={()=>void send()} className="w-btn w-btn-primary">ارسال تیکت</button></div></div>;return <div><div style={{display:"flex",justifyContent:"space-between",marginBottom:20}}><div style={{fontSize:18,fontWeight:900}}>پشتیبانی</div><button onClick={()=>setView("new")} className="w-btn w-btn-primary">تیکت جدید +</button></div><div className="w-card">{tickets.length===0?<div style={{padding:30,textAlign:"center",color:"var(--w-muted)"}}>تیکتی ثبت نشده است.</div>:tickets.map((t:any)=><div key={t.id} style={{padding:14,borderBottom:"1px solid var(--w-border)"}}><b>{t.subject}</b><div style={{fontSize:11,color:"var(--w-muted)"}}>#{t.id} · {t.status} · {t.updated_at}</div></div>)}</div></div>}
