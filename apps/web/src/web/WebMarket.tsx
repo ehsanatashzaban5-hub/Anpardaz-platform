@@ -535,54 +535,8 @@ function FavoritesSection({ favorites, onSelect, onToggleFav, onAddCart, cart }:
 }
 
 // ── Orders Section ──────────────────────────────────
-function OrdersSection({ cart }: { cart:string[] }) {
-  const orders = [
-    { id:"ORD-001", product:"لپ‌تاپ ASUS ZenBook 14", price:42000000, status:"در حال ارسال", date:"۱۴۰۳/۰۸/۲۰" },
-    { id:"ORD-002", product:"هدفون Sony WH-1000XM5", price:8500000, status:"تحویل داده شد", date:"۱۴۰۳/۰۸/۱۰" },
-    { id:"ORD-003", product:"کیبورد مکانیکی Keychron", price:3200000, status:"در انتظار پرداخت", date:"۱۴۰۳/۰۸/۲۲" },
-  ];
-  const colors: Record<string,string> = { "در حال ارسال":"#d97706","تحویل داده شد":"#10b981","در انتظار پرداخت":"#ef4444" };
-  return (
-    <div>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>سفارش‌ها</div>
-      <div className="w-card" style={{ overflow:"hidden" }}>
-        {orders.map((o,i)=>(
-          <div key={o.id} style={{ display:"flex", gap:16, padding:"16px", borderBottom:i<orders.length-1?"1px solid var(--w-border)":"none", alignItems:"center" }}>
-            <div style={{ width:56, height:56, borderRadius:10, background:"rgba(217,119,6,0.08)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <WI n="package" s={22} style={{ color:"#d97706" }}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{o.product}</div>
-              <div style={{ fontSize:12, color:"var(--w-muted)", marginTop:2 }}>{o.id} · {o.date}</div>
-            </div>
-            <div style={{ textAlign:"left" }}>
-              <div style={{ fontSize:14, fontWeight:900, marginBottom:4 }}>{fmtIRT(o.price)}</div>
-              <span style={{ fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:5, background:`${colors[o.status]}15`, color:colors[o.status] }}>{o.status}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-      {cart.length > 0 && (
-        <div style={{ marginTop:20 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:10 }}>سبد خرید ({FA(cart.length)} آیتم)</div>
-          <div className="w-card" style={{ padding:"16px" }}>
-            {cart.map((id,i)=>{const p=MARKET_PRODUCTS.find(x=>x.id===id); if(!p) return null; return (
-              <div key={`${id}-${i}`} style={{ display:"flex", gap:12, padding:"8px 0", borderBottom:"1px solid var(--w-border)", alignItems:"center" }}>
-                <div style={{ flex:1, fontSize:13 }}>{p.titleFa}</div>
-                <div style={{ fontSize:13, fontWeight:800, color:"#d97706" }}>{fmtIRT(p.price)}</div>
-              </div>
-            );})}
-            <div style={{ marginTop:12, textAlign:"left" }}>
-              <button className="w-btn w-btn-primary" style={{ padding:"10px 24px", background:"#d97706" }}>پرداخت و تکمیل خرید</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+function OrdersSection({cart}:{cart:string[]}){const[orders,setOrders]=useState<any[]>([]);useEffect(()=>{(async()=>{const token=localStorage.getItem("anpardaz:accessToken")??"";if(!token)return;try{const r=await fetch(MARKET_API+"/api/v1/market/me/orders",{headers:{authorization:"Bearer "+token}});if(r.ok){const d=await r.json();setOrders(d.orders??[])}}catch{}})()},[]);return <div><div style={{fontSize:18,fontWeight:900,marginBottom:20}}>فعالیت خرید من</div><div className="w-card" style={{overflow:"hidden"}}>{orders.length===0?<div style={{padding:30,color:"var(--w-muted)",textAlign:"center"}}>سفارش ثبت‌شده‌ای در آن مارکت وجود ندارد.</div>:orders.map((o:any,i:number)=><div key={o.id} style={{display:"flex",gap:16,padding:16,borderBottom:i<orders.length-1?"1px solid var(--w-border)":"none"}}><div style={{flex:1}}>محصول #{o.product_id}<div style={{fontSize:11,color:"var(--w-muted)"}}>عملیات {o.operation_id??"—"} · {o.status}</div></div><b>{fmtIRT(Number(o.unit_price??0))}</b></div>)}</div>{cart.length>0&&<div className="w-card" style={{marginTop:16,padding:16}}>{cart.map(id=><div key={id}>{MARKET_PRODUCTS.find(p=>p.id===id)?.titleFa??id}</div>)}</div>}</div>}
 
-// ── Price Alerts Section ────────────────────────────
 function AlertsSection() {
   const [alerts, setAlerts] = useState([
     { id:"a1", product:"لپ‌تاپ Dell XPS 15", targetPrice:35000000, currentPrice:42000000 },
@@ -623,65 +577,8 @@ function AlertsSection() {
 }
 
 // ── AI Assistant Section ────────────────────────────
-function AiSection() {
-  const [msgs, setMsgs] = useState<{role:"assistant"|"user";text:string}[]>([
-    { role:"assistant", text:"سلام! من دستیار هوشمند آن مارکت هستم. می‌توانم در یافتن بهترین محصول، مقایسه قیمت‌ها، و توصیه‌های خرید به شما کمک کنم." },
-  ]);
-  const [input, setInput] = useState("");
-  const bottomRef = useRef<HTMLDivElement>(null);
+function AiSection(){const[msgs,setMsgs]=useState<{role:"assistant"|"user";text:string}[]>([{role:"assistant",text:"سلام! من دستیار هوشمند آن مارکت هستم. سؤال خریدتان را بپرسید."}]);const[input,setInput]=useState("");const[busy,setBusy]=useState(false);const send=async()=>{const q=input.trim();if(!q||busy)return;setInput("");setMsgs(m=>[...m,{role:"user",text:q}]);setBusy(true);try{const token=localStorage.getItem("anpardaz:accessToken")??"";const r=await fetch(MARKET_API+"/api/v1/market/ai/assist",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({input:q})});const d=await r.json();if(!r.ok)throw new Error();setMsgs(m=>[...m,{role:"assistant",text:d?.result?.text??"پاسخ دریافت نشد."}]);}catch{setMsgs(m=>[...m,{role:"assistant",text:"دستیار هوشمند در حال حاضر در دسترس نیست."}]);}finally{setBusy(false)}};return <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - var(--w-header) - 100px)"}}><div style={{fontSize:18,fontWeight:900,marginBottom:16}}>دستیار هوشمند خرید</div><div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:12}}>{msgs.map((m,i)=><div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-start":"flex-end"}}><div style={{maxWidth:"75%",padding:"12px 16px",borderRadius:12,background:m.role==="user"?"rgba(217,119,6,0.08)":"var(--w-card2)",fontSize:13,lineHeight:1.7}}>{m.text}</div></div>)}</div><div style={{display:"flex",gap:8,paddingTop:12,borderTop:"1px solid var(--w-border)"}}><input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void send()}} placeholder="مثلاً برای یک لپ‌تاپ تا ۵۰ میلیون راهنمایی کن..." className="w-input"/><button onClick={()=>void send()} disabled={busy} className="w-btn w-btn-primary" style={{background:"#8b5cf6"}}>ارسال</button></div></div>}
 
-  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
-
-  const send = () => {
-    if (!input.trim()) return;
-    const q = input.trim();
-    setInput("");
-    setMsgs(m=>[...m,{role:"user" as const,text:q}]);
-    setTimeout(()=>{
-      let answer = "در حال بررسی درخواست شما هستم...";
-      if (q.includes("لپتاپ") || q.includes("لپ‌تاپ"))
-        answer = "برای لپ‌تاپ با بودجه متوسط، ASUS ZenBook 14 با پردازنده Intel Core i7 گزینه‌ای عالی است.";
-      else if (q.includes("گوشی") || q.includes("موبایل"))
-        answer = "پرفروش‌ترین گوشی‌ها: iPhone 15 Pro، Samsung Galaxy S24 Ultra، و Xiaomi 14 Pro.";
-      else if (q.includes("ارزان") || q.includes("تخفیف"))
-        answer = "بهترین تخفیف‌های امروز: هدفون Sony WH-1000XM5 با ۲۰٪ تخفیف، کیبورد Keychron K2 با ۱۵٪ تخفیف.";
-      else
-        answer = `برای «${q}» چندین گزینه عالی در آن مارکت داریم. بر اساس قیمت، برند، یا امکانات خاصی جستجو کنیم؟`;
-      setMsgs(m=>[...m,{role:"assistant" as const,text:answer}]);
-    }, 800);
-  };
-
-  return (
-    <div style={{ display:"flex", flexDirection:"column", height:"calc(100vh - var(--w-header) - 100px)" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
-        <div style={{ width:40, height:40, borderRadius:12, background:"rgba(139,92,246,0.12)", display:"flex", alignItems:"center", justifyContent:"center", color:"#8b5cf6" }}>
-          <WI n="sparkle" s={20}/>
-        </div>
-        <div>
-          <div style={{ fontSize:16, fontWeight:900 }}>دستیار هوشمند خرید</div>
-          <div style={{ fontSize:11, color:"var(--w-muted)" }}>آماده کمک به خرید شما</div>
-        </div>
-      </div>
-      <div style={{ flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:12, paddingBottom:8 }}>
-        {msgs.map((m,i)=>(
-          <div key={i} style={{ display:"flex", justifyContent:m.role==="user"?"flex-start":"flex-end", gap:10 }}>
-            {m.role==="assistant" && <div style={{ width:30, height:30, borderRadius:"50%", background:"rgba(139,92,246,0.1)", display:"flex", alignItems:"center", justifyContent:"center", color:"#8b5cf6", flexShrink:0 }}><WI n="sparkle" s={14}/></div>}
-            <div style={{ maxWidth:"65%", padding:"12px 16px", borderRadius:12, background:m.role==="user"?"rgba(217,119,6,0.08)":"var(--w-card2)", fontSize:13, lineHeight:1.7 }}>
-              {m.text}
-            </div>
-          </div>
-        ))}
-        <div ref={bottomRef}/>
-      </div>
-      <div style={{ display:"flex", gap:8, paddingTop:12, borderTop:"1px solid var(--w-border)" }}>
-        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")send();}} placeholder="سؤال خود را بپرسید..." className="w-input" style={{ flex:1 }}/>
-        <button onClick={send} className="w-btn w-btn-primary" style={{ padding:"10px 18px", background:"#8b5cf6" }}><WI n="send" s={15}/></button>
-      </div>
-    </div>
-  );
-}
-
-// ── Market Account ──────────────────────────────────
 function MarketAccount() {
   return (
     <div style={{ maxWidth:600 }}>
@@ -721,53 +618,4 @@ function MarketAccount() {
 }
 
 // ── Market Tickets ──────────────────────────────────
-function MarketTickets() {
-  const [view, setView] = useState<"list"|"new">("list");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
-  const TICKETS = [
-    { id:"MK-304", subject:"محصول دریافتی با توضیحات مطابقت ندارد", status:"پاسخ داده شده", date:"۱۴۰۳/۰۸/۱۸", color:"#10b981" },
-    { id:"MK-291", subject:"مشکل در فرایند پرداخت", status:"بسته شده", date:"۱۴۰۳/۰۷/۳۰", color:"var(--w-muted)" },
-  ];
-  if (view === "new") return (
-    <div style={{ maxWidth:560 }}>
-      <button onClick={()=>setView("list")} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:20 }}>
-        <WI n="arrow-right" s={13}/> بازگشت
-      </button>
-      <h2 style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>تیکت جدید</h2>
-      <div className="w-card" style={{ padding:"22px", display:"flex", flexDirection:"column", gap:14 }}>
-        <div>
-          <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>موضوع</label>
-          <input value={subject} onChange={e=>setSubject(e.target.value)} className="w-input" placeholder="موضوع را بنویسید"/>
-        </div>
-        <div>
-          <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>توضیحات</label>
-          <textarea value={body} onChange={e=>setBody(e.target.value)} rows={5} className="w-input" placeholder="مشکل خود را شرح دهید..." style={{ resize:"vertical" }}/>
-        </div>
-        <button disabled={!subject||!body} onClick={()=>setView("list")} className="w-btn w-btn-primary" style={{ padding:"12px", background:"#d97706", opacity:subject&&body?1:0.5 }}>ارسال تیکت</button>
-      </div>
-    </div>
-  );
-  return (
-    <div>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
-        <div style={{ fontSize:18, fontWeight:900 }}>پشتیبانی</div>
-        <button onClick={()=>setView("new")} className="w-btn w-btn-primary" style={{ padding:"8px 18px", background:"#d97706" }}>تیکت جدید +</button>
-      </div>
-      <div className="w-card" style={{ overflow:"hidden" }}>
-        {TICKETS.map((t,i)=>(
-          <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderBottom:i<TICKETS.length-1?"1px solid var(--w-border)":"none" }}>
-            <div style={{ width:36, height:36, borderRadius:10, background:`${t.color}15`, display:"flex", alignItems:"center", justifyContent:"center", color:t.color }}>
-              <WI n="document" s={17}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{t.subject}</div>
-              <div style={{ fontSize:11, color:"var(--w-muted)" }}>{t.id} · {t.date}</div>
-            </div>
-            <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, background:`${t.color}15`, color:t.color }}>{t.status}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+function MarketTickets(){const[tickets,setTickets]=useState<any[]>([]);const[view,setView]=useState<"list"|"new">("list");const[subject,setSubject]=useState("");const[body,setBody]=useState("");const[busy,setBusy]=useState(false);const load=async()=>{const token=localStorage.getItem("anpardaz:accessToken")??"";if(!token)return;try{const r=await fetch(MARKET_API+"/api/v1/market/me/tickets",{headers:{authorization:"Bearer "+token}});if(r.ok){const d=await r.json();setTickets(d.tickets??[])}}catch{}};useEffect(()=>{void load()},[]);const send=async()=>{if(!subject.trim()||!body.trim())return;setBusy(true);try{const token=localStorage.getItem("anpardaz:accessToken")??"";const r=await fetch(MARKET_API+"/api/v1/market/tickets",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({subject,message:body})});if(!r.ok)throw new Error();setSubject("");setBody("");setView("list");await load()}catch{}finally{setBusy(false)}};if(view==="new")return <div><button onClick={()=>setView("list")} className="w-btn w-btn-ghost">بازگشت</button><h2>تیکت جدید</h2><div className="w-card" style={{padding:22,display:"flex",flexDirection:"column",gap:14}}><input value={subject} onChange={e=>setSubject(e.target.value)} className="w-input" placeholder="موضوع"/><textarea value={body} onChange={e=>setBody(e.target.value)} rows={6} className="w-input" placeholder="شرح مشکل..."/><button disabled={busy||!subject.trim()||!body.trim()} onClick={()=>void send()} className="w-btn w-btn-primary">ارسال تیکت</button></div></div>;return <div><div style={{display:"flex",justifyContent:"space-between",marginBottom:20}}><div style={{fontSize:18,fontWeight:900}}>پشتیبانی</div><button onClick={()=>setView("new")} className="w-btn w-btn-primary">تیکت جدید +</button></div><div className="w-card">{tickets.length===0?<div style={{padding:30,textAlign:"center",color:"var(--w-muted)"}}>تیکتی ثبت نشده است.</div>:tickets.map((t:any)=><div key={t.id} style={{padding:14,borderBottom:"1px solid var(--w-border)"}}><b>{t.subject}</b><div style={{fontSize:11,color:"var(--w-muted)"}}>#{t.id} · {t.status} · {t.updated_at}</div></div>)}</div></div>}
