@@ -26,7 +26,19 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
       LEFT JOIN market_offers o ON o.product_id=p.id
       WHERE ${where.join(' AND ')}
       GROUP BY p.id,c.id ORDER BY p.updated_at DESC,p.id DESC LIMIT $${lim} OFFSET $${off}`,params);
-    return{products:r.rows.map((x:any)=>({...x,priceMin:x.price_min,priceMax:x.price_max,storeCount:x.store_count,offerCount:x.offer_count})),pagination:{page:p,limit:l}};
+    const ids=r.rows.map((x:any)=>Number(x.id));
+    let media:any[]=[]; let offers:any[]=[];
+    if(ids.length){
+      const [m,o]=await Promise.all([
+        pool.query('SELECT id,product_id,url,sort_order FROM market_media WHERE product_id=ANY($1::bigint[]) ORDER BY product_id,sort_order,id',[ids]),
+        pool.query(`SELECT o.id,o.product_id,o.store_id,o.price,o.currency,o.availability,o.shipping_cost,o.product_url,o.image_url,o.updated_at,s.name store_name,s.domain store_domain,s.iframe_mode FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id WHERE o.product_id=ANY($1::bigint[]) ORDER BY o.product_id,o.price,o.id`,[ids]),
+      ]);
+      media=m.rows; offers=o.rows;
+    }
+    const mediaBy=new Map<number,any[]>(),offersBy=new Map<number,any[]>();
+    for(const m of media){const a=mediaBy.get(Number(m.product_id))??[];a.push(m);mediaBy.set(Number(m.product_id),a);}
+    for(const o of offers){const a=offersBy.get(Number(o.product_id))??[];a.push(o);offersBy.set(Number(o.product_id),a);}
+    return{products:r.rows.map((x:any)=>({...x,priceMin:x.price_min,priceMax:x.price_max,storeCount:x.store_count,offerCount:x.offer_count,media:mediaBy.get(Number(x.id))??[],offers:offersBy.get(Number(x.id))??[]})),pagination:{page:p,limit:l}};
   });
 
   app.get('/api/v1/market/categories',async()=>({categories:(await pool.query(`SELECT id,parent_id,slug,name,name_fa,icon,sort_order FROM market_categories WHERE active=true ORDER BY sort_order,id`)).rows}));
@@ -119,6 +131,50 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     const t=await pool.query('SELECT * FROM market_tickets WHERE id=$1 AND user_id=$2',[id,uid]);
     if(!t.rows[0])return reply.code(404).send({error:'ticket_not_found'});
     return{ticket:t.rows[0],messages:(await pool.query('SELECT * FROM market_ticket_messages WHERE ticket_id=$1 ORDER BY created_at',[id])).rows};
+  });
+
+  app.post('/api/v1/market/products/:id/view',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),id=Number((req.params as any).id);
+    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_id'});
+    const exists=await pool.query("SELECT 1 FROM market_products WHERE id=$1 AND status<>'archived' LIMIT 1",[id]);
+    if(!exists.rows[0])return reply.code(404).send({error:'product_not_found'});
+    await pool.query('INSERT INTO market_recent_views(identity_id,user_id,product_id) VALUES($1,$2,$3)',[a.auth.sub,uid,id]);
+    await pool.query("INSERT INTO market_user_events(identity_id,user_id,event_type,surface,product_id,metadata) VALUES($1,$2,'view',$3,$4,$5)",[a.auth.sub,uid,surface((req.body as any)?.surface),id,JSON.stringify({source:'product_view'})]);
+    return{ok:true};
+  });
+
+  app.get('/api/v1/market/me/recent',{preHandler:requireAuth},async(req)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth);
+    return{products:(await pool.query("SELECT DISTINCT ON (p.id) p.*,c.slug category_slug,c.name_fa category_name_fa FROM market_recent_views v JOIN market_products p ON p.id=v.product_id LEFT JOIN market_categories c ON c.id=p.category_id WHERE v.user_id=$1 ORDER BY p.id,v.viewed_at DESC LIMIT 100",[uid])).rows};
+  });
+
+  app.get('/api/v1/market/me/alerts',{preHandler:requireAuth},async(req)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth);
+    return{alerts:(await pool.query("SELECT a.*,p.title,p.description,p.brand FROM market_price_alerts a JOIN market_products p ON p.id=a.product_id WHERE a.user_id=$1 ORDER BY a.updated_at DESC",[uid])).rows};
+  });
+
+  app.post('/api/v1/market/me/alerts',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),b=(req.body??{}) as any,id=Number(b.productId),target=Number(b.targetPrice);
+    if(!Number.isSafeInteger(id)||id<=0||!Number.isFinite(target)||target<=0)return reply.code(400).send({error:'invalid_alert'});
+    const q=await pool.query("INSERT INTO market_price_alerts(identity_id,user_id,product_id,target_price,currency) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,product_id) DO UPDATE SET target_price=EXCLUDED.target_price,enabled=true,updated_at=NOW() RETURNING *",[a.auth.sub,uid,id,target,String(b.currency??'IRR').slice(0,3)]);
+    return{alert:q.rows[0]};
+  });
+
+  app.delete('/api/v1/market/me/alerts/:productId',{preHandler:requireAuth},async(req)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth),id=Number((req.params as any).productId);
+    await pool.query('DELETE FROM market_price_alerts WHERE user_id=$1 AND product_id=$2',[uid,id]); return{deleted:true};
+  });
+
+  app.get('/api/v1/market/me/comparisons',{preHandler:requireAuth},async(req)=>{
+    const uid=await ensurePlatformUser(pool,auth(req).auth);
+    return{comparisons:(await pool.query("SELECT c.id,c.title,c.created_at,c.updated_at,COALESCE(json_agg(json_build_object('productId',i.product_id,'position',i.position) ORDER BY i.position) FILTER(WHERE i.product_id IS NOT NULL),'[]'::json) items FROM market_saved_comparisons c LEFT JOIN market_saved_comparison_items i ON i.comparison_id=c.id WHERE c.user_id=$1 GROUP BY c.id ORDER BY c.updated_at DESC",[uid])).rows};
+  });
+
+  app.post('/api/v1/market/me/comparisons',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),b=(req.body??{}) as any,ids=Array.isArray(b.productIds)?b.productIds.map(Number).filter((n:number)=>Number.isSafeInteger(n)&&n>0).slice(0,6):[];
+    if(ids.length<2)return reply.code(400).send({error:'at_least_two_products_required'});
+    const client=await pool.connect();
+    try{await client.query('BEGIN');const q=await client.query('INSERT INTO market_saved_comparisons(identity_id,user_id,title) VALUES($1,$2,$3) RETURNING *',[a.auth.sub,uid,typeof b.title==='string'&&b.title.trim()?b.title.trim().slice(0,120):'مقایسه ذخیره‌شده']);for(let i=0;i<ids.length;i++)await client.query('INSERT INTO market_saved_comparison_items(comparison_id,product_id,position) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[q.rows[0].id,ids[i],i]);await client.query('COMMIT');return reply.code(201).send({comparison:q.rows[0],productIds:ids});}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   });
 
   app.post('/api/v1/market/ai/assist',{preHandler:requireAuth},async(req,reply)=>{
