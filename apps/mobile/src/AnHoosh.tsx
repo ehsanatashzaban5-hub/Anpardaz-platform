@@ -120,38 +120,12 @@ const CATEGORIES = [
   { id:"text", label:"نوشتار" }, { id:"data", label:"داده" }, { id:"tool", label:"ابزار" },
 ];
 
-// ══════════════════════════════════════════════════════════════════
-// DEMO STATIC DATA
-// ══════════════════════════════════════════════════════════════════
-const DEMO_CONVS: Conversation[] = [
-  { id:"c1", title:"تحلیل بازار کریپتو Q3 1403",         preview:"بیت‌کوین در هفته جاری با فشار فروش مواجه شد...",          messages:[], modelId:"gemini-pro",   modeId:"analyze",   createdAt:"1403/06/15", updatedAt:"1403/06/15", group:"today" },
-  { id:"c2", title:"اسکریپت تبلیغاتی برند پوشاک",        preview:"بسیار خوب! اسکریپت ۳۰ ثانیه‌ای آماده شد...",             messages:[], modelId:"claude-sonnet",modeId:"write",     createdAt:"1403/06/14", updatedAt:"1403/06/14", group:"yesterday" },
-  { id:"c3", title:"API پرداخت با Python",                preview:"import requests\nbase_url = 'https://api.example.com'...", messages:[], modelId:"claude-opus",  modeId:"code",      createdAt:"1403/06/13", updatedAt:"1403/06/13", group:"yesterday" },
-  { id:"c4", title:"ترجمه قرارداد همکاری",               preview:"این قرارداد بین طرف اول و طرف دوم منعقد می‌گردد...",      messages:[], modelId:"gpt-4o",       modeId:"translate", createdAt:"1403/06/10", updatedAt:"1403/06/10", group:"week" },
-  { id:"c5", title:"طراحی معماری میکروسرویس",            preview:"برای سیستم شما معماری event-driven پیشنهاد می‌شود...",   messages:[], modelId:"claude-opus",  modeId:"code",      createdAt:"1403/06/08", updatedAt:"1403/06/08", group:"week" },
-  { id:"c6", title:"پیش‌نویس پروپوزال سرمایه‌گذاری",    preview:"خلاصه اجرایی: این طرح با هدف ورود به بازار...",          messages:[], modelId:"gpt-4o",       modeId:"write",     createdAt:"1403/06/01", updatedAt:"1403/06/01", group:"older" },
-  { id:"c7", title:"تحلیل رقبا — بازار نرم‌افزاری",     preview:"در این تحلیل رقبا به ۵ شرکت اصلی بازار پرداخته...",     messages:[], modelId:"gemini-pro",   modeId:"analyze",   createdAt:"1403/05/28", updatedAt:"1403/05/28", group:"older" },
-];
-
-const DEMO_PROJECTS: Project[] = [
-  { id:"p1", title:"راه‌اندازی فروشگاه اینترنتی", description:"طراحی، کدنویسی و بازاریابی پلتفرم فروش آنلاین",    modelId:"claude-opus",  modeId:"code",    conversationIds:["c3","c5"], createdAt:"1403/06/01", updatedAt:"1403/06/15", accentColor:"#7c3aed" },
-  { id:"p2", title:"کمپین تبلیغاتی پاییز ۱۴۰۳",  description:"تولید محتوا و اسکریپت برای کمپین فصلی برند",      modelId:"claude-sonnet",modeId:"content",  conversationIds:["c2"],      createdAt:"1403/05/20", updatedAt:"1403/06/14", accentColor:"#0891b2" },
-  { id:"p3", title:"گزارش تحلیل بازار مالی",      description:"تحلیل عمیق وضعیت بازار رمزارز و فرصت‌های سرمایه‌گذاری", modelId:"gemini-pro", modeId:"analyze", conversationIds:["c1","c7"], createdAt:"1403/05/10", updatedAt:"1403/06/15", accentColor:"#059669" },
-];
-
 const GROUP_LABELS: Record<string, string> = { today:"امروز", yesterday:"دیروز", week:"هفته گذشته", older:"قدیمی‌تر" };
-const AI_REPLIES = [
-  "درکت می‌کنم. بر اساس اطلاعاتی که ارائه دادی، بهترین رویکرد این است که ابتدا موضوع را به اجزای اصلی تقسیم کنیم. با تحلیل دقیق هر بخش می‌توانیم به راه‌حل جامع‌تری برسیم. آیا جزئیات بیشتری داری؟",
-  "پرسش جالبی است. این موضوع چند وجه مهم دارد که باید در نظر گرفت. اول از همه، زمینه و هدف نهایی اهمیت زیادی دارد. بگذار گام‌به‌گام پیش برویم تا بهترین پاسخ را بیابیم.",
-  "البته! آماده‌ام کمک کنم. برای بهترین نتیجه چند نکته کلیدی وجود دارد که باید در نظر گرفت. بر اساس درخواست شما، پیشنهادم این است که...",
-];
-
 // ══════════════════════════════════════════════════════════════════
 // UTILITIES
 // ══════════════════════════════════════════════════════════════════
 const FA = (s: string) => s.replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 const ftime = (d: Date) => FA(`${d.getHours()}:${String(d.getMinutes()).padStart(2,"0")}`);
-const randReply = () => AI_REPLIES[Math.floor(Math.random() * AI_REPLIES.length)];
 
 // ══════════════════════════════════════════════════════════════════
 // PROVIDER MARK
