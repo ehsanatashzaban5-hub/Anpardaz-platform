@@ -106,12 +106,6 @@ async function matchProduct(item:Item,brand:string,normalizedTitle:string){
  return best&&best.score>=.96?{productId:best.id,method:"title_similarity",confidence:best.score}:null;
 }
 
-
-async function fetchText(url:string,headers:Record<string,string>={}){
- const ac=new AbortController();const timer=setTimeout(()=>ac.abort(),timeoutMs);
- try{const r=await fetch(url,{signal:ac.signal,headers:{"accept":"application/xml,text/xml,text/html,application/json;q=0.9,*/*;q=0.1","user-agent":"AnPardaz-AnMarketSync/2.0",...headers}});const body=await r.text();if(!r.ok)throw Object.assign(new Error("HTTP "+r.status),{status:r.status});return{body,headers:r.headers,hash:createHash("sha256").update(body).digest("hex")};}
- finally{clearTimeout(timer)}
-}
 function shopifyItems(data:any,baseUrl:string):Item[]{
  const out:Item[]=[];
  for(const p of Array.isArray(data?.products)?data.products:[]){
