@@ -658,15 +658,40 @@ function ExploreView({ currentModelId, onSelectModel }: { currentModelId:string;
   );
 }
 
+function HooshAccountView({user,usage,tickets,onCreateTicket}:{user:any;usage:any;tickets:any[];onCreateTicket:(subject:string,message:string)=>Promise<void>}) {
+  const [subject,setSubject]=useState(""); const [message,setMessage]=useState(""); const [busy,setBusy]=useState(false);
+  return <div style={{flex:1,overflowY:"auto",padding:"18px 16px 24px"}} className="ah-scroll">
+    <div style={{fontSize:18,fontWeight:900,color:"var(--ah-text)",marginBottom:4}}>حساب کاربری آن هوش</div>
+    <div style={{fontSize:11,color:"var(--ah-muted)",marginBottom:16}}>مدیریت مکالمات، مصرف و پشتیبانی</div>
+    <div style={{padding:16,borderRadius:16,background:"var(--ah-card)",border:"1px solid var(--ah-border)",marginBottom:12}}>
+      <div style={{fontSize:15,fontWeight:800}}>{user?.display_name||user?.email||"کاربر آن پرداز"}</div>
+      <div style={{fontSize:11,color:"var(--ah-muted)",marginTop:4}}>{user?.email||"حساب متصل به آن پرداز"}</div>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14}}>
+      <div style={{padding:12,borderRadius:13,background:"var(--ah-card)",border:"1px solid var(--ah-border)",textAlign:"center"}}><div style={{fontSize:10,color:"var(--ah-muted)"}}>درخواست</div><b>{FA(String(usage?.requests??0))}</b></div>
+      <div style={{padding:12,borderRadius:13,background:"var(--ah-card)",border:"1px solid var(--ah-border)",textAlign:"center"}}><div style={{fontSize:10,color:"var(--ah-muted)"}}>ورودی</div><b>{FA(String(usage?.input_tokens??0))}</b></div>
+      <div style={{padding:12,borderRadius:13,background:"var(--ah-card)",border:"1px solid var(--ah-border)",textAlign:"center"}}><div style={{fontSize:10,color:"var(--ah-muted)"}}>خروجی</div><b>{FA(String(usage?.output_tokens??0))}</b></div>
+    </div>
+    <div style={{padding:16,borderRadius:16,background:"var(--ah-card)",border:"1px solid var(--ah-border)",marginBottom:12}}>
+      <div style={{fontWeight:800,fontSize:14,marginBottom:10}}>پشتیبانی و تیکت</div>
+      <input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع تیکت" style={{width:"100%",boxSizing:"border-box",background:"var(--ah-input)",border:"1px solid var(--ah-border)",borderRadius:10,padding:"10px 12px",color:"var(--ah-text)",fontFamily:"Vazirmatn",marginBottom:8}}/>
+      <textarea value={message} onChange={e=>setMessage(e.target.value)} placeholder="پیام خود را بنویسید..." rows={3} style={{width:"100%",boxSizing:"border-box",background:"var(--ah-input)",border:"1px solid var(--ah-border)",borderRadius:10,padding:"10px 12px",color:"var(--ah-text)",fontFamily:"Vazirmatn",resize:"none"}}/>
+      <button disabled={busy||!subject.trim()||!message.trim()} onClick={async()=>{setBusy(true);try{await onCreateTicket(subject.trim(),message.trim());setSubject("");setMessage("");}finally{setBusy(false)}}} style={{marginTop:9,width:"100%",padding:11,border:0,borderRadius:11,background:"#7c3aed",color:"#fff",fontFamily:"Vazirmatn",fontWeight:800}}>{busy?"در حال ارسال…":"ارسال تیکت"}</button>
+    </div>
+    <div style={{fontWeight:800,fontSize:14,marginBottom:8}}>تیکت‌های من</div>
+    {tickets.length===0?<div style={{fontSize:12,color:"var(--ah-muted)",padding:"14px 0"}}>هنوز تیکتی ثبت نشده است.</div>:tickets.map(t=><div key={t.id} style={{padding:12,borderRadius:13,background:"var(--ah-card)",border:"1px solid var(--ah-border)",marginBottom:7}}><div style={{fontWeight:700,fontSize:12}}>{t.subject}</div><div style={{display:"flex",gap:8,marginTop:5,fontSize:10,color:"var(--ah-muted)"}}><span>{t.status}</span><span>{new Date(t.updated_at).toLocaleDateString("fa-IR")}</span></div></div>)}
+  </div>;
+}
+
 // ══════════════════════════════════════════════════════════════════
 // BOTTOM NAVIGATION
 // ══════════════════════════════════════════════════════════════════
-type AhTab = "home" | "history" | "projects" | "explore";
+type AhTab = "home" | "history" | "projects" | "explore" | "account";
 const AH_TABS: { id:AhTab; label:string; icon:string }[] = [
   { id:"home",     label:"چت",       icon:"chat"    },
   { id:"history",  label:"تاریخچه",  icon:"clock"   },
   { id:"projects", label:"پروژه‌ها", icon:"folder"  },
-  { id:"explore",  label:"کشف",      icon:"compass" },
+  { id:"explore",  label:"کشف",      icon:"compass" },\n  { id:"account",  label:"حساب من",   icon:"user" },
 ];
 
 // ══════════════════════════════════════════════════════════════════
@@ -676,7 +701,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const [tab, setTab]               = useState<AhTab>("home");
   const [modelId, setModelId]       = useState("gpt-5.6-luna");
   const [showModels, setShowModels] = useState(false);
-  const [messages, setMessages]     = useState<Message[]>([]);\n  const [conversations, setConversations] = useState<Conversation[]>([]);\n  const [projects, setProjects] = useState<Project[]>([]);\n  const [conversationId, setConversationId] = useState<number|null>(null);
+  const [messages, setMessages]     = useState<Message[]>([]);\n  const [conversations, setConversations] = useState<Conversation[]>([]);\n  const [projects, setProjects] = useState<Project[]>([]);\n  const [hooshUser,setHooshUser]=useState<any>(null);\n  const [hooshUsage,setHooshUsage]=useState<any>(null);\n  const [hooshTickets,setHooshTickets]=useState<any[]>([]);\n  const [conversationId, setConversationId] = useState<number|null>(null);
   const [input, setInput]           = useState("");
   const [sending, setSending]       = useState(false);
   const [deepThink, setDeepThink]   = useState(false);
@@ -686,7 +711,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const AI_API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")||"";
   const accessToken=localStorage.getItem("anpardaz:accessToken")||"";
   const [,refreshModelCatalog]=useState(0);
-  useEffect(()=>{(async()=>{try{const h=await fetch(AI_API+"/api/v1/hoosh/me",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const hd=await h.json();if(h.ok){setConversations((hd.conversations??[]).map((c:any)=>({id:String(c.id),title:c.title||"مکالمه",preview:"",messages:[],modelId:c.model||"gpt-5.6-luna",createdAt:c.created_at,updatedAt:c.updated_at,group:"today"})));setProjects((hd.projects??[]).map((p:any)=>({id:String(p.id),title:p.title,description:p.description||"",modelId:p.model_id||"",modeId:p.mode_id,conversationIds:(p.chat_ids??[]).map(String),createdAt:p.created_at,updatedAt:p.updated_at,accentColor:p.accent_color||"#7c3aed"})));}const r=await fetch(AI_API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){AI_MODELS=d.models.map((m:any)=>({id:m.id,name:m.name,provider:m.provider,desc:m.descFa||m.desc||"",providerColor:m.providerId==="openai"?"#10A37F":m.providerId==="gemini"?"#4285F4":m.providerId==="anthropic"?"#C4956A":"#E0E0E0",capabilities:Array.isArray(m.capabilities)?m.capabilities:[],contextWindow:m.contextWindow,badge:m.badge}));PROVIDERS=[...new Set(AI_MODELS.map(m=>m.provider))];setModelId(d.models[0].id);refreshModelCatalog(x=>x+1);}}catch{}})();},[]);
+  useEffect(()=>{(async()=>{try{const h=await fetch(AI_API+"/api/v1/hoosh/me",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const hd=await h.json();if(h.ok){setHooshUser(hd.user);setHooshUsage(hd.usage);setHooshTickets(hd.tickets??[]);setConversations((hd.conversations??[]).map((c:any)=>({id:String(c.id),title:c.title||"مکالمه",preview:"",messages:[],modelId:c.model||"gpt-5.6-luna",createdAt:c.created_at,updatedAt:c.updated_at,group:"today"})));setProjects((hd.projects??[]).map((p:any)=>({id:String(p.id),title:p.title,description:p.description||"",modelId:p.model_id||"",modeId:p.mode_id,conversationIds:(p.chat_ids??[]).map(String),createdAt:p.created_at,updatedAt:p.updated_at,accentColor:p.accent_color||"#7c3aed"})));}const r=await fetch(AI_API+"/api/v1/ai/models",{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const d=await r.json();if(r.ok&&Array.isArray(d.models)&&d.models.length){AI_MODELS=d.models.map((m:any)=>({id:m.id,name:m.name,provider:m.provider,desc:m.descFa||m.desc||"",providerColor:m.providerId==="openai"?"#10A37F":m.providerId==="gemini"?"#4285F4":m.providerId==="anthropic"?"#C4956A":"#E0E0E0",capabilities:Array.isArray(m.capabilities)?m.capabilities:[],contextWindow:m.contextWindow,badge:m.badge}));PROVIDERS=[...new Set(AI_MODELS.map(m=>m.provider))];setModelId(d.models[0].id);refreshModelCatalog(x=>x+1);}}catch{}})();},[]);
 
   // Device back button: close panels first, then exit to main app
   useBackHandler(() => {
@@ -809,7 +834,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
         )}
         {tab==="history"  && <HistoryView conversations={conversations} onOpenConv={async c=>{try{const rr=await fetch(AI_API+"/api/v1/hoosh/conversations/"+c.id,{headers:accessToken?{authorization:"Bearer "+accessToken}:{}});const dd=await rr.json();if(rr.ok){setConversationId(Number(c.id));setMessages((dd.messages??[]).map((m:any)=>({id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model||c.modelId,ts:new Date(m.created_at)})));setTab("home");}}catch{}}} onNewChat={newChat}/>}
         {tab==="projects" && <ProjectsView projects={projects} onOpenProject={()=>setTab("home")} onNewProject={()=>setShowNewProj(true)}/>}
-        {tab==="explore"  && <ExploreView currentModelId={modelId} onSelectModel={id=>{setModelId(id);setTab("home");}}/>}
+        {tab==="explore"  && <ExploreView currentModelId={modelId} onSelectModel={id=>{setModelId(id);setTab("home");}}/>}\n        {tab==="account"  && <HooshAccountView user={hooshUser} usage={hooshUsage} tickets={hooshTickets} onCreateTicket={async(subject,message)=>{const r=await fetch(AI_API+"/api/v1/hoosh/tickets",{method:"POST",headers:{"content-type":"application/json",...(accessToken?{authorization:"Bearer "+accessToken}:{})},body:JSON.stringify({subject,message,conversationId:conversationId||undefined})});const d=await r.json();if(r.ok&&d.ticket)setHooshTickets(prev=>[d.ticket,...prev]);}}/>}
 
         {/* ── BOTTOM NAVIGATION ── */}
         <nav style={{ display:"flex",borderTop:"1px solid var(--ah-border)",background:"var(--ah-surface)",flexShrink:0 }}>
