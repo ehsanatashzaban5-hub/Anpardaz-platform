@@ -39,8 +39,8 @@ const THINKING_MSGS = [
 
 export default function WebHoosh({ onNavigate }: HooshProps) {
   const [view, setView]           = useState<HView>("chat");
-  const [models, setModels]       = useState<AiModel[]>(AI_MODELS);
-  const [selectedModel, setMod]   = useState<AiModel>(models[0]);
+  const [models, setModels]       = useState<AiModel[]>([]);
+  const [selectedModel, setMod]   = useState<AiModel>({id:"",name:"مدلی در دسترس نیست",providerId:"",descFa:"",capabilities:[],isAvailable:false});
   const [mode, setMode]           = useState<CreationMode>(MODES[0]);
   const [chats, setChats]         = useState<Chat[]>([]);\n  const [projects, setProjects]   = useState<AiProject[]>([]);\n  const [hooshUser,setHooshUser]=useState<any>(null); const [hooshUsage,setHooshUsage]=useState<any>(null); const [hooshTickets,setHooshTickets]=useState<any[]>([]);
   const [activeChat, setActiveChat] = useState<Chat>({id:`chat${Date.now()}`,title:"مکالمه جدید",preview:"",modelId:models[0]?.id||"gpt-5.6-luna",messages:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
