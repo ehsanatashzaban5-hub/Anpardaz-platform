@@ -573,7 +573,7 @@ function ProjectsView({ projects, onOpenProject, onNewProject }: { projects:Proj
 // ══════════════════════════════════════════════════════════════════
 // NEW PROJECT SHEET
 // ══════════════════════════════════════════════════════════════════
-function NewProjectSheet({ modelId, onClose }: { modelId:string; onClose:()=>void }) {
+function NewProjectSheet({ modelId, onClose, onCreate }: { modelId:string; onClose:()=>void; onCreate:(title:string,description:string)=>void }) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   return (
@@ -591,7 +591,7 @@ function NewProjectSheet({ modelId, onClose }: { modelId:string; onClose:()=>voi
           <div style={{fontSize:11,fontWeight:700,color:"var(--ah-muted)",marginBottom:6}}>توضیحات (اختیاری)</div>
           <textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="هدف و محتوای این پروژه را توضیح دهید..." rows={3} style={{width:"100%",background:"var(--ah-card)",border:"1px solid var(--ah-border)",borderRadius:12,padding:"11px 14px",color:"var(--ah-text)",fontSize:13,fontFamily:"Vazirmatn",outline:"none",resize:"none",boxSizing:"border-box"}}/>
         </div>
-        <button onClick={onClose} disabled={!title.trim()} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",cursor:title.trim()?"pointer":"default",background:title.trim()?"linear-gradient(135deg,#7c3aed,#5b21b6)":"var(--ah-border)",color:title.trim()?"#fff":"var(--ah-muted)",fontSize:14,fontWeight:800,fontFamily:"Vazirmatn"}}>
+        <button onClick={()=>{if(title.trim()){onCreate(title.trim(),desc.trim());onClose();}}} disabled={!title.trim()} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",cursor:title.trim()?"pointer":"default",background:title.trim()?"linear-gradient(135deg,#7c3aed,#5b21b6)":"var(--ah-border)",color:title.trim()?"#fff":"var(--ah-muted)",fontSize:14,fontWeight:800,fontFamily:"Vazirmatn"}}>
           ساخت پروژه
         </button>
       </div>
@@ -823,7 +823,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
 
         {/* ── OVERLAYS ── */}
         {showModels   && <ModelSheet current={modelId} onSelect={setModelId} onClose={()=>setShowModels(false)}/>}
-        {showNewProj  && <NewProjectSheet modelId={modelId} onClose={()=>setShowNewProj(false)}/>}
+        {showNewProj  && <NewProjectSheet modelId={modelId} onClose={()=>setShowNewProj(false)} onCreate={async(title,description)=>{try{const r=await fetch(AI_API+"/api/v1/hoosh/projects",{method:"POST",headers:{"content-type":"application/json",...(accessToken?{authorization:"Bearer "+accessToken}:{})},body:JSON.stringify({title,description,modelId})});const d=await r.json();if(r.ok&&d.project)setProjects(prev=>[{id:String(d.project.id),title:d.project.title,description:d.project.description||"",modelId:d.project.model_id||modelId,modeId:d.project.mode_id,conversationIds:[],createdAt:d.project.created_at,updatedAt:d.project.updated_at,accentColor:d.project.accent_color||"#7c3aed"},...prev]);}catch{}}}/>}
       </div>
     </>
   );
