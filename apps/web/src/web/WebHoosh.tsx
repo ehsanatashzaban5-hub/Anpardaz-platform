@@ -41,8 +41,8 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   const [view, setView]           = useState<HView>("chat");
   const [selectedModel, setMod]   = useState<AiModel>(AI_MODELS[0]);
   const [mode, setMode]           = useState<CreationMode>(MODES[0]);
-  const [chats, setChats]         = useState<Chat[]>(DEMO_CHATS);
-  const [activeChat, setActiveChat] = useState<Chat>(DEMO_CHATS[0]);
+  const [chats, setChats]         = useState<Chat[]>([]);
+  const [activeChat, setActiveChat] = useState<Chat>({id:`chat${Date.now()}`,title:"مکالمه جدید",preview:"",modelId:AI_MODELS[0]?.id||"gpt-5.6-luna",messages:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
   const [input, setInput]         = useState("");
   const [thinking, setThinking]   = useState(false);
   const [sidebarOpen, setSidebar] = useState(true);
@@ -52,6 +52,10 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   const textRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile(900);
+  const API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\\/$/,"")||"";
+  const accessToken=localStorage.getItem("anpardaz:accessToken")||"";
+  useEffect(()=>{ if(!AI_MODELS.length)return; setMod(prev=>AI_MODELS.find(m=>m.id===prev.id)||AI_MODELS[0]); },[]);
+
 
   const filteredChats = useMemo(() =>
     chats.filter(c => searchChat === "" || c.title.includes(searchChat) || c.messages.some(m => m.content.includes(searchChat)))
@@ -65,41 +69,25 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
     messagesEndRef.current?.scrollIntoView({ behavior:"smooth" });
   }, [activeChat.messages, thinking]);
 
-  const sendMessage = () => {
-    const text = input.trim();
-    if (!text || thinking) return;
+  const sendMessage = async () => {
+    const text=input.trim();
+    if(!text || thinking || !selectedModel) return;
     setInput("");
-
-    const now = new Date().toISOString();
-    const userMsg = { id:`u${Date.now()}`, role:"user" as const, content:text, createdAt:now };
-    const updatedChat: Chat = { ...activeChat, messages:[...activeChat.messages, userMsg] };
-    setActiveChat(updatedChat);
-    setChats(prev => prev.map(c => c.id === updatedChat.id ? updatedChat : c));
-    setThinking(true);
-
-    setTimeout(() => {
-      const replies: Record<string, string> = {
-        chat:       "مکالمه شما دریافت شد. چطور می‌توانم بیشتر کمک کنم؟",
-        code:       "```python\ndef solution():\n    # پیاده‌سازی\n    pass\n```",
-        write:      "متن خواسته‌شده آماده شد. می‌توانید درخواست ویرایش بدهید.",
-        translate:  "ترجمه انجام شد. متن معادل فارسی آماده است.",
-        summarize:  "خلاصه: این متن شامل نکات کلیدی زیر است...",
-        research:   "بر اساس آخرین داده‌ها، تحقیق زیر انجام شد...",
-        math:       "راه‌حل مسئله: ابتدا معادله را ساده می‌کنیم...",
-        create:     "داستان کوتاه: روزی روزگاری در سرزمینی دور...",
-      };
-      const aiMsg = {
-        id:`a${Date.now()}`,
-        role:"assistant" as const,
-        content: replies[mode.id] || "پاسخ دریافت شد. برای اطلاعات بیشتر می‌توانید سؤال کنید.",
-        createdAt: new Date().toISOString(),
-        modelId: selectedModel.id,
-      };
-      const finalChat: Chat = { ...updatedChat, messages:[...updatedChat.messages, aiMsg], updatedAt:new Date().toISOString() };
-      setActiveChat(finalChat);
-      setChats(prev => prev.map(c => c.id === finalChat.id ? finalChat : c));
-      setThinking(false);
-    }, 1800 + Math.random()*800);
+    const now=new Date().toISOString();
+    const userMsg={id:`u${Date.now()}`,role:"user" as const,content:text,createdAt:now};
+    const updatedChat={...activeChat,messages:[...activeChat.messages,userMsg],modelId:selectedModel.id};
+    setActiveChat(updatedChat);setChats(prev=>prev.some(c=>c.id===updatedChat.id)?prev.map(c=>c.id===updatedChat.id?updatedChat:c):[updatedChat,...prev]);setThinking(true);
+    try{
+      const r=await fetch(API+"/api/v1/ai/execute",{method:"POST",headers:{"content-type":"application/json",...(accessToken?{authorization:"Bearer "+accessToken}:{})},body:JSON.stringify({workflowCode:"hoosh.chat",input:text,modelId:selectedModel.id})});
+      const d=await r.json();if(!r.ok)throw new Error(d?.error||"AI_PROVIDER_FAILURE");
+      const aiMsg={id:`a${Date.now()}`,role:"assistant" as const,content:d?.result?.text||"پاسخی دریافت نشد.",createdAt:new Date().toISOString(),modelId:selectedModel.id};
+      const finalChat={...updatedChat,messages:[...updatedChat.messages,aiMsg],preview:aiMsg.content.slice(0,120),updatedAt:new Date().toISOString()};
+      setActiveChat(finalChat);setChats(prev=>prev.map(c=>c.id===finalChat.id?finalChat:c));
+    }catch{
+      const aiMsg={id:`e${Date.now()}`,role:"assistant" as const,content:"مدل انتخاب‌شده در حال حاضر از طریق سرور آن پرداز در دسترس نیست.",createdAt:new Date().toISOString(),modelId:selectedModel.id};
+      const finalChat={...updatedChat,messages:[...updatedChat.messages,aiMsg],preview:aiMsg.content.slice(0,120),updatedAt:new Date().toISOString()};
+      setActiveChat(finalChat);setChats(prev=>prev.map(c=>c.id===finalChat.id?finalChat:c));
+    }finally{setThinking(false);}
   };
 
   const newChat = () => {
