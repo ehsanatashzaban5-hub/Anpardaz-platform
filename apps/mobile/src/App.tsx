@@ -8414,21 +8414,18 @@ function AnAssistantChat({onProduct,compareMode,compareSelected,onCompareToggle,
     (_q:string,n:number)=>`نتایج آماده‌ست! ${toFaDigits(String(n))} محصول از فروشگاه‌های معتبر پیدا شد. اطلاعات بر اساس داده‌های موجود در آن مارکت است و ممکن است کامل یا به‌روز نباشد.`,
   ];
 
-  const sendMsg=()=>{
+  const sendMsg=async()=>{
     const txt=input.trim();if(!txt||thinking)return;
-    const uid=Date.now().toString();
-    setMsgs(p=>[...p,{id:uid,role:"user",text:txt}]);
-    setInput("");setThinking(true);setLastQ(txt);
-    scrollToBottom();
-    setTimeout(()=>{
-      const found=anSearch(txt).slice(0,30);
-      setResults(found);
-      const replyFn=AI_REPLIES[Math.floor(Math.random()*AI_REPLIES.length)];
-      const reply=found.length>0?replyFn(txt,found.length):`برای این درخواست نتیجه دقیقی پیدا نشد. می‌تونی جزئیات بیشتری بدی یا کلمات دیگری امتحان کنی؟`;
-      setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:reply}]);
-      setThinking(false);setShowResults(false);
-      scrollToBottom();
-    },1400);
+    const uid=Date.now().toString();setMsgs(p=>[...p,{id:uid,role:"user",text:txt}]);setInput("");setThinking(true);setLastQ(txt);scrollToBottom();
+    try{
+      const token=localStorage.getItem("anpardaz:accessToken")??"";
+      const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/ai/assist",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({input:txt})});
+      const d=await r.json();if(!r.ok)throw new Error(d?.error??"ai_unavailable");
+      const text=d?.result?.text??d?.result?.output??d?.result?.content??"پاسخ هوش مصنوعی دریافت نشد.";
+      const found=anSearch(txt).slice(0,30);setResults(found);
+      setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:String(text)}]);setShowResults(found.length>0);
+    }catch{setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:"دستیار هوشمند در حال حاضر در دسترس نیست."}]);setShowResults(false)}
+    finally{setThinking(false);scrollToBottom()}
   };
 
   const newChat=()=>{
