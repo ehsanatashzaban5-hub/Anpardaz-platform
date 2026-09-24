@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { Pool } from "pg";
+import { Pool } from "pg";\nimport { AiGateway } from "../services/ai-gateway.js";
 
 type Store={id:number;name:string;domain:string;homepage_url:string;category_hint?:string|null;verification_status:string};
 type Source={id:number;store_id:number;source_type:string;endpoint_url:string;adapter:string|null;mapping:any;etag:string|null;last_modified:string|null};
@@ -11,7 +11,7 @@ const pool=new Pool({connectionString:databaseUrl,max:4});
 const intervalMs=Math.max(5,Number(process.env.MARKET_SYNC_INTERVAL_MINUTES??30))*60_000;
 const maxStores=Math.max(1,Number(process.env.MARKET_SYNC_MAX_STORES??50));
 const timeoutMs=Math.max(5000,Number(process.env.MARKET_SYNC_TIMEOUT_MS??15000));
-const aiEnabled=process.env.MARKET_CLASSIFICATION_AI!=="false";
+const aiEnabled=process.env.MARKET_CLASSIFICATION_AI!=="false";\nconst ai=new AiGateway(pool);
 
 const text=(v:unknown)=>typeof v==="string"?v.trim():"";
 const num=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)&&n>=0?n:null};
@@ -52,9 +52,17 @@ async function resolveCategory(item:Item,store:Store){
    const q=await pool.query(`SELECT category_id FROM market_category_aliases WHERE active=true AND source_key=ANY($1::text[]) ORDER BY priority ASC LIMIT 1`,[sourceKeys]);
    if(q.rows[0])return{categoryId:Number(q.rows[0].category_id),method:"alias",confidence:0.95};
  }
- const hint=normalize(store.domain+" "+store.name);
- const q=await pool.query(`SELECT id FROM market_categories WHERE active=true AND (slug=ANY($1::text[]) OR normalize_text(name_fa)=ANY($1::text[])) LIMIT 1`,[[]]);
- void hint; void q;
+ const hint=normalize(String(store.category_hint??""));
+ if(hint){const q=await pool.query("SELECT id FROM market_categories WHERE active=true AND slug=$1 LIMIT 1",[hint]);if(q.rows[0])return{categoryId:Number(q.rows[0].id),method:"store_rule",confidence:0.88};}
+ if(aiEnabled){
+   try{
+     const cats=(await pool.query("SELECT id,slug,name_fa FROM market_categories WHERE active=true ORDER BY sort_order,id")).rows;
+     const input=JSON.stringify({title:text(item.name||item.title),brand:text(item.brands?.[0]?.name),description:text(item.description||item.short_description),storeHint:hint,categories:cats.map((x:any)=>({slug:x.slug,name_fa:x.name_fa}))});
+     const r=await ai.execute({workflowCode:"market.classify",input,sourceType:"market",sourceId:store.domain});
+     const parsed=JSON.parse(r.text);const chosen=cats.find((x:any)=>x.slug===String(parsed.slug));const confidence=Number(parsed.confidence);
+     if(chosen&&Number.isFinite(confidence)&&confidence>=0.75)return{categoryId:Number(chosen.id),method:"ai",confidence:Math.min(1,confidence)};
+   }catch{}
+ }
  return{categoryId:null,method:"review",confidence:0};
 }
 
