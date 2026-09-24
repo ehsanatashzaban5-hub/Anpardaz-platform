@@ -9,7 +9,9 @@ const page=(q:any)=>{const p=Math.max(1,Number(q.page)||1),l=Math.min(100,Math.m
 const surface=(v:any)=>v==='mobile'||v==='admin'?'mobile':v==='web'?'web':'web';
 
 export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
-  const safeDestination=(raw:string,domain:string|null)=>{try{const u=new URL(raw);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return null;if(!domain)return null;const host=u.hostname.toLowerCase(),d=domain.toLowerCase().replace(/^www\\./,'');return host===d||host.endsWith('.'+d)?u.toString():null;}catch{return null;}};\n\n  app.get('/api/v1/market/catalog',async(req)=>{
+  const safeDestination=(raw:string,domain:string|null)=>{try{const u=new URL(raw);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return null;if(!domain)return null;const host=u.hostname.toLowerCase(),d=domain.toLowerCase().replace(/^www\\./,'');return host===d||host.endsWith('.'+d)?u.toString():null;}catch{return null;}};
+
+  app.get('/api/v1/market/catalog',async(req)=>{
     const q=req.query as any; const [p,l,o]=page(q);
     const params:any[]=[]; const where:string[]=["p.status='published'"];
     if(q.q){params.push('%'+String(q.q).trim().replace(/[%_]/g,'')+'%');where.push('(p.title ILIKE $'+params.length+' OR COALESCE(p.description,\'\') ILIKE $'+params.length+' OR COALESCE(p.brand,\'\') ILIKE $'+params.length+')');}
@@ -17,8 +19,8 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     const lim=params.length+1, off=params.length+2; params.push(l,o);
     const r=await pool.query(`SELECT p.id,p.title,p.description,p.brand,p.condition,p.specs,p.source_url,
       c.slug category_slug,c.name category_name,c.name_fa category_name_fa,
-      COALESCE(MIN(o.price) FILTER(WHERE o.availability<>'out_of_stock'),0)::text price_min,
-      COALESCE(MAX(o.price) FILTER(WHERE o.availability<>'out_of_stock'),0)::text price_max,
+      COALESCE(MIN(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text price_min,
+      COALESCE(MAX(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text price_max,
       COUNT(DISTINCT os.id)::int store_count,
       COUNT(o.id) FILTER(WHERE os.id IS NOT NULL)::int offer_count
       FROM market_products p
