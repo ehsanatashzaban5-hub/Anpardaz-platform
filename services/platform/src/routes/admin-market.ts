@@ -24,6 +24,31 @@ export function registerAdminMarketRoutes(app:FastifyInstance,pool:Pool){
     const q=await pool.query(`SELECT r.*,s.name store_name,ss.source_name FROM market_sync_runs r LEFT JOIN market_stores s ON s.id=r.store_id LEFT JOIN market_store_sources ss ON ss.id=r.source_id ORDER BY r.created_at DESC LIMIT 500`);
     return{runs:q.rows};
   });
+  app.patch('/api/v1/admin/market/stores/:id',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req);if(!(await hasPermission(pool,a.auth,'approvals.write')))return reply.code(403).send({error:'forbidden'});
+    const id=Number((req.params as any).id),b=(req.body??{}) as any;
+    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_store'});
+    if(b.feedType!==undefined&&!['manual','json','xml','rss','api','crawler'].includes(b.feedType))return reply.code(400).send({error:'invalid_feed_type'});
+    if(b.iframeMode!==undefined&&!['allowed','blocked','unknown'].includes(b.iframeMode))return reply.code(400).send({error:'invalid_iframe_mode'});
+    const q=await pool.query(`UPDATE market_stores SET active=COALESCE($1,active),feed_type=COALESCE($2,feed_type),feed_url=COALESCE($3,feed_url),iframe_mode=COALESCE($4,iframe_mode),updated_at=NOW() WHERE id=$5 RETURNING id,name,domain,active,feed_type,feed_url,iframe_mode`,
+      [typeof b.active==='boolean'?b.active:null,b.feedType??null,typeof b.feedUrl==='string'?b.feedUrl.trim()||null:null,b.iframeMode??null,id]);
+    if(!q.rows[0])return reply.code(404).send({error:'store_not_found'});
+    return {store:q.rows[0]};
+  });
+
+  app.put('/api/v1/admin/market/sources',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req);if(!(await hasPermission(pool,a.auth,'approvals.write')))return reply.code(403).send({error:'forbidden'});
+    const b=(req.body??{}) as any,storeId=Number(b.storeId);
+    if(!Number.isSafeInteger(storeId)||storeId<=0||typeof b.sourceName!=='string'||!b.sourceName.trim())return reply.code(400).send({error:'invalid_source'});
+    if(!['json','xml','rss','api','crawler'].includes(b.sourceType))return reply.code(400).send({error:'invalid_source_type'});
+    if(b.endpointUrl!==undefined&&b.endpointUrl!==null){try{const u=new URL(String(b.endpointUrl));if(!['https:','http:'].includes(u.protocol))throw 0;}catch{return reply.code(400).send({error:'invalid_endpoint_url'});}}
+    const q=await pool.query(`INSERT INTO market_store_sources(store_id,source_name,source_type,endpoint_url,enabled,mapping,schedule_cron)
+      VALUES($1,$2,$3,$4,$5,$6,$7)
+      ON CONFLICT(store_id,source_name) DO UPDATE SET source_type=EXCLUDED.source_type,endpoint_url=EXCLUDED.endpoint_url,enabled=EXCLUDED.enabled,mapping=EXCLUDED.mapping,schedule_cron=EXCLUDED.schedule_cron,updated_at=NOW()
+      RETURNING *`,
+      [storeId,b.sourceName.trim().slice(0,120),b.sourceType,b.endpointUrl??null,b.enabled!==false,JSON.stringify(b.mapping??{}),typeof b.scheduleCron==='string'?b.scheduleCron.trim().slice(0,120):null]);
+    return {source:q.rows[0]};
+  });
   app.get('/api/v1/admin/market/events',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await hasPermission(pool,auth(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
     const q=await pool.query(`SELECT e.*,p.title product_title,s.name store_name,u.email
