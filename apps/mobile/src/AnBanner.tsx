@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useBackHandler } from "./backHandler";
-import { bannerApi, bannerMediaUrl } from "./bannerApi";
+import { bannerApi, bannerMediaUrl, bannerMessageMediaUrl } from "./bannerApi";
 
 /* ═══════════════════════════════════════════════════════════════
    آن بنر  |  AN BANNER — Iranian Classifieds Marketplace
@@ -1414,15 +1414,28 @@ function abReopenAd(id: string) { _ads = _ads.map(a => a.listingId === id ? { ..
 // --- Conversation/Message CRUD ---
 function abGetConvs(): ABConversation[] { return _convs; }
 function abGetMsgs(cid: string): ABMessage[] { return _msgs[cid] ?? []; }
-function abAddMsg(cid: string, msg: ABMessage) { abAddMsgAndNotify(cid, msg); }
-function abStartConv(listing: ABListing): string {
+async function abAddMsg(cid: string, msg: ABMessage) {
+  try {
+    let mediaBase64:string|undefined; let mediaMime:string|undefined;
+    if (msg.media && msg.media.startsWith("blob:")) {
+      const blob=await fetch(msg.media).then(r=>r.blob());
+      mediaMime=blob.type||"application/octet-stream";
+      mediaBase64=await new Promise<string>((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(String(fr.result).split(",")[1]??"");fr.onerror=()=>reject(fr.error);fr.readAsDataURL(blob);});
+    }
+    const response=await bannerApi.sendMessage(cid,{message:msg.text??msg.sticker??"",type:msg.type,mediaBase64,mediaMime,offerAmount:msg.offerAmount});
+    const sm=response?.message;
+    const saved:ABMessage={...msg,messageId:String(sm?.message_id??msg.messageId),createdAt:sm?.created_at??msg.createdAt,status:"sent",media:sm?.message_id&&msg.media?bannerMessageMediaUrl(sm.message_id):msg.media};
+    abAddMsgAndNotify(cid,saved);
+  } catch(e) { console.error("An Banner message failed",e); }
+}
+async function abStartConv(listing: ABListing): Promise<string> {
   const existing = _convs.find(c => c.listingId === listing.listingId && c.buyerId === _currentUid);
   if (existing) return existing.conversationId;
-  const cid = `conv-${Date.now()}`;
-  const now = new Date().toISOString();
-  _convs = [{ conversationId: cid, listingId: listing.listingId, buyerId: _currentUid, sellerId: listing.ownerId, createdAt: now, lastMessageAt: now, lastMessage: "", status: "active", unreadCount: 0 }, ..._convs];
-  storeConvsAndNotify();
-  return cid;
+  const response=await bannerApi.createConversation(listing.listingId,"");
+  const cid=String(response.conversationId);
+  const now=new Date().toISOString();
+  _convs=[{conversationId:cid,listingId:listing.listingId,buyerId:_currentUid,sellerId:listing.ownerId,createdAt:now,lastMessageAt:now,lastMessage:"",status:"active",unreadCount:0},..._convs];
+  storeConvsAndNotify(); return cid;
 }
 
 // --- User ---
@@ -2672,7 +2685,7 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
             <ABSellerCard user={owner} listing={listing}
               onProfile={() => push({ t: "profile", uid: owner.userId })}
               onCall={() => setShowPhone(true)}
-              onChat={() => { const cid = abStartConv(listing); if (onStartChat) onStartChat(cid); else push({ t: "chat", cid }); }}
+              onChat={() => { void abStartConv(listing).then(cid => { if (onStartChat) onStartChat(cid); else push({ t: "chat", cid }); }); }}
             />
             {isMyAd && (
               <div style={{ display: "flex", gap: 8, margin: "10px 16px 0", flexWrap: "wrap" }}>
