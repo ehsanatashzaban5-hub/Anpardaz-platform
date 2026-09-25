@@ -1,0 +1,11 @@
+BEGIN;
+ALTER TABLE banner_listings ADD COLUMN IF NOT EXISTS contact_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE banner_listings ADD COLUMN IF NOT EXISTS chat_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE banner_profiles ADD COLUMN IF NOT EXISTS account_status TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE banner_profiles ADD COLUMN IF NOT EXISTS violation_count INT NOT NULL DEFAULT 0;
+ALTER TABLE banner_profiles ADD COLUMN IF NOT EXISTS restriction_flags JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE banner_profiles ADD COLUMN IF NOT EXISTS restriction_reason TEXT;
+ALTER TABLE banner_profiles ADD COLUMN IF NOT EXISTS restricted_until TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_banner_listings_contact_chat ON banner_listings(contact_enabled,chat_enabled,status);
+INSERT INTO schema_migrations(version) VALUES('006_contact_preferences_and_account_controls') ON CONFLICT(version) DO NOTHING;
+COMMIT;
