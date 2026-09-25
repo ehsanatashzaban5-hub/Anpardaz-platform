@@ -1296,13 +1296,15 @@ async function initAnBannerStore(uid: string) {
   _currentUid = uid;
   _ads = []; _convs = []; _msgs = {}; _myFavs = []; _postchi = []; _bannerUsers = [];
   try {
-    const [listings,favorites,profile,conversations,notifications] = await Promise.all([
-      bannerApi.listings({limit:200}), bannerApi.favorites(), bannerApi.profile(), bannerApi.conversations(), bannerApi.notifications()
+    const [listings,myListings,favorites,profile,conversations,notifications] = await Promise.all([
+      bannerApi.listings({limit:200}), bannerApi.myListings(), bannerApi.favorites(), bannerApi.profile(), bannerApi.conversations(), bannerApi.notifications()
     ]);
-    _ads = (listings.listings ?? []).map((x:any)=>{upsertBannerUser(String(x.identity_id),x.seller_display_name);return mapApiListing(x);});
+    const livePublic=(listings.listings ?? []).map((x:any)=>{upsertBannerUser(String(x.identity_id),x.seller_display_name);return mapApiListing(x);});
+    const liveMine=(myListings.listings ?? []).map((x:any)=>mapApiListing(x));
+    const byId=new Map<string,ABListing>();for(const item of [...livePublic,...liveMine])byId.set(item.listingId,item);_ads=[...byId.values()];
     _myFavs = (favorites.listings ?? []).map((x:any)=>String(x.id));
     _myUser = {
-      userId: uid, name: profile?.profile?.display_name ?? "کاربر آن بنر", avatar: "", mobile: profile?.profile?.phone ?? "",
+      userId: uid, name: profile?.profile?.display_name ?? "کاربر آن بنر", avatar: profile?.profile?.avatar_data_url ?? "", mobile: profile?.profile?.phone ?? "",
       verificationStatus: "unverified", accountType: "personal", createdAt: profile?.profile?.created_at ?? new Date().toISOString(), lastActive: new Date().toISOString()
     };
     for (const conv of conversations.conversations ?? []) {
