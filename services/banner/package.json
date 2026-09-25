@@ -1,0 +1,20 @@
+{
+  "name": "@anpardaz/banner-service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "11.3.0",
+    "fastify": "5.12.5",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.5",
+    "@types/pg": "8.23.1",
+    "typescript": "7.0.2"
+  }
+}
