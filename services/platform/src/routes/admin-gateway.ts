@@ -243,6 +243,16 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
+  app.get('/api/v1/admin/ecosystem/anpardaz/cards/lookup', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const internalToken = process.env.ANPARDAZ_INTERNAL_TOKEN;
+    if (!internalToken) return reply.code(503).send({ error: 'anpardaz_internal_token_not_configured' });
+    const query = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
+    const result = await fetchJson(anpardazBase() + '/internal/v1/admin/cards/lookup' + query, { headers: { authorization: 'Bearer ' + internalToken } });
+    return reply.code(result.status).send(result.body);
+  });
+
   app.get('/api/v1/admin/ecosystem/anpardaz/users/:identityId', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
