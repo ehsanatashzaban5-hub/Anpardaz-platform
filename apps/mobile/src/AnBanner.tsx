@@ -1688,6 +1688,7 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
   const _v = useAdsVersion();
   const listing = abGetAds().find(l => l.listingId === lid);
   const [showPhone, setShowPhone] = useState(false);
+  const [ownerPhone, setOwnerPhone] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [reported, setReported] = useState(false);
 
@@ -1710,7 +1711,11 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
         <button className="ab-icon-btn" style={{ background: "rgba(255,255,255,0.88)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 11, flexShrink: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.18)" }} onClick={() => toggleFav(listing.listingId)}>
           <ABIco name={isFav ? "heartFill" : "heart"} size={20} color={isFav ? "#E8354E" : "#1a1a2e"} />
         </button>
-        <button className="ab-icon-btn" style={{ background: "rgba(255,255,255,0.88)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 11, flexShrink: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.18)" }}>
+        <button className="ab-icon-btn" style={{ background: "rgba(255,255,255,0.88)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 11, flexShrink: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.18)" }} onClick={() => {
+          const url=window.location.href;
+          if(navigator.share) void navigator.share({title:listing.title,url}).catch(()=>{});
+          else void navigator.clipboard?.writeText(url);
+        }}>
           <ABIco name="share" size={20} color="#1a1a2e" />
         </button>
         {onBackToPardaz && (
@@ -1781,7 +1786,7 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
             <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ab-text)", padding: "0 16px 12px" }}>فروشنده</div>
             <ABSellerCard user={owner} listing={listing}
               onProfile={() => push({ t: "profile", uid: owner.userId })}
-              onCall={() => setShowPhone(true)}
+              onCall={() => { void bannerApi.contact(listing.listingId).then(r=>{setOwnerPhone(r.phone);setShowPhone(true);}).catch(e=>console.error("seller_contact_failed",e)); }}
               onChat={() => { void abStartConv(listing).then(cid => { if (onStartChat) onStartChat(cid); else push({ t: "chat", cid }); }); }}
             />
             {isMyAd && (
@@ -1806,7 +1811,7 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
             {showPhone && (
               <div style={{ margin: "10px 16px 0", padding: "12px 16px", background: "var(--ab-green-light)", borderRadius: 12, border: "1px solid rgba(5,150,105,0.2)", display: "flex", alignItems: "center", gap: 10 }}>
                 <ABIco name="phone" size={18} color="var(--ab-green)" />
-                <span style={{ fontSize: 16, fontWeight: 700, color: "var(--ab-green)", letterSpacing: 1, direction: "ltr" }}>{owner.mobile}</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: "var(--ab-green)", letterSpacing: 1, direction: "ltr" }}>{ownerPhone}</span>
               </div>
             )}
           </div>
@@ -1814,7 +1819,12 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
 
         {/* Report */}
         <div style={{ padding: "0 16px 16px" }}>
-          <button onClick={() => setReported(true)} style={{ width: "100%", padding: "11px", borderRadius: 11, border: "1px solid var(--ab-border)", background: "transparent", fontSize: 12, color: reported ? "var(--ab-muted)" : "var(--ab-red)", fontFamily: "Vazirmatn, sans-serif", cursor: reported ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <button onClick={() => {
+            if(reported)return;
+            const reason=window.prompt("دلیل گزارش تخلف را وارد کنید");
+            if(!reason?.trim())return;
+            void bannerApi.reportListing(listing.listingId,reason.trim()).then(()=>setReported(true)).catch(e=>console.error("listing_report_failed",e));
+          }} style={{ width: "100%", padding: "11px", borderRadius: 11, border: "1px solid var(--ab-border)", background: "transparent", fontSize: 12, color: reported ? "var(--ab-muted)" : "var(--ab-red)", fontFamily: "Vazirmatn, sans-serif", cursor: reported ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <ABIco name="report" size={14} color={reported ? "var(--ab-muted)" : "var(--ab-red)"} />
             {reported ? "گزارش ارسال شد" : "گزارش تخلف"}
           </button>
