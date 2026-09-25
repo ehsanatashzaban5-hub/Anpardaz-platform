@@ -106,13 +106,35 @@ async function registerPrivate(app:FastifyInstance){
   app.get('/api/v1/banner/me',{preHandler:requireAuth},async(req)=>{const a=auth(req);const r=await pool.query(`SELECT identity_id,display_name,phone,city,created_at,updated_at,CASE WHEN avatar_data IS NOT NULL THEN 'data:'||COALESCE(avatar_mime,'image/jpeg')||';base64,'||encode(avatar_data,'base64') END avatar_data_url FROM banner_profiles WHERE identity_id=$1`,[a.sub]);return{profile:r.rows[0]??{identity_id:a.sub,display_name:null,phone:null,city:null}};});
   app.patch('/api/v1/banner/me',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),b=(req.body??{}) as any;const display=clean(b.displayName,120),phone=clean(b.phone,30),city=clean(b.city,80);const avatarMime=allowedMime.has(b.avatarMime)?b.avatarMime:null;const avatarData=typeof b.avatarBase64==='string'&&avatarMime?Buffer.from(b.avatarBase64,'base64'):null;if(avatarData&&avatarData.length>2*1024*1024)return reply.code(413).send({error:'avatar_too_large'});if(!display&&!phone&&!city&&!avatarData)return reply.code(400).send({error:'nothing_to_update'});const r=await pool.query(`INSERT INTO banner_profiles(identity_id,display_name,phone,city,avatar_data,avatar_mime) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(identity_id) DO UPDATE SET display_name=COALESCE(NULLIF($2,''),banner_profiles.display_name),phone=COALESCE(NULLIF($3,''),banner_profiles.phone),city=COALESCE(NULLIF($4,''),banner_profiles.city),avatar_data=COALESCE($5,banner_profiles.avatar_data),avatar_mime=COALESCE($6,banner_profiles.avatar_mime),updated_at=NOW() RETURNING identity_id,display_name,phone,city,created_at,updated_at,CASE WHEN avatar_data IS NOT NULL THEN 'data:'||COALESCE(avatar_mime,'image/jpeg')||';base64,'||encode(avatar_data,'base64') END avatar_data_url`,[a.sub,display,phone,city,avatarData,avatarMime]);await activity(a.sub,'profile_update','profile',a.sub,{fields:['displayName','phone','city']});return{profile:r.rows[0]};});
   app.get('/api/v1/banner/me/listings',{preHandler:requireAuth},async(req)=>{const a=auth(req);const r=await pool.query('SELECT l.id,l.title,l.status,l.price,l.currency,l.city,l.views,l.created_at,l.updated_at,c.name category_name FROM banner_listings l LEFT JOIN banner_categories c ON c.id=l.category_id WHERE l.identity_id=$1 ORDER BY l.created_at DESC',[a.sub]);return{listings:r.rows};});
+  app.post('/api/v1/banner/ai/suggest',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),b=(req.body??{}) as any,title=clean(b.title,160),description=clean(b.description,200);
+    if(!title||!description)return reply.code(400).send({error:'title_and_description_required'});
+    if(description.length>200)return reply.code(400).send({error:'description_too_long',max:200});
+    try{
+      const suggestion=await suggestWithAI(a.sub,title,description);
+      const r=await pool.query('INSERT INTO banner_ai_suggestions(identity_id,title_input,description_input,suggested_category_id,suggested_attributes,suggested_condition,suggested_price,model,provider) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',[a.sub,title,description,suggestion.categoryId,suggestion.attributes,suggestion.condition,suggestion.price,suggestion.model,suggestion.provider]);
+      await activity(a.sub,'ai_listing_suggestion','listing',null,{suggestionId:r.rows[0].id,categoryId:suggestion.categoryId,confidence:suggestion.confidence});
+      return{suggestion:{...suggestion,id:r.rows[0].id}};
+    }catch(e:any){const code=String(e?.message??'banner_ai_failed');return reply.code(code==='banner_ai_not_configured'?503:502).send({error:code});}
+  });
   app.post('/api/v1/banner/listings',{preHandler:requireAuth},async(req,reply)=>{
-    const a=auth(req),b=(req.body??{}) as any,title=clean(b.title,160),description=clean(b.description,5000),city=clean(b.city,80),condition=clean(b.condition,30),currency=clean(b.currency,3)||'IRR';
-    const attributes=typeof b.attributes==='object'&&b.attributes&&!Array.isArray(b.attributes)?Object.fromEntries(Object.entries(b.attributes).slice(0,40)):{};const categoryId=Number(b.categoryId);const price=b.price===null||b.price===undefined||b.price===''?null:Number(b.price);
-    if(!title||!description||!Number.isInteger(categoryId)||categoryId<1||JSON.stringify(attributes).length>20000||price!==null&&(!Number.isFinite(price)||price<0)||!city)return reply.code(400).send({error:'invalid_listing'});
+    const a=auth(req),b=(req.body??{}) as any,title=clean(b.title,160),description=clean(b.description,200),city=clean(b.city,80),currency=clean(b.currency,3)||'IRR';
+    if(!(await requireAllowed(a.sub,'listing')))return reply.code(403).send({error:'listing_restricted'});
+    if(!title||!description||description.length>200||!city)return reply.code(400).send({error:description.length>200?'description_too_long':'invalid_listing',max:200});
+    let suggestion:any=null;
+    try{
+      if(b.aiSuggestionId){const q=await pool.query('SELECT * FROM banner_ai_suggestions WHERE id=$1 AND identity_id=$2',[Number(b.aiSuggestionId),a.sub]);if(q.rows[0])suggestion=q.rows[0];}
+      if(!suggestion){
+        const ai=await suggestWithAI(a.sub,title,description);
+        const q=await pool.query('INSERT INTO banner_ai_suggestions(identity_id,title_input,description_input,suggested_category_id,suggested_attributes,suggested_condition,suggested_price,model,provider) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',[a.sub,title,description,ai.categoryId,ai.attributes,ai.condition,ai.price,ai.model,ai.provider]);suggestion=q.rows[0];
+      }
+    }catch(e:any){return reply.code(String(e?.message)==='banner_ai_not_configured'?503:502).send({error:String(e?.message??'banner_ai_failed')});}
+    const categoryId=Number(b.categoryId??suggestion.suggested_category_id),price=b.price!==undefined&&b.price!==null&&b.price!==''?Number(b.price):suggestion.suggested_price??null,condition=clean(b.condition,30)||suggestion.suggested_condition||'used';
+    const attributes=typeof b.attributes==='object'&&b.attributes&&!Array.isArray(b.attributes)?Object.fromEntries(Object.entries(b.attributes).slice(0,40)):suggestion.suggested_attributes??{};
+    if(!Number.isInteger(categoryId)||categoryId<1||JSON.stringify(attributes).length>20000||price!==null&&(!Number.isFinite(price)||price<0))return reply.code(400).send({error:'invalid_listing'});
     const cat=await pool.query('SELECT id FROM banner_categories WHERE id=$1 AND active=TRUE',[categoryId]);if(!cat.rows[0])return reply.code(400).send({error:'invalid_category'});
-    const r=await pool.query(`INSERT INTO banner_listings(identity_id,category_id,title,description,price,currency,condition,city,attributes,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') RETURNING *`,[a.sub,categoryId,title,description,price,currency,condition||'used',city,attributes]);
-    await activity(a.sub,'listing_created','listing',String(r.rows[0].id),{status:'pending'});await audit(a.sub,'create','listing',String(r.rows[0].id),{status:'pending'});return reply.code(201).send({listing:r.rows[0]});
+    const r=await pool.query(`INSERT INTO banner_listings(identity_id,category_id,title,description,price,currency,condition,city,attributes,ai_suggestion,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending') RETURNING *`,[a.sub,categoryId,title,description,price,currency,condition,city,attributes,suggestion]);
+    await activity(a.sub,'listing_created','listing',String(r.rows[0].id),{status:'pending',aiSuggestionId:suggestion.id});await audit(a.sub,'create','listing',String(r.rows[0].id),{status:'pending',aiSuggestionId:suggestion.id});return reply.code(201).send({listing:r.rows[0]});
   });
   app.patch('/api/v1/banner/listings/:id',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
