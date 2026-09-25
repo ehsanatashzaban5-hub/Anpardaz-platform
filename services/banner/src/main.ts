@@ -81,7 +81,8 @@ async function registerPrivate(app:FastifyInstance){
   app.patch('/api/v1/banner/listings/:id',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
     const b=(req.body??{}) as any;const fields:{sql:string;v:any}[]=[];for(const [key,col,max] of [['title','title',160],['description','description',5000],['city','city',80],['condition','condition',30]] as const){if(b[key]!==undefined){const v=clean(b[key],max);if(!v)return reply.code(400).send({error:`${key}_invalid`});fields.push({sql:`${col}=$${fields.length+2}`,v});}}
-    if(b.price!==undefined){const v=b.price===null||b.price===''?null:Number(b.price);if(v!==null&&(!Number.isFinite(v)||v<0))return reply.code(400).send({error:'price_invalid'});fields.push({sql:`price=$${fields.length+2}`,v});}
+    if(b.price!==undefined){const v=b.price===null||b.price===''?null:Number(b.price);if(v!==null&&(!Number.isFinite(v)||v<0))return reply.code(400).send({error:'price_invalid'});fields.push({sql:`price=${fields.length+2}`,v});}
+    if(b.status!==undefined){if(!['paused','published'].includes(String(b.status)))return reply.code(400).send({error:'status_invalid'});fields.push({sql:`status=${fields.length+2}`,v:String(b.status)});}
     if(!fields.length)return reply.code(400).send({error:'nothing_to_update'});
     const r=await pool.query(`UPDATE banner_listings SET ${fields.map(x=>x.sql).join(',')},updated_at=NOW() WHERE id=$1 AND identity_id=$${fields.length+2} RETURNING *`,[id,...fields.map(x=>x.v),a.sub]);if(!r.rows[0])return reply.code(404).send({error:'listing_not_found'});
     await activity(a.sub,'listing_updated','listing',String(id),{fields:fields.map(x=>x.sql.split('=')[0])});return{listing:r.rows[0]};
