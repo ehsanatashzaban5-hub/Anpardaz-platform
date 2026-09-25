@@ -40,7 +40,7 @@ async function registerPublic(app:FastifyInstance){
     const count=await pool.query(`SELECT COUNT(*)::int count FROM banner_listings l WHERE ${where.join(' AND ')}`,params);
     params.push(limit,offset);
     const rows=await pool.query(`SELECT l.id,l.category_id,c.name category_name,l.title,l.description,l.price,l.currency,l.condition,l.city,l.created_at,l.updated_at,l.views,
-      EXISTS(SELECT 1 FROM banner_media m WHERE m.listing_id=l.id) has_media
+      COALESCE((SELECT json_agg(m.id ORDER BY m.sort_order,m.id) FROM banner_media m WHERE m.listing_id=l.id),'[]'::json) media_ids
       FROM banner_listings l LEFT JOIN banner_categories c ON c.id=l.category_id WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT $${params.length-1} OFFSET $${params.length}`,params);
     return{listings:rows.rows,page,limit,total:count.rows[0].count};
   });
