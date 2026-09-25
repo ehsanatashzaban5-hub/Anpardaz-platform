@@ -1,5 +1,9 @@
 BEGIN;
 
+-- This migration is intentionally self-contained because the Banner migrations are ordered by filename.
+ALTER TABLE banner_listings ADD COLUMN IF NOT EXISTS contact_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE banner_listings ADD COLUMN IF NOT EXISTS chat_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+
 -- Every listing must keep at least one direct contact method enabled.
 ALTER TABLE banner_listings
   ADD CONSTRAINT banner_listing_contact_or_chat_chk
