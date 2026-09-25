@@ -24,6 +24,35 @@ async function notify(identityId:string,type:string,title:string,description:str
 
 const clean=(v:unknown,max=500)=>typeof v==='string'?v.trim().slice(0,max):'';
 const idParam=(v:unknown)=>/^\\d+$/.test(String(v??''))?Number(v):null;
+async function accountRestriction(identityId:string,code:string){
+  const r=await pool.query(`SELECT restriction_code,ends_at FROM banner_restrictions WHERE identity_id=$1 AND revoked_at IS NULL AND starts_at<=NOW() AND (ends_at IS NULL OR ends_at>NOW()) AND restriction_code IN ('all',$2) ORDER BY created_at DESC LIMIT 1`,[identityId,code]);
+  return r.rows[0]??null;
+}
+async function requireAllowed(identityId:string,code:string){
+  const profile=await pool.query('SELECT account_status FROM banner_profiles WHERE identity_id=$1',[identityId]);
+  if(profile.rows[0]?.account_status==='banned'||profile.rows[0]?.account_status==='suspended') return false;
+  return !(await accountRestriction(identityId,code));
+}
+async function suggestWithAI(identityId:string,title:string,description:string){
+  if(!process.env.BANNER_AI_API_KEY||!process.env.BANNER_AI_BASE_URL) throw new Error('banner_ai_not_configured');
+  const cats=await pool.query('SELECT id,parent_id,name,slug FROM banner_categories WHERE active=TRUE ORDER BY sort_order,id');
+  const prompt=`آن بنر یک پلتفرم آگهی فارسی است. عنوان و توضیح کاربر را تحلیل کن و فقط از دسته‌بندی‌های داده‌شده یک دسته/زیر‌دسته موجود را انتخاب کن. همچنین اگر از متن قابل استخراج است، فیلدهای فرم مثل condition, price, attributes را پیشنهاد بده. هرگز دسته یا شناسه جدید نساز.
+عنوان: ${title}
+توضیح: ${description}
+دسته‌ها: ${JSON.stringify(cats.rows)}
+خروجی فقط JSON با این شکل:
+{"categoryId":123,"condition":"new|like-new|good|used|for-parts|null","price":null,"attributes":{},"confidence":0.0}`;
+  const response=await fetch(process.env.BANNER_AI_BASE_URL.replace(/\/$/,'')+'/chat/completions',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+process.env.BANNER_AI_API_KEY},body:JSON.stringify({model:process.env.BANNER_AI_MODEL||'gpt-5-mini',temperature:0,response_format:{type:'json_object'},messages:[{role:'system',content:'Return valid JSON only.'},{role:'user',content:prompt}]})});
+  if(!response.ok) throw new Error('banner_ai_provider_error');
+  const json:any=await response.json();const raw=String(json?.choices?.[0]?.message?.content??'');
+  let out:any;try{out=JSON.parse(raw)}catch{throw new Error('banner_ai_invalid_response')}
+  const categoryId=Number(out.categoryId);const cat=cats.rows.find((x:any)=>Number(x.id)===categoryId);
+  if(!cat) throw new Error('banner_ai_invalid_category');
+  const confidence=Number(out.confidence);if(!Number.isFinite(confidence)||confidence<0||confidence>1) throw new Error('banner_ai_invalid_confidence');
+  const attrs=out.attributes&&typeof out.attributes==='object'&&!Array.isArray(out.attributes)?Object.fromEntries(Object.entries(out.attributes).slice(0,40)):{};
+  return {categoryId,categoryName:cat.name,categorySlug:cat.slug,condition:['new','like-new','good','used','for-parts'].includes(out.condition)?out.condition:null,price:out.price===null||out.price===undefined?null:Number(out.price),attributes:attrs,confidence,model:process.env.BANNER_AI_MODEL||'gpt-5-mini',provider:process.env.BANNER_AI_PROVIDER||'openai'};
+}
+
 
 async function registerPublic(app:FastifyInstance){
   app.get('/api/v1/banner/categories',async()=>{const r=await pool.query('SELECT id,parent_id,name,slug,sort_order FROM banner_categories WHERE active=TRUE ORDER BY sort_order,id');return{categories:r.rows};});
