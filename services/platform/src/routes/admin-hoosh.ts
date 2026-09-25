@@ -23,7 +23,22 @@ export function registerAdminHooshRoutes(app:FastifyInstance,pool:Pool){
     const q=await pool.query("SELECT id,identity_id,conversation_id,status,provider,model,requested_model,mode,attempt_count,error,created_at,completed_at FROM hoosh_requests ORDER BY created_at DESC LIMIT 500");
     return {requests:q.rows};
   });
-  app.post('/api/v1/admin/hoosh/requests/:id/retry',{preHandler:requireAuth},async(request,reply)=>{\n    const a=request as R; if(!(await hasPermission(pool,a.auth,'hoosh.manage')))return reply.code(403).send({error:'forbidden'});\n    const id=Number((request.params as any).id); if(!Number.isSafeInteger(id)||id<1)return reply.code(400).send({error:'invalid_request_id'});\n    const q=await pool.query("UPDATE hoosh_requests SET status='queued',error=NULL,started_at=NULL,lease_until=NULL,completed_at=NULL,attempt_count=0 WHERE id=$1 AND status IN ('failed','cancelled') RETURNING id,status",[id]);\n    if(!q.rows[0])return reply.code(409).send({error:'request_not_retryable'}); return {request:q.rows[0]};\n  });\n  app.post('/api/v1/admin/hoosh/requests/:id/cancel',{preHandler:requireAuth},async(request,reply)=>{\n    const a=request as R; if(!(await hasPermission(pool,a.auth,'hoosh.manage')))return reply.code(403).send({error:'forbidden'});\n    const id=Number((request.params as any).id); const q=await pool.query("UPDATE hoosh_requests SET status='cancelled',error='cancelled_by_admin',lease_until=NULL,completed_at=NOW() WHERE id=$1 AND status IN ('queued','running') RETURNING id,status",[id]);\n    if(!q.rows[0])return reply.code(409).send({error:'request_not_cancellable'}); return {request:q.rows[0]};\n  });\n  app.post('/api/v1/admin/hoosh/providers/:name/toggle',{preHandler:requireAuth},async(request,reply)=>{
+  app.post('/api/v1/admin/hoosh/requests/:id/retry',{preHandler:requireAuth},async(request,reply)=>{\n    const a=request as R; if(!(await hasPermission(pool,a.auth,'hoosh.manage')))return reply.code(403).send({error:'forbidden'});\n    const id=Number((request.params as any).id); if(!Number.isSafeInteger(id)||id<1)return reply.code(400).send({error:'invalid_request_id'});\n    const q=await pool.query("UPDATE hoosh_requests SET status='queued',error=NULL,started_at=NULL,lease_until=NULL,completed_at=NULL,attempt_count=0 WHERE id=$1 AND status IN ('failed','cancelled') RETURNING id,status",[id]);\n    if(!q.rows[0])return reply.code(409).send({error:'request_not_retryable'}); return {request:q.rows[0]};\n  });\n  app.post('/api/v1/admin/hoosh/requests/:id/cancel',{preHandler:requireAuth},async(request,reply)=>{\n    const a=request as R; if(!(await hasPermission(pool,a.auth,'hoosh.manage')))return reply.code(403).send({error:'forbidden'});\n    const id=Number((request.params as any).id); const q=await pool.query("UPDATE hoosh_requests SET status='cancelled',error='cancelled_by_admin',lease_until=NULL,completed_at=NOW() WHERE id=$1 AND status IN ('queued','running') RETURNING id,status",[id]);\n    if(!q.rows[0])return reply.code(409).send({error:'request_not_cancellable'}); return {request:q.rows[0]};\n  });\n  app.put('/api/v1/admin/hoosh/providers/:name',{preHandler:requireAuth},async(request,reply)=>{
+    const a=request as R;
+    if(!(await hasPermission(pool,a.auth,'hoosh.manage')))return reply.code(403).send({error:'forbidden'});
+    const name=String((request.params as any).name);
+    const body=(request.body??{}) as any;
+    const allowed=Array.isArray(body.allowedModels)?body.allowedModels.filter((x:any)=>typeof x==='string'&&x.trim()).map((x:string)=>x.trim().slice(0,160)).slice(0,100):null;
+    const defaultModel=typeof body.defaultModel==='string'&&body.defaultModel.trim()?body.defaultModel.trim().slice(0,160):null;
+    if(!allowed||!defaultModel||!allowed.includes(defaultModel))return reply.code(400).send({error:'invalid_model_policy'});
+    const q=await pool.query(
+      `UPDATE ai_providers SET model_policy=jsonb_set(jsonb_set(COALESCE(model_policy,'{}'::jsonb),'{allowed_models}',$1::jsonb,true),'{default_model}',to_jsonb($2::text),true) WHERE name=$3 RETURNING name,enabled,priority,model_policy`,
+      [JSON.stringify(allowed),defaultModel,name]
+    );
+    if(!q.rows[0])return reply.code(404).send({error:'provider_not_found'});
+    return {provider:q.rows[0]};
+  });
+  app.post('/api/v1/admin/hoosh/providers/:name/toggle',{preHandler:requireAuth},async(request,reply)=>{
     const a=request as R;
     if(!(await hasPermission(pool,a.auth,'hoosh.manage')))return reply.code(403).send({error:'forbidden'});
     const name=String((request.params as any).name); const enabled=Boolean((request.body as any)?.enabled);
