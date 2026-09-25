@@ -399,7 +399,7 @@ GROUNDING_RULES:
 7. Answer in Persian and keep the answer concise and useful.`;
 
     const result=await app.inject({method:'POST',url:'/api/v1/ai/execute',headers:{authorization:req.headers.authorization??''},payload:{
-      workflowCode,input:groundedInput,sourceType:'market',sourceId:String(ids.join(',')||'search')
+      workflowCode,input:groundedInput,modelId:typeof b.modelId==='string'?b.modelId.trim():undefined,sourceType:'market',sourceId:String(ids.join(',')||'search')
     }});
     if(result.statusCode>=400)return reply.code(502).send({error:'market_ai_unavailable'});
     const aiJson=result.json() as any;
@@ -409,8 +409,8 @@ GROUNDING_RULES:
       ? (await pool.query('SELECT id FROM market_ai_conversations WHERE id=$1 AND user_id=$2',[conversationId,uid])).rows[0]
       : null;
     const created=conv?.id?Number(conv.id):Number((await pool.query('INSERT INTO market_ai_conversations(identity_id,user_id,workflow_code,title) VALUES($1,$2,$3,$4) RETURNING id',[a.auth.sub,uid,workflowCode,b.input.trim().slice(0,120)])).rows[0].id);
-    const executionId=aiJson.execution?.id??aiJson.run?.id??null;
-    await pool.query('INSERT INTO market_ai_messages(conversation_id,role,content,product_ids,execution_id) VALUES($1,\'user\',$2,$3,$4),($1,\'assistant\',$5,$3,$4)',[created,b.input.trim(),ids,executionId,String(aiJson.output?.text??aiJson.output??'')]);
+    const executionId=aiJson.execution?.id??aiJson.run?.id??aiJson.result?.executionId??null;
+    await pool.query('INSERT INTO market_ai_messages(conversation_id,role,content,product_ids,execution_id) VALUES($1,\'user\',$2,$3,$4),($1,\'assistant\',$5,$3,$4)',[created,b.input.trim(),ids,executionId,String(aiJson.result?.text??aiJson.output?.text??aiJson.output??'')]);
     await pool.query('UPDATE market_ai_conversations SET updated_at=NOW() WHERE id=$1',[created]);
     await pool.query('INSERT INTO market_activity_log(identity_id,user_id,event_type,metadata) VALUES($1,$2,\'ai_assistant\',$3)',[a.auth.sub,uid,JSON.stringify({workflowCode,conversationId:created,productIds:ids,inputChars:b.input.length})]);
     return {...aiJson,conversationId:created};

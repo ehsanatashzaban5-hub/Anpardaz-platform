@@ -11,6 +11,8 @@ if(!databaseUrl) throw new Error("DATABASE_URL is required");
 const pool=new Pool({connectionString:databaseUrl,max:4});
 const intervalMs=Math.max(5,Number(process.env.MARKET_SYNC_INTERVAL_MINUTES??30))*60_000;
 const maxStores=Math.max(1,Number(process.env.MARKET_SYNC_MAX_STORES??50));
+const maxPages=Math.max(1,Number(process.env.MARKET_SYNC_MAX_PAGES??20));
+const pageSize=Math.min(100,Math.max(1,Number(process.env.MARKET_SYNC_PAGE_SIZE??100)));
 const timeoutMs=Math.max(5000,Number(process.env.MARKET_SYNC_TIMEOUT_MS??15000));
 const aiEnabled=process.env.MARKET_CLASSIFICATION_AI!=="false";
 const ai=new AiGateway(pool);
@@ -29,6 +31,19 @@ async function fetchText(url:string,headers:Record<string,string>={}){
 }
 async function fetchJson(url:string,headers:Record<string,string>={}){
  const x=await fetchText(url,headers);let data:any;try{data=JSON.parse(x.body)}catch{throw new Error("INVALID_JSON")};return{data,headers:x.headers,hash:x.hash};
+}
+function withPage(url:string,page:number){
+ try{const u=new URL(url);u.searchParams.set("page",String(page));if(!u.searchParams.has("per_page"))u.searchParams.set("per_page",String(pageSize));return u.toString()}catch{return url}
+}
+async function fetchPaginatedJson(source:Source,headers:Record<string,string>={}){
+ const all:any[]=[];let lastHeaders=new Headers();let lastHash="";
+ for(let page=1;page<=maxPages;page++){
+   const x=await fetchJson(withPage(source.endpoint_url,page),headers);lastHeaders=x.headers;lastHash=x.hash;
+   const rows=Array.isArray(x.data)?x.data:(Array.isArray(x.data?.products)?x.data.products:Array.isArray(x.data?.items)?x.data.items:[]);
+   if(!rows.length)break;all.push(...rows);
+   if(rows.length<pageSize)break;
+ }
+ return{data:all,headers:lastHeaders,hash:lastHash};
 }
 const getPath=(obj:any,path:string)=>path.split(".").filter(Boolean).reduce((v:any,k:string)=>v?.[k],obj);
 
@@ -171,11 +186,18 @@ async function syncSource(store:Store,source:Source){
    const headers:Record<string,string>={};if(source.etag)headers["if-none-match"]=source.etag;if(source.last_modified)headers["if-modified-since"]=source.last_modified;
    let fetched:{data:any;headers:Headers;hash:string};
    let items:Item[]=[];
-   if(source.adapter==='jsonld'){
-     const html=await fetchText(source.endpoint_url,headers);fetched={data:null,headers:html.headers,hash:html.hash};items=jsonLdItems(html.body);
-   }else{
-     fetched=await fetchJson(source.endpoint_url,headers);items=mappedItems(fetched.data,source.mapping);
-   }
+   if(source.adapter==='jsonld'||source.adapter==='sitemap_jsonld'){
+     if(source.adapter==='sitemap_jsonld'){
+       const maxUrls=Math.max(1,Number(source.mapping?.maxUrls??300));
+       const pages=await fetchText(source.endpoint_url,headers);
+       const urls=[...pages.body.matchAll(/<loc>\\s*([^<]+?)\\s*<\\/loc>/gi)].map(m=>m[1].trim()).filter((u:string)=>/^https?:\\/\\//i.test(u)).slice(0,maxUrls);
+       const found:Item[]=[];
+       for(let i=0;i<urls.length;i+=4){const batch=urls.slice(i,i+4);const xs=await Promise.all(batch.map(async(u:string)=>{try{const p=await fetchText(u);return jsonLdProduct(p.body,u)}catch{return null}}));for(const x of xs)if(x)found.push(x);}
+       fetched={data:null,headers:pages.headers,hash:pages.hash};items=found;
+     }else{const html=await fetchText(source.endpoint_url,headers);fetched={data:null,headers:html.headers,hash:html.hash};items=jsonLdItems(html.body);}
+   }else if(source.adapter==='shopify_products_json'){
+     const x=await fetchJson(source.endpoint_url,headers);fetched=x;items=shopifyItems(x.data,source.endpoint_url);
+   }else{const x=await fetchPaginatedJson(source,headers);fetched=x;items=mappedItems(x.data,source.mapping);}
    discovered=items.length;
    const categories=(await pool.query("SELECT id,slug,name_fa FROM market_categories WHERE active=true ORDER BY sort_order,id")).rows;
    const seen=new Set<number>();
@@ -232,7 +254,7 @@ async function syncSource(store:Store,source:Source){
 
 async function main(){
  while(true){
-   const stores=(await pool.query<Store>(`SELECT id,name,domain,homepage_url,category_hint,verification_status FROM market_stores WHERE active=true AND verification_status='verified' ORDER BY last_sync_at NULLS FIRST,id LIMIT $1`,[maxStores])).rows;
+   const stores=(await pool.query<Store>(`SELECT id,name,domain,homepage_url,category_hint,verification_status FROM market_stores WHERE active=true AND verification_status='verified' AND discovery_status='connected' ORDER BY last_sync_at NULLS FIRST,id LIMIT $1`,[maxStores])).rows;
    for(const store of stores){
      const sources=(await pool.query<Source>("SELECT id,store_id,source_type,endpoint_url,adapter,mapping,etag,last_modified FROM market_store_sources WHERE store_id=$1 AND enabled=true AND endpoint_url IS NOT NULL ORDER BY id",[store.id])).rows;
      for(const source of sources)await syncSource(store,source);

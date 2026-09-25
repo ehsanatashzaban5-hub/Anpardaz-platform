@@ -95,21 +95,51 @@ export function registerAdminMarketRoutes(app:FastifyInstance,pool:Pool){
   });
   app.get('/api/v1/admin/market/merchant-report',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await hasPermission(pool,auth(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
-    const q=req.query as any;const from=typeof q.from==='string'?q.from:null,to=typeof q.to==='string'?q.to:null,storeId=q.storeId?Number(q.storeId):null;
+    const q=req.query as any;
     const params:any[]=[];const where:string[]=[];
-    if(from){params.push(from);where.push('e.created_at >= $'+params.length);} if(to){params.push(to);where.push('e.created_at < $'+params.length);} if(storeId !== null && Number.isSafeInteger(storeId) && storeId>0){params.push(storeId);where.push('e.store_id = $'+params.length);}
+    if(typeof q.from==='string'){params.push(q.from);where.push('e.created_at >= $'+params.length);}
+    if(typeof q.to==='string'){params.push(q.to);where.push('e.created_at < $'+params.length);}
+    if(q.storeId&&Number.isSafeInteger(Number(q.storeId))){params.push(Number(q.storeId));where.push('e.store_id = $'+params.length);}
     const w=where.length?'WHERE '+where.join(' AND '):'';
-    const sql='SELECT e.store_id,s.name store_name, COUNT(*) FILTER(WHERE e.event_type=\'clickout\')::int clickouts, COUNT(DISTINCT e.user_id) FILTER(WHERE e.event_type=\'clickout\')::int unique_users, COUNT(*) FILTER(WHERE e.event_type=\'checkout_started\')::int checkout_started, COUNT(*) FILTER(WHERE e.event_type=\'purchase_reported\')::int purchases_reported, COALESCE(SUM(CASE WHEN e.event_type=\'purchase_reported\' THEN (e.metadata->>\'amount\')::numeric ELSE 0 END),0)::text purchase_amount FROM market_purchase_events e LEFT JOIN market_stores s ON s.id=e.store_id '+w+' GROUP BY e.store_id,s.name ORDER BY clickouts DESC';
-    const rows=(await pool.query(sql,params)).rows;return{from,to,storeId,rows};
-  });
-  app.get('/api/v1/admin/market/merchant-report.csv',{preHandler:requireAuth},async(req,reply)=>{
-    if(!(await hasPermission(pool,auth(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
-    const q=req.query as any;const params:any[]=[];const where:string[]=[];
-    if(typeof q.from==='string'){params.push(q.from);where.push('e.created_at >= $'+params.length);} if(typeof q.to==='string'){params.push(q.to);where.push('e.created_at < $'+params.length);} if(q.storeId&&Number.isSafeInteger(Number(q.storeId))){params.push(Number(q.storeId));where.push('e.store_id = $'+params.length);}
-    const w=where.length?'WHERE '+where.join(' AND '):'';
-    const sql='SELECT e.store_id,s.name store_name,e.event_type,e.product_id,e.offer_id,e.user_id,e.external_reference,e.metadata,e.created_at FROM market_purchase_events e LEFT JOIN market_stores s ON s.id=e.store_id '+w+' ORDER BY e.created_at';
-    const rows=(await pool.query(sql,params)).rows;const esc=(v:any)=>'"'+String(v??'').replace(/"/g,'""')+'"';
-    const csv=['store_id,store_name,event_type,product_id,offer_id,user_id,external_reference,metadata,created_at',...rows.map((r:any)=>[r.store_id,r.store_name,r.event_type,r.product_id,r.offer_id,r.user_id,r.external_reference,JSON.stringify(r.metadata),r.created_at].map(esc).join(','))].join('\n');
-    return reply.type('text/csv; charset=utf-8').send(csv);
+    const sql=`SELECT e.store_id,s.name store_name,
+      COUNT(*) FILTER(WHERE e.event_type='clickout')::int clickout_count,
+      COUNT(DISTINCT e.user_id) FILTER(WHERE e.event_type='clickout')::int unique_users,
+      COUNT(DISTINCT e.product_id) FILTER(WHERE e.event_type='clickout')::int unique_products,
+      COUNT(*) FILTER(WHERE e.event_type='clickout' AND e.metadata->>'surface'='mobile')::int mobile_clickouts,
+      COUNT(*) FILTER(WHERE e.event_type='clickout' AND e.metadata->>'surface'='web')::int web_clickouts,
+      COUNT(*) FILTER(WHERE e.event_type='purchase_reported')::int purchases_reported,
+      COALESCE(SUM(CASE WHEN e.event_type='purchase_reported' THEN NULLIF(e.metadata->>'amount','')::numeric ELSE 0 END),0)::numeric purchase_amount,
+      COALESCE(r.commission_type,'percent') commission_type,
+      COALESCE(r.commission_value,0)::numeric commission_value,
+      CASE
+        WHEN COALESCE(r.commission_type,'percent')='percent'
+          THEN COALESCE(SUM(CASE WHEN e.event_type='purchase_reported' THEN NULLIF(e.metadata->>'amount','')::numeric ELSE 0 END),0)*COALESCE(r.commission_value,0)/100
+        ELSE COUNT(*) FILTER(WHERE e.event_type='purchase_reported')*COALESCE(r.commission_value,0)
+      END::numeric estimated_commission
+      FROM market_purchase_events e
+      LEFT JOIN market_stores s ON s.id=e.store_id
+      LEFT JOIN LATERAL (
+        SELECT commission_type,commission_value
+        FROM market_merchant_commission_rules rr
+        WHERE rr.store_id=e.store_id AND rr.active=true
+          AND rr.valid_from<=NOW() AND (rr.valid_to IS NULL OR rr.valid_to>NOW())
+        ORDER BY rr.valid_from DESC,rr.id DESC LIMIT 1
+      ) r ON TRUE
+      ${w}
+      GROUP BY e.store_id,s.name,r.commission_type,r.commission_value
+      ORDER BY clickout_count DESC`;
+    const rows=(await pool.query(sql,params)).rows.map((r:any)=>({
+      ...r,
+      estimated_commission:String(r.estimated_commission??'0')
+    }));
+    const totals=rows.reduce((a:any,r:any)=>({
+      clickouts:a.clickouts+Number(r.clickout_count||0),
+      users:a.users+Number(r.unique_users||0),
+      products:a.products+Number(r.unique_products||0),
+      purchasesReported:a.purchasesReported+Number(r.purchases_reported||0),
+      purchaseAmount:a.purchaseAmount+Number(r.purchase_amount||0),
+      estimatedCommission:a.estimatedCommission+Number(r.estimated_commission||0)
+    }),{clickouts:0,users:0,products:0,purchasesReported:0,purchaseAmount:0,estimatedCommission:0});
+    return{from:q.from??null,to:q.to??null,storeId:q.storeId?Number(q.storeId):null,totals:{...totals,purchaseAmount:String(totals.purchaseAmount),estimatedCommission:String(totals.estimatedCommission)},stores:rows};
   });
 }
