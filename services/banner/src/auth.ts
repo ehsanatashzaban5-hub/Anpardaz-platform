@@ -25,14 +25,14 @@ export function verifyIdentityToken(token:string):AuthClaims|null {
   } catch { return null; }
 }
 
-export async function requireAuth(req:FastifyRequest,reply:FastifyReply) {
+export async function requireAuth(req:FastifyRequest,reply:FastifyReply): Promise<void> {
   const h=req.headers.authorization;
   const auth=h?.startsWith('Bearer ')?verifyIdentityToken(h.slice(7)):null;
-  if(!auth) return reply.code(401).send({error:'unauthorized'});
+  if(!auth){reply.code(401).send({error:'unauthorized'});return;}
   (req as FastifyRequest&{auth:AuthClaims}).auth=auth;
 }
-export function requireAdminInternal(req:FastifyRequest,reply:FastifyReply){
+export async function requireAdminInternal(req:FastifyRequest,reply:FastifyReply): Promise<void> {
   const expected=process.env.BANNER_INTERNAL_TOKEN;
-  if(!expected) return reply.code(503).send({error:'internal_credentials_not_configured'});
-  if(req.headers.authorization!==`Bearer ${expected}`) return reply.code(401).send({error:'unauthorized'});
+  if(!expected){reply.code(503).send({error:'internal_credentials_not_configured'});return;}
+  if(req.headers.authorization!==`Bearer ${expected}`){reply.code(401).send({error:'unauthorized'});return;}
 }
