@@ -10,7 +10,13 @@ export function registerHooshMediaRoutes(app:FastifyInstance,pool:Pool){
     const mode=typeof b.mode==='string'?b.mode.trim():'';
     const model=typeof b.model==='string'?b.model.trim():'';
     const prompt=typeof b.prompt==='string'?b.prompt.trim():'';
+    const idempotencyKey=String(request.headers['idempotency-key']??'').trim().slice(0,200);
     if(!['image','video','music','voice'].includes(mode)||!model||!prompt||prompt.length>20000)return reply.code(400).send({error:'invalid_media_request'});
+    if(!idempotencyKey)return reply.code(400).send({error:'idempotency_key_required'});
+    const options=typeof b.options==='object'&&b.options!==null?b.options:{};
+    if(JSON.stringify(options).length>20000)return reply.code(400).send({error:'media_options_too_large'});
+    const recent=await pool.query<{count:string}>("SELECT COUNT(*)::text count FROM hoosh_media_jobs WHERE identity_id=$1 AND created_at>NOW()-INTERVAL '1 minute'",[a.auth.sub]);
+    if(Number(recent.rows[0]?.count??0)>=10)return reply.code(429).send({error:'media_rate_limit'});
     const provider=await pool.query<any>("SELECT name,model_policy FROM ai_providers WHERE enabled=true ORDER BY priority ASC");
     const p=provider.rows.find((x:any)=>Array.isArray(x.model_policy?.allowed_models)&&x.model_policy.allowed_models.includes(model));
     const caps=p?.model_policy?.capabilities?.[model];
@@ -21,8 +27,16 @@ export function registerHooshMediaRoutes(app:FastifyInstance,pool:Pool){
     if(projectId!==null&&!Number.isSafeInteger(projectId))return reply.code(400).send({error:'invalid_project_id'});
     if(convId){const q=await pool.query('SELECT 1 FROM hoosh_conversations WHERE id=$1 AND identity_id=$2',[convId,a.auth.sub]);if(!q.rows[0])return reply.code(404).send({error:'conversation_not_found'});}
     if(projectId){const q=await pool.query('SELECT 1 FROM hoosh_projects WHERE id=$1 AND identity_id=$2',[projectId,a.auth.sub]);if(!q.rows[0])return reply.code(404).send({error:'project_not_found'});}
-    const q=await pool.query('INSERT INTO hoosh_media_jobs(identity_id,conversation_id,project_id,mode,provider,model,prompt,options) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,status,mode,provider,model,created_at',[a.auth.sub,convId,projectId,mode,p.name,model,prompt,JSON.stringify(b.options??{})]);
-    return reply.code(202).send({job:q.rows[0]});
+    try{
+      const q=await pool.query('INSERT INTO hoosh_media_jobs(identity_id,conversation_id,project_id,mode,provider,model,prompt,options,idempotency_key) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,status,mode,provider,model,created_at',[a.auth.sub,convId,projectId,mode,p.name,model,prompt,JSON.stringify(options),idempotencyKey]);
+      return reply.code(202).send({job:q.rows[0]});
+    }catch(e:any){
+      if(e?.code==='23505'){
+        const existing=await pool.query('SELECT id,status,mode,provider,model,created_at FROM hoosh_media_jobs WHERE identity_id=$1 AND idempotency_key=$2',[a.auth.sub,idempotencyKey]);
+        if(existing.rows[0])return reply.code(202).send({job:existing.rows[0],deduplicated:true});
+      }
+      throw e;
+    }
   });
 
   app.get('/api/v1/hoosh/media',{preHandler:requireAuth},async(request)=>{
