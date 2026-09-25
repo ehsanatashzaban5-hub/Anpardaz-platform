@@ -2009,6 +2009,7 @@ function ABPostFlow({ push }: {
   const [aiAnim, setAiAnim] = useState(false);
   const [aiOverridden, setAiOverridden] = useState(false);
   const [aiSetFields, setAiSetFields] = useState<{cat?:boolean;condition?:boolean;price?:boolean}>({});
+  const [aiSuggestionId, setAiSuggestionId] = useState<number | null>(null);
 
   /* ── Real submission: the backend is the only source of listing status ── */
   useEffect(() => {
@@ -2023,7 +2024,7 @@ function ABPostFlow({ push }: {
         if(!cat)throw new Error("banner_category_not_configured");
         const price=data.form.priceMode==="fixed"?(Number(data.form.price.replace(/[^0-9۰-۹]/g,"").replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))))||0):null;
         const created=await bannerApi.createListing({
-          categoryId:Number(cat.id),title:data.form.title.trim(),description:data.form.desc.trim(),price,
+          categoryId:Number(cat.id),aiSuggestionId:aiSuggestionId,title:data.form.title.trim(),description:data.form.desc.trim(),price,
           condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR",attributes:data.dynFields
         });
         const id=String(created.listing.id);
@@ -2113,55 +2114,37 @@ function ABPostFlow({ push }: {
   const cityName = IRAN_PROVINCES.flatMap(p => p.cities).find(c => c.id === postCity)?.name ?? "تهران";
   const rootCatColor = AB_CATS.find(c => selectedLeaf?.categoryId.startsWith(c.categoryId))?.color ?? "#999";
 
-  const runAiCategorization = (title: string, desc: string) => {
-    /* Simulate AI: pick a category based on keywords, auto-fill condition and price */
-    const text = (title + " " + desc).toLowerCase();
-    let aiCat: ABCategory | null = null;
-    const catHints: [string[], string][] = [
-      [["موبایل","گوشی","آیفون","سامسونگ","اپل","شیائومی"], "mob-phone"],
-      [["لپ‌تاپ","لپتاپ","laptop","کامپیوتر","نوتبوک"], "elec-laptop"],
-      [["ماشین","خودرو","پراید","پژو","رنو","سمند"], "veh-car"],
-      [["خانه","آپارتمان","اجاره","رهن","ملک","زمین"], "prop-apart"],
-      [["کتاب","کتب"], "ent-book"],
-    ];
-    for (const [keywords, catId] of catHints) {
-      if (keywords.some(k => text.includes(k))) {
-        const found = findCatById(catId);
-        if (found) { aiCat = found; break; }
-      }
+  const runAiCategorization = async (title: string, desc: string) => {
+    const result=await bannerApi.aiSuggest(title,desc);
+    setAiSuggestionId(result.suggestion.id);
+    const found=findCatById(String(result.suggestion.categoryId));
+    if(found){setSelectedLeaf(found);setAiSetFields({cat:true,condition:!!result.suggestion.condition,price:result.suggestion.price!==null});}
+    setForm(f=>({...f,
+      condition:(result.suggestion.condition as typeof f.condition) || f.condition,
+      price:result.suggestion.price!==null ? String(result.suggestion.price) : f.price
+    }));
+    if(result.suggestion.attributes&&found){
+      const allowed=getDynFields(found);
+      const attrs:any=result.suggestion.attributes;
+      const filtered:Record<string,string>={};
+      for(const field of allowed)if(attrs[field.key]!==undefined)filtered[field.key]=String(attrs[field.key]);
+      setDynFields(filtered);
     }
-    if (!aiCat) {
-      const allLeaves: ABCategory[] = [];
-      const collectLeaves = (cats: ABCategory[]) => cats.forEach(c => { if (c.children.length === 0) allLeaves.push(c); else collectLeaves(c.children); });
-      collectLeaves(AB_CATS);
-      aiCat = allLeaves[Math.floor(Math.random() * Math.min(allLeaves.length, 12))];
-    }
-    const aiCondition: typeof form.condition = text.includes("نو") || text.includes("آکبند") ? "new" : text.includes("در حد نو") || text.includes("کارکرده کم") ? "like-new" : "good";
-    const priceMatch = text.match(/(\d[\d,]+)\s*(تومان|هزار تومان|میلیون)?/);
-    const aiPrice = priceMatch ? priceMatch[1].replace(/,/g, "") : "";
-    const setFields: {cat?:boolean;condition?:boolean;price?:boolean} = {};
-    if (aiCat) { setSelectedLeaf(aiCat); setFields.cat = true; }
-    setForm(f => ({ ...f, condition: aiCondition, price: aiPrice && !f.price ? aiPrice : f.price }));
-    if (aiCondition) setFields.condition = true;
-    if (aiPrice) setFields.price = true;
-    setAiSetFields(setFields);
   };
-
-  const goNext = () => {
+  const goNext = async () => {
     const errs: string[] = [];
     if (step === 0) {
       if (photos.length === 0) errs.push("حداقل یک تصویر اضافه کنید.");
       if (!form.title.trim()) errs.push("عنوان آگهی را وارد کنید.");
       if (!form.desc.trim()) errs.push("توضیحات آگهی را وارد کنید.");
+      if (form.desc.length > 200) errs.push("توضیحات آگهی باید حداکثر ۲۰۰ کاراکتر باشد.");
       if (errs.length > 0) { setErrors(errs); return; }
       setErrors([]);
       if (!aiOverridden) {
         setAiAnim(true);
-        setTimeout(() => {
-          runAiCategorization(form.title, form.desc);
-          setAiAnim(false);
-          setStep(1);
-        }, 2800);
+        try { await runAiCategorization(form.title, form.desc); setStep(1); }
+        catch(e){ setErrors([e instanceof Error?e.message:"banner_ai_failed"]); }
+        finally { setAiAnim(false); }
       } else {
         setStep(1);
       }
@@ -2378,7 +2361,8 @@ function ABPostFlow({ push }: {
 
               <div style={{ marginBottom: 20 }}>
                 <label style={{ fontSize: 16, fontWeight: 700, color: "var(--ab-text)", display: "block", marginBottom: 8, fontFamily: "Vazirmatn,sans-serif" }}>توضیحات <span style={{ color: "var(--ab-red)" }}>*</span></label>
-                <textarea className="ab-post-textarea" placeholder="جزئیات بیشتر درباره آگهی بنویسید…" value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))} rows={5} />
+                <textarea className="ab-post-textarea" placeholder="حداکثر ۲۰۰ کاراکتر؛ جزئیات دقیق آگهی را بنویسید…" value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value.slice(0,200) }))} maxLength={200} rows={5} />
+                <div style={{ fontSize: 12, color: form.desc.length >= 200 ? "var(--ab-red)" : "var(--ab-muted)", marginTop: 6, fontFamily: "Vazirmatn,sans-serif" }}>{toFaD(form.desc.length)} / ۲۰۰</div>
               </div>
             </>
           )}
