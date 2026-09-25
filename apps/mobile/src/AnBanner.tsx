@@ -1279,7 +1279,7 @@ function mapApiListing(x: any): ABListing {
     title: x.title, description: x.description ?? "", images: Array.isArray(x.media_ids) ? x.media_ids.map((id:number)=>bannerMediaUrl(id)) : [],
     price: Number(x.price ?? 0), priceMode: x.price === null ? "negotiable" : "fixed",
     condition: (["new","like-new","good","used","for-parts"].includes(x.condition) ? x.condition : "used") as ABListing["condition"],
-    cityId: x.city ?? "", provinceId: "", attributes: {}, status: x.status === "published" ? "active" : x.status,
+    cityId: x.city ?? "", provinceId: "", attributes: x.attributes && typeof x.attributes === "object" ? x.attributes : {}, status: x.status === "published" ? "active" : x.status,
     createdAt: x.created_at, updatedAt: x.updated_at, expiresAt: x.expires_at ?? "",
     viewCount: Number(x.views ?? 0), favoriteCount: 0, messageCount: 0,
     contactEnabled: x.contact_enabled !== false, chatEnabled: x.chat_enabled !== false,
@@ -1330,7 +1330,7 @@ function storeFavs() { /* backend is source of truth */ }
 // --- Ad CRUD ---
 function abGetAds(): ABListing[] { return _ads; }
 function abAddAd(ad: ABListing) { _ads = [ad, ..._ads]; _notifyAds(); }
-async function abUpdateAd(ad: ABListing) { try{await bannerApi.updateListing(ad.listingId,{title:ad.title,description:ad.description,price:ad.price,city:ad.cityId,condition:ad.condition});_ads=_ads.map(a=>a.listingId===ad.listingId?ad:a);_notifyAds();}catch(e){console.error("listing_update_failed",e);} }
+async function abUpdateAd(ad: ABListing) { try{await bannerApi.updateListing(ad.listingId,{title:ad.title,description:ad.description,price:ad.price,city:ad.cityId,condition:ad.condition,attributes:ad.attributes});_ads=_ads.map(a=>a.listingId===ad.listingId?ad:a);_notifyAds();}catch(e){console.error("listing_update_failed",e);} }
 async function abDeleteAd(id: string) { try{await bannerApi.deleteListing(id);_ads=_ads.filter(a=>a.listingId!==id);_notifyAds();}catch(e){console.error("listing_delete_failed",e);} }
 async function abCloseAd(id: string) { try{await bannerApi.updateListing(id,{status:"paused"});_ads=_ads.map(a=>a.listingId===id?{...a,status:"expired" as const,updatedAt:new Date().toISOString()}:a);_notifyAds();}catch(e){console.error("listing_pause_failed",e);} }
 async function abReopenAd(id: string) { try{await bannerApi.updateListing(id,{status:"published"});_ads=_ads.map(a=>a.listingId===id?{...a,status:"active" as const,updatedAt:new Date().toISOString()}:a);_notifyAds();}catch(e){console.error("listing_reopen_failed",e);} }
@@ -2010,7 +2010,7 @@ function ABPostFlow({ push }: {
         const price=data.form.priceMode==="fixed"?(Number(data.form.price.replace(/[^0-9۰-۹]/g,"").replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))))||0):null;
         const created=await bannerApi.createListing({
           categoryId:Number(cat.id),title:data.form.title.trim(),description:data.form.desc.trim(),price,
-          condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR"
+          condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR",attributes:data.dynFields
         });
         const id=String(created.listing.id);
         for(const src of data.photos){
@@ -2552,7 +2552,7 @@ function ABEditPostFlow({ push, lid }: { push: (v: ABView) => void; lid: string 
   const [form, setForm] = useState({
     title: existing?.title ?? "",
     desc: existing?.description ?? "",
-    price: existing ? (existing.price / 1000).toString() : "",
+    price: existing ? String(existing.price ?? "") : "",
     priceMode: (existing?.priceMode ?? "fixed") as "fixed"|"negotiable"|"free"|"swap",
     condition: (existing?.condition ?? "used") as "new"|"like-new"|"good"|"used"|"for-parts",
   });
