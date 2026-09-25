@@ -1386,6 +1386,7 @@ async function initAnBannerStore(uid: string) {
       const cid=String(conv.conversation_id);
       _convs.push({conversationId:cid,listingId:String(conv.listing_id),buyerId:String(conv.buyer_identity_id),sellerId:String(conv.seller_identity_id),createdAt:conv.created_at,lastMessageAt:conv.last_message_at,lastMessage:conv.last_message??"",status:conv.status==="archived"?"archived":"active",unreadCount:0});
     }
+    await Promise.all(_convs.slice(0,50).map(async conv=>{try{const d=await bannerApi.conversation(conv.conversationId);_msgs[conv.conversationId]=(d.messages??[]).map((m:any)=>({messageId:String(m.message_id),conversationId:conv.conversationId,senderId:String(m.sender_identity_id),type:(m.message_type??"text") as ABMessage["type"],text:m.body||undefined,offerAmount:m.offer_amount?Number(m.offer_amount):undefined,media:m.media_mime?bannerMessageMediaUrl(m.message_id):undefined,createdAt:m.created_at,status:"delivered"}));}catch{}}));
     for (const n of notifications.notifications ?? []) _postchi.push({eventId:String(n.id),type:n.type==="support-reply"?"support-reply":"system",title:n.title,description:n.description,read:Boolean(n.read),createdAt:n.created_at});
   } catch (e) {
     console.error("An Banner API unavailable",e);
