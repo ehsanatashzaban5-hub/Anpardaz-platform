@@ -40,7 +40,7 @@ export default function FinancialCenterLive({onBack}:Props){
      <div style={{padding:11,borderRadius:13,background:"rgba(255,255,255,.03)"}}><small>خالص</small><strong style={{display:"block",color:income-expense>=0?"#00D6B0":"#f87171",marginTop:4}}>{fa(income-expense)}</strong></div>
     </div>
     <div style={{fontWeight:800,fontSize:13,margin:"10px 0"}}>تراکنش‌های واقعی کارت‌های تحت حسابرسی</div>
-    <div style={{display:"grid",gap:6}}>{data.transactions.slice(0,50).map(t=><div key={t.id} style={{display:"flex",justifyContent:"space-between;alignItems:center",padding:10,borderRadius:12,background:"rgba(255,255,255,.025)",border:"1px solid rgba(255,255,255,.05)"}}>
+    <div style={{display:"grid",gap:6}}>{data.transactions.slice(0,50).map(t=><div key={t.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:10,borderRadius:12,background:"rgba(255,255,255,.025)",border:"1px solid rgba(255,255,255,.05)"}}>
       <div><div style={{fontSize:11,fontWeight:700}}>{t.description||t.category||"تراکنش بانکی"}</div><div style={{fontSize:9,color:"#7f949f",marginTop:3}}>کارت •••• {last4(t.last4)} · {t.category}</div></div>
       <b style={{fontSize:11,color:t.direction==="income"?"#00D6B0":"#f87171"}}>{t.direction==="income"?"+":"-"} {fa(Number(t.amount))}</b>
     </div>)}</div>
