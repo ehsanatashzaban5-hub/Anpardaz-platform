@@ -53,6 +53,12 @@ async function registerPublic(app:FastifyInstance){
     await audit(null,'view','listing',String(id),{public:true});
     return{listing:{...r.rows[0],views:r.rows[0].views+1},media:media.rows};
   });
+  app.get('/api/v1/banner/messages/:id/media',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
+    const r=await pool.query(`SELECT m.media_data,m.media_mime FROM banner_inquiry_messages m JOIN banner_inquiries i ON i.id=m.inquiry_id WHERE m.id=$1 AND (i.buyer_identity_id=$2 OR i.seller_identity_id=$2)`,[id,a.sub]);
+    if(!r.rows[0]?.media_data)return reply.code(404).send({error:'media_not_found'});
+    reply.header('Content-Type',r.rows[0].media_mime??'application/octet-stream').send(r.rows[0].media_data);
+  });
   app.get('/api/v1/banner/media/:id',async(req,reply)=>{
     const id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
     const r=await pool.query('SELECT mime_type,data,filename FROM banner_media WHERE id=$1',[id]);if(!r.rows[0])return reply.code(404).send({error:'media_not_found'});
