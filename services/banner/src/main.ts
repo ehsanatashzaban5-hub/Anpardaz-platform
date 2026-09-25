@@ -5,12 +5,14 @@ import {requireAuth,requireAdminInternal,type AuthClaims} from './auth.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
 const app=Fastify({logger:true});
+const isProduction=process.env.NODE_ENV==='production';
+if(isProduction){for(const name of ['DATABASE_URL','CORS_ORIGIN','IDENTITY_ISSUER','IDENTITY_PUBLIC_KEY_B64','BANNER_INTERNAL_TOKEN']){const value=process.env[name];if(!value||value.includes('CHANGE_ME')||value.includes('your-web-domain.example')||value.includes('BASE64-DER-ED25519-PUBLIC-KEY'))throw new Error('Production environment variable '+name+' must be configured with a real value');}}
 const pool=new Pool({connectionString:process.env.DATABASE_URL,max:10,connectionTimeoutMillis:5000,idleTimeoutMillis:30000});
 const MAX_MEDIA_BYTES=8*1024*1024;
 const allowedMime=new Set(['image/jpeg','image/png','image/webp']);
 
 function auth(req:FastifyRequest){return (req as R).auth;}
-async function audit(identityId:string,action:string,resourceType:string,resourceId:string|null,metadata:unknown={},requestId?:string){
+async function audit(identityId:string|null,action:string,resourceType:string,resourceId:string|null,metadata:unknown={},requestId?:string){
   await pool.query('INSERT INTO banner_audit_logs(identity_id,action,resource_type,resource_id,request_id,metadata) VALUES($1,$2,$3,$4,$5,$6)',[identityId,action,resourceType,resourceId,requestId??null,metadata]);
 }
 async function activity(identityId:string,eventType:string,resourceType:string|null,resourceId:string|null,metadata:unknown={},requestId?:string){
@@ -44,7 +46,7 @@ async function registerPublic(app:FastifyInstance){
     if(!r.rows[0])return reply.code(404).send({error:'listing_not_found'});
     await pool.query('UPDATE banner_listings SET views=views+1 WHERE id=$1',[id]);
     const media=await pool.query('SELECT id,mime_type,filename,sort_order FROM banner_media WHERE listing_id=$1 ORDER BY sort_order,id',[id]);
-    await audit('00000000-0000-0000-0000-000000000000','view','listing',String(id),{public:true});
+    await audit(null,'view','listing',String(id),{public:true});
     return{listing:{...r.rows[0],views:r.rows[0].views+1},media:media.rows};
   });
   app.get('/api/v1/banner/media/:id',async(req,reply)=>{
