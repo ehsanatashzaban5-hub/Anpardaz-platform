@@ -3052,6 +3052,7 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
   const [recording, setRecording] = useState(false);
   const [recordingSecs, setRecordingSecs] = useState(0);
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
+  const chatImageRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const mediaRecRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -3074,6 +3075,13 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
   const sendSticker = (s:string) => {
     void abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId:_currentUid, type:"sticker", sticker:s, text:s, createdAt:new Date().toISOString(), status:"sent" });
     setShowStickers(false);
+  };
+  const sendImage = async (file: File) => {
+    if(!["image/jpeg","image/png","image/webp"].includes(file.type)){console.error("chat_image_type_rejected");return;}
+    if(file.size>8*1024*1024){console.error("chat_image_too_large");return;}
+    const url=URL.createObjectURL(file);
+    try { await abAddMsg(cid,{messageId:Date.now().toString(),conversationId:cid,senderId:_currentUid,type:"image",media:url,text:"",createdAt:new Date().toISOString(),status:"sent"}); }
+    finally { URL.revokeObjectURL(url); }
   };
   const sendOffer = () => {
     const amt=Number(offerVal.replace(/[^0-9]/g,"")); if(!amt)return;
@@ -3194,6 +3202,14 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
               </div>
             );
           }
+          if (msg.type === "image" && msg.media) {
+            return (
+              <div key={msg.messageId} style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "78%", display: "flex", flexDirection: "column", gap: 3 }}>
+                <img src={msg.media} alt="تصویر پیام" style={{ maxWidth: "280px", maxHeight: "360px", borderRadius: 14, objectFit: "cover", border: "1px solid var(--ab-border)" }} />
+                <div style={{ fontSize: 10, color: "var(--ab-muted)", fontFamily: "Vazirmatn,sans-serif", alignSelf: isMe ? "flex-end" : "flex-start" }}>{new Date(msg.createdAt).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"})}</div>
+              </div>
+            );
+          }
           if (msg.type === "voice") {
             const dur = msg.duration ?? 0;
             const isPlaying = playingMsgId === msg.messageId;
@@ -3280,6 +3296,10 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
       ) : (
         /* Normal Input bar */
         <div className="ab-chat-input-bar">
+          <input ref={chatImageRef} type="file" accept="image/jpeg,image/png,image/webp" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f)void sendImage(f);e.currentTarget.value="";}} />
+          <button className="ab-icon-btn" onClick={() => { setShowStickers(false); setOfferMode(false); chatImageRef.current?.click(); }} title="ارسال تصویر">
+            <ABIco name="image" size={20} color="var(--ab-muted)" />
+          </button>
           <button className="ab-icon-btn" onClick={() => { setShowStickers(!showStickers); setOfferMode(false); }}>
             <span style={{ fontSize: 20, lineHeight: 1 }}>😊</span>
           </button>
