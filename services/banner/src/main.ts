@@ -149,6 +149,12 @@ async function registerPrivate(app:FastifyInstance){
   });
   app.get('/api/v1/banner/me/tickets',{preHandler:requireAuth},async(req)=>{const a=auth(req);const r=await pool.query('SELECT id,subject,category,priority,status,created_at,updated_at FROM banner_tickets WHERE identity_id=$1 ORDER BY updated_at DESC',[a.sub]);return{tickets:r.rows};});
   app.post('/api/v1/banner/tickets',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),b=(req.body??{}) as any,subject=clean(b.subject,160),message=clean(b.message,4000),category=clean(b.category,60)||'general';if(!subject||!message)return reply.code(400).send({error:'subject_and_message_required'});const r=await pool.query('INSERT INTO banner_tickets(identity_id,subject,category) VALUES($1,$2,$3) RETURNING *',[a.sub,subject,category]);await pool.query('INSERT INTO banner_ticket_messages(ticket_id,sender_identity_id,sender_type,body) VALUES($1,$2,\'user\',$3)',[r.rows[0].id,a.sub,message]);await activity(a.sub,'ticket_created','ticket',String(r.rows[0].id),{category});await notify(a.sub,'system','تیکت ثبت شد','تیکت پشتیبانی شما در آن بنر ثبت شد');return reply.code(201).send({ticket:r.rows[0]});});
+  app.post('/api/v1/banner/tickets/:id/reply',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),id=idParam((req.params as any).id),body=clean((req.body as any)?.message,4000);if(!id||!body)return reply.code(400).send({error:'invalid_reply'});
+    const owner=await pool.query('SELECT identity_id FROM banner_tickets WHERE id=$1 AND identity_id=$2',[id,a.sub]);if(!owner.rows[0])return reply.code(404).send({error:'ticket_not_found'});
+    const m=await pool.query('INSERT INTO banner_ticket_messages(ticket_id,sender_identity_id,sender_type,body) VALUES($1,$2,\'user\',$3) RETURNING *',[id,a.sub,body]);
+    await pool.query('UPDATE banner_tickets SET status=\'open\',updated_at=NOW() WHERE id=$1',[id]);await activity(a.sub,'ticket_reply','ticket',String(id));return{message:m.rows[0]};
+  });
   app.get('/api/v1/banner/tickets/:id',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});const r=await pool.query('SELECT * FROM banner_tickets WHERE id=$1 AND identity_id=$2',[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'ticket_not_found'});const m=await pool.query('SELECT id,sender_type,body,created_at FROM banner_ticket_messages WHERE ticket_id=$1 ORDER BY created_at',[id]);return{ticket:r.rows[0],messages:m.rows};});
 }
 
