@@ -2026,7 +2026,7 @@ function ABPostFlow({ push }: {
         const price=data.form.priceMode==="fixed"?(Number(data.form.price.replace(/[^0-9۰-۹]/g,"").replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))))||0):null;
         const created=await bannerApi.createListing({
           categoryId:Number(cat.id),aiSuggestionId:aiSuggestionId,title:data.form.title.trim(),description:data.form.desc.trim(),price,
-          condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR",attributes:data.dynFields
+          condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR",attributes:data.dynFields,contactEnabled:data.contactMethods.phone,chatEnabled:data.contactMethods.chat
         });
         const id=String(created.listing.id);
         for(const src of data.photos){
