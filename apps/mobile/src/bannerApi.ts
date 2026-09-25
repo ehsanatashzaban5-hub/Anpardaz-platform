@@ -23,6 +23,7 @@ export const bannerApi={
   async tickets(){return call("/api/v1/banner/me/tickets") as Promise<{tickets:any[]}>;},
   async ticket(id:string){return call("/api/v1/banner/tickets/"+encodeURIComponent(id));},
   async createTicket(subject:string,message:string,category="general"){return call("/api/v1/banner/tickets",{method:"POST",body:JSON.stringify({subject,message,category})});},
+  async replyTicket(id:string,message:string){return call("/api/v1/banner/tickets/"+encodeURIComponent(id)+"/reply",{method:"POST",body:JSON.stringify({message})});},
   async profile(){return call("/api/v1/banner/me");},
   async updateProfile(body:any){return call("/api/v1/banner/me",{method:"PATCH",body:JSON.stringify(body)});},
 };
