@@ -4733,7 +4733,8 @@ function ABTicketDetailScreen({ tid, push, tickets, setTickets }: { tid: string;
 
   const sendReply = () => {
     if (!reply.trim()) return;
-    void bannerApi.ticket(tid).then(()=>bannerApi.createTicket).catch(()=>{});
+    const text=reply.trim();
+    void bannerApi.replyTicket(tid,text).then(()=>setTickets(ts=>ts.map(t=>t.ticketId===tid?{...t, messages:[...t.messages,{id:String(Date.now()),senderId:"user",text,createdAt:new Date().toISOString()}],updatedAt:new Date().toISOString()}:t))).catch(e=>console.error("ticket_reply_failed",e));
     setReply("");
   };
 
