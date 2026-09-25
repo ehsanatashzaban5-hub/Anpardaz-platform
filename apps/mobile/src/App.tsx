@@ -202,6 +202,10 @@ async function userSettingsRequest(path:string,init:RequestInit={}){
   return data as {settings?:UserSettings;pinEnabled?:boolean};
 }
 
+async function anpardazGetSettings():Promise<any>{return anpardazRequest("/api/v1/settings");}
+async function anpardazUpdateSettings(payload:Record<string,unknown>):Promise<any>{return anpardazRequest("/api/v1/settings",{method:"PATCH",body:JSON.stringify(payload)});}
+async function anpardazUpdatePin(action:"enable"|"change"|"disable",currentPin?:string,newPin?:string):Promise<any>{return anpardazRequest("/api/v1/settings/pin",{method:"PUT",body:JSON.stringify({action,currentPin,newPin})});}
+async function anpardazVerifyPin(pin:string):Promise<boolean>{try{await anpardazRequest("/api/v1/settings/pin/verify",{method:"POST",body:JSON.stringify({pin})});return true}catch{return false}}
 async function anpardazCardBalance(cardNumber:string,otp:string,cvv2:string,expiryMonth:string,expiryYear:string){return anpardazRequest("/api/v1/cards/balance",{method:"POST",body:JSON.stringify({cardNumber,otp,cvv2,expiryMonth,expiryYear,idempotencyKey:crypto.randomUUID()})});}
 async function anpardazTransfer(destinationExternal:string,amount:number,currency:string,description:string){return anpardazRequest("/api/v1/transfers",{method:"POST",body:JSON.stringify({destinationExternal,amount:String(amount),currency,description,idempotencyKey:crypto.randomUUID()})});}
 async function sarrafRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANSARRAF_API_BASE)throw new Error("ansarraf_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const r=await fetch(`${ANSARRAF_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data?.error??"ansarraf_request_failed"));return data;}async function sarrafAssets():Promise<SarrafAssetRecord[]>{const d=await sarrafRequest("/api/v1/assets");return Array.isArray(d?.assets)?d.assets:[]}function sarrafAssetId(assets:SarrafAssetRecord[],symbol:string){const aliases=symbol==="TMN"?["TMN","TOMAN","IRT","IRR"]:symbol==="USDT"?["USDT"]:[symbol];const a=assets.find(x=>aliases.includes(String(x.symbol).toUpperCase())&&x.status!=="disabled");if(!a)throw new Error(`asset_not_available:${symbol}`);return a.id;}async function sarrafPlaceOrder(baseSymbol:string,quoteSymbol:string,side:"buy"|"sell",orderType:"market"|"limit",quantity:number,price?:number,quoteAmount?:number){const assets=await sarrafAssets();const body:any={baseAssetId:sarrafAssetId(assets,baseSymbol),quoteAssetId:sarrafAssetId(assets,quoteSymbol),side,orderType,quantity:String(quantity),idempotencyKey:crypto.randomUUID()};if(orderType==="limit")body.price=String(price);else if(side==="buy")body.quoteAmount=String(quoteAmount??0);return sarrafRequest("/api/v1/orders",{method:"POST",body:JSON.stringify(body)});}async function sarrafWalletMap():Promise<Record<string,number>>{const d=await sarrafRequest("/api/v1/wallets");const out:Record<string,number>={};for(const w of d?.wallets??[])out[String(w.symbol).toUpperCase()]=Number(w.available_balance??0);return out;}async function sarrafOrders():Promise<any[]>{const d=await sarrafRequest("/api/v1/orders");return Array.isArray(d?.orders)?d.orders:[]}
@@ -1109,9 +1113,9 @@ function VerificationAnimation({onSuccess,onFail}:{onSuccess:()=>void;onFail:()=
   );
 }
 
-function PinUnlock({user,onVerified}:{user:UserData;onVerified:()=>void}){
+function PinUnlock({user,onVerified,onVerifyPin}:{user:UserData;onVerified:()=>void;onVerifyPin?:(pin:string)=>Promise<boolean>}){
   const [pin,setPin]=useState(""),[error,setError]=useState(""),[support,setSupport]=useState(false);
-  const tap=(digit:string)=>{const next=pin+digit;if(next.length>4)return;setPin(next);setError("");if(next.length===4)setTimeout(()=>{if(next===user.pin)onVerified();else{setPin("");setError("رمز امنیتی صحیح نیست. دوباره تلاش کنید.")}},150)};
+  const tap=(digit:string)=>{const next=pin+digit;if(next.length>4)return;setPin(next);setError("");if(next.length===4)setTimeout(async()=>{const ok=onVerifyPin?await onVerifyPin(next):next===user.pin;if(ok)onVerified();else{setPin("");setError("رمز امنیتی صحیح نیست. دوباره تلاش کنید.")}},150)};
   const keys=["1","2","3","4","5","6","7","8","9","","0","del"];
   return <div className="auth-screen" dir="rtl"><div className="auth-card pin-card pin-unlock-card"><img src={anPardazLogo} alt="آن‌پرداز" className="pin-logo"/><div style={{display:"flex",justifyContent:"center",marginBottom:12,color:"#00D6B0"}}><Icon name="lock" size={32}/></div><h2>رمز امنیتی را وارد کنید</h2><p>برای ورود به حساب {toFaDigits(user.phone)}، رمز ۴ رقمی خود را وارد کنید.</p><div style={{display:"flex",justifyContent:"center",gap:16,margin:"20px 0"}}>{[0,1,2,3].map(i=><div key={i} style={{width:16,height:16,borderRadius:"50%",background:pin.length>i?"#00D6B0":"rgba(120,190,210,0.2)",transition:"background 0.2s"}}/>)}</div>{error&&<p className="field-err" style={{textAlign:"center"}}>{error}</p>}<div dir="ltr" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>{keys.map((key,i)=>key===""?<div key={i}/>:key==="del"?<button key={i} onClick={()=>setPin(v=>v.slice(0,-1))} style={{height:68,borderRadius:16,background:"#071D2C",border:"1px solid rgba(120,190,210,0.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#F4FAFC"}}><Icon name="delete" size={22}/></button>:<button key={i} onClick={()=>tap(key)} style={{height:68,borderRadius:16,background:"#071D2C",border:"1px solid rgba(120,190,210,0.15)",fontSize:28,fontWeight:700,fontFamily:"Vazirmatn",color:"#F4FAFC",cursor:"pointer"}}>{toFaDigits(key)}</button>)}</div><button className="forgot-pin" onClick={()=>setSupport(true)}>رمز خود را فراموش کرده‌اید؟</button></div>{support&&<div className="receipt-page" dir="rtl"><div className="receipt-page-header"><button className="back-btn" onClick={()=>setSupport(false)}><Icon name="arrow" size={20}/></button><h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>بازیابی رمز امنیتی</h2><div style={{width:36}}/></div><div className="receipt-page-body" style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 24px"}}><img src={anPardazLogo} alt="آن‌پرداز" style={{width:64,height:64,borderRadius:16,marginBottom:20}}/><h3 style={{marginBottom:12}}>بازیابی رمز امنیتی</h3><p style={{textAlign:"center",lineHeight:1.8,marginBottom:8}}>برای غیرفعال کردن رمز فراموش‌شده، با پشتیبانی آن‌پرداز تماس بگیرید.</p><div style={{fontSize:18,fontWeight:900,color:"#00D6B0",letterSpacing:2,margin:"12px 0",fontFamily:"Vazirmatn",direction:"ltr"}}>۰۹۳۷۵۴۳۷۱۰۶</div><button className="primary-button" style={{marginTop:16,width:"100%"}} onClick={()=>setSupport(false)}>متوجه شدم</button></div></div>}</div>;
 }
@@ -6029,7 +6033,7 @@ function AddCardModal({onAdd,onClose}:{onAdd:(c:BankCard)=>void;onClose:()=>void
 }
 
 // ─── Profile Page ─────────────────────────────────────────────────────────────
-function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:UserData;onUpdate:(u:UserData)=>void;onLogout:()=>void;lightTheme:boolean;setLightTheme:(v:boolean)=>void}){
+function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme:setLightThemePersisted}:{user:UserData;onUpdate:(u:UserData)=>void;onLogout:()=>void;lightTheme:boolean;setLightTheme:(v:boolean)=>void}){
   const [modal,setModal]=useState<null|"info"|"addcard"|"addcard-shaparak"|"support"|"settings">(null);
   const [pinModal,setPinModal]=useState<null|"enable"|"change"|"disable">(null);
   const [pinStep,setPinStep]=useState<"enter-current"|"enter-new"|"confirm-new">("enter-current");
@@ -6038,41 +6042,14 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
   const [pinError,setPinError]=useState("");
   const handlePinOpen=(mode:"enable"|"change"|"disable")=>{setPinModal(mode);setPinStep(mode==="enable"?"enter-new":"enter-current");setPinInput("");setPinNew("");setPinError("");};
   const handlePinDigit=(d:string)=>{if(pinInput.length<4)setPinInput(p=>{const next=p+d;
-    if(next.length===4){
-      setTimeout(async()=>{
-        if(pinModal==="enable"){
-          if(pinStep==="enter-new"){setPinNew(next);setPinStep("confirm-new");setPinInput("");}
-          else if(pinStep==="confirm-new"){
-            if(next===pinNew){
-              try{
-                await userSettingsRequest("/api/v1/user/settings/pin/enable",{method:"POST",body:JSON.stringify({newPin:pinNew})});
-                onUpdate({...user,pin:pinNew});DB.saveUser({...user,pin:pinNew});setPinModal(null);
-              }catch{setPinError("ذخیره رمز انجام نشد. دوباره تلاش کنید.");setPinInput("");}
-            }else{setPinError("رمزها یکسان نیستند. دوباره امتحان کن.");setPinStep("enter-new");setPinNew("");setPinInput("");}
-          }
-        } else if(pinModal==="change"){
-          if(pinStep==="enter-current"){if(next===user.pin){setPinStep("enter-new");setPinInput("");setPinError("");}else{setPinError("رمز اشتباه است.");setPinInput("");}}
-          else if(pinStep==="enter-new"){setPinNew(next);setPinStep("confirm-new");setPinInput("");}
-          else if(pinStep==="confirm-new"){
-            if(next===pinNew){
-              try{
-                await userSettingsRequest("/api/v1/user/settings/pin/change",{method:"POST",body:JSON.stringify({currentPin:user.pin,newPin:pinNew})});
-                onUpdate({...user,pin:pinNew});DB.saveUser({...user,pin:pinNew});setPinModal(null);
-              }catch{setPinError("رمز فعلی یا رمز جدید معتبر نیست.");setPinInput("");}
-            }else{setPinError("رمزها یکسان نیستند.");setPinStep("enter-new");setPinNew("");setPinInput("");}
-          }
-        } else if(pinModal==="disable"){
-          if(next===user.pin){
-            try{
-              await userSettingsRequest("/api/v1/user/settings/pin/disable",{method:"POST",body:JSON.stringify({currentPin:user.pin})});
-              onUpdate({...user,pin:""});DB.saveUser({...user,pin:""});setPinModal(null);
-            }catch{setPinError("غیرفعال‌سازی رمز انجام نشد.");setPinInput("");}
-          }else{setPinError("رمز اشتباه است.");setPinInput("");}
-        }
-      },100);
-    }
-    return next;
-  });
+    if(next.length===4){setTimeout(async()=>{try{
+      if(pinModal==="enable"){if(pinStep==="enter-new"){setPinNew(next);setPinStep("confirm-new");setPinInput("");}
+      else if(next===pinNew){await anpardazUpdatePin("enable",undefined,pinNew);onUpdate({...user,pin:""});DB.saveUser({...user,pin:""});setPinModal(null);}else{setPinError("رمزها یکسان نیستند.");setPinStep("enter-new");setPinNew("");setPinInput("");}}
+      else if(pinModal==="change"){if(pinStep==="enter-current"){if(await anpardazVerifyPin(next)){setPinStep("enter-new");setPinInput("");setPinError("");}else{setPinError("رمز اشتباه است.");setPinInput("");}}
+      else if(pinStep==="enter-new"){setPinNew(next);setPinStep("confirm-new");setPinInput("");}
+      else if(next===pinNew){await anpardazUpdatePin("change",undefined,pinNew);onUpdate({...user,pin:""});DB.saveUser({...user,pin:""});setPinModal(null);}else{setPinError("رمزها یکسان نیستند.");setPinStep("enter-new");setPinNew("");setPinInput("");}}
+      else if(pinModal==="disable"){if(await anpardazVerifyPin(next)){await anpardazUpdatePin("disable",next);onUpdate({...user,pin:""});DB.saveUser({...user,pin:""});setPinModal(null);}else{setPinError("رمز اشتباه است.");setPinInput("");}}
+    }catch{setPinError("ارتباط با سرور برقرار نشد؛ تنظیم رمز ذخیره نشد.");setPinInput("");}},100);} return next;});};
   const pinStepLabel=()=>{
     if(pinModal==="enable")return pinStep==="enter-new"?"رمز جدید ۴ رقمی را وارد کنید":"رمز را تکرار کنید";
     if(pinModal==="change")return pinStep==="enter-current"?"رمز فعلی را وارد کنید":pinStep==="enter-new"?"رمز جدید را وارد کنید":"رمز جدید را تکرار کنید";
@@ -9739,7 +9716,7 @@ export default function App() {
   if(appState==="otp")return <OTPVerify phone={pendingPhone} correctCode={pendingCode} devCode={pendingDevCode} onVerified={handleVerified} onBack={()=>setAppState("login")}/>;
   if(appState==="onboard-photo")return <OnboardPhoto onDone={p=>{setObPhoto(p);setObLegalAccepted(true);setAppState("onboard-profile")}} onBack={()=>setAppState("otp")} initialAccepted={obLegalAccepted}/>;
   if(appState==="onboard-profile")return <OnboardProfile onDone={d=>{setObProfile(d);setAppState("onboard-pin")}} onBack={()=>setAppState("onboard-photo")} initialData={obProfile}/>;
-  if(appState==="unlock-pin"&&user)return <PinUnlock user={user} onVerified={()=>setAppState("ready")}/>;
+  if(appState==="unlock-pin"&&user)return <PinUnlock user={user} onVerified={()=>setAppState("ready")} onVerifyPin={anpardazVerifyPin}/>;
   if(appState==="onboard-pin")return <OnboardPin onDone={pin=>{setPendingPin(pin);setAppState("verify-anim")}} onSkip={()=>{setPendingPin("");setAppState("verify-anim")}} onBack={()=>setAppState("onboard-profile")}/>;
   if(appState==="verify-anim")return <VerificationAnimation onSuccess={()=>{const u:UserData={uid:_genUid(),...obProfile,phone:pendingPhone,photo:obPhoto,pin:pendingPin,tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(u);DB.setCurrentPhone(u.phone);setUser(u);setTransactions([]);setHomeServices(SERVICES.slice(0,8).map(s=>s.id));setHomeSkeleton(false);setAppState("ready");setPendingTour(true);}} onFail={()=>{setPendingPin("");setAppState("onboard-pin")}}/>;
   if(!user)return null;
