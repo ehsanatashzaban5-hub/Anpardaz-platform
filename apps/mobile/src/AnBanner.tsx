@@ -1372,7 +1372,13 @@ async function abStartConv(listing: ABListing): Promise<string> {
 
 // --- User ---
 function abGetUser(): ABUser { return _myUser; }
-function abUpdateUser(u: ABUser) { _myUser = u; storeUser(); }
+async function abUpdateUser(u: ABUser) {
+  try{
+    const body:any={displayName:u.name,phone:u.mobile};
+    if(u.avatar?.startsWith("data:")){const m=u.avatar.match(/^data:([^;]+);base64,(.*)$/);if(m){body.avatarMime=m[1];body.avatarBase64=m[2];}}
+    const r=await bannerApi.updateProfile(body);_myUser={...u,avatar:r?.profile?.avatar_data_url??u.avatar};_notifyAds();
+  }catch(e){console.error("profile_update_failed",e);}
+}
 
 // --- Favs ---
 function abGetFavs(): string[] { return _myFavs; }
@@ -2781,7 +2787,7 @@ function ABEditProfileForm({ push }: { push: (v: ABView) => void }) {
   };
 
   const handleSave = () => {
-    abUpdateUser({ ...user, name: form.name.trim() || user.name, mobile: form.mobile.trim() || user.mobile });
+    void abUpdateUser({ ...user, name: form.name.trim() || user.name, mobile: form.mobile.trim() || user.mobile });
     setSaved(true);
     setTimeout(() => push({ t: "me" }), 1200);
   };
@@ -2792,7 +2798,7 @@ function ABEditProfileForm({ push }: { push: (v: ABView) => void }) {
         <ABCropEditor
           src={cropSrc}
           onConfirm={(dataURL) => {
-            abUpdateUser({ ...abGetUser(), avatar: dataURL });
+            void abUpdateUser({ ...abGetUser(), avatar: dataURL });
             URL.revokeObjectURL(cropSrc);
             setCropSrc(null);
           }}
