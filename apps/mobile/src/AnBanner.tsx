@@ -2900,58 +2900,42 @@ function ABPostFlow({ push }: {
   const [aiOverridden, setAiOverridden] = useState(false);
   const [aiSetFields, setAiSetFields] = useState<{cat?:boolean;condition?:boolean;price?:boolean}>({});
 
-  /* ── useEffects for status progression — always declared, never conditional ── */
+  /* ── Real submission: the backend is the only source of listing status ── */
   useEffect(() => {
     if (adStatus !== "reviewing") return;
-    const t = setTimeout(() => setAdStatus("approved"), 2800);
-    return () => clearTimeout(t);
-  }, [adStatus]);
-
-  useEffect(() => {
-    if (adStatus !== "approved") return;
-    const t = setTimeout(() => {
-      const data = submittedRef.current;
-      if (!data) { setAdStatus("published"); return; }
-      const prov = IRAN_PROVINCES.find(p => p.cities.some(c => c.id === data.postCity));
-      const newAd: ABListing = {
-        listingId: `user-${Date.now()}`,
-        token: `tk-${Date.now()}`,
-        ownerId: _currentUid,
-        categoryId: data.selectedLeaf?.categoryId ?? "personal",
-        parentCategoryId: data.selectedLeaf?.categoryId.split("-")[0] ?? "personal",
-        title: data.form.title || "آگهی جدید",
-        description: data.form.desc,
-        images: data.photos.length > 0 ? data.photos : ["https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400"],
-        price: data.form.priceMode === "fixed" ? (parseInt(data.form.price, 10) || 0) : 0,
-        priceMode: data.form.priceMode,
-        condition: data.form.condition,
-        cityId: data.postCity,
-        provinceId: prov?.id ?? "tehran",
-        attributes: data.dynFields,
-        status: "active",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        viewCount: 0, favoriteCount: 0, messageCount: 0,
-        contactEnabled: data.contactMethods.phone,
-        chatEnabled: data.contactMethods.chat,
-        verificationStatus: "none",
-      };
-      abAddAd(newAd);
-      // Emit Postchi event for listing published
-      abAddPostchiEvent({
-        eventId: `pe-pub-${newAd.listingId}`,
-        type: "published",
-        title: "آگهی منتشر شد ✓",
-        description: newAd.title.slice(0, 60),
-        read: false, createdAt: new Date().toISOString(),
-        listingId: newAd.listingId, color: "#059669",
-      });
-      setAdStatus("published");
-    }, 2000);
-    return () => clearTimeout(t);
-  }, [adStatus]);
-
+    const data=submittedRef.current;
+    if(!data||!data.selectedLeaf)return;
+    let cancelled=false;
+    (async()=>{
+      try{
+        const cats=await bannerApi.categories();
+        const cat=cats.categories.find((x:any)=>x.name===data.selectedLeaf?.name||x.slug===data.selectedLeaf?.categoryId);
+        if(!cat)throw new Error("banner_category_not_configured");
+        const price=data.form.priceMode==="fixed"?(Number(data.form.price.replace(/[^0-9۰-۹]/g,"").replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))))||0):null;
+        const created=await bannerApi.createListing({
+          categoryId:Number(cat.id),title:data.form.title.trim(),description:data.form.desc.trim(),price,
+          condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR"
+        });
+        const id=String(created.listing.id);
+        for(const src of data.photos){
+          if(src.startsWith("data:")){
+            const blob=await fetch(src).then(x=>x.blob());
+            const file=new File([blob],"banner-image.jpg",{type:blob.type||"image/jpeg"});
+            await bannerApi.uploadMedia(id,file);
+          }
+        }
+        if(!cancelled){
+          const live=await bannerApi.myListings();
+          _ads=(live.listings??[]).map((x:any)=>mapApiListing(x));
+          _notifyAds();
+        }
+      }catch(e){
+        if(!cancelled){setErrors([e instanceof Error?e.message:"banner_submit_failed"]);setAdStatus("draft");}
+      }
+    })();
+    return()=>{cancelled=true};
+  },[adStatus]);
+  
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
