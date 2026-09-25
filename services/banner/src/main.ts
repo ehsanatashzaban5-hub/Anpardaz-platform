@@ -134,7 +134,7 @@ async function registerPrivate(app:FastifyInstance){
     if(!Number.isInteger(categoryId)||categoryId<1||JSON.stringify(attributes).length>20000||price!==null&&(!Number.isFinite(price)||price<0))return reply.code(400).send({error:'invalid_listing'});
     const cat=await pool.query('SELECT id FROM banner_categories WHERE id=$1 AND active=TRUE',[categoryId]);if(!cat.rows[0])return reply.code(400).send({error:'invalid_category'});
     const r=await pool.query(`INSERT INTO banner_listings(identity_id,category_id,title,description,price,currency,condition,city,attributes,ai_suggestion,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending') RETURNING *`,[a.sub,categoryId,title,description,price,currency,condition,city,attributes,suggestion]);
-    await activity(a.sub,'listing_created','listing',String(r.rows[0].id),{status:'pending',aiSuggestionId:suggestion.id});await audit(a.sub,'create','listing',String(r.rows[0].id),{status:'pending',aiSuggestionId:suggestion.id});return reply.code(201).send({listing:r.rows[0]});
+    await activity(a.sub,'listing_created','listing',String(r.rows[0].id),{status:'pending',aiSuggestionId:suggestion.id});await notify(a.sub,'system','آگهی ثبت شد','آگهی شما با موفقیت ثبت شد و برای تأیید مدیریت در صف بررسی قرار گرفت.');await audit(a.sub,'create','listing',String(r.rows[0].id),{status:'pending',aiSuggestionId:suggestion.id});return reply.code(201).send({listing:r.rows[0]});
   });
   app.patch('/api/v1/banner/listings/:id',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});if(!(await requireAllowed(a.sub,'listing')))return reply.code(403).send({error:'listing_restricted'});
@@ -172,6 +172,7 @@ async function registerPrivate(app:FastifyInstance){
     if(listing.rows[0].identity_id===a.sub)return reply.code(400).send({error:'cannot_report_own_listing'});
     try{
       const r=await pool.query('INSERT INTO banner_reports(reporter_identity_id,listing_id,reason,description) VALUES($1,$2,$3,$4) RETURNING *',[a.sub,id,reason,description||null]);
+      await pool.query('INSERT INTO banner_violation_reports(reporter_identity_id,reported_identity_id,listing_id,reason,description) VALUES($1,$2,$3,$4,$5)',[a.sub,listing.rows[0].identity_id,id,reason,description||null]);
       await activity(a.sub,'listing_reported','listing',String(id),{reportId:r.rows[0].id,reason});await audit(a.sub,'report','listing',String(id),{reason});
       return reply.code(201).send({report:r.rows[0]});
     }catch(e:any){if(e?.code==='23505')return reply.code(409).send({error:'report_already_exists'});throw e;}
