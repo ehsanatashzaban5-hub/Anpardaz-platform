@@ -8,6 +8,8 @@ export const bannerApi={
   async me(){return call("/api/v1/banner/me");},
   async myListings(){return call("/api/v1/banner/me/listings") as Promise<{listings:BannerApiListing[]}>;},
   async favorites(){return call("/api/v1/banner/me/favorites") as Promise<{listings:BannerApiListing[]}>;},
+  async recentViews(){return call("/api/v1/banner/me/recent-views") as Promise<{listings:BannerApiListing[]}>;},
+  async recordView(id:string){return call("/api/v1/banner/me/recent-views/"+encodeURIComponent(id),{method:"POST",body:"{}"});},
   async favorite(id:string){return call("/api/v1/banner/listings/"+encodeURIComponent(id)+"/favorite",{method:"POST"});},
   async contact(id:string){return call("/api/v1/banner/listings/"+encodeURIComponent(id)+"/contact") as Promise<{phone:string}>;},
   async reportListing(id:string,reason:string,description=""){return call("/api/v1/banner/listings/"+encodeURIComponent(id)+"/report",{method:"POST",body:JSON.stringify({reason,description})});},
