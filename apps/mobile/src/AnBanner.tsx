@@ -3980,49 +3980,19 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
     if (el) el.scrollTop = el.scrollHeight;
   }, [displayMsgs.length]);
 
-  // Simulate reply after 1.5s — replace with real WebSocket/API call when backend is ready
-  const simulateReply = (context: string) => {
-    const replies: Record<string, string[]> = {
-      sticker: ["😊 ممنون!", "❤️", "خوبه!"],
-      voice: ["پیام صوتی دریافت شد ✅", "شنیدم، ممنون"],
-      offer: ["بررسی می‌کنم و خبر می‌دم", "قیمت مناسبه، موافقم ✅", "کمی بیشتر فکر می‌کنم"],
-      hello: ["سلام، بله هنوز موجوده 🙂", "سلام، خوش اومدید! بفرمایید", "سلام! چطور می‌تونم کمک کنم؟"],
-      available: ["بله، هنوز موجوده ✅", "بله، کالا دسترس است", "موجوده، اگه می‌خوای ببینی خبر بده"],
-      price: ["قیمت مشخصه، چانه نمی‌زنم", "کمی می‌شه تخفیف داد", "قیمت آخرمه، صرفه‌جویی کردم"],
-      default: ["ممنون از پیامت 🙏", "باشه، متوجه شدم", "حتماً، لطف دارید", "بله، درسته"],
-    };
-    // Detect hello/greeting patterns
-    const lower = input.toLowerCase();
-    let key = context;
-    if (context === "default") {
-      if (/سلام|درود|هلو/.test(lower)) key = "hello";
-      else if (/موجود|هست|داری/.test(lower)) key = "available";
-      else if (/قیمت|تخفیف|چند/.test(lower)) key = "price";
-    }
-    const pool = replies[key] ?? replies.default;
-    const text = pool[Math.floor(Math.random() * pool.length)];
-    setTimeout(() => {
-      abAddMsg(cid, { messageId: `auto-${Date.now()}`, conversationId: cid, senderId: otherUserId ?? "u2", type: "text", text, createdAt: new Date().toISOString(), status: "delivered" });
-    }, 1500);
-  };
-
   const send = () => {
     if (!input.trim()) return;
-    abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "text", text: input.trim(), createdAt: new Date().toISOString(), status: "sent" });
-    simulateReply("default");
+    void abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type:"text", text:input.trim(), createdAt:new Date().toISOString(), status:"sent" });
     setInput(""); setShowStickers(false);
   };
-  const sendSticker = (s: string) => {
-    abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "sticker", sticker: s, createdAt: new Date().toISOString(), status: "sent" });
-    simulateReply("sticker");
+  const sendSticker = (s:string) => {
+    void abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId:_currentUid, type:"sticker", sticker:s, text:s, createdAt:new Date().toISOString(), status:"sent" });
     setShowStickers(false);
   };
   const sendOffer = () => {
-    const amt = Number(offerVal.replace(/[^0-9]/g, ""));
-    if (!amt) return;
-    abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "offer", offerAmount: amt, createdAt: new Date().toISOString(), status: "sent" });
-    simulateReply("offer");
-    setOfferMode(false); setOfferVal("");
+    const amt=Number(offerVal.replace(/[^0-9]/g,"")); if(!amt)return;
+    void abAddMsg(cid,{messageId:Date.now().toString(),conversationId:cid,senderId:_currentUid,type:"offer",offerAmount:amt,text:String(amt),createdAt:new Date().toISOString(),status:"sent"});
+    setOfferMode(false);setOfferVal("");
   };
 
   const startRecording = async () => {
@@ -4039,18 +4009,14 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
         const dur = recordingSecs;
         setRecording(false); setRecordingSecs(0);
         if (recTimerRef.current) clearInterval(recTimerRef.current);
-        abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "voice", media: url, duration: dur, createdAt: new Date().toISOString(), status: "sent" });
-        simulateReply("voice");
+        void abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "voice", media: url, duration: dur, createdAt: new Date().toISOString(), status: "sent" });
       };
       mr.start();
       mediaRecRef.current = mr;
       setRecording(true);
       recTimerRef.current = setInterval(() => setRecordingSecs(s => s + 1), 1000);
     } catch {
-      // MediaRecorder not available (Figma sandbox) — send a mock voice message
-      const dur = 3;
-      abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "voice", duration: dur, createdAt: new Date().toISOString(), status: "sent" });
-      simulateReply("voice");
+      console.error("voice_recording_unavailable");
     }
   };
   const stopRecording = () => {
