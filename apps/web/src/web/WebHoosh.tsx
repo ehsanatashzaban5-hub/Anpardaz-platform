@@ -757,7 +757,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
       const t:Message={id:"t-"+Date.now(),role:"ai",text:isMedia?"در حال تولید…":"",thinking:true,modelId,ts:new Date()};
       setMessages(prev=>[...prev,u,t]); setInput("");
       if(isMedia){
-        const d=await hooshApi("/v1/hoosh/media",{method:"POST",body:JSON.stringify({conversationId,mode:modeId,model:modelId,prompt:text})});
+        const d=await hooshApi("/v1/hoosh/media",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({conversationId,mode:modeId,model:modelId,prompt:text})});
         const jobId=String(d.job.id);
         for(let i=0;i<180;i++){
           await new Promise(r=>setTimeout(r,1000)); const j=await hooshApi("/v1/hoosh/media/"+jobId);
