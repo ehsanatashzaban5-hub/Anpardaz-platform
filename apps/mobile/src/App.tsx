@@ -204,6 +204,16 @@ async function userSettingsRequest(path:string,init:RequestInit={}){
   return data as {settings?:UserSettings;pinEnabled?:boolean};
 }
 
+async function anpardazCards():Promise<BankCard[]>{
+  const d=await anpardazRequest("/api/v1/cards");
+  return Array.isArray(d?.cards)?d.cards.map((x:any)=>({id:String(x.id),number:String(x.number??"•••• "+String(x.last4??"")),bank:String(x.bank_name??"بانک"),holderName:String(x.holder_name??""),registrationStatus:String(x.registration_status??"verified")})): [];
+}
+async function startShaparakCardRegistration():Promise<{sessionId:string;authorizationUrl:string}>{
+  return anpardazRequest("/api/v1/cards/registration/start",{method:"POST"});
+}
+async function shaparakRegistrationStatus(sessionId:string){
+  return anpardazRequest("/api/v1/cards/registration/"+encodeURIComponent(sessionId));
+}
 async function anpardazCardBalance(cardNumber:string,otp:string,cvv2:string,expiryMonth:string,expiryYear:string){return anpardazRequest("/api/v1/cards/balance",{method:"POST",body:JSON.stringify({cardNumber,otp,cvv2,expiryMonth,expiryYear,idempotencyKey:crypto.randomUUID()})});}
 async function anpardazTransfer(destinationExternal:string,amount:number,currency:string,description:string){return anpardazRequest("/api/v1/transfers",{method:"POST",body:JSON.stringify({destinationExternal,amount:String(amount),currency,description,idempotencyKey:crypto.randomUUID()})});}
 async function sarrafRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANSARRAF_API_BASE)throw new Error("ansarraf_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const r=await fetch(`${ANSARRAF_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data?.error??"ansarraf_request_failed"));return data;}async function sarrafAssets():Promise<SarrafAssetRecord[]>{const d=await sarrafRequest("/api/v1/assets");return Array.isArray(d?.assets)?d.assets:[]}function sarrafAssetId(assets:SarrafAssetRecord[],symbol:string){const aliases=symbol==="TMN"?["TMN","TOMAN","IRT","IRR"]:symbol==="USDT"?["USDT"]:[symbol];const a=assets.find(x=>aliases.includes(String(x.symbol).toUpperCase())&&x.status!=="disabled");if(!a)throw new Error(`asset_not_available:${symbol}`);return a.id;}async function sarrafPlaceOrder(baseSymbol:string,quoteSymbol:string,side:"buy"|"sell",orderType:"market"|"limit",quantity:number,price?:number,quoteAmount?:number){const assets=await sarrafAssets();const body:any={baseAssetId:sarrafAssetId(assets,baseSymbol),quoteAssetId:sarrafAssetId(assets,quoteSymbol),side,orderType,quantity:String(quantity),idempotencyKey:crypto.randomUUID()};if(orderType==="limit")body.price=String(price);else if(side==="buy")body.quoteAmount=String(quoteAmount??0);return sarrafRequest("/api/v1/orders",{method:"POST",body:JSON.stringify(body)});}async function sarrafWalletMap():Promise<Record<string,number>>{const d=await sarrafRequest("/api/v1/wallets");const out:Record<string,number>={};for(const w of d?.wallets??[])out[String(w.symbol).toUpperCase()]=Number(w.available_balance??0);return out;}async function sarrafOrders():Promise<any[]>{const d=await sarrafRequest("/api/v1/orders");return Array.isArray(d?.orders)?d.orders:[]}
@@ -6364,31 +6374,52 @@ function HistoryPage({transactions,cards}:{transactions:TxRecord[];cards:BankCar
 
 // ─── Card Balance Screen ──────────────────────────────────────────────────────
 // ─── Shaparak Card Registration Modal ────────────────────────────────────────
-function ShaparkCardModal({onClose}:{onClose:()=>void}){
+function ShaparkCardModal({onClose,onRegistered}:{onClose:()=>void;onRegistered?:()=>void}){
+  const [busy,setBusy]=useState(false);
+  const [sessionId,setSessionId]=useState("");
+  const [status,setStatus]=useState<"idle"|"pending"|"verified"|"rejected"|"error">("idle");
+  const [message,setMessage]=useState("");
+  const timer=useRef<ReturnType<typeof setInterval>|null>(null);
   useBackHandler(onClose);
+  useEffect(()=>()=>{if(timer.current)clearInterval(timer.current)},[]);
+  const poll=(id:string)=>{
+    if(timer.current)clearInterval(timer.current);
+    timer.current=setInterval(async()=>{
+      try{
+        const d=await shaparakRegistrationStatus(id);const st=String(d?.registration?.status??"pending");
+        if(st==="verified"||st==="rejected"||st==="expired"||st==="cancelled"||st==="error"){
+          if(timer.current)clearInterval(timer.current);
+          if(st==="verified"){setStatus("verified");setMessage("کارت با تأیید شاپرک به‌صورت خودکار در آن‌پرداز ثبت شد.");window.dispatchEvent(new Event("anp-cards-updated"));onRegistered?.();}
+          else {setStatus(st==="rejected"?"rejected":"error");setMessage(st==="rejected"?"ثبت کارت توسط سرویس تأیید نشد.":"فرایند ثبت کارت کامل نشد.");}
+        }
+      }catch{}
+    },2000);
+  };
+  const start=async()=>{
+    setBusy(true);setMessage("");
+    try{
+      const r=await startShaparakCardRegistration();setSessionId(r.sessionId);setStatus("pending");poll(r.sessionId);
+      window.location.href=r.authorizationUrl;
+    }catch(e){setStatus("error");setMessage(e instanceof Error?e.message:"اتصال به فرایند ثبت کارت برقرار نشد.");}
+    finally{setBusy(false)}
+  };
   return <div className="anp-full-page" dir="rtl">
-    <div className="anp-page-header">
-      <button className="back-btn" onClick={onClose}><Icon name="arrow" size={20}/></button>
-      <h2 className="subscreen-title">افزودن کارت بانکی</h2>
-      <div style={{width:36}}/>
-    </div>
+    <div className="anp-page-header"><button className="back-btn" onClick={onClose}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">افزودن کارت بانکی</h2><div style={{width:36}}/></div>
     <div className="anp-page-body">
       <div style={{textAlign:"center",marginBottom:24}}>
         <div style={{width:72,height:72,borderRadius:20,background:"rgba(0,214,176,0.12)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}><Icon name="credit" size={32} stroke={1.5}/></div>
-        <h3 style={{margin:0,fontSize:19,fontWeight:800,color:"var(--text-primary)"}}>ثبت کارت در شاپرک</h3>
+        <h3 style={{margin:0,fontSize:19,fontWeight:800,color:"var(--text-primary)"}}>ثبت کارت بانکی</h3>
       </div>
-      <p style={{fontSize:13,color:"var(--text-muted)",textAlign:"right",lineHeight:2,marginBottom:24,direction:"rtl"}}>
-        با توجه به دستورالعمل بانک مرکزی، بانک شما به سامانه هاب شاپرک اضافه گردیده است. لازم است که ابتدا اطلاعات کارت بانکی خود را در این سامانه ثبت کنید. بعد از ثبت می توانید به برنامه آن پرداز بازگردید و تراکنش را ادامه دهید.
-      </p>
-      <button className="primary-button" style={{width:"100%",marginBottom:10}}
-        onClick={()=>window.open("https://tsm.shaparak.ir/cardManagement/enrollment.html?tid=a94a717e-a56e-42c7-b53f-81d2e997d2c1","_blank")}>
-        ثبت کارت در شاپرک
-      </button>
-      <button className="outline-button" style={{width:"100%"}} onClick={onClose}>بازگشت</button>
+      <p style={{fontSize:13,color:"var(--text-muted)",textAlign:"right",lineHeight:2,marginBottom:24}}>برای امنیت، ثبت کارت از مسیر تأیید مالکیت کارت انجام می‌شود. شماره کامل کارت در آن‌پرداز ذخیره نمی‌شود؛ پس از تأیید، فقط اطلاعات لازم و شناسه امن کارت نگهداری خواهد شد.</p>
+      {message&&<div style={{padding:12,borderRadius:12,background:status==="verified"?"rgba(0,214,176,.1)":"rgba(239,68,68,.08)",color:status==="verified"?"#00D6B0":"#fca5a5",fontSize:12,lineHeight:1.8,marginBottom:12}}>{message}</div>}
+      {sessionId&&<div style={{fontSize:10,color:"var(--text-faint)",marginBottom:12}}>شناسه پیگیری: <span dir="ltr">{sessionId}</span></div>}
+      {status!=="verified"&&<button className="primary-button" style={{width:"100%",marginBottom:10}} onClick={start} disabled={busy}>{busy?"در حال آماده‌سازی…":"ادامه و ثبت کارت"}</button>}
+      <button className="outline-button" style={{width:"100%"}} onClick={onClose}>{status==="verified"?"بستن":"انصراف"}</button>
     </div>
   </div>;
 }
 
+// ─── FinField
 // ─── FinField ─────────────────────────────────────────────────────────────────
 // Unified payment field: floating RTL label + eye toggle (right) + paste (left).
 // Stores Persian digits. 34px large font for weak-eyesight accessibility.
