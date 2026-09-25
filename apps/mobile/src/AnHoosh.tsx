@@ -154,6 +154,21 @@ const ftime = (d: Date) => FA(`${d.getHours()}:${String(d.getMinutes()).padStart
 // ══════════════════════════════════════════════════════════════════
 // PROVIDER MARK
 // ══════════════════════════════════════════════════════════════════
+function AccountView(){
+  const [profile,setProfile]=useState<any>(null); const [tickets,setTickets]=useState<any[]>([]);
+  const [subject,setSubject]=useState(""); const [content,setContent]=useState(""); const [busy,setBusy]=useState(false);
+  const load=useCallback(async()=>{try{const r=await Promise.all([hooshApi("/v1/hoosh/profile"),hooshApi("/v1/hoosh/tickets")]);setProfile(r[0].profile);setTickets(r[1].tickets??[]);}catch{}},[]);
+  useEffect(()=>{void load()},[load]);
+  const save=async()=>{setBusy(true);try{const r=await hooshApi("/v1/hoosh/profile",{method:"PUT",body:JSON.stringify({displayName:profile?.display_name??""})});setProfile(r.profile);}finally{setBusy(false)}};
+  const ticket=async()=>{if(!subject.trim()||!content.trim())return;setBusy(true);try{await hooshApi("/v1/hoosh/tickets",{method:"POST",body:JSON.stringify({subject,content})});setSubject("");setContent("");await load();}finally{setBusy(false)}};
+  const box={background:"var(--ah-card)",border:"1px solid var(--ah-border)",borderRadius:18,padding:18};
+  const input={width:"100%",boxSizing:"border-box" as const,padding:11,borderRadius:12,border:"1px solid var(--ah-border)",background:"var(--ah-input)",color:"var(--ah-text)",fontFamily:"Vazirmatn"};
+  return <div style={{flex:1,overflowY:"auto",padding:20}} className="ah-scroll"><div style={{maxWidth:760,margin:"0 auto",display:"grid",gap:14}}>
+    <div style={box}><div style={{fontWeight:900,fontSize:18}}>حساب کاربری</div><div style={{color:"var(--ah-muted)",fontSize:12,margin:"6px 0 14px"}}>{profile?.email??"—"}</div><input value={profile?.display_name??""} onChange={e=>setProfile((p:any)=>({...p,display_name:e.target.value}))} placeholder="نام نمایشی" style={input}/><button onClick={save} disabled={busy} className="ah-send-btn" style={{marginTop:10,width:"100%",background:"#7c3aed",color:"#fff"}}>ذخیره پروفایل</button></div>
+    <div style={box}><div style={{fontWeight:900,fontSize:16,marginBottom:10}}>پشتیبانی و تیکت</div><input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع تیکت" style={{...input,marginBottom:8}}/><textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="شرح درخواست" rows={4} style={input}/><button onClick={ticket} disabled={busy||!subject.trim()||!content.trim()} className="ah-send-btn" style={{marginTop:10,width:"100%",background:"#7c3aed",color:"#fff"}}>ثبت تیکت</button></div>
+    <div style={box}><div style={{fontWeight:900,fontSize:16,marginBottom:10}}>تیکت‌های من</div>{tickets.length?tickets.map(t=><div key={t.id} style={{padding:"10px 0",borderBottom:"1px solid var(--ah-border)"}}><b>{t.subject}</b><div style={{fontSize:11,color:"var(--ah-muted)",marginTop:4}}>{t.status} · {t.priority}</div></div>):<div style={{fontSize:12,color:"var(--ah-muted)"}}>هنوز تیکتی ثبت نشده است.</div>}</div>
+  </div></div>;
+}
 function PMark({ provider, size = 36 }: { provider: string; size?: number }) {
   const r = Math.round(size * 0.28);
   const icons: Record<string, React.ReactNode> = {
@@ -659,12 +674,13 @@ function ExploreView({ currentModelId, onSelectModel }: { currentModelId:string;
 // ══════════════════════════════════════════════════════════════════
 // BOTTOM NAVIGATION
 // ══════════════════════════════════════════════════════════════════
-type AhTab = "home" | "history" | "projects" | "explore";
+type AhTab = "home" | "history" | "projects" | "explore" | "account";
 const AH_TABS: { id:AhTab; label:string; icon:string }[] = [
   { id:"home",     label:"چت",       icon:"chat"    },
   { id:"history",  label:"تاریخچه",  icon:"clock"   },
   { id:"projects", label:"پروژه‌ها", icon:"folder"  },
   { id:"explore",  label:"کشف",      icon:"compass" },
+  { id:"account",  label:"حساب",      icon:"settings" },
 ];
 
 // ══════════════════════════════════════════════════════════════════
@@ -865,6 +881,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
         {tab==="history"  && <HistoryView onOpenConv={async c=>{try{setActiveConversationId(c.id);const d=await hooshApi(`/v1/hoosh/conversations/${c.id}`);setMessages((d.messages??[]).map((m:any)=>({id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at)})));setTab("home");}catch{}} onNewChat={newChat}/>}
         {tab==="projects" && <ProjectsView onOpenProject={()=>setTab("home")} onNewProject={()=>setShowNewProj(true)}/>}
         {tab==="explore"  && <ExploreView currentModelId={modelId} onSelectModel={id=>{setModelId(id);setTab("home");}}/>}
+        {tab==="account" && <AccountView/>}
 
         {/* ── BOTTOM NAVIGATION ── */}
         <nav style={{ display:"flex",borderTop:"1px solid var(--ah-border)",background:"var(--ah-surface)",flexShrink:0 }}>
