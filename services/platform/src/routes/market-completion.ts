@@ -102,6 +102,18 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return{searches:(await pool.query(`SELECT s.*,u.email FROM market_user_searches s LEFT JOIN platform_users u ON u.id=s.user_id ORDER BY s.created_at DESC LIMIT $1`,[limit])).rows};
   });
 
+  app.get('/api/v1/admin/market/readiness',{preHandler:requireAuth},async(req,reply)=>{
+    if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
+    const [stores,products,offers,lastSync,ai]=await Promise.all([
+      pool.query(`SELECT COUNT(*)::int total,COUNT(*) FILTER(WHERE verification_status='verified')::int verified,COUNT(*) FILTER(WHERE discovery_status='connected')::int connected,COUNT(*) FILTER(WHERE active=true)::int active FROM market_stores`),
+      pool.query(`SELECT COUNT(*)::int total,COUNT(*) FILTER(WHERE status='published')::int published FROM market_products`),
+      pool.query(`SELECT COUNT(*)::int total,COUNT(*) FILTER(WHERE availability<>'out_of_stock')::int live FROM market_offers`),
+      pool.query(`SELECT MAX(completed_at) last_completed_at FROM market_sync_runs WHERE status='succeeded'`),
+      pool.query(`SELECT name,enabled,model_policy->>'default_model' default_model,secret_ref FROM ai_providers WHERE name IN ('openai','gemini','openai_compatible') ORDER BY priority`)
+    ]);
+    return {stores:stores.rows[0],products:products.rows[0],offers:offers.rows[0],lastSync:lastSync.rows[0]?.last_completed_at??null,ai:ai.rows.map((x:any)=>({...x,keyConfigured:Boolean(x.secret_ref&&process.env[x.secret_ref])}))};
+  });
+
   app.get('/api/v1/admin/market/ai-history',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     const limit=Math.min(2000,Math.max(1,Number((req.query as any).limit)||300));
