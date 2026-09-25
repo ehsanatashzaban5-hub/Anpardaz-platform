@@ -75,50 +75,46 @@ interface Project {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// AI MODEL CATALOG — scalable, provider-grouped
+// LIVE AI MODEL CATALOG — server is the source of truth; no fake models
 // ══════════════════════════════════════════════════════════════════
-const AI_MODELS: AIModel[] = [
-  // ── OpenAI ──
-  { id:"gpt-4o-mini",       name:"GPT-4o Mini",         provider:"OpenAI",    desc:"سریع و مقرون‌به‌صرفه — مناسب کارهای روزانه و پرحجم",               providerColor:"#10A37F", capabilities:["fast","translation","writing"] },
-  { id:"gpt-4o",            name:"GPT-4o",              provider:"OpenAI",    desc:"پیشرفته برای پاسخ دقیق، تحلیل تصویر و سند، کدنویسی",               providerColor:"#10A37F", capabilities:["vision","coding","doc-analysis","writing","translation"], contextWindow:"128K" },
-  { id:"o3",                name:"o3",                  provider:"OpenAI",    desc:"مدل استدلالی پیشرفته — مناسب ریاضیات و مسائل پیچیده",               providerColor:"#10A37F", capabilities:["reasoning","coding"], badge:"new", contextWindow:"200K" },
-  { id:"o4-mini",           name:"o4-mini",             provider:"OpenAI",    desc:"استدلال سریع با هزینه پایین — بهترین ترکیب قدرت و سرعت",            providerColor:"#10A37F", capabilities:["reasoning","fast","coding"], badge:"new" },
-  // ── Anthropic ──
-  { id:"claude-haiku",      name:"Claude Haiku 3.5",    provider:"Anthropic", desc:"سریع‌ترین مدل کلود — مناسب کارهای ساده و پرتکرار",                  providerColor:"#C4956A", capabilities:["fast","writing","translation"] },
-  { id:"claude-sonnet",     name:"Claude Sonnet 5",     provider:"Anthropic", desc:"توازن ایده‌آل هوش و سرعت — بهترین انتخاب روزانه",                   providerColor:"#C4956A", capabilities:["coding","writing","vision","reasoning"], contextWindow:"200K" },
-  { id:"claude-opus",       name:"Claude Opus 5",       provider:"Anthropic", desc:"بهترین برای کدنویسی پیچیده، تحقیق عمیق و پروژه‌های بزرگ",           providerColor:"#C4956A", capabilities:["coding","reasoning","doc-analysis","writing"], badge:"pro", contextWindow:"200K" },
-  // ── Google ──
-  { id:"gemini-flash",      name:"Gemini 2.0 Flash",    provider:"Google",    desc:"سریع و کارآمد برای حجم بالا با کیفیت قابل‌قبول",                    providerColor:"#4285F4", capabilities:["fast","vision","translation"], badge:"new" },
-  { id:"gemini-flash-think",name:"Gemini Flash Thinking",provider:"Google",   desc:"استدلال گام‌به‌گام با سرعت فلش — ترکیب منحصربه‌فرد",                providerColor:"#4285F4", capabilities:["reasoning","fast"], badge:"new" },
-  { id:"gemini-pro",        name:"Gemini 2.5 Pro",      provider:"Google",    desc:"ایده‌آل برای تحقیق، داده‌های چندمرحله‌ای و تحلیل سند",               providerColor:"#4285F4", capabilities:["reasoning","vision","doc-analysis","coding"], contextWindow:"1M" },
-  // ── xAI ──
-  { id:"grok-3-mini",       name:"Grok 3 Mini",         provider:"xAI",       desc:"سریع و اقتصادی — دسترسی محدود به اینترنت",                          providerColor:"#E0E0E0", capabilities:["fast","writing"] },
-  { id:"grok-3",            name:"Grok 3",              provider:"xAI",       desc:"دسترسی به اینترنت زنده — اخبار و اطلاعات لحظه‌ای",                  providerColor:"#E0E0E0", capabilities:["reasoning","vision","doc-analysis"], badge:"new" },
-  // ── DeepSeek ──
-  { id:"deepseek-v3",       name:"DeepSeek V3",         provider:"DeepSeek",  desc:"قدرتمند در کدنویسی و پاسخ‌های دقیق فنی — متن‌باز",                 providerColor:"#4FACFE", capabilities:["coding","writing","fast"] },
-  { id:"deepseek-r2",       name:"DeepSeek R2",         provider:"DeepSeek",  desc:"استدلال عمیق در ریاضیات، علوم و برنامه‌نویسی",                      providerColor:"#4FACFE", capabilities:["reasoning","coding"], contextWindow:"128K" },
-  // ── Meta ──
-  { id:"llama-4-scout",     name:"Llama 4 Scout",       provider:"Meta",      desc:"آخرین نسل مدل‌های متن‌باز متا — چندمدالی با کانتکست بلند",         providerColor:"#0668E1", capabilities:["vision","coding","fast"], badge:"new", contextWindow:"10M" },
-  { id:"llama-3.3-70b",     name:"Llama 3.3 70B",       provider:"Meta",      desc:"مدل ۷۰ میلیارد پارامتری متن‌باز — عالی برای استقرار شخصی",         providerColor:"#0668E1", capabilities:["coding","writing","reasoning"] },
-  // ── Mistral ──
-  { id:"mistral-large",     name:"Mistral Large 2",     provider:"Mistral",   desc:"مدل چندزبانه پیشرفته — قوی در کدنویسی و استدلال",                   providerColor:"#FF7000", capabilities:["coding","reasoning","writing","translation"], contextWindow:"128K" },
-  { id:"codestral",         name:"Codestral",           provider:"Mistral",   desc:"تخصصی کدنویسی — پشتیبانی از ۸۰+ زبان برنامه‌نویسی",               providerColor:"#FF7000", capabilities:["coding"], contextWindow:"256K" },
-  { id:"mistral-small",     name:"Mistral Small 3.1",   provider:"Mistral",   desc:"سریع و مقرون‌به‌صرفه با کیفیت بالا — ایده‌آل API",                  providerColor:"#FF7000", capabilities:["fast","writing","translation"] },
-  // ── Qwen ──
-  { id:"qwen-max",          name:"Qwen 2.5 Max",        provider:"Qwen",      desc:"قوی‌ترین مدل علی‌بابا — چندزبانه و چندمدالی",                      providerColor:"#1677FF", capabilities:["coding","reasoning","writing","vision"], contextWindow:"1M" },
-  { id:"qwq-32b",           name:"QwQ 32B",             provider:"Qwen",      desc:"مدل استدلالی قدرتمند با ۳۲ میلیارد پارامتر",                        providerColor:"#1677FF", capabilities:["reasoning","coding","writing"] },
-  { id:"qwen-coder",        name:"Qwen 2.5 Coder",      provider:"Qwen",      desc:"تخصصی کدنویسی — بهترین در تکمیل کد و دیباگ",                       providerColor:"#1677FF", capabilities:["coding"], contextWindow:"128K" },
-];
-
-const PROVIDERS = [...new Set(AI_MODELS.map(m => m.provider))];
-
-const CAPABILITY_LABELS: Record<string, string> = {
-  "reasoning": "استدلال", "coding": "کد", "vision": "تصویر",
-  "image-gen": "تصویرسازی", "video-gen": "ویدیو", "music-gen": "موسیقی",
-  "voice": "صدا", "translation": "ترجمه", "doc-analysis": "سند",
-  "fast": "سریع", "writing": "نوشتن", "long-context": "متن بلند",
+let AI_MODELS: AIModel[] = [];
+let PROVIDERS: string[] = [];
+const PROVIDER_COLORS: Record<string,string> = {
+  openai:"#10A37F", gemini:"#4285F4", anthropic:"#C4956A",
+  openai_compatible:"#8B5CF6", qwen:"#1677FF", deepseek:"#4FACFE",
+  mistral:"#FF7000", xai:"#E0E0E0", meta:"#0668E1",
 };
 
+function modelFromProvider(provider:any, modelId:string): AIModel {
+  const policy=provider?.modelPolicy??{};
+  const caps=Array.isArray(policy.capabilities)?policy.capabilities:[];
+  return {
+    id:modelId,
+    name:String(policy.labels?.[modelId]??modelId),
+    provider:String(provider?.id??provider?.name??provider?.type??"AI"),
+    desc:String(policy.descriptions?.[modelId]??"مدل فعال‌شده توسط سرور آن هوش."),
+    capabilities:caps.length?caps:["text"],
+    providerColor:PROVIDER_COLORS[String(provider?.id??provider?.name??"").toLowerCase()]??"#8B5CF6",
+    contextWindow:policy.context_windows?.[modelId]?String(policy.context_windows[modelId]):undefined,
+  };
+}
+
+let DEMO_CONVS: Conversation[] = [];
+let DEMO_PROJECTS: Project[] = [];
+
+const apiBase = (import.meta.env.VITE_PLATFORM_API_URL || "/api").replace(/\/$/,"");
+const authToken = () => localStorage.getItem("anpardaz:accessToken");
+async function hooshApi(path:string, init:RequestInit={}) {
+  const token=authToken();
+  if(!token) throw new Error("AUTH_REQUIRED");
+  const headers=new Headers(init.headers);
+  headers.set("Authorization",`Bearer ${token}`);
+  headers.set("Content-Type","application/json");
+  const res=await fetch(`${apiBase}${path}`,{...init,headers});
+  const body=await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(body?.error??`HTTP_${res.status}`);
+  return body;
+}
 // ══════════════════════════════════════════════════════════════════
 // CREATION MODES
 // ══════════════════════════════════════════════════════════════════
@@ -694,7 +690,7 @@ const AH_TABS: { id:AhTab; label:string; icon:string }[] = [
 // ══════════════════════════════════════════════════════════════════
 export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const [tab, setTab]               = useState<AhTab>("home");
-  const [modelId, setModelId]       = useState("gpt-4o-mini");
+  const [modelId, setModelId]       = useState("");
   const [showModels, setShowModels] = useState(false);
   const [messages, setMessages]     = useState<Message[]>([]);
   const [input, setInput]           = useState("");
@@ -702,31 +698,83 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const [activeMode, setActiveMode] = useState<CreationMode|null>(null);
   const [filterCat, setFilterCat]   = useState("all");
   const [showNewProj, setShowNewProj] = useState(false);
+  const [refresh, setRefresh] = useState(0);
 
-  // Device back button: close panels first, then exit to main app
   useBackHandler(() => {
     if (showModels) { setShowModels(false); return; }
     if (showNewProj) { setShowNewProj(false); return; }
     onBack();
   });
 
+  const model = AI_MODELS.find(m=>m.id===modelId) ?? {
+    id:"",name:"مدل پیکربندی نشده",provider:"",desc:"مدل فعال توسط سرور آن هوش ارائه می‌شود.",
+    capabilities:[],providerColor:"#8B5CF6"
+  };
   const inChat = messages.length > 0;
-  const model = AI_MODELS.find(m=>m.id===modelId)!;
 
-  const send = useCallback(() => {
-    if(!input.trim())return;
-    const u: Message = { id:`u${Date.now()}`, role:"user", text:input.trim(), ts:new Date() };
-    const t: Message = { id:`t${Date.now()}`, role:"ai", text:"", thinking:true, modelId, ts:new Date() };
-    setMessages(prev=>[...prev,u,t]);
-    setInput("");
-    const d = deepThink ? 2400+Math.random()*600 : 900+Math.random()*500;
-    setTimeout(()=>{
-      setMessages(prev=>prev.filter(m=>!m.thinking).concat({ id:`a${Date.now()}`, role:"ai", text:randReply(), modelId, ts:new Date() }));
-    }, d);
-  }, [input, modelId, deepThink]);
+  const loadRuntime = useCallback(async()=>{
+    try{
+      const [models,convs,projects]=await Promise.all([
+        hooshApi("/v1/hoosh/models"),
+        hooshApi("/v1/hoosh/conversations"),
+        hooshApi("/v1/hoosh/projects")
+      ]);
+      const mapped:AIModel[]=[];
+      for(const p of (models.providers??[])){
+        const allowed=Array.isArray(p.modelPolicy?.allowed_models)?p.modelPolicy.allowed_models:[];
+        for(const id of allowed) mapped.push(modelFromProvider(p,String(id)));
+      }
+      AI_MODELS=mapped;
+      PROVIDERS=[...new Set(mapped.map(m=>m.provider))];
+      DEMO_CONVS=(convs.conversations??[]).map((x:any)=>({
+        id:String(x.id),title:x.title??"مکالمه جدید",preview:"",messages:[],
+        modelId:x.model??mapped[0]?.id??"",modeId:x.mode??"assistant",
+        createdAt:x.created_at,updatedAt:x.updated_at,group:"week"
+      }));
+      DEMO_PROJECTS=(projects.projects??[]).map((x:any)=>({
+        id:String(x.id),title:x.title,description:x.description??"",modelId:x.model??mapped[0]?.id??"",
+        modeId:x.mode??"assistant",conversationIds:[],createdAt:x.created_at,updatedAt:x.updated_at,accentColor:"#8B5CF6"
+      }));
+      if(!modelId&&mapped[0]) setModelId(mapped[0].id);
+      else if(modelId&&!mapped.some(m=>m.id===modelId)&&mapped[0]) setModelId(mapped[0].id);
+      setRefresh(v=>v+1);
+    }catch{}
+  },[modelId]);
 
-  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setTab("home"); }, []);
+  useEffect(()=>{ if(authToken()) void loadRuntime(); },[loadRuntime]);
 
+  const send = useCallback(async()=>{
+    const text=input.trim();
+    if(!text||!modelId)return;
+    let conversationId=DEMO_CONVS.find(c=>c.id.startsWith("active-"))?.id;
+    try{
+      if(!conversationId){
+        const d=await hooshApi("/v1/hoosh/conversations",{method:"POST",body:JSON.stringify({title:"مکالمه جدید",model:modelId,mode:activeMode?.id??"assistant"})});
+        conversationId=String(d.conversation.id);
+        DEMO_CONVS.unshift({id:conversationId,title:"مکالمه جدید",preview:"",messages:[],modelId,modeId:activeMode?.id??"assistant",createdAt:d.conversation.created_at,updatedAt:d.conversation.updated_at,group:"today"});
+      }
+      const u:Message={id:`u-${Date.now()}`,role:"user",text,ts:new Date()};
+      const t:Message={id:`t-${Date.now()}`,role:"ai",text:"",thinking:true,modelId,ts:new Date()};
+      setMessages(prev=>[...prev,u,t]); setInput("");
+      const idem=`hoosh-ui-${conversationId}-${Date.now()}`;
+      await hooshApi(`/v1/hoosh/conversations/${conversationId}/messages`,{method:"POST",headers:{"Idempotency-Key":idem},body:JSON.stringify({content:text,model:modelId,mode:activeMode?.id??"assistant"})});
+      for(let i=0;i<30;i++){
+        await new Promise(r=>setTimeout(r,1000));
+        const d=await hooshApi(`/v1/hoosh/conversations/${conversationId}`);
+        const assistant=(d.messages??[]).filter((m:any)=>m.role==="assistant").at(-1);
+        if(assistant){
+          setMessages((prev)=>[...prev.filter(m=>!m.thinking),{id:String(assistant.id),role:"ai",text:assistant.content,modelId:assistant.metadata?.model??modelId,ts:new Date(assistant.created_at)}]);
+          DEMO_CONVS=DEMO_CONVS.map(c=>c.id===conversationId?{...c,preview:assistant.content,updatedAt:d.conversation.updated_at}:c);
+          setRefresh(v=>v+1);
+          break;
+        }
+      }
+    }catch(e:any){
+      setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:`err-${Date.now()}`,role:"ai",text:`خطا در اجرای آن هوش: ${e?.message??"AI_EXECUTION_FAILED"}`,modelId,ts:new Date()}]);
+    }
+  },[input,modelId,activeMode]);
+
+  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setTab("home"); },[]);
   const handleSelectMode = (mode: CreationMode) => {
     if(mode.id==="__clear__"){ setActiveMode(null); return; }
     setActiveMode(prev => prev?.id===mode.id ? null : mode);
