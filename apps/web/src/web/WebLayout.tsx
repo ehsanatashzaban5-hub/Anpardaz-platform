@@ -334,6 +334,7 @@ export function WebFooter({ onNavigate }: FooterProps) {
     ]},
     { label:"شرکت", items:[
       { label:"درباره آن پرداز", page:"about"    as WebPage },
+      { label:"تنظیمات",         page:"settings" as WebPage },
       { label:"پشتیبانی",        page:"support"  as WebPage },
       { label:"دانلود اپلیکیشن", page:"download" as WebPage },
     ]},
