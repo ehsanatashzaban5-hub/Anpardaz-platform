@@ -245,10 +245,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
 
   // Browser-facing admin proxy for isolated An Banner operations.
   const bannerBase = () => (process.env.BANNER_SERVICE_URL ?? 'http://localhost:4005').replace(/\/$/, '');
-  const bannerHeaders = () => {
-    const token = process.env.BANNER_INTERNAL_TOKEN;
-    return token ? { authorization: 'Bearer ' + token } : {};
-  };
+  const bannerHeaders = (): Record<string,string> => ({ authorization: 'Bearer ' + (process.env.BANNER_INTERNAL_TOKEN ?? '') });
 
   app.get('/api/v1/admin/ecosystem/banner/overview', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
