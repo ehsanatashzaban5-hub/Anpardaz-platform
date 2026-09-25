@@ -7527,7 +7527,6 @@ function HelpSystem({onClose,userPhone,homeServices,homePlatforms}:{onClose:()=>
 
 // ─── Financial Center Screen ──────────────────────────────────────────────────
 function FinancialCenterScreen({transactions,onBack,user}:{transactions:TxRecord[];onBack:()=>void;user:UserData}){
-  return <FinancialCenterLive onBack={onBack}/>;
   type ViewMode="day"|"month"|"year";
   type SelTxType={id:string;note?:string;type?:string;createdAt:string;isIncome:boolean;isExpense:boolean;isInternal:boolean;category:string;irr:number};
   const [viewMode,setViewMode]=useState<ViewMode>("day");
@@ -9810,7 +9809,7 @@ export default function App() {
   if(subPage==="card-balance")return <div key="card-balance" className={`app${lt} app-slide`} dir="rtl"><CardBalanceScreen user={user!} onBack={goBack} onDone={goHome}/><SNAV/></div>;
   if(subPage==="charge-payment")return <div key="charge-payment" className={`app${lt} app-slide`} dir="rtl"><ChargePaymentScreen data={chargePayData!} user={user!} onUpdate={updateWithTx} onBack={()=>setSubPage(chargePayOrigin)} onDone={goHome}/><SNAV/></div>;
   if(subPage==="cashback")return <div key="cashback" className={`app${lt} app-slide`} dir="rtl"><CashbackScreen user={user!} transactions={transactions} onBack={goBack} onUpdate={(u,tx)=>{setUser(u);const newTxs=[tx,...transactions];setTransactions(newTxs);if(u)DB.saveTx(u.phone,newTxs);DB.saveUser(u);}}/><SNAV/></div>;
-  if(subPage==="financial-center")return <div key="financial-center" className={`app${lt} app-slide`} dir="rtl"><FinancialCenterScreen transactions={transactions} onBack={goBack} user={user}/><SNAV/></div>;
+  if(subPage==="financial-center")return <div key="financial-center" className={`app${lt} app-slide`} dir="rtl"><FinancialCenterLive onBack={goBack}/><SNAV/></div>;
 function ComparisonPopup({ids,onClose,onMinimize,minimized,onProduct}:{ids:string[];onClose:()=>void;onMinimize:()=>void;minimized:boolean;onProduct:(pid:string)=>void}){
   const prods=ids.map(id=>MARKET_PRODUCTS.find(p=>p.id===id)).filter(Boolean) as AnProduct[];
   const [aiText,setAiText]=useState("");
