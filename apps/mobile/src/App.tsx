@@ -7526,7 +7526,7 @@ function HelpSystem({onClose,userPhone,homeServices,homePlatforms}:{onClose:()=>
 }
 
 // ─── Financial Center Screen ──────────────────────────────────────────────────
-function FinancialCenterScreen({onBack}:{transactions:TxRecord[];onBack:()=>void;user:UserData}){ return <FinancialCenterLive onBack={onBack}/>; }
+function FinancialCenterScreen(props:any){ return <FinancialCenterLive onBack={props.onBack}/>; }
 
 // ─── AN MARKET ─────────────────────────────────────────────────────────────────
 type AnView=
