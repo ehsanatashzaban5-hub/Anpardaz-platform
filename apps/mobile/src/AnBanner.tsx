@@ -279,6 +279,8 @@ function listingMatchesCity(l: ABListing, sel: CitySelection): boolean {
   return sel.ids.includes(l.cityId) || sel.ids.includes(l.provinceId ?? "");
 }
 
+function abCategoryListingCount(cat: ABCategory): number { const ids=new Set<string>(); const walk=(x:ABCategory)=>{ids.add(x.categoryId);x.children.forEach(walk)};walk(cat); return _ads.filter(a=>ids.has(a.categoryId)).length; }
+
 function cityNameById(cityId: string): string {
   for (const p of IRAN_PROVINCES) {
     const c = p.cities.find(c => c.id === cityId);
@@ -405,7 +407,7 @@ interface ABReport {
   createdAt: string;
 }
 
-/* ─── Mock Data ──────────────────────────────────────────────────── */
+/* ─── Static Banner taxonomy (configuration only; listing data comes from the Banner API) ─── */
 
 /* Compact category builder — keeps taxonomy data readable */
 function _c(id: string, pid: string | null, lvl: number, name: string, col: string, n: number, ch: ABCategory[] = []): ABCategory {
@@ -1274,7 +1276,7 @@ function _tryParse<T>(key: string, fallback: T): T {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
 }
 // Version-gated seed: bump to clear stale localStorage when seed data changes
-const AB_DATA_VERSION = "v3";
+const AB_DATA_VERSION = "v4";
 let _currentUid = "default";
 const abKey = (k: string) => `ab2_${_currentUid}_${k}`;
 
@@ -3696,7 +3698,7 @@ function ABSearchScreen({ initialQ, push, favs, toggleFav, citySelection }: {
                   {path.slice(0, -1).map(p => p.name).join(" ← ")}
                 </div>
               </div>
-              <div style={{ fontSize: 11, color: "#AAA", fontFamily: "Vazirmatn,sans-serif" }}>{toFaD(cat.listingCount)} آگهی</div>
+              <div style={{ fontSize: 11, color: "#AAA", fontFamily: "Vazirmatn,sans-serif" }}>{toFaD(abCategoryListingCount(cat))} آگهی</div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#CCC" strokeWidth="2" strokeLinecap="round">
                 <polyline points="15 18 9 12 15 6" transform="scale(-1,1) translate(-24,0)"/>
               </svg>
