@@ -14,7 +14,7 @@ function date(x:any){for(const v of [x.occurredAt,x.transactionDate,x.date,x.cre
 function dir(x:any){const s=String(x.direction??x.type??x.transactionType??x.creditDebit??'').toLowerCase();if(/debit|expense|withdraw|برداشت|بدهکار/.test(s))return' expense'.trim();if(/credit|income|deposit|واریز|بستانکار/.test(s))return'income';const n=Number(String(x.amount??'').replace(/,/g,''));return n<0?'expense':'income'}
 function cat(d:string,t:string){const n=d.toLowerCase();if(/قبض|برق|آب|گاز|مخابرات/.test(n))return'قبوض';if(/شارژ|اینترنت/.test(n))return'شارژ و اینترنت';if(/بیمه/.test(n))return'بیمه';if(/خلافی|عوارض|ترافیک/.test(n))return'حمل و نقل';if(/حقوق|دستمزد/.test(n))return'درآمد';if(/انتقال|کارت به کارت|پایا|ساتنا/.test(n))return t==='income'?'دریافت انتقال':'انتقال وجه';return t==='income'?'سایر درآمدها':'سایر هزینه‌ها'}
 async function accountingPost(pool:Pool,customerId:string,cardId:number,externalId:string,amount:string,currency:string,direction:string,category:string,description:string){
- const base=process.env.ACCOUNTING_SERVICE_URL?.replace(/\\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;
+ const base=process.env.ACCOUNTING_SERVICE_URL?.replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;
  if(!base||!token)return {status:'not_configured'};
  const customer=(await pool.query('SELECT identity_id FROM customers WHERE id=$1',[customerId])).rows[0];if(!customer?.identity_id)return {status:'customer_identity_missing'};
  const assetCode=`ANP:BANKCARD:${cardId}`,counterCode=`ANP:${direction==='income'?'INCOME':'EXPENSE'}:${category||'OTHER'}`;
