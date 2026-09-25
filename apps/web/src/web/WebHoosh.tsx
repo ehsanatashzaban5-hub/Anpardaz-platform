@@ -89,7 +89,7 @@ const PROVIDER_COLORS: Record<string,string> = {
 
 function modelFromProvider(provider:any, modelId:string): AIModel {
   const policy=provider?.modelPolicy??{};
-  const caps=Array.isArray(policy.capabilities)?policy.capabilities:[];
+  const caps=Array.isArray(policy.capabilities)?policy.capabilities:(policy.capabilities?.[modelId]??[]);
   return {
     id:modelId,
     name:String(policy.labels?.[modelId]??modelId),
@@ -782,7 +782,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
     }catch(e:any){ setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:"err-"+Date.now(),role:"ai",text:"خطا در اجرای آن هوش: "+(e?.message??"AI_EXECUTION_FAILED"),modelId,ts:new Date()}]); }
   },[input,modelId,activeMode,activeConversationId]);
 
-  const openConversation = useCallback(async(c:Conversation)=>{ try{ setActiveConversationId(c.id); const d=await hooshApi("/v1/hoosh/conversations/"+c.id); setMessages((d.messages??[]).map((m:any)=>({id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at)}))); setTab("home"); }catch{} },[]);
+  const openConversation = useCallback(async(c:Conversation)=>{ try{ setActiveConversationId(c.id); const d=await hooshApi("/v1/hoosh/conversations/"+c.id); const rows=await Promise.all((d.messages??[]).map(async(m:any)=>{const jobId=m.metadata?.mediaJobId; let media:any=undefined; if(jobId){try{const j=await hooshApi("/v1/hoosh/media/"+jobId); if(j.job?.status==="completed"){const url=await hooshMediaBlob(String(jobId)); media={url,type:j.job.mime_type??"application/octet-stream",name:j.job.file_name,jobId:String(jobId)};}}catch{}} return {id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at),media};})); setMessages(rows); setTab("home"); }catch{} },[]);
   const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setActiveConversationId(null); setTab("home"); },[]);
   const handleSelectMode = (mode: CreationMode) => {
     if(mode.id==="__clear__"){ setActiveMode(null); return; }

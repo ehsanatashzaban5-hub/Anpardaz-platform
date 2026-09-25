@@ -54,6 +54,22 @@ services:
     cap_drop:
       - ALL
 
+  platform-hoosh-media-worker:
+    build:
+      context: ../../services/platform
+      dockerfile: Dockerfile
+    command: ["node", "dist/workers/hoosh-media.js"]
+    restart: unless-stopped
+    env_file:
+      - ./platform.env
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
   platform-market-ingestion-worker:
     build:
       context: ../../services/platform
