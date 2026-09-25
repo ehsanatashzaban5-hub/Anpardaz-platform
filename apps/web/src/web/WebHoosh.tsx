@@ -62,6 +62,7 @@ interface CreationMode {
 interface Message {
   id: string; role: "user" | "ai"; text: string;
   modelId?: string; ts: Date; thinking?: boolean;
+  media?: { url:string; type:string; name?:string; jobId?:string };
 }
 interface Conversation {
   id: string; title: string; preview: string;
@@ -116,6 +117,13 @@ async function hooshApi(path:string, init:RequestInit={}) {
   if(!res.ok) throw new Error(body?.error??`HTTP_${res.status}`);
   return body;
 }
+
+async function hooshMediaBlob(id:string){
+  const token=authToken(); if(!token) throw new Error("AUTH_REQUIRED");
+  const res=await fetch(`${apiBase}/v1/hoosh/media/${id}/content`,{headers:{Authorization:`Bearer ${token}`}});
+  if(!res.ok) throw new Error(`MEDIA_HTTP_${res.status}`);
+  return URL.createObjectURL(await res.blob());
+}
 // ══════════════════════════════════════════════════════════════════
 // CREATION MODES
 // ══════════════════════════════════════════════════════════════════
@@ -137,26 +145,6 @@ const CATEGORIES = [
   { id:"text", label:"نوشتار" }, { id:"data", label:"داده" }, { id:"tool", label:"ابزار" },
 ];
 
-// ══════════════════════════════════════════════════════════════════
-// DEMO STATIC DATA
-// ══════════════════════════════════════════════════════════════════
-const DEMO_CONVS: Conversation[] = [
-  { id:"c1", title:"تحلیل بازار کریپتو Q3 1403",         preview:"بیت‌کوین در هفته جاری با فشار فروش مواجه شد...",          messages:[], modelId:"gemini-pro",   modeId:"analyze",   createdAt:"1403/06/15", updatedAt:"1403/06/15", group:"today" },
-  { id:"c2", title:"اسکریپت تبلیغاتی برند پوشاک",        preview:"بسیار خوب! اسکریپت ۳۰ ثانیه‌ای آماده شد...",             messages:[], modelId:"claude-sonnet",modeId:"write",     createdAt:"1403/06/14", updatedAt:"1403/06/14", group:"yesterday" },
-  { id:"c3", title:"API پرداخت با Python",                preview:"import requests\nbase_url = 'https://api.example.com'...", messages:[], modelId:"claude-opus",  modeId:"code",      createdAt:"1403/06/13", updatedAt:"1403/06/13", group:"yesterday" },
-  { id:"c4", title:"ترجمه قرارداد همکاری",               preview:"این قرارداد بین طرف اول و طرف دوم منعقد می‌گردد...",      messages:[], modelId:"gpt-4o",       modeId:"translate", createdAt:"1403/06/10", updatedAt:"1403/06/10", group:"week" },
-  { id:"c5", title:"طراحی معماری میکروسرویس",            preview:"برای سیستم شما معماری event-driven پیشنهاد می‌شود...",   messages:[], modelId:"claude-opus",  modeId:"code",      createdAt:"1403/06/08", updatedAt:"1403/06/08", group:"week" },
-  { id:"c6", title:"پیش‌نویس پروپوزال سرمایه‌گذاری",    preview:"خلاصه اجرایی: این طرح با هدف ورود به بازار...",          messages:[], modelId:"gpt-4o",       modeId:"write",     createdAt:"1403/06/01", updatedAt:"1403/06/01", group:"older" },
-  { id:"c7", title:"تحلیل رقبا — بازار نرم‌افزاری",     preview:"در این تحلیل رقبا به ۵ شرکت اصلی بازار پرداخته...",     messages:[], modelId:"gemini-pro",   modeId:"analyze",   createdAt:"1403/05/28", updatedAt:"1403/05/28", group:"older" },
-];
-
-const DEMO_PROJECTS: Project[] = [
-  { id:"p1", title:"راه‌اندازی فروشگاه اینترنتی", description:"طراحی، کدنویسی و بازاریابی پلتفرم فروش آنلاین",    modelId:"claude-opus",  modeId:"code",    conversationIds:["c3","c5"], createdAt:"1403/06/01", updatedAt:"1403/06/15", accentColor:"#7c3aed" },
-  { id:"p2", title:"کمپین تبلیغاتی پاییز ۱۴۰۳",  description:"تولید محتوا و اسکریپت برای کمپین فصلی برند",      modelId:"claude-sonnet",modeId:"content",  conversationIds:["c2"],      createdAt:"1403/05/20", updatedAt:"1403/06/14", accentColor:"#0891b2" },
-  { id:"p3", title:"گزارش تحلیل بازار مالی",      description:"تحلیل عمیق وضعیت بازار رمزارز و فرصت‌های سرمایه‌گذاری", modelId:"gemini-pro", modeId:"analyze", conversationIds:["c1","c7"], createdAt:"1403/05/10", updatedAt:"1403/06/15", accentColor:"#059669" },
-];
-
-const GROUP_LABELS: Record<string, string> = { today:"امروز", yesterday:"دیروز", week:"هفته گذشته", older:"قدیمی‌تر" };
 // ══════════════════════════════════════════════════════════════════
 // UTILITIES
 // ══════════════════════════════════════════════════════════════════
@@ -302,7 +290,7 @@ function Bubble({ msg }: { msg: Message }) {
         </div>
       )}
       <div style={{maxWidth:"80%",background:user?"linear-gradient(135deg,#7c3aed,#5b21b6)":"var(--ah-card)",borderRadius:user?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"11px 14px",color:user?"#fff":"var(--ah-text)",fontSize:14,lineHeight:1.72,boxShadow:user?"0 4px 16px rgba(124,58,237,0.2)":"none",border:user?"none":"1px solid var(--ah-border)"}}>
-        {msg.thinking ? <Dots/> : msg.text}
+        {msg.thinking ? <Dots/> : <>{msg.text}{msg.media?.type?.startsWith("video/")&&<video controls playsInline src={msg.media.url} style={{display:"block",width:"100%",maxWidth:520,borderRadius:12,marginTop:10}}/>}{msg.media?.type?.startsWith("audio/")&&<audio controls src={msg.media.url} style={{display:"block",width:"100%",marginTop:10}}/>}{msg.media?.type?.startsWith("image/")&&<img src={msg.media.url} alt={msg.text} style={{display:"block",width:"100%",maxWidth:520,borderRadius:12,marginTop:10}}/>}</>}
         {!msg.thinking && <div style={{fontSize:10,color:user?"rgba(255,255,255,0.5)":"var(--ah-muted)",marginTop:6,textAlign:"left"}}>{ftime(msg.ts)}</div>}
       </div>
     </div>
@@ -736,41 +724,53 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
   useEffect(()=>{ if(authToken()) void loadRuntime(); },[loadRuntime]);
 
   const send = useCallback(async()=>{
-    const text=input.trim();
-    if(!text||!modelId)return;
-    let conversationId=activeConversationId;
+    const text=input.trim(); if(!text||!modelId)return;
+    let conversationId=activeConversationId; const modeId=activeMode?.id??"assistant";
+    const isMedia=["image","video","music","voice"].includes(modeId);
+    const selected=AI_MODELS.find(m=>m.id===modelId);
+    if(isMedia&&!selected?.capabilities?.includes(modeId)){
+      setMessages(prev=>[...prev,{id:"err-"+Date.now(),role:"ai",text:"برای این نوع تولید، یک مدل سازگار را از فهرست مدل‌ها انتخاب کنید.",modelId,ts:new Date()}]); return;
+    }
     try{
       if(!conversationId){
-        const d=await hooshApi("/v1/hoosh/conversations",{method:"POST",body:JSON.stringify({title:"مکالمه جدید",model:modelId,mode:activeMode?.id??"assistant"})});
-        conversationId=String(d.conversation.id);
-        setActiveConversationId(conversationId);
-        DEMO_CONVS.unshift({id:conversationId,title:"مکالمه جدید",preview:"",messages:[],modelId,modeId:activeMode?.id??"assistant",createdAt:d.conversation.created_at,updatedAt:d.conversation.updated_at,group:"today"});
+        const d=await hooshApi("/v1/hoosh/conversations",{method:"POST",body:JSON.stringify({title:"مکالمه جدید",model:modelId,mode:modeId})});
+        conversationId=String(d.conversation.id); setActiveConversationId(conversationId);
+        DEMO_CONVS.unshift({id:conversationId,title:"مکالمه جدید",preview:"",messages:[],modelId,modeId,createdAt:d.conversation.created_at,updatedAt:d.conversation.updated_at,group:"today"});
       }
-      const u:Message={id:`u-${Date.now()}`,role:"user",text,ts:new Date()};
-      const t:Message={id:`t-${Date.now()}`,role:"ai",text:"",thinking:true,modelId,ts:new Date()};
+      const u:Message={id:"u-"+Date.now(),role:"user",text,ts:new Date()};
+      const t:Message={id:"t-"+Date.now(),role:"ai",text:isMedia?"در حال تولید…":"",thinking:true,modelId,ts:new Date()};
       setMessages(prev=>[...prev,u,t]); setInput("");
-      const idem=`hoosh-ui-${conversationId}-${Date.now()}`;
-      await hooshApi(`/v1/hoosh/conversations/${conversationId}/messages`,{method:"POST",headers:{"Idempotency-Key":idem},body:JSON.stringify({content:text,model:modelId,mode:activeMode?.id??"assistant"})});
+      if(isMedia){
+        const d=await hooshApi("/v1/hoosh/media",{method:"POST",body:JSON.stringify({conversationId,mode:modeId,model:modelId,prompt:text})});
+        const jobId=String(d.job.id);
+        for(let i=0;i<180;i++){
+          await new Promise(r=>setTimeout(r,1000)); const j=await hooshApi("/v1/hoosh/media/"+jobId);
+          if(j.job.status==="completed"){
+            const url=await hooshMediaBlob(jobId); const label=modeId==="video"?"ویدیو":modeId==="music"?"موسیقی":modeId==="voice"?"صدا":"تصویر";
+            setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:"m-"+jobId,role:"ai",text:label+" آماده شد.",modelId,ts:new Date(j.job.completed_at??Date.now()),media:{url,type:j.job.mime_type??"application/octet-stream",name:j.job.file_name,jobId}}]); break;
+          }
+          if(j.job.status==="failed"||j.job.status==="cancelled") throw new Error(j.job.error??"MEDIA_GENERATION_FAILED");
+        }
+        return;
+      }
+      const idem="hoosh-ui-"+conversationId+"-"+Date.now();
+      await hooshApi("/v1/hoosh/conversations/"+conversationId+"/messages",{method:"POST",headers:{"Idempotency-Key":idem},body:JSON.stringify({content:text,model:modelId,mode:modeId})});
       for(let i=0;i<30;i++){
-        await new Promise(r=>setTimeout(r,1000));
-        const d=await hooshApi(`/v1/hoosh/conversations/${conversationId}`);
+        await new Promise(r=>setTimeout(r,1000)); const d=await hooshApi("/v1/hoosh/conversations/"+conversationId);
         const assistant=(d.messages??[]).filter((m:any)=>m.role==="assistant").at(-1);
         if(assistant){
-          setMessages((prev)=>[...prev.filter(m=>!m.thinking),{id:String(assistant.id),role:"ai",text:assistant.content,modelId:assistant.metadata?.model??modelId,ts:new Date(assistant.created_at)}]);
-          DEMO_CONVS=DEMO_CONVS.map(c=>c.id===conversationId?{...c,preview:assistant.content,updatedAt:d.conversation.updated_at}:c);
-          setRefresh(v=>v+1);
-          break;
+          setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:String(assistant.id),role:"ai",text:assistant.content,modelId:assistant.metadata?.model??modelId,ts:new Date(assistant.created_at)}]);
+          DEMO_CONVS=DEMO_CONVS.map(c=>c.id===conversationId?{...c,preview:assistant.content,updatedAt:d.conversation.updated_at}:c); setRefresh(v=>v+1); break;
         }
       }
-    }catch(e:any){
-      setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:`err-${Date.now()}`,role:"ai",text:`خطا در اجرای آن هوش: ${e?.message??"AI_EXECUTION_FAILED"}`,modelId,ts:new Date()}]);
-    }
-  },[input,modelId,activeMode,activeConversationId]);
+    }catch(e:any){ setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:"err-"+Date.now(),role:"ai",text:"خطا در اجرای آن هوش: "+(e?.message??"AI_EXECUTION_FAILED"),modelId,ts:new Date()}]); }
+  }},[input,modelId,activeMode,activeConversationId]);
 
   const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setActiveConversationId(null); setTab("home"); },[]);
   const handleSelectMode = (mode: CreationMode) => {
     if(mode.id==="__clear__"){ setActiveMode(null); return; }
     setActiveMode(prev => prev?.id===mode.id ? null : mode);
+    if(mode.id!=="__clear__"){ const compatible=AI_MODELS.find(m=>m.capabilities?.includes(mode.id)); if(compatible) setModelId(compatible.id); }
   };
 
   return (
