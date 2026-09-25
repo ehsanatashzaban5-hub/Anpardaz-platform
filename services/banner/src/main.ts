@@ -131,11 +131,10 @@ async function registerPrivate(app:FastifyInstance){
   });
   app.post('/api/v1/banner/conversations',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),b=(req.body??{}) as any,id=Number(b.listingId),body=clean(b.message,2000);
-    if(!Number.isInteger(id)||id<1||!body)return reply.code(400).send({error:'invalid_conversation'});
+    if(!Number.isInteger(id)||id<1)return reply.code(400).send({error:'invalid_conversation'});
     const l=await pool.query('SELECT identity_id FROM banner_listings WHERE id=$1 AND status=\'published\'',[id]);if(!l.rows[0]||l.rows[0].identity_id===a.sub)return reply.code(404).send({error:'listing_not_found'});
-    const r=await pool.query('INSERT INTO banner_inquiries(listing_id,buyer_identity_id,seller_identity_id,message) VALUES($1,$2,$3,$4) RETURNING *',[id,a.sub,l.rows[0].identity_id,body]);
-    await pool.query('INSERT INTO banner_inquiry_messages(inquiry_id,sender_identity_id,body) VALUES($1,$2,$3)',[r.rows[0].id,a.sub,body]);
-    await notify(l.rows[0].identity_id,'message','پیام جدید','برای آگهی شما پیام جدیدی ارسال شده است');
+    const r=await pool.query('INSERT INTO banner_inquiries(listing_id,buyer_identity_id,seller_identity_id,message) VALUES($1,$2,$3,$4) RETURNING *',[id,a.sub,l.rows[0].identity_id,body||'']);
+    if(body){await pool.query('INSERT INTO banner_inquiry_messages(inquiry_id,sender_identity_id,body) VALUES($1,$2,$3)',[r.rows[0].id,a.sub,body]);await notify(l.rows[0].identity_id,'message','پیام جدید','برای آگهی شما پیام جدیدی ارسال شده است');}
     await activity(a.sub,'conversation_created','inquiry',String(r.rows[0].id),{listingId:id});return reply.code(201).send({conversationId:String(r.rows[0].id),inquiry:r.rows[0]});
   });
   app.post('/api/v1/banner/conversations/:id/messages',{preHandler:requireAuth},async(req,reply)=>{
