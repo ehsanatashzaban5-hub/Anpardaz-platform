@@ -84,6 +84,28 @@ CREATE TABLE IF NOT EXISTS banner_ai_suggestions(
 );
 CREATE INDEX IF NOT EXISTS idx_banner_ai_identity_created ON banner_ai_suggestions(identity_id,created_at DESC);
 
+CREATE TABLE IF NOT EXISTS banner_admin_alerts(
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  alert_type TEXT NOT NULL,
+  identity_id UUID,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  threshold INT,
+  resolved_at TIMESTAMPTZ,
+  resolved_by UUID,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_banner_admin_alerts_open ON banner_admin_alerts(resolved_at,created_at DESC);
+
+CREATE TABLE IF NOT EXISTS banner_recent_views(
+  identity_id UUID NOT NULL,
+  listing_id BIGINT NOT NULL REFERENCES banner_listings(id) ON DELETE CASCADE,
+  viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  view_count INT NOT NULL DEFAULT 1,
+  PRIMARY KEY(identity_id,listing_id)
+);
+CREATE INDEX IF NOT EXISTS idx_banner_recent_views_identity ON banner_recent_views(identity_id,viewed_at DESC);
+
 CREATE TABLE IF NOT EXISTS banner_user_history_exports(
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   identity_id UUID NOT NULL,
