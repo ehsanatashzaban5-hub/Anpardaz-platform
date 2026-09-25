@@ -36,7 +36,7 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
   const [conversation,setConversation]=useState<any|null>(null);
   const [notifications,setNotifications]=useState<any[]>([]);
   const [profile,setProfile]=useState<any|null>(null);
-  const [myListings,setMyListings]=useState<Listing[]>([]);
+  const [myListings,setMyListings]=useState<Listing[]>([]);const [recentViews,setRecentViews]=useState<Listing[]>([]);
 
   const loadHome=async()=>{
     setLoading(true);setError("");
@@ -51,11 +51,11 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
     if(!isLoggedIn)return;
     setLoading(true);setError("");
     try{
-      const [f,t,n,p,m,ml]=await Promise.all([
+      const [f,t,n,p,m,ml,rv]=await Promise.all([
         api("/api/v1/banner/me/favorites"),api("/api/v1/banner/me/tickets"),api("/api/v1/banner/me/notifications"),
-        api("/api/v1/banner/me"),api("/api/v1/banner/me/conversations"),api("/api/v1/banner/me/listings")
+        api("/api/v1/banner/me"),api("/api/v1/banner/me/conversations"),api("/api/v1/banner/me/listings"),api("/api/v1/banner/me/recent-views")
       ]);
-      setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));setTickets(t.tickets??[]);setNotifications(n.notifications??[]);setProfile(p.profile??null);setConversations(m.conversations??[]);setMyListings(ml.listings??[]);
+      setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));setTickets(t.tickets??[]);setNotifications(n.notifications??[]);setProfile(p.profile??null);setConversations(m.conversations??[]);setMyListings(ml.listings??[]);setRecentViews(rv.listings??[]);
     }catch(e){setError(e instanceof Error?e.message:"خطا در دریافت اطلاعات حساب")}finally{setLoading(false)}
   };
   useEffect(()=>{void loadHome()},[query,city,category,isLoggedIn]);
@@ -68,10 +68,10 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
     if(!isLoggedIn){onAuthRequired();return;}
     try{const r=await api("/api/v1/banner/listings/"+encodeURIComponent(id)+"/favorite",{method:"POST"});setFavorites(p=>{const n=new Set(p);r.favorite?n.add(id):n.delete(id);return n;});}catch(e){setError(e instanceof Error?e.message:"favorite_failed")}
   };
-  const openListing=async(x:Listing)=>{try{const d=await api("/api/v1/banner/listings/"+x.id);setSelected({...x,...d.listing,media:d.media??[]});}catch(e){setError(e instanceof Error?e.message:"listing_failed")}};
+  const openListing=async(x:Listing)=>{try{if(isLoggedIn)await api("/api/v1/banner/me/recent-views/"+x.id,{method:"POST",body:"{}"});const d=await api("/api/v1/banner/listings/"+x.id);setSelected({...x,...d.listing,media:d.media??[]});}catch(e){setError(e instanceof Error?e.message:"listing_failed")}};
 
   const nav=[
-    ["home","خانه"],["favorites","علاقه‌مندی‌ها"],["messages","پیام‌ها"],["notifications","اعلان‌ها"],
+    ["home","خانه"],["favorites","علاقه‌مندی‌ها"],["recent","آخرین مشاهده‌ها"],["messages","پیام‌ها"],["notifications","اعلان‌ها"],
     ["my-listings","آگهی‌های من"],["account","حساب کاربری"],["tickets","پشتیبانی"]
   ] as const;
 
@@ -96,6 +96,7 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
         {error&&<div className="w-card" style={{padding:12,marginBottom:12,color:"#dc2626"}}>{error}</div>}
         {selected&&<Detail listing={selected} favorite={favorites.has(String(selected.id))} onBack={()=>setSelected(null)} onFavorite={()=>void toggleFavorite(String(selected.id))} isLoggedIn={isLoggedIn} onAuthRequired={onAuthRequired}/>}
         {!selected&&section==="home"&&<Home listings={filtered} loading={loading} favorites={favorites} onOpen={openListing} onFavorite={toggleFavorite}/>}
+        {section==="recent"&&<Home listings={recentViews} loading={loading} favorites={favorites} onOpen={openListing} onFavorite={toggleFavorite} title="آخرین مشاهده‌ها"/>}
         {section==="favorites"&&<Home listings={listings.filter(x=>favorites.has(String(x.id)))} loading={loading} favorites={favorites} onOpen={openListing} onFavorite={toggleFavorite} title="علاقه‌مندی‌های من"/>}
         {section==="my-listings"&&<MyListings listings={myListings} onOpen={openListing} onRefresh={loadPrivate}/>}
         {section==="account"&&<Account profile={profile} onRefresh={loadPrivate}/>}
