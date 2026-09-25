@@ -32,6 +32,7 @@ export type WebPage =
   | "video" | "video-detail"
   | "auth" | "kyc"
   | "download"
+  | "settings"
   | "support"
   | "about";
 
