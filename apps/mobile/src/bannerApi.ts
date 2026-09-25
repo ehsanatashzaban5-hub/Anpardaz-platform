@@ -22,6 +22,7 @@ export const bannerApi={
   async conversation(id:string){return call("/api/v1/banner/conversations/"+encodeURIComponent(id));},
   async createConversation(listingId:string,message:string){return call("/api/v1/banner/conversations",{method:"POST",body:JSON.stringify({listingId:Number(listingId),message})});},
   async sendMessage(id:string,payload:{message?:string;type?:string;mediaBase64?:string;mediaMime?:string;offerAmount?:number}){return call("/api/v1/banner/conversations/"+encodeURIComponent(id)+"/messages",{method:"POST",body:JSON.stringify(payload)});},
+  async messageMediaDataUrl(id:string){const t=token();const r=await fetch(BASE+"/api/v1/banner/messages/"+encodeURIComponent(id)+"/media",{headers:{authorization:"Bearer "+t},cache:"no-store"});if(!r.ok)throw new Error("banner_message_media_failed");const blob=await r.blob();return URL.createObjectURL(blob);},
   async notifications(){return call("/api/v1/banner/me/notifications") as Promise<{notifications:any[]}>;},
   async readNotification(id:string){return call("/api/v1/banner/notifications/"+encodeURIComponent(id)+"/read",{method:"PATCH",body:"{}"});},
   async readAllNotifications(){return call("/api/v1/banner/notifications/read-all",{method:"POST",body:"{}"});},
