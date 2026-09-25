@@ -25,28 +25,12 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
   app.get('/api/v1/cards',{preHandler:requireAuth},async(req)=>{
     const c=await ensureCustomer(pool,r(req).auth);
     return {cards:(await pool.query(
-      'SELECT id,account_id,last4,bank_name,status,created_at FROM cards WHERE customer_id=$1 ORDER BY created_at DESC',[c]
+      'SELECT id,account_id,last4,bank_name,status,provider,registration_status,holder_identity_match,verified_at,created_at FROM cards WHERE customer_id=$1 AND status=\'active\' AND registration_status IN (\'verified\',\'legacy\') ORDER BY created_at DESC',[c]
     )).rows};
   });
 
-  app.post('/api/v1/cards',{preHandler:requireAuth},async(req,reply)=>{
-    const c=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;
-    if(!sid(b.accountId)||typeof b.last4!=='string'||/^\d{4}$/.test(b.last4)===false||typeof b.cardToken!=='string'||b.cardToken.length<16)
-      return reply.code(400).send({error:'invalid_card'});
-    if(b.bankName!=null&&(typeof b.bankName!=='string'||b.bankName.trim().length>120))
-      return reply.code(400).send({error:'invalid_bank_name'});
-    const owner=await pool.query('SELECT id FROM accounts WHERE id=$1 AND customer_id=$2',[b.accountId,c]);
-    if(!owner.rows[0])return reply.code(404).send({error:'account_not_found'});
-    try{
-      const x=await pool.query(
-        'INSERT INTO cards(customer_id,account_id,card_token,last4,bank_name) VALUES($1,$2,$3,$4,$5) RETURNING id,account_id,last4,bank_name,status,created_at',
-        [c,b.accountId,b.cardToken,b.last4,b.bankName?.trim()||null]
-      );
-      return reply.code(201).send({card:x.rows[0]});
-    }catch(e:any){
-      if(e?.code==='23505')return reply.code(409).send({error:'card_already_exists'});
-      throw e;
-    }
+  app.post('/api/v1/cards',{preHandler:requireAuth},async(_req,reply)=>{
+    return reply.code(409).send({error:'card_registration_required',message:'کارت بانکی فقط پس از تأیید فرایند ثبت کارت و مالکیت آن قابل اضافه‌شدن است.'});
   });
 
   app.post('/api/v1/cards/balance',{preHandler:requireAuth},async(req,reply)=>{
