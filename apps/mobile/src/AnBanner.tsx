@@ -1308,6 +1308,8 @@ async function initAnBannerStore(uid: string) {
       verificationStatus: "unverified", accountType: "personal", createdAt: profile?.profile?.created_at ?? new Date().toISOString(), lastActive: new Date().toISOString()
     };
     for (const conv of conversations.conversations ?? []) {
+      upsertBannerUser(String(conv.buyer_identity_id),conv.buyer_display_name);
+      upsertBannerUser(String(conv.seller_identity_id),conv.seller_display_name);
       const cid=String(conv.conversation_id);
       _convs.push({conversationId:cid,listingId:String(conv.listing_id),buyerId:String(conv.buyer_identity_id),sellerId:String(conv.seller_identity_id),createdAt:conv.created_at,lastMessageAt:conv.last_message_at,lastMessage:conv.last_message??"",status:conv.status==="archived"?"archived":"active",unreadCount:0});
     }
