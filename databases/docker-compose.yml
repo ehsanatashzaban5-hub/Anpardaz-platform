@@ -32,6 +32,28 @@ services:
     ports: ["5435:5432"]
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
     volumes: [platform-db-data:/var/lib/postgresql/data]
+  banner-db:
+    image: postgres:17
+    container_name: banner-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${BANNER_DB_NAME:-banner}
+      POSTGRES_USER: ${BANNER_DB_USER:-banner}
+      POSTGRES_PASSWORD: ${BANNER_DB_PASSWORD:?Set BANNER_DB_PASSWORD}
+    ports: ["5437:5432"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
+    volumes: [banner-db-data:/var/lib/postgresql/data]
+  banner-db:
+    image: postgres:17
+    container_name: banner-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${BANNER_DB_NAME:-banner}
+      POSTGRES_USER: ${BANNER_DB_USER:-banner}
+      POSTGRES_PASSWORD: ${BANNER_DB_PASSWORD:?Set BANNER_DB_PASSWORD}
+    ports: ["5437:5432"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
+    volumes: [banner-db-data:/var/lib/postgresql/data]
   accounting-db:
     image: postgres:17
     container_name: accounting-db
@@ -48,3 +70,5 @@ volumes:
   ansarraf-db-data:
   platform-db-data:
   accounting-db-data:
+  banner-db-data:
+  banner-db-data:

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useBackHandler } from "./backHandler";
+import { bannerApi, bannerMediaUrl, bannerMessageMediaUrl } from "./bannerApi";
 
 /* ═══════════════════════════════════════════════════════════════
    آن بنر  |  AN BANNER — Iranian Classifieds Marketplace
@@ -1259,84 +1260,15 @@ const AB_CATS: ABCategory[] = [
   ]),
 ];
 
-const AB_USERS: ABUser[] = [
-  { userId: "u1", name: "مهدی رضایی", avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&face", mobile: "09121234567", verificationStatus: "verified", accountType: "personal", createdAt: "2024-01-15T10:00:00Z", lastActive: "2026-09-07T08:30:00Z" },
-  { userId: "u2", name: "سارا احمدی", avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b5bd?w=80&h=80&fit=crop&face", mobile: "09351234567", verificationStatus: "verified", accountType: "personal", createdAt: "2023-09-10T09:00:00Z", lastActive: "2026-09-06T18:00:00Z" },
-  { userId: "u3", name: "فروشگاه دیجیتال نوین", avatar: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=80&h=80&fit=crop", mobile: "02188776655", verificationStatus: "verified", accountType: "business", createdAt: "2023-03-01T08:00:00Z", lastActive: "2026-09-07T09:00:00Z" },
-  { userId: "u4", name: "رضا کریمی", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&face", mobile: "09197654321", verificationStatus: "pending", accountType: "personal", createdAt: "2025-02-20T11:00:00Z", lastActive: "2026-09-05T14:00:00Z" },
-  { userId: "u5", name: "مبل‌فروشی ایران", avatar: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=80&h=80&fit=crop", mobile: "02155443322", verificationStatus: "verified", accountType: "business", createdAt: "2022-08-12T07:00:00Z", lastActive: "2026-09-07T10:00:00Z" },
-  // Test seller — used for buyer→seller chat testing
-  { userId: "u6", name: "علی محمدی", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop&face", mobile: "09123456789", verificationStatus: "verified", accountType: "personal", createdAt: "2023-06-01T09:00:00Z", lastActive: "2026-09-07T07:00:00Z" },
-];
-
-const AB_BUSINESSES: ABBusiness[] = [
-  { businessId: "b1", ownerId: "u3", businessName: "فروشگاه دیجیتال نوین", logo: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=80&h=80&fit=crop", businessType: "فروشگاه الکترونیک", description: "ارائه انواع لوازم دیجیتال با بهترین قیمت و ضمانت اصالت کالا", phone: "021-88776655", address: "تهران، خیابان ولیعصر، پلاک ۱۲۳", city: "تهران", workingHours: "۹ تا ۲۱ - همه روزه", verificationStatus: "verified", listingCount: 84 },
-  { businessId: "b2", ownerId: "u5", businessName: "مبل‌فروشی ایران", logo: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=80&h=80&fit=crop", businessType: "مبل و دکوراسیون", description: "تولید و فروش مبلمان با کیفیت، تحویل در سراسر ایران", phone: "021-55443322", address: "تهران، شهرک صنعتی پایتخت", city: "تهران", workingHours: "۸ تا ۱۸ - شنبه تا چهارشنبه", verificationStatus: "verified", listingCount: 42 },
-];
-
-const IMG = (id: string, w = 400, h = 320) =>
-  `https://images.unsplash.com/${id}?w=${w}&h=${h}&fit=crop&auto=format`;
-
-const AB_LISTINGS: ABListing[] = [
-  { listingId: "l1", token: "tk-l1", ownerId: "u1", categoryId: "veh-pass-sedan", parentCategoryId: "vehicles", title: "پراید ۱۳۲ مدل ۱۴۰۰ - یک دست کارکرده", description: "پراید ۱۳۲ رنگ سفید، مدل ۱۴۰۰، ۶۵ هزار کیلومتر، بدون تصادف، لوازم اصلی. خریدار جدی تماس بگیرد.", images: [IMG("photo-1549317661-cf369843db33"),IMG("photo-1493238792000-8113da705763")], price: 285000000, priceMode: "negotiable", condition: "good", cityId: "tehran", provinceId: "tehran", districtId: "shemiranat", attributes: { "سال ساخت": "۱۴۰۰", "کارکرد": "۶۵,۰۰۰ کیلومتر", "رنگ": "سفید", "گیربکس": "دستی" }, status: "active", createdAt: "2026-09-06T08:00:00Z", updatedAt: "2026-09-06T08:00:00Z", expiresAt: "2026-10-06T08:00:00Z", viewCount: 428, favoriteCount: 32, messageCount: 14, contactEnabled: true, chatEnabled: true, verificationStatus: "none", isUrgent: true },
-  { listingId: "l2", token: "tk-l2", ownerId: "u2", categoryId: "dig-mob-iphone", parentCategoryId: "digital", title: "آیفون ۱۵ پرو مکس ۲۵۶ گیگ - نو در حد آکبند", description: "آیفون ۱۵ پرو مکس رنگ تیتانیوم طبیعی، ۲۵۶ گیگابایت، فاکتور دار، ضمانت دار، همراه با جعبه کامل.", images: [IMG("photo-1510557880182-3d4d3cba35a5"),IMG("photo-1601784551446-26c9a9f3dc35")], price: 85000000, priceMode: "fixed", condition: "like-new", cityId: "isfahan", provinceId: "isfahan", attributes: { "حافظه": "۲۵۶ گیگ", "رنگ": "تیتانیوم طبیعی", "شبکه": "دوسیم‌کارت" }, status: "active", createdAt: "2026-09-06T10:30:00Z", updatedAt: "2026-09-06T10:30:00Z", expiresAt: "2026-10-06T10:30:00Z", viewCount: 892, favoriteCount: 78, messageCount: 45, contactEnabled: true, chatEnabled: true, verificationStatus: "verified", isFeatured: true },
-  { listingId: "l3", token: "tk-l3", ownerId: "u3", businessId: "b1", categoryId: "dig-lap-student", parentCategoryId: "digital", title: "لپ‌تاپ ایسوس VivoBook 15 - Core i5 نسل ۱۲", description: "لپ‌تاپ ایسوس مدل X1502ZA، پردازنده Core i5-1240P، رم ۸ گیگ، SSD 512 گیگ، صفحه نمایش FHD 15.6 اینچ.", images: [IMG("photo-1525547719571-a2d4ac8945e2"),IMG("photo-1593642632559-0c6d3fc62b89")], price: 42000000, priceMode: "fixed", condition: "new", cityId: "tehran", provinceId: "tehran", attributes: { "پردازنده": "Core i5-1240P", "رم": "۸ گیگ", "حافظه": "512 SSD", "صفحه": "15.6 FHD" }, status: "active", createdAt: "2026-09-05T14:00:00Z", updatedAt: "2026-09-05T14:00:00Z", expiresAt: "2026-10-05T14:00:00Z", viewCount: 315, favoriteCount: 21, messageCount: 8, contactEnabled: true, chatEnabled: false, verificationStatus: "verified" },
-  { listingId: "l4", token: "tk-l4", ownerId: "u4", categoryId: "hk-furn-sofa", parentCategoryId: "home-kitchen", title: "مبل راحتی ال شکل - کاملاً نو بدون استفاده", description: "مبل راحتی ال‌شکل با روکش چرم مصنوعی بژ، ۷ نفره، کاملاً نو، فقط یک بار باز شده. علت فروش: تعویض دکوراسیون.", images: [IMG("photo-1555041469-a586c61ea9bc"),IMG("photo-1549187774-b4e9b0445b41")], price: 18500000, priceMode: "negotiable", condition: "new", cityId: "tehran", provinceId: "tehran", districtId: "yaft-abad", attributes: { "جنس روکش": "چرم مصنوعی", "رنگ": "بژ", "تعداد نفر": "۷" }, status: "active", createdAt: "2026-09-04T11:00:00Z", updatedAt: "2026-09-04T11:00:00Z", expiresAt: "2026-10-04T11:00:00Z", viewCount: 167, favoriteCount: 19, messageCount: 6, contactEnabled: true, chatEnabled: true, verificationStatus: "none" },
-  { listingId: "l5", token: "tk-l5", ownerId: "u5", businessId: "b2", categoryId: "hk-bed-frame", parentCategoryId: "home-kitchen", title: "تخت خواب دونفره چوب طبیعی با تاج منبت‌کاری", description: "تخت خواب دونفره ۱۶۰×۲۰۰ از چوب طبیعی گردو با تاج منبت‌کاری دستی، همراه با تشک فنری ارتوپدی.", images: [IMG("photo-1578683100755-d50a12bac3a1"),IMG("photo-1505693416388-ac5ce068fe85")], price: 32000000, priceMode: "fixed", condition: "new", cityId: "tehran", provinceId: "tehran", attributes: { "جنس": "چوب گردو", "ابعاد": "۱۶۰×۲۰۰", "شامل تشک": "بله" }, status: "active", createdAt: "2026-09-03T09:00:00Z", updatedAt: "2026-09-03T09:00:00Z", expiresAt: "2026-10-03T09:00:00Z", viewCount: 241, favoriteCount: 28, messageCount: 9, contactEnabled: true, chatEnabled: false, verificationStatus: "verified" },
-  { listingId: "l6", token: "tk-l6", ownerId: "u1", categoryId: "re-rent-apt", parentCategoryId: "realestate", title: "اجاره آپارتمان ۸۵ متری نوساز - منطقه ۵ تهران", description: "آپارتمان ۸۵ متری، ۲ خوابه، طبقه سوم از ۴، نوساز ۱۴۰۲، آسانسور، پارکینگ، انباری، کابینت ام‌دی‌اف.", images: [IMG("photo-1502672260266-1c1ef2d93688"),IMG("photo-1522708323590-d24dbb6b0267")], price: 5500000, priceMode: "fixed", condition: "new", cityId: "tehran", provinceId: "tehran", districtId: "tehranpars", attributes: { "متراژ": "۸۵ متر", "خواب": "۲", "ودیعه": "۴۰۰ میلیون تومان", "اجاره ماهانه": "۵.۵ میلیون تومان" }, status: "active", createdAt: "2026-09-07T07:00:00Z", updatedAt: "2026-09-07T07:00:00Z", expiresAt: "2026-10-07T07:00:00Z", viewCount: 532, favoriteCount: 48, messageCount: 22, contactEnabled: true, chatEnabled: true, verificationStatus: "none", isUrgent: true },
-  { listingId: "l7", token: "tk-l7", ownerId: "u2", categoryId: "per-clo-women", parentCategoryId: "personal", title: "پالتو زنانه کشمیر ایتالیایی - سایز M - نو", description: "پالتو کشمیر اصل ایتالیایی رنگ کرم، سایز M، یک‌بار پوشیده شده در مجلس. بدون آسیب.", images: [IMG("photo-1523381294911-8d3cead13475"),IMG("photo-1591047139829-d91aecb6caea")], price: 3800000, priceMode: "fixed", condition: "like-new", cityId: "shiraz", provinceId: "fars", attributes: { "سایز": "M", "رنگ": "کرم", "جنس": "کشمیر ایتالیایی" }, status: "active", createdAt: "2026-09-05T16:00:00Z", updatedAt: "2026-09-05T16:00:00Z", expiresAt: "2026-10-05T16:00:00Z", viewCount: 189, favoriteCount: 24, messageCount: 11, contactEnabled: true, chatEnabled: true, verificationStatus: "none" },
-  { listingId: "l8", token: "tk-l8", ownerId: "u4", categoryId: "ent-book-novel", parentCategoryId: "entertainment", title: "مجموعه کتاب‌های روان‌شناسی ۱۵ جلدی", description: "۱۵ جلد کتاب روان‌شناسی برترین نویسندگان دنیا، ترجمه دکتر زندی‌پور، حالت خوب، بدون آسیب به جلد.", images: [IMG("photo-1495446815901-a7297e633e8d"),IMG("photo-1481627834876-b7833e8f5570")], price: 850000, priceMode: "negotiable", condition: "good", cityId: "mashhad", provinceId: "khorasan-razavi", attributes: { "تعداد": "۱۵ جلد", "موضوع": "روان‌شناسی", "مترجم": "دکتر زندی‌پور" }, status: "active", createdAt: "2026-09-04T13:00:00Z", updatedAt: "2026-09-04T13:00:00Z", expiresAt: "2026-10-04T13:00:00Z", viewCount: 94, favoriteCount: 12, messageCount: 5, contactEnabled: true, chatEnabled: true, verificationStatus: "none" },
-  { listingId: "l9", token: "tk-l9", ownerId: "u3", businessId: "b1", categoryId: "dig-tv-led", parentCategoryId: "digital", title: "تلویزیون ۵۵ اینچ سامسونگ 4K QLED - مدل ۲۰۲۵", description: "تلویزیون ۵۵ اینچ سامسونگ QLED، رزولوشن 4K، HDR10+، Smart TV با سیستم‌عامل Tizen، کاملاً نو با گارانتی.", images: [IMG("photo-1593642632632-2b0d2a4c1c4c"),IMG("photo-1598327105666-5b89351aff97")], price: 65000000, priceMode: "fixed", condition: "new", cityId: "tehran", provinceId: "tehran", attributes: { "سایز": "۵۵ اینچ", "رزولوشن": "4K QLED", "گارانتی": "۱۸ ماهه" }, status: "active", createdAt: "2026-09-02T10:00:00Z", updatedAt: "2026-09-02T10:00:00Z", expiresAt: "2026-10-02T10:00:00Z", viewCount: 445, favoriteCount: 38, messageCount: 16, contactEnabled: false, chatEnabled: true, verificationStatus: "verified", isFeatured: true },
-  { listingId: "l10", token: "tk-l10", ownerId: "u1", categoryId: "ent-ani-cat", parentCategoryId: "entertainment", title: "گربه پرشین باکره سفید - ۱۸ ماهه", description: "گربه پرشین سفید، ۱۸ ماهه، واکسینه و ریزچیپ‌دار، با شناسنامه دامپزشکی. مواد غذایی و لوازم همراه.", images: [IMG("photo-1587300003388-59208cc962cb"),IMG("photo-1574158622682-e40e69881006")], price: 12000000, priceMode: "negotiable", condition: "new", cityId: "tehran", provinceId: "tehran", attributes: { "نژاد": "پرشین", "سن": "۱۸ ماه", "جنسیت": "ماده", "واکسن": "کامل" }, status: "active", createdAt: "2026-09-06T15:00:00Z", updatedAt: "2026-09-06T15:00:00Z", expiresAt: "2026-10-06T15:00:00Z", viewCount: 328, favoriteCount: 44, messageCount: 19, contactEnabled: true, chatEnabled: true, verificationStatus: "none" },
-  { listingId: "l11", token: "tk-l11", ownerId: "u2", categoryId: "veh-pass-sedan", parentCategoryId: "vehicles", title: "تویوتا کمری ۲۰۲۳ - فول آپشن - یک مالک", description: "تویوتا کمری مدل ۲۰۲۳ رنگ مشکی، فول آپشن، کروز کنترل، دوربین ۳۶۰، صندلی گرمایشی، ۲۸ هزار کیلومتر.", images: [IMG("photo-1555215695-3004980ad54e"),IMG("photo-1492144534655-ae79c964c9d7")], price: 1850000000, priceMode: "negotiable", condition: "like-new", cityId: "tehran", provinceId: "tehran", districtId: "jordan", attributes: { "مدل": "۲۰۲۳", "رنگ": "مشکی", "کارکرد": "۲۸,۰۰۰ کیلومتر", "گیربکس": "اتوماتیک" }, status: "active", createdAt: "2026-09-01T09:00:00Z", updatedAt: "2026-09-01T09:00:00Z", expiresAt: "2026-10-01T09:00:00Z", viewCount: 1240, favoriteCount: 89, messageCount: 52, contactEnabled: true, chatEnabled: true, verificationStatus: "verified", isFeatured: true },
-  { listingId: "l12", token: "tk-l12", ownerId: "u4", categoryId: "veh-moto-sport", parentCategoryId: "vehicles", title: "موتور هوندا CBR 150 - مدل ۱۴۰۲", description: "موتور هوندا CBR 150 آبی، مدل ۱۴۰۲، ۸ هزار کیلومتر، بیمه معتبر، مدارک کامل.", images: [IMG("photo-1558618666-fcd25c85cd64"),IMG("photo-1449426468159-d96dbf08f19f")], price: 145000000, priceMode: "fixed", condition: "good", cityId: "karaj", provinceId: "alborz", attributes: { "مدل": "۱۴۰۲", "رنگ": "آبی", "کارکرد": "۸,۰۰۰ کیلومتر" }, status: "active", createdAt: "2026-09-05T11:00:00Z", updatedAt: "2026-09-05T11:00:00Z", expiresAt: "2026-10-05T11:00:00Z", viewCount: 213, favoriteCount: 17, messageCount: 7, contactEnabled: true, chatEnabled: true, verificationStatus: "none" },
-  { listingId: "l13", token: "tk-l13", ownerId: "u3", businessId: "b1", categoryId: "dig-mob-android", parentCategoryId: "digital", title: "سامسونگ Galaxy S24 Ultra - ۲۵۶ گیگ - کاملاً نو", description: "سامسونگ Galaxy S24 Ultra رنگ تیتانیوم زرد، ۲۵۶ گیگ، نو در حد آکبند، با کلیه لوازم و گارانتی.", images: [IMG("photo-1610945265064-0e34e5519bbf"),IMG("photo-1601784551446-26c9a9f3dc35")], price: 78000000, priceMode: "fixed", condition: "new", cityId: "tehran", provinceId: "tehran", attributes: { "رنگ": "تیتانیوم زرد", "حافظه": "۲۵۶ گیگ", "گارانتی": "۱۲ ماهه" }, status: "active", createdAt: "2026-09-07T06:00:00Z", updatedAt: "2026-09-07T06:00:00Z", expiresAt: "2026-10-07T06:00:00Z", viewCount: 671, favoriteCount: 55, messageCount: 31, contactEnabled: false, chatEnabled: true, verificationStatus: "verified" },
-  { listingId: "l14", token: "tk-l14", ownerId: "u5", businessId: "b2", categoryId: "hk-ves-pot", parentCategoryId: "home-kitchen", title: "ست ظروف چدنی لاج ۱۲ پارچه - اورجینال آمریکا", description: "ست ظروف چدنی لاج اصل آمریکا، ۱۲ پارچه، مناسب همه انواع گاز و اجاق برقی، همراه با جعبه اصلی.", images: [IMG("photo-1556909114-f6e7ad7d3136"),IMG("photo-1574680096145-d05b474e2155")], price: 8500000, priceMode: "fixed", condition: "new", cityId: "tehran", provinceId: "tehran", attributes: { "برند": "Lodge", "تعداد": "۱۲ پارچه", "جنس": "چدن" }, status: "active", createdAt: "2026-09-03T14:00:00Z", updatedAt: "2026-09-03T14:00:00Z", expiresAt: "2026-10-03T14:00:00Z", viewCount: 178, favoriteCount: 23, messageCount: 9, contactEnabled: true, chatEnabled: false, verificationStatus: "verified" },
-  { listingId: "l15", token: "tk-l15", ownerId: "u1", categoryId: "ent-bike-mountain", parentCategoryId: "entertainment", title: "دوچرخه کوهستان Scott Scale 960 - سایز M", description: "دوچرخه کوهستان Scott Scale 960 سایز M، یک‌سال کارکرده، تنها برای تفریح، کاملاً سالم، یک مالک.", images: [IMG("photo-1485965120184-e220f721d03d"),IMG("photo-1558618166-fcd25c85cd64")], price: 22000000, priceMode: "negotiable", condition: "good", cityId: "tehran", provinceId: "tehran", attributes: { "برند": "Scott", "سایز": "M", "سیستم": "Shimano Deore" }, status: "active", createdAt: "2026-09-04T16:00:00Z", updatedAt: "2026-09-04T16:00:00Z", expiresAt: "2026-10-04T16:00:00Z", viewCount: 156, favoriteCount: 14, messageCount: 5, contactEnabled: true, chatEnabled: true, verificationStatus: "none" },
-  // ── Test seller: علی محمدی (u6) — 4 listings for buyer↔seller chat testing ──
-  { listingId: "l16", token: "tk-l16", ownerId: "u6", categoryId: "veh-pass-sedan", parentCategoryId: "vehicles", title: "سمند سورن ELX مدل ۱۴۰۱ - دو دست - بدون رنگ", description: "سمند سورن ELX مدل ۱۴۰۱ رنگ نقره‌ای، دو دست، بدون رنگ‌خوردگی، ۴۲ هزار کیلومتر، سند ملکی تک‌برگ، آماده انتقال.", images: [IMG("photo-1541899481282-d53bffe3c35d"),IMG("photo-1502877338535-766e1452684a")], price: 395000000, priceMode: "negotiable", condition: "good", cityId: "tehran", provinceId: "tehran", attributes: { "سال": "۱۴۰۱", "رنگ": "نقره‌ای", "کارکرد": "۴۲,۰۰۰ کیلومتر", "گیربکس": "دستی" }, status: "active", createdAt: "2026-09-08T09:00:00Z", updatedAt: "2026-09-08T09:00:00Z", expiresAt: "2026-10-08T09:00:00Z", viewCount: 187, favoriteCount: 21, messageCount: 8, contactEnabled: true, chatEnabled: true, verificationStatus: "none", isUrgent: true },
-  { listingId: "l17", token: "tk-l17", ownerId: "u6", categoryId: "dig-mob-android", parentCategoryId: "digital", title: "شیائومی Redmi Note 13 Pro - ۲۵۶ گیگ - نو", description: "شیائومی Redmi Note 13 Pro رنگ مشکی، ۲۵۶ گیگ، ۸ گیگ رم، نمایشگر AMOLED 120Hz، باتری ۵۰۰۰mAh، کاملاً نو با گارانتی یک‌ساله.", images: [IMG("photo-1610945265064-0e34e5519bbf"),IMG("photo-1512941937669-90a1b58e7e9c")], price: 18500000, priceMode: "fixed", condition: "new", cityId: "tehran", provinceId: "tehran", attributes: { "حافظه": "۲۵۶ گیگ", "رم": "۸ گیگ", "رنگ": "مشکی", "گارانتی": "۱ ساله" }, status: "active", createdAt: "2026-09-08T10:30:00Z", updatedAt: "2026-09-08T10:30:00Z", expiresAt: "2026-10-08T10:30:00Z", viewCount: 342, favoriteCount: 29, messageCount: 13, contactEnabled: true, chatEnabled: true, verificationStatus: "none" },
-  { listingId: "l18", token: "tk-l18", ownerId: "u6", categoryId: "hk-furn-sofa", parentCategoryId: "home-kitchen", title: "کاناپه سه‌نفره مدرن - جنس روکش پارچه - رنگ خاکستری", description: "کاناپه سه‌نفره مدرن، روکش پارچه ضخیم خاکستری، پایه چوبی، راحت و بادوام. دو سال پیش خریداری شده، حالت عالی.", images: [IMG("photo-1555041469-a586c61ea9bc"),IMG("photo-1586023492125-27b2c045efd7")], price: 9500000, priceMode: "negotiable", condition: "good", cityId: "tehran", provinceId: "tehran", attributes: { "تعداد نفر": "۳", "جنس روکش": "پارچه", "رنگ": "خاکستری" }, status: "active", createdAt: "2026-09-07T14:00:00Z", updatedAt: "2026-09-07T14:00:00Z", expiresAt: "2026-10-07T14:00:00Z", viewCount: 95, favoriteCount: 8, messageCount: 4, contactEnabled: true, chatEnabled: true, verificationStatus: "none" },
-  { listingId: "l19", token: "tk-l19", ownerId: "u6", categoryId: "dig-lap-student", parentCategoryId: "digital", title: "لپ‌تاپ لنوو IdeaPad 3 - Core i3 - ۸ گیگ رم", description: "لپ‌تاپ لنوو IdeaPad 3 پردازنده Core i3-1215U، رم ۸ گیگ، SSD 256 گیگ، صفحه ۱۵.۶ اینچ FHD، باتری ۳ ساعته. مناسب برای کارهای روزمره و دانشجویی.", images: [IMG("photo-1525547719571-a2d4ac8945e2"),IMG("photo-1588872657578-7efd1f1555ed")], price: 24000000, priceMode: "fixed", condition: "good", cityId: "tehran", provinceId: "tehran", attributes: { "پردازنده": "Core i3-1215U", "رم": "۸ گیگ", "حافظه": "256 SSD", "صفحه": "15.6 FHD" }, status: "active", createdAt: "2026-09-06T12:00:00Z", updatedAt: "2026-09-06T12:00:00Z", expiresAt: "2026-10-06T12:00:00Z", viewCount: 261, favoriteCount: 18, messageCount: 7, contactEnabled: true, chatEnabled: true, verificationStatus: "none" },
-];
-
-const AB_CONVERSATIONS: ABConversation[] = [
-  { conversationId: "c1", listingId: "l1", buyerId: "u1", sellerId: "u2", createdAt: "2026-09-05T10:00:00Z", lastMessageAt: "2026-09-07T08:15:00Z", lastMessage: "ممنون، فردا می‌توانم بیایم ببینم؟", status: "active", unreadCount: 1 },
-  { conversationId: "c2", listingId: "l2", buyerId: "u1", sellerId: "u2", createdAt: "2026-09-04T14:30:00Z", lastMessageAt: "2026-09-06T19:45:00Z", lastMessage: "قیمت پایین‌تر نمی‌آید؟", status: "active", unreadCount: 0 },
-  { conversationId: "c3", listingId: "l9", buyerId: "u1", sellerId: "u3", createdAt: "2026-09-06T11:00:00Z", lastMessageAt: "2026-09-06T11:30:00Z", lastMessage: "بله، موجود است. خدمتتان هستیم.", status: "active", unreadCount: 2 },
-];
-
-const AB_MESSAGES: Record<string, ABMessage[]> = {
-  c1: [
-    { messageId: "m1", conversationId: "c1", senderId: "u2", type: "text", text: "سلام. پراید دیدید؟", createdAt: "2026-09-05T10:00:00Z", status: "read" },
-    { messageId: "m2", conversationId: "c1", senderId: "u1", type: "text", text: "سلام، بله. آیا هنوز موجود است؟", createdAt: "2026-09-05T10:05:00Z", status: "read" },
-    { messageId: "m3", conversationId: "c1", senderId: "u2", type: "text", text: "بله موجوده. کجایید؟ می‌تونید بیاید ببینید.", createdAt: "2026-09-05T10:10:00Z", status: "read" },
-    { messageId: "m4", conversationId: "c1", senderId: "u1", type: "offer", offerAmount: 265000000, createdAt: "2026-09-07T07:00:00Z", status: "read" },
-    { messageId: "m5", conversationId: "c1", senderId: "u2", type: "text", text: "قیمت خیلی پایینه، حداقل ۲۷۵ میلیون.", createdAt: "2026-09-07T08:00:00Z", status: "read" },
-    { messageId: "m6", conversationId: "c1", senderId: "u1", type: "text", text: "ممنون، فردا می‌توانم بیایم ببینم؟", createdAt: "2026-09-07T08:15:00Z", status: "delivered" },
-  ],
-};
-
-const AB_NOTIFS: ABNotification[] = [
-  { notificationId: "n1", userId: "me", type: "message", title: "پیام جدید", description: "علی محمدی: قیمت خیلی پایینه، حداقل ۲۷۵...", read: false, createdAt: "2026-09-07T08:00:00Z" },
-  { notificationId: "n2", userId: "me", type: "view", title: "بازدید از آگهی شما", description: "آیفون ۱۵ پرو مکس شما ۴۰ بازدید جدید داشته", read: false, createdAt: "2026-09-06T20:00:00Z" },
-  { notificationId: "n3", userId: "me", type: "favorite", title: "علاقه‌مندی جدید", description: "کسی آگهی مبل راحتی شما را ذخیره کرد", read: true, createdAt: "2026-09-06T15:30:00Z" },
-  { notificationId: "n4", userId: "me", type: "system", title: "آگهی‌تان رو به انقضاست", description: "آگهی دوچرخه Scott شما ۵ روز دیگر منقضی می‌شود", read: true, createdAt: "2026-09-05T09:00:00Z" },
-  { notificationId: "n5", userId: "me", type: "price-alert", title: "کاهش قیمت", description: "آیفون ۱۵ پرو مکس که نشان کردید ۵٪ کاهش قیمت داشته", read: true, createdAt: "2026-09-04T12:00:00Z" },
-];
-
-const MY_FAVS = ["l2", "l9", "l11"];
-const MY_LISTINGS = ["l6", "l15"];
-
 /* ─── Mutable Ad/Chat/User Store (Backend-ready) ─────────────────── */
 // Module-level mutable store — components read from these, write via helpers.
 // localStorage keeps state across page refreshes. Swap helpers with API calls when backend is ready.
 
 let _ads: ABListing[] = [];
-let _convs: ABConversation[] = [...AB_CONVERSATIONS];
-let _msgs: Record<string, ABMessage[]> = { ...AB_MESSAGES };
-let _myUser: ABUser = { ...AB_USERS[0] };
-let _myFavs: string[] = [...MY_FAVS];
+let _convs: ABConversation[] = [];
+let _msgs: Record<string, ABMessage[]> = {};
+let _myUser: ABUser = { userId:"", name:"", avatar:"", mobile:"", verificationStatus:"unverified", accountType:"personal", createdAt:"", lastActive:"" };
+let _myFavs: string[] = [];
 
 function _tryParse<T>(key: string, fallback: T): T {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
@@ -1346,22 +1278,50 @@ const AB_DATA_VERSION = "v3";
 let _currentUid = "default";
 const abKey = (k: string) => `ab2_${_currentUid}_${k}`;
 
-function initAnBannerStore(uid: string) {
-  if (_currentUid === uid) return;
+let _bannerUsers: ABUser[] = [];
+function mapApiListing(x: any): ABListing {
+  const category = AB_CATS.find(c => c.name === x.category_name);
+  return {
+    listingId: String(x.id), token: "", ownerId: String(x.identity_id),
+    categoryId: category?.categoryId ?? String(x.category_id), parentCategoryId: category?.parentId ?? "",
+    title: x.title, description: x.description ?? "", images: Array.isArray(x.media_ids) ? x.media_ids.map((id:number)=>bannerMediaUrl(id)) : [],
+    price: Number(x.price ?? 0), priceMode: x.price === null ? "negotiable" : "fixed",
+    condition: (["new","like-new","good","used","for-parts"].includes(x.condition) ? x.condition : "used") as ABListing["condition"],
+    cityId: x.city ?? "", provinceId: "", attributes: {}, status: x.status === "published" ? "active" : x.status,
+    createdAt: x.created_at, updatedAt: x.updated_at, expiresAt: x.expires_at ?? "",
+    viewCount: Number(x.views ?? 0), favoriteCount: 0, messageCount: 0,
+    contactEnabled: x.contact_enabled !== false, chatEnabled: x.chat_enabled !== false,
+    verificationStatus: "none",
+  };
+}
+function upsertBannerUser(id:string,name?:string) {
+  if (!id) return;
+  if (_bannerUsers.some(u=>u.userId===id)) return;
+  _bannerUsers.push({userId:id,name:name||"کاربر آن بنر",avatar:"",mobile:"",verificationStatus:"unverified",accountType:"personal",createdAt:new Date().toISOString(),lastActive:new Date().toISOString()});
+}
+function abGetBannerUser(id:string){return _bannerUsers.find(u=>u.userId===id);}
+async function initAnBannerStore(uid: string) {
   _currentUid = uid;
-  const verKey = abKey("data_ver");
+  _ads = []; _convs = []; _msgs = {}; _myFavs = []; _postchi = []; _bannerUsers = [];
   try {
-    if (localStorage.getItem(verKey) !== AB_DATA_VERSION) {
-      ["ads","convs","msgs","user","favs","city_sel","postchi"].forEach(k => localStorage.removeItem(abKey(k)));
-      localStorage.setItem(verKey, AB_DATA_VERSION);
+    const [listings,favorites,profile,conversations,notifications] = await Promise.all([
+      bannerApi.listings({limit:200}), bannerApi.favorites(), bannerApi.profile(), bannerApi.conversations(), bannerApi.notifications()
+    ]);
+    _ads = (listings.listings ?? []).map((x:any)=>{upsertBannerUser(String(x.identity_id),x.seller_display_name);return mapApiListing(x);});
+    _myFavs = (favorites.listings ?? []).map((x:any)=>String(x.id));
+    _myUser = {
+      userId: uid, name: profile?.profile?.display_name ?? "کاربر آن بنر", avatar: "", mobile: profile?.profile?.phone ?? "",
+      verificationStatus: "unverified", accountType: "personal", createdAt: profile?.profile?.created_at ?? new Date().toISOString(), lastActive: new Date().toISOString()
+    };
+    for (const conv of conversations.conversations ?? []) {
+      const cid=String(conv.conversation_id);
+      _convs.push({conversationId:cid,listingId:String(conv.listing_id),buyerId:String(conv.buyer_identity_id),sellerId:String(conv.seller_identity_id),createdAt:conv.created_at,lastMessageAt:conv.last_message_at,lastMessage:conv.last_message??"",status:conv.status==="archived"?"archived":"active",unreadCount:0});
     }
-  } catch {}
-  _ads = _tryParse<ABListing[]>(abKey("ads"), [...AB_LISTINGS]);
-  _convs = _tryParse<ABConversation[]>(abKey("convs"), [...AB_CONVERSATIONS]);
-  _msgs = _tryParse<Record<string, ABMessage[]>>(abKey("msgs"), { ...AB_MESSAGES });
-  _myUser = _tryParse<ABUser>(abKey("user"), { ...AB_USERS[0] });
-  _myFavs = _tryParse<string[]>(abKey("favs"), [...MY_FAVS]);
-  _postchi = _tryParse<ABPostchiEvent[]>(abKey("postchi"), INIT_POSTCHI);
+    await Promise.all(_convs.slice(0,50).map(async conv=>{try{const d=await bannerApi.conversation(conv.conversationId);_msgs[conv.conversationId]=(d.messages??[]).map((m:any)=>({messageId:String(m.message_id),conversationId:conv.conversationId,senderId:String(m.sender_identity_id),type:(m.message_type??"text") as ABMessage["type"],text:m.body||undefined,offerAmount:m.offer_amount?Number(m.offer_amount):undefined,media:m.media_mime?bannerMessageMediaUrl(m.message_id):undefined,createdAt:m.created_at,status:"delivered"}));}catch{}}));
+    for (const n of notifications.notifications ?? []) _postchi.push({eventId:String(n.id),type:n.type==="support-reply"?"support-reply":"system",title:n.title,description:n.description,read:Boolean(n.read),createdAt:n.created_at});
+  } catch (e) {
+    console.error("An Banner API unavailable",e);
+  }
   _notifyAds(); _notifyConvs(); _notifyPostchi();
 }
 
@@ -1377,29 +1337,48 @@ function storeFavs() { try { localStorage.setItem(abKey("favs"), JSON.stringify(
 
 // --- Ad CRUD ---
 function abGetAds(): ABListing[] { return _ads; }
-function abAddAd(ad: ABListing) { _ads = [ad, ..._ads]; storeAds(); }
-function abUpdateAd(ad: ABListing) { _ads = _ads.map(a => a.listingId === ad.listingId ? ad : a); storeAds(); }
-function abDeleteAd(id: string) { _ads = _ads.filter(a => a.listingId !== id); storeAds(); }
-function abCloseAd(id: string) { _ads = _ads.map(a => a.listingId === id ? { ...a, status: "expired" as const, updatedAt: new Date().toISOString() } : a); storeAds(); }
-function abReopenAd(id: string) { _ads = _ads.map(a => a.listingId === id ? { ...a, status: "active" as const, updatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() } : a); storeAds(); }
+function abAddAd(ad: ABListing) { _ads = [ad, ..._ads]; _notifyAds(); }
+async function abUpdateAd(ad: ABListing) { try{await bannerApi.updateListing(ad.listingId,{title:ad.title,description:ad.description,price:ad.price,city:ad.cityId,condition:ad.condition});_ads=_ads.map(a=>a.listingId===ad.listingId?ad:a);_notifyAds();}catch(e){console.error("listing_update_failed",e);} }
+async function abDeleteAd(id: string) { try{await bannerApi.deleteListing(id);_ads=_ads.filter(a=>a.listingId!==id);_notifyAds();}catch(e){console.error("listing_delete_failed",e);} }
+async function abCloseAd(id: string) { try{await bannerApi.updateListing(id,{status:"paused"});_ads=_ads.map(a=>a.listingId===id?{...a,status:"expired" as const,updatedAt:new Date().toISOString()}:a);_notifyAds();}catch(e){console.error("listing_pause_failed",e);} }
+async function abReopenAd(id: string) { try{await bannerApi.updateListing(id,{status:"published"});_ads=_ads.map(a=>a.listingId===id?{...a,status:"active" as const,updatedAt:new Date().toISOString()}:a);_notifyAds();}catch(e){console.error("listing_reopen_failed",e);} }
 
 // --- Conversation/Message CRUD ---
 function abGetConvs(): ABConversation[] { return _convs; }
 function abGetMsgs(cid: string): ABMessage[] { return _msgs[cid] ?? []; }
-function abAddMsg(cid: string, msg: ABMessage) { abAddMsgAndNotify(cid, msg); }
-function abStartConv(listing: ABListing): string {
+async function abAddMsg(cid: string, msg: ABMessage) {
+  try {
+    let mediaBase64:string|undefined; let mediaMime:string|undefined;
+    if (msg.media && msg.media.startsWith("blob:")) {
+      const blob=await fetch(msg.media).then(r=>r.blob());
+      mediaMime=blob.type||"application/octet-stream";
+      mediaBase64=await new Promise<string>((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(String(fr.result).split(",")[1]??"");fr.onerror=()=>reject(fr.error);fr.readAsDataURL(blob);});
+    }
+    const response=await bannerApi.sendMessage(cid,{message:msg.text??msg.sticker??"",type:msg.type,mediaBase64,mediaMime,offerAmount:msg.offerAmount});
+    const sm=response?.message;
+    const saved:ABMessage={...msg,messageId:String(sm?.message_id??msg.messageId),createdAt:sm?.created_at??msg.createdAt,status:"sent",media:sm?.message_id&&msg.media?bannerMessageMediaUrl(sm.message_id):msg.media};
+    abAddMsgAndNotify(cid,saved);
+  } catch(e) { console.error("An Banner message failed",e); }
+}
+async function abStartConv(listing: ABListing): Promise<string> {
   const existing = _convs.find(c => c.listingId === listing.listingId && c.buyerId === _currentUid);
   if (existing) return existing.conversationId;
-  const cid = `conv-${Date.now()}`;
-  const now = new Date().toISOString();
-  _convs = [{ conversationId: cid, listingId: listing.listingId, buyerId: _currentUid, sellerId: listing.ownerId, createdAt: now, lastMessageAt: now, lastMessage: "", status: "active", unreadCount: 0 }, ..._convs];
-  storeConvsAndNotify();
-  return cid;
+  const response=await bannerApi.createConversation(listing.listingId,"");
+  const cid=String(response.conversationId);
+  const now=new Date().toISOString();
+  _convs=[{conversationId:cid,listingId:listing.listingId,buyerId:_currentUid,sellerId:listing.ownerId,createdAt:now,lastMessageAt:now,lastMessage:"",status:"active",unreadCount:0},..._convs];
+  storeConvsAndNotify(); return cid;
 }
 
 // --- User ---
 function abGetUser(): ABUser { return _myUser; }
-function abUpdateUser(u: ABUser) { _myUser = u; storeUser(); }
+async function abUpdateUser(u: ABUser) {
+  try{
+    const body:any={displayName:u.name,phone:u.mobile};
+    if(u.avatar?.startsWith("data:")){const m=u.avatar.match(/^data:([^;]+);base64,(.*)$/);if(m){body.avatarMime=m[1];body.avatarBase64=m[2];}}
+    const r=await bannerApi.updateProfile(body);_myUser={...u,avatar:r?.profile?.avatar_data_url??u.avatar};_notifyAds();
+  }catch(e){console.error("profile_update_failed",e);}
+}
 
 // --- Favs ---
 function abGetFavs(): string[] { return _myFavs; }
@@ -1471,834 +1450,6 @@ function usePostchiVersion() {
   const [v, setV] = useState(0);
   useEffect(() => _subscribePostchi(() => setV(x => x + 1)), []);
   return v;
-}
-
-const INIT_AB_TICKETS: ABTicket[] = [
-  {
-    ticketId: "t1", userId: "me", subject: "مشکل در ثبت آگهی",
-    status: "answered", createdAt: "2026-09-05T10:00:00Z", updatedAt: "2026-09-06T14:00:00Z",
-    messages: [
-      { id: "tm1", senderId: "user", text: "سلام، نمی‌توانم آگهی ثبت کنم. خطا می‌دهد.", createdAt: "2026-09-05T10:00:00Z" },
-      { id: "tm2", senderId: "support", text: "سلام، مشکل بررسی شد. لطفاً مجدداً تلاش کنید.", createdAt: "2026-09-06T14:00:00Z" },
-    ]
-  },
-  {
-    ticketId: "t2", userId: "me", subject: "درخواست حذف آگهی",
-    status: "closed", createdAt: "2026-09-01T09:00:00Z", updatedAt: "2026-09-02T11:00:00Z",
-    messages: [
-      { id: "tm3", senderId: "user", text: "خواهشاً آگهی شماره l3 را حذف کنید.", createdAt: "2026-09-01T09:00:00Z" },
-      { id: "tm4", senderId: "support", text: "آگهی حذف شد.", createdAt: "2026-09-02T11:00:00Z" },
-    ]
-  },
-];
-
-/* ─── SVG Icon Library ───────────────────────────────────────────── */
-const ABIco = ({ name, size = 20, color = "currentColor", style }: { name: string; size?: number; color?: string; style?: React.CSSProperties }) => {
-  const s = { width: size, height: size, display: "block", flexShrink: 0, ...style };
-  const paths: Record<string, React.ReactNode> = {
-    home: <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
-    grid: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></>,
-    plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
-    msg: <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>,
-    user: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
-    search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
-    arrow: <><polyline points="15 18 9 12 15 6"/></>,
-    heart: <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>,
-    heartFill: <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" fill={color}/>,
-    share: <><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></>,
-    phone: <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.64 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>,
-    camera: <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></>,
-    send: <><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>,
-    star: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
-    eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
-    map: <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></>,
-    filter: <><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></>,
-    bell: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>,
-    edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
-    trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></>,
-    check: <polyline points="20 6 9 17 4 12"/>,
-    x: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
-    image: <><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>,
-    info: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
-    verified: <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>,
-    list: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
-    clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
-    dollar: <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
-    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
-    chevron: <polyline points="9 18 15 12 9 6"/>,
-    moreV: <><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></>,
-    report: <><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></>,
-    refresh: <><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></>,
-  };
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={s}>
-      {paths[name] ?? <circle cx="12" cy="12" r="10"/>}
-    </svg>
-  );
-};
-
-/* ─── Base Design System Components ─────────────────────────────── */
-
-function ABHeader({ title, onBack, rightSlot, transparent }: {
-  title?: string; onBack?: () => void; rightSlot?: React.ReactNode; transparent?: boolean;
-}) {
-  return (
-    <div className="ab-header" style={transparent ? { background: "transparent", borderColor: "transparent" } : undefined}>
-      {onBack && (
-        <button className="ab-icon-btn" onClick={onBack}>
-          <ABIco name="arrow" size={22} color="var(--ab-text)" />
-        </button>
-      )}
-      {title && <div className="ab-header-title" style={!onBack ? { textAlign: "right", paddingRight: 12 } : undefined}>{title}</div>}
-      {rightSlot ?? <div style={{ width: 44 }} />}
-    </div>
-  );
-}
-
-function ABBtn({ label, onClick, fullWidth, secondary, ghost, disabled, icon, loading }: {
-  label: string; onClick?: () => void; fullWidth?: boolean;
-  secondary?: boolean; ghost?: boolean; disabled?: boolean; icon?: string; loading?: boolean;
-}) {
-  const cls = secondary ? "ab-btn-secondary" : ghost ? "ab-btn-ghost" : "ab-btn-primary";
-  return (
-    <button className={cls} onClick={onClick} disabled={disabled || loading}
-      style={{ width: fullWidth ? "100%" : undefined, opacity: disabled ? 0.55 : 1 }}>
-      {loading ? <span style={{ width: 18, height: 18, border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#FFF", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> : null}
-      {icon && !loading && <ABIco name={icon} size={18} color="currentColor" />}
-      {label}
-    </button>
-  );
-}
-
-function ABSearch({ value, onChange, onSearch, placeholder }: {
-  value: string; onChange: (v: string) => void; onSearch: (v: string) => void; placeholder?: string;
-}) {
-  return (
-    <div className="ab-search-bar">
-      <ABIco name="search" size={18} color="var(--ab-muted)" style={{ flexShrink: 0 }} />
-      <input
-        value={value} onChange={e => onChange(e.target.value)}
-        onKeyDown={e => e.key === "Enter" && onSearch(value)}
-        placeholder={placeholder ?? "جستجو در آن بنر..."}
-        style={{ flex: 1 }}
-      />
-      {value && (
-        <button className="ab-icon-btn" style={{ width: 32, height: 32 }} onClick={() => onChange("")}>
-          <ABIco name="x" size={14} color="var(--ab-muted)" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function ABCondBadge({ condition }: { condition: string }) {
-  return (
-    <span className="ab-badge" style={{ background: condBg(condition), color: condColor(condition) }}>
-      {condLabel(condition)}
-    </span>
-  );
-}
-
-function ABListingCard({ listing, onTap, onFav, isFav, layout = "grid" }: {
-  listing: ABListing; onTap: () => void; onFav?: () => void; isFav?: boolean; layout?: "grid" | "list";
-}) {
-  const owner = AB_USERS.find(u => u.userId === listing.ownerId);
-  const city = cityNameById(listing.cityId);
-
-  if (layout === "list") {
-    return (
-      <div className="ab-listing-row" onClick={onTap}>
-        <img src={listing.images[0]} alt={listing.title} style={{ width: 128, height: 128, objectFit: "cover", flexShrink: 0 }} onError={e => { (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' fill='%23f0f0f0'%3E%3Crect width='128' height='128'/%3E%3C/svg%3E"; }} />
-        <div style={{ flex: 1, padding: "12px 14px", display: "flex", flexDirection: "column", justifyContent: "space-between", minWidth: 0 }}>
-          <div>
-            {listing.isUrgent && <span className="ab-badge ab-badge-urgent" style={{ marginBottom: 6 }}>فوری</span>}
-            <div style={{ fontSize: 15, fontWeight: 700, color: "var(--ab-text)", lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{listing.title}</div>
-          </div>
-          <div style={{ fontSize: 13, color: "var(--ab-text2)", marginTop: 4 }}>{condLabel(listing.condition)}</div>
-          <div style={{ fontSize: 13, color: "var(--ab-text2)", marginTop: 2 }}>{fmtPrice(listing.price, listing.priceMode)}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ab-muted)", marginTop: 2 }}>
-            <span>{city}</span>
-            <span>·</span>
-            <span>{timeAgo(listing.createdAt)}</span>
-          </div>
-        </div>
-        {onFav && (
-          <button className="ab-icon-btn" style={{ margin: "0 4px", alignSelf: "center" }} onClick={e => { e.stopPropagation(); onFav(); }}>
-            <ABIco name={isFav ? "heartFill" : "heart"} size={18} color={isFav ? "#E8354E" : "var(--ab-muted)"} />
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="ab-listing-card" onClick={onTap}>
-      <div style={{ position: "relative" }}>
-        <img src={listing.images[0]} alt={listing.title} style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }} onError={e => { (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150' fill='%23f0f0f0'%3E%3Crect width='200' height='150'/%3E%3C/svg%3E"; }} />
-        {listing.isUrgent && <span className="ab-badge ab-badge-urgent" style={{ position: "absolute", top: 8, right: 8 }}>فوری</span>}
-        {listing.isFeatured && !listing.isUrgent && <span className="ab-badge ab-badge-featured" style={{ position: "absolute", top: 8, right: 8 }}>ویژه</span>}
-        {onFav && (
-          <button className="ab-icon-btn" onClick={e => { e.stopPropagation(); onFav(); }}
-            style={{ position: "absolute", top: 6, left: 6, background: "rgba(255,255,255,0.9)", borderRadius: 10, width: 34, height: 34 }}>
-            <ABIco name={isFav ? "heartFill" : "heart"} size={16} color={isFav ? "#E8354E" : "var(--ab-text2)"} />
-          </button>
-        )}
-      </div>
-      <div style={{ padding: "10px 10px 11px" }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ab-text)", lineHeight: 1.5, marginBottom: 6, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{listing.title}</div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ab-text)", marginBottom: 6 }}>{fmtPrice(listing.price, listing.priceMode)}</div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--ab-muted)" }}>
-            <ABIco name="map" size={10} color="var(--ab-muted)" />
-            <span>{city}</span>
-          </div>
-          <span style={{ fontSize: 11, color: "var(--ab-muted)" }}>{timeAgo(listing.createdAt)}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ABCatCard({ cat, onClick }: { cat: ABCategory; onClick: () => void }) {
-  return (
-    <div className="ab-cat-card" onClick={onClick}>
-      <div style={{ width: 48, height: 48, borderRadius: 14, background: cat.color + "15", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
-        {cat.emoji}
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ab-text)", textAlign: "center", lineHeight: 1.4 }}>{cat.name}</div>
-      <div style={{ fontSize: 10, color: "var(--ab-muted)" }}>{toFaD(cat.listingCount.toLocaleString())} آگهی</div>
-    </div>
-  );
-}
-
-function ABSellerCard({ user, listing, onProfile, onCall, onChat }: {
-  user: ABUser; listing: ABListing; onProfile: () => void; onCall?: () => void; onChat?: () => void;
-}) {
-  return (
-    <div className="ab-card" style={{ padding: 16, margin: "0 16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-        <img src={user.avatar} alt={user.name} style={{ width: 52, height: 52, borderRadius: 14, objectFit: "cover", flexShrink: 0 }} onClick={onProfile} />
-        <div style={{ flex: 1 }} onClick={onProfile}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: "var(--ab-text)" }}>{user.name}</span>
-            {user.verificationStatus === "verified" && <ABIco name="verified" size={14} color="var(--ab-blue)" />}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--ab-muted)", marginTop: 3 }}>
-            {user.accountType === "business" ? "فروشگاه" : "فروشنده شخصی"} · فعال {timeAgo(user.lastActive)}
-          </div>
-        </div>
-        <span style={{ fontSize: 11, color: "var(--ab-muted)", background: "var(--ab-bg)", padding: "4px 10px", borderRadius: 8 }}>
-          {toFaD(listing.viewCount)} بازدید
-        </span>
-      </div>
-      <div style={{ display: "flex", gap: 10 }}>
-        {listing.chatEnabled && (
-          <button className="ab-btn-secondary" style={{ flex: 1 }} onClick={onChat}>
-            <ABIco name="msg" size={16} color="var(--ab-red)" />
-            پیام
-          </button>
-        )}
-        {listing.contactEnabled && (
-          <button className="ab-btn-primary" style={{ flex: 1 }} onClick={onCall}>
-            <ABIco name="phone" size={16} color="#FFF" />
-            تماس
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ABEmpty({ title, desc, icon }: { title: string; desc?: string; icon?: string }) {
-  return (
-    <div className="ab-empty-state">
-      <div className="ab-empty-icon">
-        <span style={{ fontSize: 32 }}>{icon ?? "📭"}</span>
-      </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: "var(--ab-text)" }}>{title}</div>
-      {desc && <div style={{ fontSize: 13, color: "var(--ab-text2)", lineHeight: 1.7, maxWidth: 260 }}>{desc}</div>}
-    </div>
-  );
-}
-
-function ABSkeleton({ width = "100%", height = 16, radius = 6, style }: { width?: number | string; height?: number | string; radius?: number; style?: React.CSSProperties }) {
-  return <div className="ab-skeleton" style={{ width, height, borderRadius: radius, ...style }} />;
-}
-
-function ABImageGallery({ images, title }: { images: string[]; title: string }) {
-  const [idx, setIdx] = useState(0);
-  const [lightbox, setLightbox] = useState(false);
-  return (
-    <>
-      <div style={{ position: "relative", background: "#000", aspectRatio: "4/3", overflow: "hidden", cursor: "pointer" }} onClick={() => setLightbox(true)}>
-        <img src={images[idx]} alt={title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        <div style={{ position: "absolute", bottom: 10, right: 0, left: 0, display: "flex", justifyContent: "center", gap: 6 }}>
-          {images.map((_, i) => (
-            <button key={i} onClick={e => { e.stopPropagation(); setIdx(i); }}
-              style={{ width: i === idx ? 20 : 7, height: 7, borderRadius: 3.5, background: i === idx ? "#FFF" : "rgba(255,255,255,0.45)", border: "none", cursor: "pointer", padding: 0, transition: "width .2s" }} />
-          ))}
-        </div>
-        <span style={{ position: "absolute", top: 10, left: 10, background: "rgba(0,0,0,0.5)", color: "#FFF", fontSize: 12, padding: "4px 10px", borderRadius: 8 }}>
-          {toFaD(idx + 1)}/{toFaD(images.length)}
-        </span>
-      </div>
-      {lightbox && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.93)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }} onClick={() => setLightbox(false)}>
-          <img src={images[idx]} alt={title} style={{ maxWidth: "95vw", maxHeight: "80vh", objectFit: "contain" }} onClick={e => e.stopPropagation()} />
-          <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-            {images.map((_, i) => (
-              <button key={i} onClick={e => { e.stopPropagation(); setIdx(i); }}
-                style={{ width: i === idx ? 24 : 8, height: 8, borderRadius: 4, background: i === idx ? "#FFF" : "rgba(255,255,255,0.35)", border: "none", cursor: "pointer", padding: 0, transition: "width .2s" }} />
-            ))}
-          </div>
-          <button style={{ position: "absolute", top: 20, left: 20, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 10, width: 44, height: 44, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setLightbox(false)}>
-            <ABIco name="x" size={20} color="#FFF" />
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
-
-/* ─── Helper ─────────────────────────────────────────────────────── */
-function findCatById(id: string, nodes: ABCategory[] = AB_CATS): ABCategory | undefined {
-  for (const cat of nodes) {
-    if (cat.categoryId === id) return cat;
-    const found = findCatById(id, cat.children);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-function getAllDescendantIds(id: string): string[] {
-  const cat = findCatById(id);
-  if (!cat) return [id];
-  const ids: string[] = [id];
-  const collect = (nodes: ABCategory[]) => {
-    for (const n of nodes) { ids.push(n.categoryId); collect(n.children); }
-  };
-  collect(cat.children);
-  return ids;
-}
-
-function getBreadcrumb(id: string): ABCategory[] {
-  const path: ABCategory[] = [];
-  const walk = (nodes: ABCategory[], target: string): boolean => {
-    for (const n of nodes) {
-      if (n.categoryId === target) { path.push(n); return true; }
-      if (walk(n.children, target)) { path.unshift(n); return true; }
-    }
-    return false;
-  };
-  walk(AB_CATS, id);
-  return path;
-}
-
-function searchCategories(q: string): { cat: ABCategory; path: ABCategory[] }[] {
-  const results: { cat: ABCategory; path: ABCategory[] }[] = [];
-  const walk = (nodes: ABCategory[], ancestors: ABCategory[]) => {
-    for (const n of nodes) {
-      if (n.name.includes(q)) results.push({ cat: n, path: [...ancestors, n] });
-      walk(n.children, [...ancestors, n]);
-    }
-  };
-  walk(AB_CATS, []);
-  return results;
-}
-
-/* ─── Category SVG Icons ─────────────────────────────────────────── */
-const HOME_CATS = [
-  { id: "realestate",   name: "املاک",               color: "#10B981", bg: "rgba(16,185,129,0.14)" },
-  { id: "vehicles",     name: "وسایل نقلیه",         color: "#3B82F6", bg: "rgba(59,130,246,0.14)" },
-  { id: "digital",      name: "کالای دیجیتال",        color: "#A78BFA", bg: "rgba(139,92,246,0.14)" },
-  { id: "home-kitchen", name: "خانه و آشپزخانه",     color: "#F59E0B", bg: "rgba(245,158,11,0.14)" },
-  { id: "services",     name: "خدمات",                color: "#94A3B8", bg: "rgba(100,116,139,0.14)" },
-  { id: "personal",     name: "وسایل شخصی",          color: "#F472B6", bg: "rgba(236,72,153,0.14)" },
-  { id: "entertainment",name: "سرگرمی و فراغت",      color: "#22D3EE", bg: "rgba(8,145,178,0.14)" },
-  { id: "social",       name: "اجتماعی",              color: "#4ADE80", bg: "rgba(22,163,74,0.14)" },
-  { id: "industrial",   name: "تجهیزات و صنعتی",    color: "#9CA3AF", bg: "rgba(55,65,81,0.3)" },
-  { id: "jobs",         name: "استخدام و کاریابی",   color: "#60A5FA", bg: "rgba(30,64,175,0.2)" },
-];
-
-function CatIcon({ id, color, size = 26 }: { id: string; color: string; size?: number }) {
-  const s = { fill: "none", stroke: color, strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  const icons: Record<string, React.ReactNode> = {
-    /* Root categories */
-    realestate:    <><path {...s} d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline {...s} points="9 22 9 12 15 12 15 22"/></>,
-    vehicles:      <><path {...s} d="M5 17H3a2 2 0 0 1-2-2V9l3-6h12l3 6v6a2 2 0 0 1-2 2h-2"/><circle {...s} cx="7.5" cy="17.5" r="2.5"/><circle {...s} cx="16.5" cy="17.5" r="2.5"/></>,
-    digital:       <><rect {...s} x="5" y="2" width="14" height="20" rx="2"/><line {...s} x1="12" y1="18" x2="12.01" y2="18"/></>,
-    "home-kitchen":<><path {...s} d="M2 12h20M6 12v7a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-7"/><path {...s} d="M8 12V7a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v5"/><line {...s} x1="10" y1="4" x2="10" y2="5"/><line {...s} x1="14" y1="4" x2="14" y2="5"/></>,
-    services:      <><path {...s} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>,
-    personal:      <><path {...s} d="M20.38 3.46L16 2l-4 4-4-4-4.38 1.46a2 2 0 0 0-1.2 2.34l2.68 9.93c.37 1.38 1.62 2.27 3 2.27h7.8c1.38 0 2.63-.89 3-2.27l2.68-9.93a2 2 0 0 0-1.2-2.34z"/></>,
-    entertainment: <><path {...s} d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path {...s} d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></>,
-    social:        <><circle {...s} cx="12" cy="8" r="4"/><path {...s} d="M3 21v-2a7 7 0 0 1 14 0v2"/><path {...s} d="M19 8a3 3 0 0 1 0 6"/><path {...s} d="M21 21v-1a5 5 0 0 0-3-4.65"/></>,
-    industrial:    <><circle {...s} cx="12" cy="12" r="3"/><path {...s} d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
-    jobs:          <><rect {...s} x="2" y="7" width="20" height="14" rx="2"/><path {...s} d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>,
-    /* Real estate subcategories */
-    "re-sell-res": <><path {...s} d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle {...s} cx="12" cy="15" r="2"/></>,
-    "re-rent-res": <><rect {...s} x="3" y="11" width="18" height="11" rx="2"/><path {...s} d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
-    "re-sell-com": <><rect {...s} x="3" y="4" width="18" height="17" rx="2"/><path {...s} d="M9 4v17"/><path {...s} d="M15 4v17"/><path {...s} d="M3 10h18"/><path {...s} d="M3 16h18"/></>,
-    "re-rent-com": <><rect {...s} x="3" y="4" width="18" height="17" rx="2"/><path {...s} d="M9 4v17"/><path {...s} d="M3 10h18"/></>,
-    "re-short":    <><rect {...s} x="3" y="4" width="18" height="18" rx="2"/><line {...s} x1="16" y1="2" x2="16" y2="6"/><line {...s} x1="8" y1="2" x2="8" y2="6"/><line {...s} x1="3" y1="10" x2="21" y2="10"/></>,
-    "re-land":     <><path {...s} d="M3 20h18M3 20l4-8 4 4 3-6 4 10"/></>,
-    "re-project":  <><path {...s} d="M2 20h20M4 20V10l8-6 8 6v10"/><rect {...s} x="9" y="14" width="6" height="6"/></>,
-    "re-services": <><path {...s} d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path {...s} d="M9 14h6"/><path {...s} d="M12 11v6"/></>,
-    /* Vehicle subcategories */
-    "veh-cars":    <><path {...s} d="M5 17H3a2 2 0 0 1-2-2V9l3-6h12l3 6v6a2 2 0 0 1-2 2h-2"/><circle {...s} cx="7.5" cy="17.5" r="2.5"/><circle {...s} cx="16.5" cy="17.5" r="2.5"/></>,
-    "veh-motorcycle":<><path {...s} d="M5 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path {...s} d="M19 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/><path {...s} d="M5 15h4l2-6h4l2 4"/></>,
-    "veh-bicycle": <><circle {...s} cx="5" cy="15" r="4"/><circle {...s} cx="19" cy="15" r="4"/><path {...s} d="M5 15l5-8h4l3 8"/><path {...s} d="M12 7l2 8"/></>,
-    "veh-marine":  <><path {...s} d="M2 20h20M12 4v8M8 8l4-4 4 4"/><path {...s} d="M4 16s2 2 8 2 8-2 8-2"/></>,
-    "veh-parts":   <><circle {...s} cx="12" cy="12" r="3"/><path {...s} d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></>,
-    "veh-tire":    <><circle {...s} cx="12" cy="12" r="10"/><circle {...s} cx="12" cy="12" r="4"/><line {...s} x1="12" y1="8" x2="12" y2="4"/><line {...s} x1="12" y1="20" x2="12" y2="16"/><line {...s} x1="8" y1="12" x2="4" y2="12"/><line {...s} x1="20" y1="12" x2="16" y2="12"/></>,
-    "veh-acc":     <><path {...s} d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></>,
-    "veh-service": <><path {...s} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>,
-    /* Digital subcategories */
-    "dig-mobile":  <><rect {...s} x="5" y="2" width="14" height="20" rx="2"/><line {...s} x1="12" y1="18" x2="12.01" y2="18"/></>,
-    "dig-tablet":  <><rect {...s} x="4" y="2" width="16" height="20" rx="2"/><line {...s} x1="12" y1="18" x2="12.01" y2="18"/><line {...s} x1="8" y1="6" x2="16" y2="6"/></>,
-    "dig-laptop":  <><rect {...s} x="2" y="3" width="20" height="14" rx="2"/><path {...s} d="M2 17h20v2H2z"/></>,
-    "dig-computer":<><rect {...s} x="2" y="3" width="20" height="14" rx="2"/><line {...s} x1="8" y1="21" x2="16" y2="21"/><line {...s} x1="12" y1="17" x2="12" y2="21"/></>,
-    "dig-parts":   <><rect {...s} x="7" y="7" width="10" height="10" rx="1"/><path {...s} d="M7 9H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2"/><path {...s} d="M17 9h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path {...s} d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path {...s} d="M9 17v2a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-2"/></>,
-    "dig-monitor": <><rect {...s} x="2" y="3" width="20" height="14" rx="2"/><line {...s} x1="8" y1="21" x2="16" y2="21"/><line {...s} x1="12" y1="17" x2="12" y2="21"/><line {...s} x1="9" y1="9" x2="15" y2="9"/><line {...s} x1="9" y1="12" x2="15" y2="12"/></>,
-    "dig-printer": <><polyline {...s} points="6 9 6 2 18 2 18 9"/><path {...s} d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect {...s} x="6" y="14" width="12" height="8"/></>,
-    "dig-network": <><path {...s} d="M5 12.55a11 11 0 0 1 14.08 0"/><path {...s} d="M1.42 9a16 16 0 0 1 21.16 0"/><path {...s} d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line {...s} x1="12" y1="20" x2="12.01" y2="20"/></>,
-    "dig-camera":  <><path {...s} d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle {...s} cx="12" cy="13" r="4"/></>,
-    "dig-audio":   <><path {...s} d="M3 18v-6a9 9 0 0 1 18 0v6"/><path {...s} d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></>,
-    "dig-tv":      <><rect {...s} x="2" y="7" width="20" height="15" rx="2"/><polyline {...s} points="17 2 12 7 7 2"/></>,
-    "dig-gaming":  <><line {...s} x1="6" y1="12" x2="10" y2="12"/><line {...s} x1="8" y1="10" x2="8" y2="14"/><line {...s} x1="15" y1="13" x2="15.01" y2="13"/><line {...s} x1="18" y1="11" x2="18.01" y2="11"/><rect {...s} x="2" y="6" width="20" height="12" rx="5"/></>,
-    "dig-watch":   <><circle {...s} cx="12" cy="12" r="7"/><polyline {...s} points="12 9 12 12 13.5 13.5"/><path {...s} d="M16.51 17.35l-.35 3.83a2 2 0 0 1-2 1.82H9.83a2 2 0 0 1-2-1.82l-.35-3.83m.01-10.7.35-3.83A2 2 0 0 1 9.83 1h4.35a2 2 0 0 1 2 1.82l.35 3.83"/></>,
-    "dig-smart":   <><path {...s} d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path {...s} d="M9 14h6M9 17h4"/></>,
-    /* Home & Kitchen */
-    "hk-appliance":<><rect {...s} x="2" y="4" width="14" height="17" rx="2"/><path {...s} d="M2 9h14"/><path {...s} d="M18 6l4 4-4 4"/><circle {...s} cx="7" cy="15" r="1"/></>,
-    "hk-furniture":<><path {...s} d="M20 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v3"/><path {...s} d="M2 11a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H2z"/><line {...s} x1="4" y1="18" x2="4" y2="21"/><line {...s} x1="20" y1="18" x2="20" y2="21"/></>,
-    "hk-bedroom":  <><path {...s} d="M2 4v16"/><path {...s} d="M2 8h18a2 2 0 0 1 2 2v10"/><path {...s} d="M2 17h20"/><path {...s} d="M6 8v9"/></>,
-    "hk-carpet":   <><rect {...s} x="3" y="6" width="18" height="12" rx="2"/><path {...s} d="M3 12h18"/><path {...s} d="M8 6v12"/><path {...s} d="M16 6v12"/></>,
-    "hk-decor":    <><rect {...s} x="3" y="3" width="18" height="18" rx="2"/><circle {...s} cx="9" cy="9" r="2"/><path {...s} d="M21 15l-5-5L5 21"/></>,
-    "hk-lighting": <><line {...s} x1="12" y1="2" x2="12" y2="6"/><line {...s} x1="12" y1="18" x2="12" y2="22"/><line {...s} x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line {...s} x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line {...s} x1="2" y1="12" x2="6" y2="12"/><line {...s} x1="18" y1="12" x2="22" y2="12"/><circle {...s} cx="12" cy="12" r="5"/></>,
-    "hk-hvac":     <><path {...s} d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93 4.93 19.07"/><circle {...s} cx="12" cy="12" r="3"/></>,
-    "hk-bathroom": <><path {...s} d="M4 12h16a1 1 0 0 1 1 1v3a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4v-3a1 1 0 0 1 1-1z"/><path {...s} d="M6 12V5a2 2 0 0 1 2-2h3v2.25"/><path {...s} d="M4 21v1M20 21v1"/></>,
-    "hk-cleaning": <><path {...s} d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><line {...s} x1="9" y1="22" x2="9" y2="12"/><line {...s} x1="15" y1="22" x2="15" y2="12"/></>,
-    /* Services */
-    "svc-vehicle": <><path {...s} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>,
-    "svc-construction":<><path {...s} d="M2 20h20M4 20V10l8-6 8 6v10"/></>,
-    "svc-tech":    <><rect {...s} x="2" y="3" width="20" height="14" rx="2"/><path {...s} d="M8 21h8M12 17v4"/><path {...s} d="M9 10l2 2 4-4"/></>,
-    "svc-finance": <><line {...s} x1="12" y1="1" x2="12" y2="23"/><path {...s} d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
-    "svc-transport":<><rect {...s} x="1" y="3" width="15" height="13" rx="1"/><path {...s} d="M16 8h4l3 3v5h-7V8z"/><circle {...s} cx="5.5" cy="18.5" r="2.5"/><circle {...s} cx="18.5" cy="18.5" r="2.5"/></>,
-    "svc-education":<><path {...s} d="M22 10v6M2 10l10-5 10 5-10 5z"/><path {...s} d="M6 12v5c3 3 9 3 12 0v-5"/></>,
-    "svc-beauty":  <><path {...s} d="M6 2v6l-2 2v4l2 2v6"/><path {...s} d="M18 2v6l2 2v4l-2 2v6"/><line {...s} x1="6" y1="12" x2="18" y2="12"/></>,
-    "svc-cleaning":<><path {...s} d="M3 6h18M3 12h18M3 18h18"/></>,
-    "svc-garden":  <><path {...s} d="M17 8C8 10 5.9 16.17 3.82 20.49"/><path {...s} d="M9.5 13.75C9.5 13.75 11 11 15 9c4-2 7-1 7-1s-2 4-6 6c-4 2-6.5 1.25-6.5 1.25z"/></>,
-    "svc-event":   <><path {...s} d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></>,
-    "svc-legal":   <><path {...s} d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
-    "svc-other":   <><circle {...s} cx="12" cy="12" r="10"/><path {...s} d="M12 8v4M12 16h.01"/></>,
-    /* Personal */
-    "per-clothes": <><path {...s} d="M20.38 3.46L16 2l-4 4-4-4-4.38 1.46a2 2 0 0 0-1.2 2.34l2.68 9.93c.37 1.38 1.62 2.27 3 2.27h7.8c1.38 0 2.63-.89 3-2.27l2.68-9.93a2 2 0 0 0-1.2-2.34z"/></>,
-    "per-shoes":   <><path {...s} d="M3 11l9-9 9 9"/><path {...s} d="M12 3v18"/><path {...s} d="M5 21h14"/></>,
-    "per-bag":     <><path {...s} d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line {...s} x1="3" y1="6" x2="21" y2="6"/><path {...s} d="M16 10a4 4 0 0 1-8 0"/></>,
-    "per-jewelry": <><polyline {...s} points="3.5 14 3.5 20 20.5 20 20.5 14"/><line {...s} x1="12" y1="14" x2="12" y2="20"/><path {...s} d="M7 8l5 6 5-6"/><line {...s} x1="3.5" y1="8" x2="20.5" y2="8"/><line {...s} x1="3.5" y1="4" x2="20.5" y2="4"/></>,
-    "per-watch":   <><circle {...s} cx="12" cy="12" r="7"/><polyline {...s} points="12 9 12 12 13.5 13.5"/></>,
-    "per-beauty":  <><path {...s} d="M3 22V8l9-6 9 6v14"/><path {...s} d="M9 22V12h6v10"/></>,
-    "per-baby":    <><circle {...s} cx="12" cy="12" r="10"/><path {...s} d="M8 14s1.5 2 4 2 4-2 4-2"/><line {...s} x1="9" y1="9" x2="9.01" y2="9"/><line {...s} x1="15" y1="9" x2="15.01" y2="9"/></>,
-    "per-stationery":<><line {...s} x1="18" y1="2" x2="22" y2="6"/><path {...s} d="M7.5 20.5L19 9l-4-4L3.5 16.5 2 22z"/></>,
-    /* Entertainment */
-    "ent-books":   <><path {...s} d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path {...s} d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></>,
-    "ent-music":   <><path {...s} d="M9 18V5l12-2v13"/><circle {...s} cx="6" cy="18" r="3"/><circle {...s} cx="18" cy="16" r="3"/></>,
-    "ent-sports":  <><circle {...s} cx="12" cy="12" r="10"/><path {...s} d="M4.93 4.93l4.24 4.24m5.66 5.66l4.24 4.24M14.12 9.88a3 3 0 1 1-4.24 4.24 3 3 0 0 1 4.24-4.24z"/></>,
-    "ent-camp":    <><path {...s} d="M3 17l5-10 4 7 3-5 6 8H3z"/><path {...s} d="M3 20h18"/></>,
-    "ent-tickets": <><path {...s} d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/></>,
-    "ent-travel":  <><path {...s} d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.1z"/></>,
-    "ent-collect": <><circle {...s} cx="12" cy="8" r="7"/><polyline {...s} points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></>,
-    "ent-animals": <><path {...s} d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path {...s} d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></>,
-    "ent-toys":    <><rect {...s} x="3" y="3" width="18" height="18" rx="2"/><path {...s} d="M3 9h18M9 3v18"/></>,
-    /* Social */
-    "soc-events":  <><rect {...s} x="3" y="4" width="18" height="18" rx="2"/><line {...s} x1="16" y1="2" x2="16" y2="6"/><line {...s} x1="8" y1="2" x2="8" y2="6"/><line {...s} x1="3" y1="10" x2="21" y2="10"/></>,
-    "soc-volunteer":<><path {...s} d="M18 8h1a4 4 0 0 1 0 8h-1"/><path {...s} d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line {...s} x1="6" y1="1" x2="6" y2="4"/><line {...s} x1="10" y1="1" x2="10" y2="4"/><line {...s} x1="14" y1="1" x2="14" y2="4"/></>,
-    "soc-lost":    <><circle {...s} cx="11" cy="11" r="8"/><line {...s} x1="21" y1="21" x2="16.65" y2="16.65"/><line {...s} x1="11" y1="8" x2="11" y2="14"/><line {...s} x1="8" y1="11" x2="14" y2="11"/></>,
-    "soc-found":   <><circle {...s} cx="11" cy="11" r="8"/><line {...s} x1="21" y1="21" x2="16.65" y2="16.65"/></>,
-    "soc-announce":<><path {...s} d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.11 12 19.79 19.79 0 0 1 1.07 3.4 2 2 0 0 1 3 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 16z"/></>,
-    /* Industrial */
-    "ind-tools":   <><path {...s} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>,
-    "ind-machinery":<><circle {...s} cx="12" cy="12" r="3"/><path {...s} d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></>,
-    "ind-building":<><rect {...s} x="2" y="7" width="8" height="14"/><path {...s} d="M10 7V3l6 4"/><rect {...s} x="16" y="7" width="6" height="14"/><path {...s} d="M2 21h20"/></>,
-    "ind-business":<><path {...s} d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path {...s} d="M9 22V12h6v10"/></>,
-    "ind-medical": <><path {...s} d="M22 12h-4l-3 9L9 3l-3 9H2"/></>,
-    "ind-agri":    <><path {...s} d="M3 17l9-14 9 14H3z"/><path {...s} d="M3 21h18M12 21V3"/></>,
-    "ind-wholesale":<><rect {...s} x="2" y="7" width="6" height="14"/><rect {...s} x="9" y="3" width="6" height="18"/><rect {...s} x="16" y="7" width="6" height="14"/></>,
-    /* Jobs */
-    "job-admin":   <><rect {...s} x="2" y="7" width="20" height="14" rx="2"/><path {...s} d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>,
-    "job-finance": <><line {...s} x1="12" y1="1" x2="12" y2="23"/><path {...s} d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
-    "job-sales":   <><line {...s} x1="18" y1="20" x2="18" y2="10"/><line {...s} x1="12" y1="20" x2="12" y2="4"/><line {...s} x1="6" y1="20" x2="6" y2="14"/></>,
-    "job-it":      <><polyline {...s} points="16 18 22 12 16 6"/><polyline {...s} points="8 6 2 12 8 18"/></>,
-    "job-engineering":<><circle {...s} cx="12" cy="12" r="3"/><path {...s} d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4"/></>,
-    "job-technical":<><path {...s} d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></>,
-    "job-education":<><path {...s} d="M22 10v6M2 10l10-5 10 5-10 5z"/><path {...s} d="M6 12v5c3 3 9 3 12 0v-5"/></>,
-    "job-medical": <><path {...s} d="M22 12h-4l-3 9L9 3l-3 9H2"/></>,
-    "job-beauty":  <><path {...s} d="M6 2v6l-2 2v4l2 2v6"/><path {...s} d="M18 2v6l2 2v4l-2 2v6"/></>,
-    "job-transport":<><circle {...s} cx="12" cy="12" r="10"/><path {...s} d="M12 8v4M12 16h.01"/></>,
-    "job-restaurant":<><path {...s} d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><line {...s} x1="7" y1="2" x2="7" y2="22"/><path {...s} d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3z"/></>,
-    "job-services":<><path {...s} d="M18 8h1a4 4 0 0 1 0 8h-1"/><path {...s} d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></>,
-    "job-media":   <><polygon {...s} points="23 7 16 12 23 17 23 7"/><rect {...s} x="1" y="5" width="15" height="14" rx="2"/></>,
-    "job-architecture":<><polygon {...s} points="3 11 22 2 13 21 11 13 3 11"/></>,
-  };
-  /* Prefix-based fallback for deep subcategory IDs */
-  const prefixMap: Record<string, string> = {
-    "dig-aud": "dig-audio", "dig-cam": "dig-camera", "dig-game": "dig-gaming",
-    "dig-mob-acc": "dig-mobile", "dig-mob": "dig-mobile", "dig-lap": "dig-laptop",
-    "dig-tab": "dig-tablet", "dig-pc": "dig-computer", "dig-pt": "dig-parts",
-    "dig-mon": "dig-monitor", "dig-net": "dig-network", "dig-prn": "dig-printer",
-    "dig-tv": "dig-tv", "dig-watch": "dig-watch", "dig-smart": "dig-smart",
-    "re-sell": "re-sell-res", "re-rent": "re-rent-res", "re-sc": "re-sell-com",
-    "re-rc": "re-rent-com", "re-sh": "re-short", "re-land": "re-land",
-    "re-proj": "re-project", "re-svc": "re-services",
-    "veh-pass": "veh-cars", "veh-car": "veh-cars", "veh-hvy": "veh-cars",
-    "veh-moto": "veh-motorcycle", "veh-bike": "veh-bicycle",
-    "veh-marine": "veh-marine", "veh-pt": "veh-parts",
-    "veh-tire": "veh-tire", "veh-svc": "veh-service", "veh-acc": "veh-acc",
-    "hk-app": "hk-appliance", "hk-kit": "hk-appliance", "hk-ves": "hk-appliance",
-    "hk-furn": "hk-furniture", "hk-sew": "hk-furniture",
-    "hk-bed": "hk-bedroom", "hk-car": "hk-carpet",
-    "hk-dec": "hk-decor", "hk-lit": "hk-lighting",
-    "hk-hvac": "hk-hvac", "hk-bath": "hk-bathroom", "hk-cln": "hk-cleaning",
-    "svc-veh": "svc-vehicle", "svc-con": "svc-construction", "svc-fin": "svc-finance",
-    "svc-trn": "svc-transport", "svc-edu": "svc-education", "svc-bty": "svc-beauty",
-    "svc-cln": "svc-cleaning", "svc-grd": "svc-garden", "svc-evt": "svc-event",
-    "svc-leg": "svc-legal", "svc-imm": "svc-legal", "svc-tech": "svc-tech",
-    "per-clo": "per-clothes", "per-sh": "per-shoes", "per-jew": "per-jewelry",
-    "per-wat": "per-watch", "per-bty": "per-beauty", "per-baby": "per-baby",
-    "per-sta": "per-stationery", "per-bag": "per-bag",
-    "ent-book": "ent-books", "ent-mus": "ent-music", "ent-spt": "ent-sports",
-    "ent-cmp": "ent-camp", "ent-tkt": "ent-tickets", "ent-col": "ent-collect",
-    "ent-trv": "ent-travel", "ent-ani": "ent-animals", "ent-toy": "ent-toys",
-    "ent-bike": "ent-sports",
-    "soc-evt": "soc-events", "soc-vol": "soc-volunteer",
-    "soc-lost": "soc-lost", "soc-fnd": "soc-found",
-    "ind-tl": "ind-tools", "ind-mch": "ind-machinery", "ind-bld": "ind-building",
-    "ind-biz": "ind-business", "ind-med": "ind-medical",
-    "ind-agr": "ind-agri", "ind-whl": "ind-wholesale",
-    "job-adm": "job-admin", "job-fin": "job-finance", "job-sal": "job-sales",
-    "job-eng": "job-engineering", "job-tec": "job-technical", "job-edu": "job-education",
-    "job-med": "job-media", "job-bty": "job-beauty", "job-trn": "job-transport",
-    "job-rst": "job-restaurant", "job-svc": "job-services", "job-arc": "job-architecture",
-    "job-it": "job-it",
-  };
-  const resolve = (rawId: string): React.ReactNode => {
-    if (icons[rawId]) return icons[rawId];
-    /* Try progressively shorter prefixes */
-    const segs = rawId.split("-");
-    for (let i = segs.length - 1; i >= 2; i--) {
-      const prefix = segs.slice(0, i).join("-");
-      if (prefixMap[prefix]) {
-        const mapped = prefixMap[prefix];
-        if (icons[mapped]) return icons[mapped];
-      }
-    }
-    /* Last-resort: root category by first segment */
-    const rootMap: Record<string, string> = {
-      re: "realestate", veh: "vehicles", dig: "digital", hk: "home-kitchen",
-      svc: "services", per: "personal", ent: "entertainment",
-      soc: "social", ind: "industrial", job: "jobs",
-    };
-    const root = segs[0];
-    if (rootMap[root] && icons[rootMap[root]]) return icons[rootMap[root]];
-    return <circle cx="12" cy="12" r="10" fill="none" stroke={color} strokeWidth="1.8"/>;
-  };
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24">{resolve(id)}</svg>
-  );
-}
-
-/* ─── ABCategorySheet ────────────────────────────────────────────── */
-function ABCategorySheet({ catId, onClose, onSelectFinal }: {
-  catId: string | null; onClose: () => void; onSelectFinal: (cid: string) => void;
-}) {
-  const [subStack, setSubStack] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
-
-  useEffect(() => { if (!catId) { setSubStack([]); setSearch(""); } }, [catId]);
-  useEffect(() => { setSearch(""); }, [subStack.length]);
-
-  const rootCat = catId ? AB_CATS.find(c => c.categoryId === catId) : null;
-
-  // If root has no children, select it immediately (no render-time side effects)
-  const cbRef = React.useRef({ onSelectFinal, onClose });
-  cbRef.current = { onSelectFinal, onClose };
-  useEffect(() => {
-    if (catId && rootCat && rootCat.children.length === 0) {
-      cbRef.current.onSelectFinal(catId);
-      cbRef.current.onClose();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catId]);
-
-  if (!catId || !rootCat || rootCat.children.length === 0) return null;
-
-  const currentCatId = subStack.length > 0 ? subStack[subStack.length - 1] : catId;
-  const currentCat = findCatById(currentCatId);
-  const allChildren = currentCat?.children ?? [];
-  const children = search.trim()
-    ? allChildren.filter(c => c.name.includes(search.trim()))
-    : allChildren;
-
-  const handleRowClick = (sub: ABCategory) => {
-    if (sub.children.length > 0) setSubStack(s => [...s, sub.categoryId]);
-    else { onSelectFinal(sub.categoryId); onClose(); }
-  };
-
-  const goBack = () => {
-    if (subStack.length > 0) setSubStack(s => s.slice(0, -1));
-    else onClose();
-  };
-
-  return createPortal(
-    <>
-      <div className="ab-sheet-overlay" onClick={onClose} />
-      <div className="ab-sheet">
-        <div className="ab-sheet-handle" />
-        <div className="ab-sheet-header">
-          <button onClick={goBack} style={{ background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10 }}>
-            {subStack.length > 0 ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--ab-text2)" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--ab-text2)" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            )}
-          </button>
-          <span style={{ fontSize: 18, fontWeight: 800, color: "var(--ab-text)", fontFamily: "Vazirmatn,sans-serif" }}>
-            {currentCat?.name ?? rootCat.name}
-          </span>
-          <div style={{ width: 36 }} />
-        </div>
-        {/* Search field */}
-        <div style={{ padding: "10px 14px 6px", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", background: "var(--ab-card2)", border: "1px solid var(--ab-border)", borderRadius: 12, padding: "0 12px", height: 44, gap: 8 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ab-muted)" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={`جستجو در ${currentCat?.name ?? rootCat.name}…`}
-              style={{ flex: 1, border: "none", background: "transparent", fontFamily: "Vazirmatn,sans-serif", fontSize: 14, color: "var(--ab-text)", outline: "none", direction: "rtl" }}
-            />
-            {search && (
-              <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ab-muted)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="ab-sheet-body">
-          {children.length === 0 && (
-            <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--ab-muted)", fontFamily: "Vazirmatn,sans-serif", fontSize: 14 }}>نتیجه‌ای یافت نشد</div>
-          )}
-          {children.map(sub => (
-            <div key={sub.categoryId} className="ab-sheet-row" onClick={() => handleRowClick(sub)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ab-faint)" strokeWidth="2" strokeLinecap="round">
-                <polyline points="15 18 9 12 15 6" transform="scale(-1,1) translate(-24,0)"/>
-              </svg>
-              <div style={{ flex: 1, padding: "0 14px" }}>
-                <span style={{ fontSize: 16, fontWeight: 600, color: "var(--ab-text)", fontFamily: "Vazirmatn,sans-serif" }}>{sub.name}</span>
-              </div>
-              <div style={{ fontSize: 12, color: "var(--ab-muted)", fontFamily: "Vazirmatn,sans-serif", flexShrink: 0 }}>{toFaD(sub.listingCount)} آگهی</div>
-            </div>
-          ))}
-          {!search && (
-            <div className="ab-sheet-row" style={{ background: "var(--ab-card2)" }} onClick={() => { onSelectFinal(currentCatId); onClose(); }}>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: 15, fontWeight: 600, color: "var(--ab-text2)", fontFamily: "Vazirmatn,sans-serif" }}>همه آگهی‌های این دسته</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </>,
-    document.body
-  );
-}
-
-/* ─── ABCitySelector ──────────────────────────────────────────────── */
-const CITY_RED = "#E8354E";
-const CITY_RED_BG = "rgba(232,53,78,0.06)";
-
-function ABCitySelector({ sel, onClose, onApply }: {
-  sel: CitySelection; onClose: () => void; onApply: (s: CitySelection) => void;
-}) {
-  const initCityId = sel.type === "cities" && sel.ids.length === 1 ? sel.ids[0] : null;
-  const [selectedCityId, setSelectedCityId] = React.useState<string | null>(initCityId);
-  const [search, setSearch] = React.useState("");
-  const [expandedProvinces, setExpandedProvinces] = React.useState<Set<string>>(() => {
-    const s = new Set<string>();
-    if (initCityId) {
-      const prov = IRAN_PROVINCES.find(p => p.cities.some(c => c.id === initCityId));
-      if (prov) s.add(prov.id);
-    }
-    return s;
-  });
-
-  const filteredProvs = React.useMemo(() => {
-    const q = search.trim();
-    if (!q) return IRAN_PROVINCES;
-    const lower = q;
-    return IRAN_PROVINCES
-      .map(p => ({ ...p, cities: p.cities.filter(c => c.name.includes(lower)) }))
-      .filter(p => p.cities.length > 0 || p.name.includes(lower));
-  }, [search]);
-
-  // When searching, auto-expand provinces with matching cities
-  React.useEffect(() => {
-    if (search.trim()) {
-      const matching = new Set(filteredProvs.filter(p => p.cities.length > 0).map(p => p.id));
-      setExpandedProvinces(matching);
-    }
-  }, [search, filteredProvs]);
-
-  const toggleProvince = (provId: string) => {
-    setExpandedProvinces(prev => {
-      const next = new Set(prev);
-      if (next.has(provId)) next.delete(provId);
-      else next.add(provId);
-      return next;
-    });
-  };
-
-  const selectCity = (cityId: string) => {
-    setSelectedCityId(cityId);
-    // Auto-expand province of the selected city
-    const prov = IRAN_PROVINCES.find(p => p.cities.some(c => c.id === cityId));
-    if (prov) setExpandedProvinces(prev => { const n = new Set(prev); n.add(prov.id); return n; });
-  };
-
-  const buildSelection = (): CitySelection =>
-    selectedCityId ? { type: "cities", ids: [selectedCityId] } : { type: "all" };
-
-  const handleApply = () => {
-    onApply(buildSelection());
-  };
-
-  const handleOverlayClick = () => {
-    // Apply current pending selection before closing (don't discard)
-    onApply(buildSelection());
-  };
-
-  const isAll = selectedCityId === null;
-  const selectedCityName = selectedCityId ? cityNameById(selectedCityId) : null;
-
-  return createPortal(
-    <>
-      <div className="ab-sheet-overlay" onClick={handleOverlayClick} />
-      <div className="ab-sheet" style={{ maxHeight: "92vh" }}>
-        <div className="ab-sheet-handle" />
-        <div className="ab-sheet-header">
-          <button onClick={handleOverlayClick} style={{ background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10 }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--ab-text2)" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-          <span style={{ fontSize: 17, fontWeight: 800, color: "var(--ab-text)", fontFamily: "Vazirmatn,sans-serif" }}>انتخاب شهر</span>
-          <button onClick={handleApply} style={{ background: "none", border: "none", cursor: "pointer", padding: "6px 12px", fontSize: 14, fontWeight: 700, color: CITY_RED, fontFamily: "Vazirmatn,sans-serif" }}>تأیید</button>
-        </div>
-
-        {/* Selected city banner */}
-        {!isAll && selectedCityName && (
-          <div style={{ margin: "0 14px 8px", background: CITY_RED_BG, border: `1.5px solid rgba(232,53,78,0.3)`, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, direction: "rtl" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={CITY_RED} strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            <span style={{ fontSize: 14, fontWeight: 700, color: CITY_RED, fontFamily: "Vazirmatn,sans-serif", flex: 1 }}>{selectedCityName} انتخاب شده</span>
-            <button onClick={() => setSelectedCityId(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex", alignItems: "center" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ab-muted)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-        )}
-
-        {/* Search */}
-        <div style={{ padding: "0 14px 8px", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", background: "var(--ab-card2)", border: "1px solid var(--ab-border)", borderRadius: 12, padding: "0 12px", height: 44, gap: 8 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ab-muted)" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input
-              value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="جستجوی شهر یا استان..."
-              style={{ flex: 1, border: "none", background: "transparent", fontFamily: "Vazirmatn,sans-serif", fontSize: 14, color: "var(--ab-text)", outline: "none", direction: "rtl" }} />
-            {search && (
-              <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ab-muted)" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* All Iran option */}
-        <div onClick={() => setSelectedCityId(null)}
-          style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 18px", borderBottom: "1px solid var(--ab-border)", borderTop: "1px solid var(--ab-border)", cursor: "pointer", flexShrink: 0, direction: "rtl", background: isAll ? CITY_RED_BG : "transparent", userSelect: "none" }}>
-          {/* Radio circle */}
-          <div style={{ width: 22, height: 22, borderRadius: 11, border: `2.5px solid ${isAll ? CITY_RED : "var(--ab-faint)"}`, background: isAll ? CITY_RED : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            {isAll && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-          </div>
-          <span style={{ fontSize: 15, fontWeight: isAll ? 800 : 500, color: isAll ? CITY_RED : "var(--ab-text)", fontFamily: "Vazirmatn,sans-serif" }}>کل ایران</span>
-        </div>
-
-        {/* Province + city list */}
-        <div className="ab-sheet-body">
-          {filteredProvs.map(prov => {
-            const hasSelectedCity = prov.cities.some(c => c.id === selectedCityId);
-            const isExpanded = expandedProvinces.has(prov.id);
-            return (
-              <div key={prov.id}>
-                {/* Province row — entire row toggles expansion */}
-                <div
-                  onClick={() => toggleProvince(prov.id)}
-                  style={{ display: "flex", alignItems: "center", padding: "13px 18px", cursor: "pointer", borderBottom: "1px solid var(--ab-border)", direction: "rtl", background: hasSelectedCity ? "rgba(232,53,78,0.06)" : "transparent", userSelect: "none" }}>
-                  <span style={{ flex: 1, fontSize: 15, fontWeight: hasSelectedCity ? 800 : 600, color: hasSelectedCity ? CITY_RED : "var(--ab-text)", fontFamily: "Vazirmatn,sans-serif" }}>{prov.name}</span>
-                  {hasSelectedCity && (
-                    <span style={{ fontSize: 11, color: CITY_RED, fontFamily: "Vazirmatn,sans-serif", marginLeft: 6, marginRight: 6, background: CITY_RED_BG, padding: "2px 8px", borderRadius: 8 }}>
-                      {selectedCityName}
-                    </span>
-                  )}
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={hasSelectedCity ? CITY_RED : "#AAAAAA"} strokeWidth="2.2" strokeLinecap="round"
-                    style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s", flexShrink: 0 }}>
-                    <polyline points="6 9 12 15 18 9"/>
-                  </svg>
-                </div>
-                {/* City rows */}
-                {isExpanded && prov.cities.map(city => {
-                  const isSel = city.id === selectedCityId;
-                  return (
-                    <div key={city.id}
-                      onClick={e => { e.stopPropagation(); selectCity(city.id); }}
-                      style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 18px 12px 18px", paddingRight: 52, borderBottom: "1px solid var(--ab-border2)", cursor: "pointer", background: isSel ? CITY_RED_BG : "var(--ab-card2)", direction: "rtl" }}>
-                      <div style={{
-                        width: 22, height: 22, borderRadius: 11,
-                        border: `2.5px solid ${isSel ? CITY_RED : "var(--ab-faint)"}`,
-                        background: isSel ? CITY_RED : "transparent",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0,
-                        boxShadow: isSel ? `0 0 0 3px rgba(232,53,78,0.15)` : "none",
-                      }}>
-                        {isSel && (
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
-                        )}
-                      </div>
-                      <span style={{ fontSize: 14, color: isSel ? CITY_RED : "var(--ab-text2)", fontWeight: isSel ? 700 : 400, fontFamily: "Vazirmatn,sans-serif", flex: 1 }}>
-                        {city.name}
-                      </span>
-                      {isSel && (
-                        <div style={{ width: 8, height: 8, borderRadius: 4, background: CITY_RED, flexShrink: 0 }} />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Action buttons */}
-        <div style={{ padding: "12px 16px", paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", borderTop: "1px solid var(--ab-border)", display: "flex", gap: 10, flexShrink: 0, background: "var(--ab-bg2)" }}>
-          <button onClick={() => setSelectedCityId(null)} style={{ flex: 1, height: 48, borderRadius: 13, border: "1.5px solid var(--ab-border)", background: "var(--ab-card2)", fontFamily: "Vazirmatn,sans-serif", fontSize: 14, color: "var(--ab-text2)", cursor: "pointer", fontWeight: 600 }}>
-            کل ایران
-          </button>
-          <button onClick={handleApply} style={{ flex: 2, height: 48, borderRadius: 13, border: "none", background: CITY_RED, fontFamily: "Vazirmatn,sans-serif", fontSize: 15, color: "#FFF", cursor: "pointer", fontWeight: 700 }}>
-            {isAll ? "نمایش کل ایران" : `تأیید — ${selectedCityName}`}
-          </button>
-        </div>
-      </div>
-    </>,
-    document.body
-  );
 }
 
 /* ─── Screen: Home Tab ───────────────────────────────────────────── */
@@ -2554,7 +1705,7 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
   const [reported, setReported] = useState(false);
 
   if (!listing) return <ABEmpty title="آگهی یافت نشد" icon="🔍" />;
-  const owner = AB_USERS.find(u => u.userId === listing.ownerId);
+  const owner = abGetBannerUser(listing.ownerId);
   const city = cityNameById(listing.cityId);
   const isFav = favs.includes(listing.listingId);
   const goBack = pop ?? (() => push({ t: "home" }));
@@ -2644,7 +1795,7 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
             <ABSellerCard user={owner} listing={listing}
               onProfile={() => push({ t: "profile", uid: owner.userId })}
               onCall={() => setShowPhone(true)}
-              onChat={() => { const cid = abStartConv(listing); if (onStartChat) onStartChat(cid); else push({ t: "chat", cid }); }}
+              onChat={() => { void abStartConv(listing).then(cid => { if (onStartChat) onStartChat(cid); else push({ t: "chat", cid }); }); }}
             />
             {isMyAd && (
               <div style={{ display: "flex", gap: 8, margin: "10px 16px 0", flexWrap: "wrap" }}>
@@ -2858,58 +2009,42 @@ function ABPostFlow({ push }: {
   const [aiOverridden, setAiOverridden] = useState(false);
   const [aiSetFields, setAiSetFields] = useState<{cat?:boolean;condition?:boolean;price?:boolean}>({});
 
-  /* ── useEffects for status progression — always declared, never conditional ── */
+  /* ── Real submission: the backend is the only source of listing status ── */
   useEffect(() => {
     if (adStatus !== "reviewing") return;
-    const t = setTimeout(() => setAdStatus("approved"), 2800);
-    return () => clearTimeout(t);
-  }, [adStatus]);
-
-  useEffect(() => {
-    if (adStatus !== "approved") return;
-    const t = setTimeout(() => {
-      const data = submittedRef.current;
-      if (!data) { setAdStatus("published"); return; }
-      const prov = IRAN_PROVINCES.find(p => p.cities.some(c => c.id === data.postCity));
-      const newAd: ABListing = {
-        listingId: `user-${Date.now()}`,
-        token: `tk-${Date.now()}`,
-        ownerId: _currentUid,
-        categoryId: data.selectedLeaf?.categoryId ?? "personal",
-        parentCategoryId: data.selectedLeaf?.categoryId.split("-")[0] ?? "personal",
-        title: data.form.title || "آگهی جدید",
-        description: data.form.desc,
-        images: data.photos.length > 0 ? data.photos : ["https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400"],
-        price: data.form.priceMode === "fixed" ? (parseInt(data.form.price, 10) || 0) : 0,
-        priceMode: data.form.priceMode,
-        condition: data.form.condition,
-        cityId: data.postCity,
-        provinceId: prov?.id ?? "tehran",
-        attributes: data.dynFields,
-        status: "active",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        viewCount: 0, favoriteCount: 0, messageCount: 0,
-        contactEnabled: data.contactMethods.phone,
-        chatEnabled: data.contactMethods.chat,
-        verificationStatus: "none",
-      };
-      abAddAd(newAd);
-      // Emit Postchi event for listing published
-      abAddPostchiEvent({
-        eventId: `pe-pub-${newAd.listingId}`,
-        type: "published",
-        title: "آگهی منتشر شد ✓",
-        description: newAd.title.slice(0, 60),
-        read: false, createdAt: new Date().toISOString(),
-        listingId: newAd.listingId, color: "#059669",
-      });
-      setAdStatus("published");
-    }, 2000);
-    return () => clearTimeout(t);
-  }, [adStatus]);
-
+    const data=submittedRef.current;
+    if(!data||!data.selectedLeaf)return;
+    let cancelled=false;
+    (async()=>{
+      try{
+        const cats=await bannerApi.categories();
+        const cat=cats.categories.find((x:any)=>x.name===data.selectedLeaf?.name||x.slug===data.selectedLeaf?.categoryId);
+        if(!cat)throw new Error("banner_category_not_configured");
+        const price=data.form.priceMode==="fixed"?(Number(data.form.price.replace(/[^0-9۰-۹]/g,"").replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))))||0):null;
+        const created=await bannerApi.createListing({
+          categoryId:Number(cat.id),title:data.form.title.trim(),description:data.form.desc.trim(),price,
+          condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR"
+        });
+        const id=String(created.listing.id);
+        for(const src of data.photos){
+          if(src.startsWith("data:")){
+            const blob=await fetch(src).then(x=>x.blob());
+            const file=new File([blob],"banner-image.jpg",{type:blob.type||"image/jpeg"});
+            await bannerApi.uploadMedia(id,file);
+          }
+        }
+        if(!cancelled){
+          const live=await bannerApi.myListings();
+          _ads=(live.listings??[]).map((x:any)=>mapApiListing(x));
+          _notifyAds();
+        }
+      }catch(e){
+        if(!cancelled){setErrors([e instanceof Error?e.message:"banner_submit_failed"]);setAdStatus("draft");}
+      }
+    })();
+    return()=>{cancelled=true};
+  },[adStatus]);
+  
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -3652,7 +2787,7 @@ function ABEditProfileForm({ push }: { push: (v: ABView) => void }) {
   };
 
   const handleSave = () => {
-    abUpdateUser({ ...user, name: form.name.trim() || user.name, mobile: form.mobile.trim() || user.mobile });
+    void abUpdateUser({ ...user, name: form.name.trim() || user.name, mobile: form.mobile.trim() || user.mobile });
     setSaved(true);
     setTimeout(() => push({ t: "me" }), 1200);
   };
@@ -3663,7 +2798,7 @@ function ABEditProfileForm({ push }: { push: (v: ABView) => void }) {
         <ABCropEditor
           src={cropSrc}
           onConfirm={(dataURL) => {
-            abUpdateUser({ ...abGetUser(), avatar: dataURL });
+            void abUpdateUser({ ...abGetUser(), avatar: dataURL });
             URL.revokeObjectURL(cropSrc);
             setCropSrc(null);
           }}
@@ -3872,7 +3007,7 @@ function ABMsgsTab({ push }: { push: (v: ABView) => void }) {
         ) : filteredConvs.map(conv => {
           const listing = abGetAds().find(l => l.listingId === conv.listingId);
           const otherUserId = conv.sellerId === _currentUid ? conv.buyerId : conv.sellerId;
-          const other = AB_USERS.find(u => u.userId === otherUserId);
+          const other = abGetBannerUser(otherUserId);
           const hasUnread = conv.unreadCount > 0;
           return (
             <div key={conv.conversationId} onClick={() => push({ t: "chat", cid: conv.conversationId })}
@@ -3916,7 +3051,7 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
   const conv = abGetConvs().find(c => c.conversationId === cid);
   const listing = abGetAds().find(l => l.listingId === conv?.listingId);
   const otherUserId = conv ? (conv.sellerId === _currentUid ? conv.buyerId : conv.sellerId) : null;
-  const other = AB_USERS.find(u => u.userId === otherUserId);
+  const other = abGetBannerUser(otherUserId);
   const [input, setInput] = useState("");
   const [offerMode, setOfferMode] = useState(false);
   const [offerVal, setOfferVal] = useState("");
@@ -3938,49 +3073,19 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
     if (el) el.scrollTop = el.scrollHeight;
   }, [displayMsgs.length]);
 
-  // Simulate reply after 1.5s — replace with real WebSocket/API call when backend is ready
-  const simulateReply = (context: string) => {
-    const replies: Record<string, string[]> = {
-      sticker: ["😊 ممنون!", "❤️", "خوبه!"],
-      voice: ["پیام صوتی دریافت شد ✅", "شنیدم، ممنون"],
-      offer: ["بررسی می‌کنم و خبر می‌دم", "قیمت مناسبه، موافقم ✅", "کمی بیشتر فکر می‌کنم"],
-      hello: ["سلام، بله هنوز موجوده 🙂", "سلام، خوش اومدید! بفرمایید", "سلام! چطور می‌تونم کمک کنم؟"],
-      available: ["بله، هنوز موجوده ✅", "بله، کالا دسترس است", "موجوده، اگه می‌خوای ببینی خبر بده"],
-      price: ["قیمت مشخصه، چانه نمی‌زنم", "کمی می‌شه تخفیف داد", "قیمت آخرمه، صرفه‌جویی کردم"],
-      default: ["ممنون از پیامت 🙏", "باشه، متوجه شدم", "حتماً، لطف دارید", "بله، درسته"],
-    };
-    // Detect hello/greeting patterns
-    const lower = input.toLowerCase();
-    let key = context;
-    if (context === "default") {
-      if (/سلام|درود|هلو/.test(lower)) key = "hello";
-      else if (/موجود|هست|داری/.test(lower)) key = "available";
-      else if (/قیمت|تخفیف|چند/.test(lower)) key = "price";
-    }
-    const pool = replies[key] ?? replies.default;
-    const text = pool[Math.floor(Math.random() * pool.length)];
-    setTimeout(() => {
-      abAddMsg(cid, { messageId: `auto-${Date.now()}`, conversationId: cid, senderId: otherUserId ?? "u2", type: "text", text, createdAt: new Date().toISOString(), status: "delivered" });
-    }, 1500);
-  };
-
   const send = () => {
     if (!input.trim()) return;
-    abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "text", text: input.trim(), createdAt: new Date().toISOString(), status: "sent" });
-    simulateReply("default");
+    void abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type:"text", text:input.trim(), createdAt:new Date().toISOString(), status:"sent" });
     setInput(""); setShowStickers(false);
   };
-  const sendSticker = (s: string) => {
-    abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "sticker", sticker: s, createdAt: new Date().toISOString(), status: "sent" });
-    simulateReply("sticker");
+  const sendSticker = (s:string) => {
+    void abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId:_currentUid, type:"sticker", sticker:s, text:s, createdAt:new Date().toISOString(), status:"sent" });
     setShowStickers(false);
   };
   const sendOffer = () => {
-    const amt = Number(offerVal.replace(/[^0-9]/g, ""));
-    if (!amt) return;
-    abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "offer", offerAmount: amt, createdAt: new Date().toISOString(), status: "sent" });
-    simulateReply("offer");
-    setOfferMode(false); setOfferVal("");
+    const amt=Number(offerVal.replace(/[^0-9]/g,"")); if(!amt)return;
+    void abAddMsg(cid,{messageId:Date.now().toString(),conversationId:cid,senderId:_currentUid,type:"offer",offerAmount:amt,text:String(amt),createdAt:new Date().toISOString(),status:"sent"});
+    setOfferMode(false);setOfferVal("");
   };
 
   const startRecording = async () => {
@@ -3997,18 +3102,14 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
         const dur = recordingSecs;
         setRecording(false); setRecordingSecs(0);
         if (recTimerRef.current) clearInterval(recTimerRef.current);
-        abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "voice", media: url, duration: dur, createdAt: new Date().toISOString(), status: "sent" });
-        simulateReply("voice");
+        void abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "voice", media: url, duration: dur, createdAt: new Date().toISOString(), status: "sent" });
       };
       mr.start();
       mediaRecRef.current = mr;
       setRecording(true);
       recTimerRef.current = setInterval(() => setRecordingSecs(s => s + 1), 1000);
     } catch {
-      // MediaRecorder not available (Figma sandbox) — send a mock voice message
-      const dur = 3;
-      abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId: _currentUid, type: "voice", duration: dur, createdAt: new Date().toISOString(), status: "sent" });
-      simulateReply("voice");
+      console.error("voice_recording_unavailable");
     }
   };
   const stopRecording = () => {
@@ -4438,19 +3539,20 @@ function ABMyListings({ push }: { push: (v: ABView) => void }) {
 
 /* ─── Screen: Notifications ──────────────────────────────────────── */
 function ABNotifsScreen({ push }: { push: (v: ABView) => void }) {
-  const [notifs, setNotifs] = useState(AB_NOTIFS);
+  const [notifs, setNotifs] = useState<ABNotification[]>([]);
+  useEffect(() => { bannerApi.notifications().then(x=>setNotifs((x.notifications??[]).map((n:any)=>({notificationId:String(n.id),userId:_currentUid,type:(n.type??"system") as ABNotification["type"],title:n.title,description:n.description,read:Boolean(n.read),createdAt:n.created_at})))).catch(e=>console.error("notifications_failed",e)); }, []);
   const iconMap: Record<string, string> = { message: "msg", offer: "dollar", view: "eye", favorite: "heart", system: "info", "price-alert": "bell" };
   const colorMap: Record<string, string> = { message: "#E8354E", offer: "#059669", view: "#2563EB", favorite: "#E8354E", system: "#D97706", "price-alert": "#7C3AED" };
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <ABHeader title="اعلان‌ها" onBack={() => push({ t: "me" })} rightSlot={
-        <button className="ab-icon-btn" onClick={() => setNotifs(n => n.map(x => ({ ...x, read: true })))}>
+        <button className="ab-icon-btn" onClick={() => { void bannerApi.readAllNotifications(); setNotifs(n => n.map(x => ({ ...x, read: true }))); }}>
           <ABIco name="check" size={18} color="var(--ab-red)" />
         </button>
       } />
       <div className="ab-page">
         {notifs.map(n => (
-          <div key={n.notificationId} className={`ab-notif-row${!n.read ? " unread" : ""}`} onClick={() => setNotifs(prev => prev.map(x => x.notificationId === n.notificationId ? { ...x, read: true } : x))}>
+          <div key={n.notificationId} className={`ab-notif-row${!n.read ? " unread" : ""}`} onClick={() => { void bannerApi.readNotification(n.notificationId); setNotifs(prev => prev.map(x => x.notificationId === n.notificationId ? { ...x, read: true } : x)); }}>
             <div style={{ width: 42, height: 42, borderRadius: 13, background: colorMap[n.type] + "15", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <ABIco name={iconMap[n.type] ?? "bell"} size={18} color={colorMap[n.type]} />
             </div>
@@ -4620,7 +3722,7 @@ function ABSearchScreen({ initialQ, push, favs, toggleFav, citySelection }: {
 function ABProfileScreen({ uid, push, favs, toggleFav }: {
   uid: string; push: (v: ABView) => void; favs: string[]; toggleFav: (id: string) => void;
 }) {
-  const user = AB_USERS.find(u => u.userId === uid);
+  const user = uid === _myUser.userId ? _myUser : abGetBannerUser(uid);
   const biz = AB_BUSINESSES.find(b => b.ownerId === uid);
   const listings = abGetAds().filter(l => l.ownerId === uid && l.status === "active");
   if (!user) return <ABEmpty title="کاربر یافت نشد" />;
@@ -4736,12 +3838,13 @@ function ABMyTicketsScreen({ push, tickets, setTickets }: { push: (v: ABView) =>
 function ABTicketDetailScreen({ tid, push, tickets, setTickets }: { tid: string; push: (v: ABView) => void; tickets: ABTicket[]; setTickets: React.Dispatch<React.SetStateAction<ABTicket[]>> }) {
   const ticket = tickets.find(t => t.ticketId === tid);
   const [reply, setReply] = useState("");
+  useEffect(()=>{if(!tid)return;void bannerApi.ticket(tid).then((x:any)=>{const t=x.ticket;setTickets(ts=>ts.map(v=>v.ticketId===tid?{...v,status:t.status==="open"?"pending":t.status==="resolved"?"answered":"closed",updatedAt:t.updated_at,messages:(x.messages??[]).map((m:any)=>({id:String(m.id),senderId:m.sender_type==="admin"?"support":"user",text:m.body,createdAt:m.created_at}))}:v));}).catch(e=>console.error("ticket_load_failed",e));},[tid]);
   if (!ticket) return <ABEmpty title="تیکت یافت نشد" icon="🎫" />;
 
   const sendReply = () => {
     if (!reply.trim()) return;
-    const msg: ABTicketMessage = { id: `tm${Date.now()}`, senderId: "user", text: reply.trim(), createdAt: new Date().toISOString() };
-    setTickets(ts => ts.map(t => t.ticketId === tid ? { ...t, messages: [...t.messages, msg], updatedAt: new Date().toISOString() } : t));
+    const text=reply.trim();
+    void bannerApi.replyTicket(tid,text).then(()=>setTickets(ts=>ts.map(t=>t.ticketId===tid?{...t, messages:[...t.messages,{id:String(Date.now()),senderId:"user",text,createdAt:new Date().toISOString()}],updatedAt:new Date().toISOString()}:t))).catch(e=>console.error("ticket_reply_failed",e));
     setReply("");
   };
 
@@ -4786,16 +3889,11 @@ function ABNewTicketScreen({ push, tickets, setTickets }: { push: (v: ABView) =>
 
   const submit = () => {
     if (!subject || !message.trim()) return;
-    const tid = `t${Date.now()}`;
-    const now = new Date().toISOString();
-    const newTicket: ABTicket = {
-      ticketId: tid, userId: "me", subject,
-      status: "pending", createdAt: now, updatedAt: now,
-      messages: [{ id: `tm${Date.now()}`, senderId: "user", text: message.trim(), createdAt: now }]
-    };
-    setTickets(ts => [newTicket, ...ts]);
-    setSubmitted(true);
-    setTimeout(() => push({ t: "ticket", tid }), 800);
+    void bannerApi.createTicket(subject,message.trim()).then((x:any)=>{
+      const t=x.ticket;const now=t.created_at??new Date().toISOString();
+      const newTicket:ABTicket={ticketId:String(t.id),userId:_currentUid,subject:t.subject,status:"pending",createdAt:now,updatedAt:t.updated_at??now,messages:[{id:"local",senderId:"user",text:message.trim(),createdAt:now}]};
+      setTickets(ts=>[newTicket,...ts]);setSubmitted(true);setTimeout(()=>push({t:"ticket",tid:String(t.id)}),800);
+    }).catch(e=>console.error("ticket_create_failed",e));
   };
 
   if (submitted) {
@@ -4932,10 +4030,10 @@ function ABTermsPage({ push }: { push: (v: ABView) => void }) {
 
 /* ─── Main AnBanner Screen ───────────────────────────────────────── */
 export default function AnBannerScreen({ onBack, userId, lightTheme }: { onBack: () => void; userId: string; lightTheme?: boolean }) {
-  useEffect(() => { if (userId) initAnBannerStore(userId); }, [userId]);
+  useEffect(() => { if (userId) void initAnBannerStore(userId); }, [userId]);
   const [tab, setTab] = useState<ABTab>("home");
   const [stack, setStack] = useState<ABView[]>([{ t: "home" }]);
-  const [favs, setFavs] = useState<string[]>(MY_FAVS);
+  const [favs, setFavs] = useState<string[]>([]);
   const [citySelection, setCitySelection] = useState<CitySelection>(() => {
     try {
       const raw = localStorage.getItem(abKey("city_sel"));
@@ -4948,7 +4046,8 @@ export default function AnBannerScreen({ onBack, userId, lightTheme }: { onBack:
     try { localStorage.setItem(abKey("city_sel"), JSON.stringify(sel)); } catch {}
   };
   const [showCitySelector, setShowCitySelector] = useState(false);
-  const [tickets, setTickets] = useState<ABTicket[]>(INIT_AB_TICKETS);
+  const [tickets, setTickets] = useState<ABTicket[]>([]);
+  useEffect(() => { if (!userId) return; bannerApi.tickets().then(x => setTickets((x.tickets??[]).map((t:any)=>({ticketId:String(t.id),userId,subject:t.subject,status:t.status==="open"?"pending":t.status==="resolved"?"answered":"closed",createdAt:t.created_at,updatedAt:t.updated_at,messages:[]})))).catch(e=>console.error("An Banner tickets unavailable",e)); }, [userId]);
 
   const push = (v: ABView) => setStack(s => [...s, v]);
   const pop = () => {
@@ -4965,7 +4064,10 @@ export default function AnBannerScreen({ onBack, userId, lightTheme }: { onBack:
   const startChat = (cid: string) => {
     setStack([{ t: "chat-list" }, { t: "chat", cid }]);
   };
-  const toggleFav = (id: string) => setFavs(f => f.includes(id) ? f.filter(x => x !== id) : [...f, id]);
+  const toggleFav = (id: string) => {
+    const next=favs.includes(id)?favs.filter(x=>x!==id):[...favs,id];setFavs(next);
+    void bannerApi.favorite(id).catch(e=>{console.error("favorite_failed",e);setFavs(favs);});
+  };
 
   const cur = stack[stack.length - 1];
 

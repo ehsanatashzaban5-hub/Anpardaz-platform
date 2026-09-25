@@ -57,12 +57,14 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
       const ansarrafUrl = process.env.ANSARRAF_SERVICE_URL ?? 'http://localhost:4002';
       const anpardazUrl = process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001';
       const accountingUrl = process.env.ACCOUNTING_SERVICE_URL ?? 'http://localhost:4004';
+      const bannerUrl = process.env.BANNER_SERVICE_URL ?? 'http://localhost:4005';
       const ansarrafToken = process.env.ANSARRAF_INTERNAL_TOKEN;
       const anpardazToken = process.env.ANPARDAZ_INTERNAL_TOKEN;
       const accountingToken = process.env.ACCOUNTING_INTERNAL_TOKEN;
-      if (!ansarrafToken || !anpardazToken || !accountingToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
+      const bannerToken = process.env.BANNER_INTERNAL_TOKEN;
+      if (!ansarrafToken || !anpardazToken || !accountingToken || !bannerToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
 
-      const [ansarraf, anpardaz, accounting] = await Promise.all([
+      const [ansarraf, anpardaz, accounting, banner] = await Promise.all([
         fetchJson(`${ansarrafUrl.replace(/\/$/, '')}/internal/v1/admin/users/${encodeURIComponent(identityId)}/summary`, {
           headers: { authorization: `Bearer ${ansarrafToken}` },
         }),
@@ -72,6 +74,9 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
         fetchJson(`${accountingUrl.replace(/\/$/, '')}/internal/v1/ledger/accounts?ownerIdentityId=${encodeURIComponent(identityId)}&limit=500`, {
           headers: { authorization: `Bearer ${accountingToken}` },
         }),
+        fetchJson(`${bannerUrl.replace(/\/$/, '')}/internal/v1/admin/users/${encodeURIComponent(identityId)}/summary`, {
+          headers: { authorization: `Bearer ${bannerToken}` },
+        }),
       ]);
 
       return {
@@ -80,6 +85,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
           ansarraf: ansarraf.ok ? ansarraf.body : { unavailable: true, status: ansarraf.status, error: ansarraf.body },
           anpardaz: anpardaz.ok ? anpardaz.body : { unavailable: true, status: anpardaz.status, error: anpardaz.body },
           accounting: accounting.ok ? accounting.body : { unavailable: true, status: accounting.status, error: accounting.body },
+          banner: banner.ok ? banner.body : { unavailable: true, status: banner.status, error: banner.body },
         },
       };
     },
@@ -234,6 +240,82 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     const result = await fetchJson(anpardazBase() + '/internal/v1/admin/users/' + encodeURIComponent(identityId) + '/summary', {
       headers: { authorization: process.env.ANPARDAZ_INTERNAL_TOKEN ? 'Bearer ' + process.env.ANPARDAZ_INTERNAL_TOKEN : '' },
     });
+    return reply.code(result.status).send(result.body);
+  });
+
+  // Browser-facing admin proxy for isolated An Banner operations.
+  const bannerBase = () => (process.env.BANNER_SERVICE_URL ?? 'http://localhost:4005').replace(/\/$/, '');
+  const bannerHeaders = (): Record<string,string> => ({ authorization: 'Bearer ' + (process.env.BANNER_INTERNAL_TOKEN ?? '') });
+
+  app.get('/api/v1/admin/ecosystem/banner/overview', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const token = process.env.BANNER_INTERNAL_TOKEN;
+    if (!token) return reply.code(503).send({ error: 'banner_internal_token_not_configured' });
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/overview', { headers: bannerHeaders() });
+    return reply.code(result.status).send(result.body);
+  });
+  app.get('/api/v1/admin/ecosystem/banner/listings', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/listings' + (request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), { headers: bannerHeaders() });
+    return reply.code(result.status).send(result.body);
+  });
+  app.patch('/api/v1/admin/ecosystem/banner/listings/:id/status', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const body = { ...(request.body as Record<string, unknown> ?? {}), actorIdentityId: req.auth.sub };
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/listings/' + encodeURIComponent((request.params as { id: string }).id) + '/status', {
+      method: 'PATCH', headers: { ...bannerHeaders(), 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    return reply.code(result.status).send(result.body);
+  });
+  app.get('/api/v1/admin/ecosystem/banner/tickets', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/tickets' + (request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), { headers: bannerHeaders() });
+    return reply.code(result.status).send(result.body);
+  });
+  app.get('/api/v1/admin/ecosystem/banner/tickets/:id', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/tickets/' + encodeURIComponent((request.params as { id: string }).id), { headers: bannerHeaders() });
+    return reply.code(result.status).send(result.body);
+  });
+  app.post('/api/v1/admin/ecosystem/banner/tickets/:id/reply', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const body = { ...(request.body as Record<string, unknown> ?? {}), adminIdentityId: req.auth.sub };
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/tickets/' + encodeURIComponent((request.params as { id: string }).id) + '/reply', {
+      method: 'POST', headers: { ...bannerHeaders(), 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    return reply.code(result.status).send(result.body);
+  });
+  app.patch('/api/v1/admin/ecosystem/banner/tickets/:id', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const body = { ...(request.body as Record<string, unknown> ?? {}), adminIdentityId: req.auth.sub };
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/tickets/' + encodeURIComponent((request.params as { id: string }).id), {
+      method: 'PATCH', headers: { ...bannerHeaders(), 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    return reply.code(result.status).send(result.body);
+  });
+  app.get('/api/v1/admin/ecosystem/banner/activity', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/activity' + (request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), { headers: bannerHeaders() });
+    return reply.code(result.status).send(result.body);
+  });
+  app.get('/api/v1/admin/ecosystem/banner/audit', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/audit' + (request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), { headers: bannerHeaders() });
+    return reply.code(result.status).send(result.body);
+  });
+  app.get('/api/v1/admin/ecosystem/banner/users/:identityId', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/users/' + encodeURIComponent((request.params as { identityId: string }).identityId) + '/summary', { headers: bannerHeaders() });
     return reply.code(result.status).send(result.body);
   });
 
