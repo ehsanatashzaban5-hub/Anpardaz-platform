@@ -32,7 +32,7 @@ function Toggle({ value, onChange, label }: { value: boolean; onChange: () => vo
   );
 }
 
-export default function WebSettings({ onNavigate }: { onNavigate: (p: any) => void }) {
+export default function WebSettings({ onNavigate, onThemeChange }: { onNavigate: (p: any) => void; onThemeChange?: (light: boolean) => void }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,7 +52,7 @@ export default function WebSettings({ onNavigate }: { onNavigate: (p: any) => vo
     requestSettings("/api/v1/user/settings").then(({ settings: s }) => {
       if (!active || !s) return;
       setSettings(s);
-      applyTheme(s.theme);
+      applyTheme(s.theme); onThemeChange?.(s.theme === "light");
       if (s.fontScale === 0) document.documentElement.style.fontSize = "";
       else document.documentElement.style.fontSize = `${100 + s.fontScale * 7}%`;
     }).catch(() => setMessage("دریافت تنظیمات انجام نشد.")).finally(() => active && setLoading(false));
@@ -65,7 +65,7 @@ export default function WebSettings({ onNavigate }: { onNavigate: (p: any) => vo
     try {
       const { settings: saved } = await requestSettings("/api/v1/user/settings", { method:"PATCH", body:JSON.stringify(next) });
       setSettings(saved);
-      if (saved.theme) applyTheme(saved.theme);
+      if (saved.theme) { applyTheme(saved.theme); onThemeChange?.(saved.theme === "light"); }
       if (saved.fontScale === 0) document.documentElement.style.fontSize = "";
       else document.documentElement.style.fontSize = `${100 + saved.fontScale * 7}%`;
     } catch { setMessage("ذخیره تنظیمات انجام نشد."); }
