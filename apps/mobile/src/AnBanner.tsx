@@ -304,6 +304,7 @@ type ABView =
   | { t: "chat"; cid: string }
   | { t: "me" }
   | { t: "fav" }
+  | { t: "recent" }
   | { t: "my-listings" }
   | { t: "notifs" }
   | { t: "postchi" }
@@ -3346,6 +3347,7 @@ function ABMeTab({ push, favs }: { push: (v: ABView) => void; favs: string[] }) 
         {[
           { label: "آگهی‌های من", icon: "list", action: () => push({ t: "my-listings" }) },
           { label: "نشان‌شده‌ها", icon: "heart", action: () => push({ t: "fav" }) },
+          { label: "آخرین مشاهده‌ها", icon: "eye", action: () => push({ t: "recent" }) },
           { label: "پیام‌ها", icon: "msg", action: () => push({ t: "chat-list" }) },
           { label: "اعلان‌ها", icon: "bell", action: () => push({ t: "notifs" }) },
           { label: "تیکت‌های من", icon: "info", action: () => push({ t: "my-tickets" }) },
@@ -3424,6 +3426,19 @@ function ABFavScreen({ push, favs, toggleFav }: {
       </div>
     </div>
   );
+}
+
+/* ─── Screen: Recent Views ──────────────────────────────────────── */
+function ABRecentScreen({ push }: { push: (v: ABView) => void }) {
+  const [items,setItems]=useState<any[]>([]);
+  useEffect(()=>{void bannerApi.recentViews().then(r=>setItems(r.listings??[])).catch(()=>setItems([]));},[]);
+  return <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+    <ABHeader title="آخرین مشاهده‌ها" onBack={()=>push({t:"me"})}/>
+    <div className="ab-page" style={{padding:"12px 16px"}}>
+      {!items.length?<ABEmpty title="هنوز آگهی‌ای مشاهده نکرده‌اید" desc="آگهی‌هایی که باز می‌کنید اینجا ثبت می‌شوند." icon="👁️"/>:
+      <div style={{background:"var(--ab-card)",borderRadius:14,overflow:"hidden"}}>{items.map((l:any,idx:number)=><div key={l.id} onClick={()=>push({t:"listing",lid:String(l.id)})} style={{display:"flex",gap:12,padding:"14px 16px",borderBottom:idx<items.length-1?"1px solid var(--ab-border)":"none",cursor:"pointer",direction:"rtl",alignItems:"center"}}><div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:"var(--ab-text)"}}>{l.title}</div><div style={{fontSize:12,color:"var(--ab-muted)",marginTop:5}}>{l.category_name??"—"} · {l.city}</div></div><div style={{fontSize:11,color:"var(--ab-muted)"}}>{toFaD(l.view_count??1)} بازدید</div></div>)}</div>}
+    </div>
+  </div>;
 }
 
 /* ─── Screen: My Listings ────────────────────────────────────────── */
@@ -4107,6 +4122,7 @@ export default function AnBannerScreen({ onBack, userId, lightTheme }: { onBack:
       {cur.t === "chat-list" && <ABMsgsTab push={push} />}
       {cur.t === "chat" && <ABChatView cid={cur.cid} push={push} pop={pop} />}
       {cur.t === "me" && <ABMeTab push={push} favs={favs} />}
+      {cur.t === "recent" && <ABRecentScreen push={push} />}
       {cur.t === "fav" && <ABFavScreen push={push} favs={favs} toggleFav={toggleFav} />}
       {cur.t === "my-listings" && <ABMyListings push={push} />}
       {cur.t === "edit-post" && <ABEditPostFlow push={push} lid={cur.lid} />}
