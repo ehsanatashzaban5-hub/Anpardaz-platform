@@ -190,7 +190,7 @@ async function syncSource(store:Store,source:Source){
      if(source.adapter==='sitemap_jsonld'){
        const maxUrls=Math.max(1,Number(source.mapping?.maxUrls??300));
        const pages=await fetchText(source.endpoint_url,headers);
-       const urls=[...pages.body.matchAll(/<loc>\\s*([^<]+?)\\s*<\\/loc>/gi)].map(m=>m[1].trim()).filter((u:string)=>/^https?:\\/\\//i.test(u)).slice(0,maxUrls);
+       const urls=[...pages.body.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/gi)].map(m=>m[1].trim()).filter((u:string)=>/^https?:\/\//i.test(u)).slice(0,maxUrls);
        const found:Item[]=[];
        for(let i=0;i<urls.length;i+=4){const batch=urls.slice(i,i+4);const xs=await Promise.all(batch.map(async(u:string)=>{try{const p=await fetchText(u);return jsonLdProduct(p.body,u)}catch{return null}}));for(const x of xs)if(x)found.push(x);}
        fetched={data:null,headers:pages.headers,hash:pages.hash};items=found;
