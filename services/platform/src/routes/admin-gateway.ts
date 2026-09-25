@@ -343,6 +343,10 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.write')))return reply.code(403).send({error:'forbidden'});
     const body={...(request.body as Record<string,unknown>??{}),adminIdentityId:req.auth.sub};const result=await fetchJson(bannerBase()+'/internal/v1/admin/users/'+encodeURIComponent((request.params as {identityId:string}).identityId)+'/restrict',{method:'POST',headers:{...bannerHeaders(),'content-type':'application/json'},body:JSON.stringify(body)});return reply.code(result.status).send(result.body);
   });
+  app.post('/api/v1/admin/ecosystem/banner/users/:identityId/unrestrict', { preHandler: requireAuth }, async (request, reply) => {
+    const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.write')))return reply.code(403).send({error:'forbidden'});
+    const body={...(request.body as Record<string,unknown>??{}),adminIdentityId:req.auth.sub};const result=await fetchJson(bannerBase()+'/internal/v1/admin/users/'+encodeURIComponent((request.params as {identityId:string}).identityId)+'/unrestrict',{method:'POST',headers:{...bannerHeaders(),'content-type':'application/json'},body:JSON.stringify(body)});return reply.code(result.status).send(result.body);
+  });
   app.post('/api/v1/admin/ecosystem/banner/users/:identityId/ban', { preHandler: requireAuth }, async (request, reply) => {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.write')))return reply.code(403).send({error:'forbidden'});
     const body={...(request.body as Record<string,unknown>??{}),adminIdentityId:req.auth.sub};const result=await fetchJson(bannerBase()+'/internal/v1/admin/users/'+encodeURIComponent((request.params as {identityId:string}).identityId)+'/ban',{method:'POST',headers:{...bannerHeaders(),'content-type':'application/json'},body:JSON.stringify(body)});return reply.code(result.status).send(result.body);

@@ -1,6 +1,7 @@
 import Fastify,{type FastifyInstance,type FastifyRequest,type FastifyReply} from 'fastify';
 import cors from '@fastify/cors';
 import {Pool} from 'pg';
+import sharp from 'sharp';
 import {requireAuth,requireAdminInternal,type AuthClaims} from './auth.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
@@ -10,11 +11,18 @@ if(isProduction){for(const name of ['DATABASE_URL','CORS_ORIGIN','IDENTITY_ISSUE
 const pool=new Pool({connectionString:process.env.DATABASE_URL,max:10,connectionTimeoutMillis:5000,idleTimeoutMillis:30000});
 const MAX_MEDIA_BYTES=8*1024*1024;
 const allowedMime=new Set(['image/jpeg','image/png','image/webp']);
-function validImageBytes(data:Buffer,mime:string){
-  if(mime==='image/jpeg') return data.length>3 && data[0]===0xff && data[1]===0xd8 && data[2]===0xff;
-  if(mime==='image/png') return data.length>8 && data.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
-  if(mime==='image/webp') return data.length>12 && data.subarray(0,4).toString('ascii')==='RIFF' && data.subarray(8,12).toString('ascii')==='WEBP';
-  return false;
+async function sanitizeImage(data:Buffer,mime:string):Promise<Buffer>{
+  if(!allowedMime.has(mime)||data.length===0||data.length>MAX_MEDIA_BYTES) throw new Error('invalid_image_content');
+  const image=sharp(data,{limitInputPixels:40_000_000,limitInputChannels:5,failOn:'warning',sequentialRead:true});
+  const meta=await image.metadata();
+  if(!meta.width||!meta.height||meta.width>10000||meta.height>10000) throw new Error('invalid_image_dimensions');
+  const normalized= mime==='image/jpeg'
+    ? await image.rotate().jpeg({quality:88,mozjpeg:true}).toBuffer()
+    : mime==='image/png'
+      ? await image.rotate().png({compressionLevel:9}).toBuffer()
+      : await image.rotate().webp({quality:88}).toBuffer();
+  if(!normalized.length||normalized.length>MAX_MEDIA_BYTES) throw new Error('normalized_image_too_large');
+  return normalized;
 }
 
 function auth(req:FastifyRequest){return (req as R).auth;}
@@ -53,10 +61,11 @@ async function suggestWithAI(identityId:string,title:string,description:string){
   const json:any=await response.json();const raw=String(json?.choices?.[0]?.message?.content??'');
   let out:any;try{out=JSON.parse(raw)}catch{throw new Error('banner_ai_invalid_response')}
   const categoryId=Number(out.categoryId);const cat=cats.rows.find((x:any)=>Number(x.id)===categoryId);
-  if(!cat) throw new Error('banner_ai_invalid_category');
+  if(!cat||!cat.parent_id) throw new Error('banner_ai_invalid_subcategory');
   const confidence=Number(out.confidence);if(!Number.isFinite(confidence)||confidence<0||confidence>1) throw new Error('banner_ai_invalid_confidence');
   const attrs=out.attributes&&typeof out.attributes==='object'&&!Array.isArray(out.attributes)?Object.fromEntries(Object.entries(out.attributes).slice(0,40)):{};
-  return {categoryId,categoryName:cat.name,categorySlug:cat.slug,condition:['new','like-new','good','used','for-parts'].includes(out.condition)?out.condition:null,price:out.price===null||out.price===undefined?null:Number(out.price),attributes:attrs,confidence,model:process.env.BANNER_AI_MODEL||'gpt-5-mini',provider:process.env.BANNER_AI_PROVIDER||'openai'};
+  const parent=cats.rows.find((x:any)=>Number(x.id)===Number(cat.parent_id));
+  return {categoryId,categoryName:cat.name,categorySlug:cat.slug,parentCategoryId:parent?.id??null,parentCategoryName:parent?.name??null,condition:['new','like-new','good','used','for-parts'].includes(out.condition)?out.condition:null,price:out.price===null||out.price===undefined?null:Number(out.price),attributes:attrs,confidence,model:process.env.BANNER_AI_MODEL||'gpt-5-mini',provider:process.env.BANNER_AI_PROVIDER||'openai'};
 }
 
 
@@ -104,13 +113,13 @@ async function registerPublic(app:FastifyInstance){
   app.get('/api/v1/banner/media/:id',async(req,reply)=>{
     const id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
     const r=await pool.query('SELECT mime_type,data,filename FROM banner_media WHERE id=$1',[id]);if(!r.rows[0])return reply.code(404).send({error:'media_not_found'});
-    reply.header('Content-Type',r.rows[0].mime_type).header('Content-Disposition',`inline; filename="${r.rows[0].filename}"`).send(r.rows[0].data);
+    reply.header('Content-Type',r.rows[0].mime_type).header('Content-Disposition','inline').send(r.rows[0].data);
   });
 }
 
 async function registerPrivate(app:FastifyInstance){
   app.get('/api/v1/banner/me',{preHandler:requireAuth},async(req)=>{const a=auth(req);if(a.phone)await pool.query(`INSERT INTO banner_profiles(identity_id,phone) VALUES($1,$2) ON CONFLICT(identity_id) DO UPDATE SET phone=COALESCE(NULLIF(banner_profiles.phone,''),EXCLUDED.phone),updated_at=NOW()`,[a.sub,a.phone]);const r=await pool.query(`SELECT identity_id,display_name,phone,city,account_status,violation_count,restriction_flags,restriction_reason,restricted_until,created_at,updated_at,CASE WHEN avatar_data IS NOT NULL THEN 'data:'||COALESCE(avatar_mime,'image/jpeg')||';base64,'||encode(avatar_data,'base64') END avatar_data_url FROM banner_profiles WHERE identity_id=$1`,[a.sub]);return{profile:r.rows[0]??{identity_id:a.sub,display_name:null,phone:null,city:null}};});
-  app.patch('/api/v1/banner/me',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),b=(req.body??{}) as any;const display=clean(b.displayName,120),phone=clean(b.phone||a.phone,30),city=clean(b.city,80);const avatarMime=allowedMime.has(b.avatarMime)?b.avatarMime:null;const avatarData=typeof b.avatarBase64==='string'&&avatarMime?Buffer.from(b.avatarBase64,'base64'):null;if(avatarData&&avatarData.length>2*1024*1024)return reply.code(413).send({error:'avatar_too_large'});if(!display&&!phone&&!city&&!avatarData)return reply.code(400).send({error:'nothing_to_update'});const r=await pool.query(`INSERT INTO banner_profiles(identity_id,display_name,phone,city,avatar_data,avatar_mime) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(identity_id) DO UPDATE SET display_name=COALESCE(NULLIF($2,''),banner_profiles.display_name),phone=COALESCE(NULLIF($3,''),banner_profiles.phone),city=COALESCE(NULLIF($4,''),banner_profiles.city),avatar_data=COALESCE($5,banner_profiles.avatar_data),avatar_mime=COALESCE($6,banner_profiles.avatar_mime),updated_at=NOW() RETURNING identity_id,display_name,phone,city,created_at,updated_at,CASE WHEN avatar_data IS NOT NULL THEN 'data:'||COALESCE(avatar_mime,'image/jpeg')||';base64,'||encode(avatar_data,'base64') END avatar_data_url`,[a.sub,display,phone,city,avatarData,avatarMime]);await activity(a.sub,'profile_update','profile',a.sub,{fields:['displayName','phone','city']});return{profile:r.rows[0]};});
+  app.patch('/api/v1/banner/me',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),b=(req.body??{}) as any;const display=clean(b.displayName,120),phone=clean(a.phone,30),city=clean(b.city,80);const avatarMime=allowedMime.has(b.avatarMime)?b.avatarMime:null;let avatarData:Buffer|null=null;if(typeof b.avatarBase64==='string'&&avatarMime){const rawAvatar=Buffer.from(b.avatarBase64,'base64');if(rawAvatar.length>MAX_MEDIA_BYTES)return reply.code(413).send({error:'avatar_too_large'});try{avatarData=await sanitizeImage(rawAvatar,avatarMime);}catch(e:any){return reply.code(String(e?.message)==='normalized_image_too_large'?413:400).send({error:String(e?.message??'invalid_avatar')});}}if(!display&&!phone&&!city&&!avatarData)return reply.code(400).send({error:'nothing_to_update'});const r=await pool.query(`INSERT INTO banner_profiles(identity_id,display_name,phone,city,avatar_data,avatar_mime) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(identity_id) DO UPDATE SET display_name=COALESCE(NULLIF($2,''),banner_profiles.display_name),phone=COALESCE(NULLIF($3,''),banner_profiles.phone),city=COALESCE(NULLIF($4,''),banner_profiles.city),avatar_data=COALESCE($5,banner_profiles.avatar_data),avatar_mime=COALESCE($6,banner_profiles.avatar_mime),updated_at=NOW() RETURNING identity_id,display_name,phone,city,created_at,updated_at,CASE WHEN avatar_data IS NOT NULL THEN 'data:'||COALESCE(avatar_mime,'image/jpeg')||';base64,'||encode(avatar_data,'base64') END avatar_data_url`,[a.sub,display,phone,city,avatarData,avatarMime]);await activity(a.sub,'profile_update','profile',a.sub,{fields:['displayName','phone','city']});return{profile:r.rows[0]};});
   app.get('/api/v1/banner/me/listings',{preHandler:requireAuth},async(req)=>{const a=auth(req);const r=await pool.query('SELECT l.id,l.title,l.status,l.moderation_reason,l.price,l.currency,l.city,l.contact_enabled,l.chat_enabled,l.views,l.created_at,l.updated_at,c.name category_name FROM banner_listings l LEFT JOIN banner_categories c ON c.id=l.category_id WHERE l.identity_id=$1 ORDER BY l.created_at DESC',[a.sub]);return{listings:r.rows};});
   app.post('/api/v1/banner/ai/suggest',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),b=(req.body??{}) as any,title=clean(b.title,160),description=clean(b.description,200);
@@ -156,10 +165,10 @@ async function registerPrivate(app:FastifyInstance){
   app.post('/api/v1/banner/listings/:id/media',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
     const b=(req.body??{}) as {mimeType?:string;filename?:string;dataBase64?:string};if(!allowedMime.has(b.mimeType??'')||typeof b.dataBase64!=='string')return reply.code(400).send({error:'invalid_media'});
-    const data=Buffer.from(b.dataBase64,'base64');if(!data.length||data.length>MAX_MEDIA_BYTES)return reply.code(413).send({error:'media_too_large'});if(!validImageBytes(data,b.mimeType??''))return reply.code(400).send({error:'invalid_image_content'});
+    const raw=Buffer.from(b.dataBase64,'base64');if(!raw.length||raw.length>MAX_MEDIA_BYTES)return reply.code(413).send({error:'media_too_large'});let data:Buffer;try{data=await sanitizeImage(raw,b.mimeType??'');}catch(e:any){return reply.code(String(e?.message)==='normalized_image_too_large'?413:400).send({error:String(e?.message??'invalid_image_content')});}
     const owner=await pool.query('SELECT id FROM banner_listings WHERE id=$1 AND identity_id=$2',[id,a.sub]);if(!owner.rows[0])return reply.code(404).send({error:'listing_not_found'});
     const count=await pool.query('SELECT COUNT(*)::int count FROM banner_media WHERE listing_id=$1',[id]);if(count.rows[0].count>=8)return reply.code(400).send({error:'media_limit_reached'});
-    const r=await pool.query('INSERT INTO banner_media(listing_id,identity_id,mime_type,filename,data,sort_order) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,mime_type,filename,sort_order',[id,a.sub,b.mimeType,b.filename?.slice(0,180)||'image',data,count.rows[0].count]);
+    const r=await pool.query('INSERT INTO banner_media(listing_id,identity_id,mime_type,filename,data,sort_order) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,mime_type,filename,sort_order',[id,a.sub,b.mimeType,clean(String(b.filename??'image').replace(/[\\/\r\n\0]/g,'_'),120)||'image',data,count.rows[0].count]);
     await activity(a.sub,'media_uploaded','media',String(r.rows[0].id),{listingId:id,mimeType:b.mimeType,size:data.length});return reply.code(201).send({media:r.rows[0]});
   });
   app.delete('/api/v1/banner/media/:id',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});const r=await pool.query('DELETE FROM banner_media WHERE id=$1 AND identity_id=$2 RETURNING id,listing_id',[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'media_not_found'});await activity(a.sub,'media_deleted','media',String(id),{listingId:r.rows[0].listing_id});return{deleted:true};});
@@ -218,7 +227,7 @@ async function registerPrivate(app:FastifyInstance){
   app.post('/api/v1/banner/conversations',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),b=(req.body??{}) as any,id=Number(b.listingId),body=clean(b.message,2000);if(!(await requireAllowed(a.sub,'chat')))return reply.code(403).send({error:'chat_restricted'});
     if(!Number.isInteger(id)||id<1)return reply.code(400).send({error:'invalid_conversation'});
-    const l=await pool.query('SELECT identity_id FROM banner_listings WHERE id=$1 AND status=\'published\'',[id]);if(!l.rows[0]||l.rows[0].identity_id===a.sub)return reply.code(404).send({error:'listing_not_found'});
+    const l=await pool.query('SELECT identity_id,chat_enabled FROM banner_listings WHERE id=$1 AND status=\'published\'',[id]);if(!l.rows[0]||l.rows[0].identity_id===a.sub)return reply.code(404).send({error:'listing_not_found'});if(l.rows[0].chat_enabled!==true)return reply.code(403).send({error:'chat_disabled'});
     const r=await pool.query('INSERT INTO banner_inquiries(listing_id,buyer_identity_id,seller_identity_id,message) VALUES($1,$2,$3,$4) RETURNING *',[id,a.sub,l.rows[0].identity_id,body||'']);
     if(body){await pool.query('INSERT INTO banner_inquiry_messages(inquiry_id,sender_identity_id,body) VALUES($1,$2,$3)',[r.rows[0].id,a.sub,body]);await notify(l.rows[0].identity_id,'message','پیام جدید','برای آگهی شما پیام جدیدی ارسال شده است');}
     await activity(a.sub,'conversation_created','inquiry',String(r.rows[0].id),{listingId:id});return reply.code(201).send({conversationId:String(r.rows[0].id),inquiry:r.rows[0]});
@@ -227,7 +236,7 @@ async function registerPrivate(app:FastifyInstance){
     const a=auth(req),id=idParam((req.params as any).id),b=(req.body??{}) as any,body=clean(b.message,2000),type=['text','image','offer','sticker','voice'].includes(b.type)?b.type:'text';if(!id||(type==='text'&&!body))return reply.code(400).send({error:'invalid_message'});if(!(await requireAllowed(a.sub,'message')))return reply.code(403).send({error:'message_restricted'});
     const r=await pool.query('SELECT buyer_identity_id,seller_identity_id,l.chat_enabled FROM banner_inquiries i JOIN banner_listings l ON l.id=i.listing_id WHERE i.id=$1 AND (buyer_identity_id=$2 OR seller_identity_id=$2)',[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'conversation_not_found'});
     if(r.rows[0].chat_enabled!==true)return reply.code(403).send({error:'chat_disabled'});const recipient=r.rows[0].buyer_identity_id===a.sub?r.rows[0].seller_identity_id:r.rows[0].buyer_identity_id;
-    const media=typeof b.mediaBase64==='string'&&b.mediaBase64?Buffer.from(b.mediaBase64,'base64'):null;if(media&&media.length>8*1024*1024)return reply.code(413).send({error:'media_too_large'});if(media){if(type!=='image'||!allowedMime.has(String(b.mediaMime??''))||!validImageBytes(media,String(b.mediaMime)))return reply.code(400).send({error:'image_only_media_required'});}const m=await pool.query('INSERT INTO banner_inquiry_messages(inquiry_id,sender_identity_id,body,message_type,media_data,media_mime,offer_amount) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text message_id,sender_identity_id,body,message_type,media_mime,offer_amount,created_at',[id,a.sub,body,type,media,b.mediaMime??null,b.offerAmount??null]);
+    const rawMedia=typeof b.mediaBase64==='string'&&b.mediaBase64?Buffer.from(b.mediaBase64,'base64'):null;if(rawMedia&&rawMedia.length>MAX_MEDIA_BYTES)return reply.code(413).send({error:'media_too_large'});let media:Buffer|null=null;if(rawMedia){if(type!=='image'||!allowedMime.has(String(b.mediaMime??'')))return reply.code(400).send({error:'image_only_media_required'});try{media=await sanitizeImage(rawMedia,String(b.mediaMime));}catch(e:any){return reply.code(String(e?.message)==='normalized_image_too_large'?413:400).send({error:String(e?.message??'invalid_image_content')});}}const m=await pool.query('INSERT INTO banner_inquiry_messages(inquiry_id,sender_identity_id,body,message_type,media_data,media_mime,offer_amount) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text message_id,sender_identity_id,body,message_type,media_mime,offer_amount,created_at',[id,a.sub,body,type,media,b.mediaMime??null,b.offerAmount??null]);
     await pool.query('UPDATE banner_inquiries SET status=\'replied\',updated_at=NOW() WHERE id=$1',[id]);
     await notify(recipient,'message','پیام جدید','در گفت‌وگوی آن بنر پیام جدیدی دارید');
     await activity(a.sub,'message_sent','inquiry',String(id));return reply.code(201).send({message:m.rows[0]});
@@ -284,6 +293,19 @@ async function registerInternal(app:FastifyInstance){
     const identity=String((req.params as any).identityId),b=(req.body??{}) as any;if(!b.adminIdentityId)return reply.code(400).send({error:'admin_identity_required'});
     const r=await pool.query('UPDATE banner_profiles SET account_status=\'banned\',restriction_flags=jsonb_set(restriction_flags,\'{all}\',\'true\'::jsonb,true),restriction_reason=$2,restricted_until=NULL,updated_at=NOW() WHERE identity_id=$1 RETURNING *',[identity,clean(b.reason,1000)||'مسدودسازی دائمی توسط مدیریت']);if(!r.rows[0])return reply.code(404).send({error:'profile_not_found'});
     await notify(identity,'system','مسدودسازی حساب',r.rows[0].restriction_reason);await audit(b.adminIdentityId,'admin_ban_user','user',identity,{permanent:true});return{profile:r.rows[0]};
+  });
+  app.post('/internal/v1/admin/users/:identityId/unrestrict',{preHandler:requireAdminInternal},async(req,reply)=>{
+    const identity=String((req.params as any).identityId),b=(req.body??{}) as any;
+    if(!b.adminIdentityId)return reply.code(400).send({error:'admin_identity_required'});
+    const r=await pool.query('UPDATE banner_restrictions SET revoked_at=NOW(),revoked_by=$2 WHERE identity_id=$1 AND revoked_at IS NULL RETURNING id',[identity,b.adminIdentityId]);
+    const active=await pool.query("SELECT 1 FROM banner_restrictions WHERE identity_id=$1 AND revoked_at IS NULL AND starts_at<=NOW() AND (ends_at IS NULL OR ends_at>NOW()) LIMIT 1",[identity]);
+    const p=active.rows[0]
+      ? await pool.query("UPDATE banner_profiles SET account_status='restricted',updated_at=NOW() WHERE identity_id=$1 RETURNING *",[identity])
+      : await pool.query("UPDATE banner_profiles SET account_status='active',restriction_flags='{}'::jsonb,restriction_reason=NULL,restricted_until=NULL,updated_at=NOW() WHERE identity_id=$1 AND account_status<>'banned' RETURNING *",[identity]);
+    if(!p.rows[0])return reply.code(404).send({error:'profile_not_found'});
+    await notify(identity,'system','رفع محدودیت حساب','محدودیت‌های فعال حساب شما توسط مدیریت رفع شد.');
+    await audit(b.adminIdentityId,'admin_unrestrict_user','user',identity,{revokedCount:r.rowCount??0});
+    return{profile:p.rows[0],revokedCount:r.rowCount??0};
   });
   app.get('/internal/v1/admin/overview',{preHandler:requireAdminInternal},async()=>{const [l,p,t,u,a,rp]=await Promise.all([pool.query("SELECT COUNT(*)::int count FROM banner_listings WHERE status='published'"),pool.query("SELECT COUNT(*)::int count FROM banner_listings WHERE status='pending'"),pool.query("SELECT COUNT(*)::int count FROM banner_tickets WHERE status NOT IN ('resolved','closed')"),pool.query("SELECT COUNT(DISTINCT identity_id)::int count FROM banner_activity_events"),pool.query("SELECT COUNT(*)::int count FROM banner_audit_logs"),pool.query("SELECT COUNT(*)::int count FROM banner_reports WHERE status='pending'")]);return{publishedListings:l.rows[0].count,pendingListings:p.rows[0].count,openTickets:t.rows[0].count,activeUsers:u.rows[0].count,auditEvents:a.rows[0].count,pendingReports:rp.rows[0].count};});
   app.get('/internal/v1/admin/listings',{preHandler:requireAdminInternal},async(req)=>{const q=req.query as any,limit=Math.min(200,Math.max(1,Number(q.limit??100)||100));const r=await pool.query('SELECT id,identity_id,category_id,title,description,price,currency,condition,city,status,views,created_at,updated_at FROM banner_listings ORDER BY created_at DESC LIMIT $1',[limit]);return{listings:r.rows};});
