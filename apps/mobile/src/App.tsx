@@ -7526,7 +7526,8 @@ function HelpSystem({onClose,userPhone,homeServices,homePlatforms}:{onClose:()=>
 }
 
 // ─── Financial Center Screen ──────────────────────────────────────────────────
-function FinancialCenterScreen({transactions,onBack,user}:{transactions:TxRecord[];onBack:()=>void;user:UserData}){\n  return <FinancialCenterLive onBack={onBack}/>;
+function FinancialCenterScreen({transactions,onBack,user}:{transactions:TxRecord[];onBack:()=>void;user:UserData}){
+  return <FinancialCenterLive onBack={onBack}/>;
   type ViewMode="day"|"month"|"year";
   type SelTxType={id:string;note?:string;type?:string;createdAt:string;isIncome:boolean;isExpense:boolean;isInternal:boolean;category:string;irr:number};
   const [viewMode,setViewMode]=useState<ViewMode>("day");
