@@ -783,7 +783,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
         }
       }
     }catch(e:any){ setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:"err-"+Date.now(),role:"ai",text:"خطا در اجرای آن هوش: "+(e?.message??"AI_EXECUTION_FAILED"),modelId,ts:new Date()}]); }
-  }},[input,modelId,activeMode,activeConversationId]);
+  },[input,modelId,activeMode,activeConversationId]);
 
   const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setActiveConversationId(null); setTab("home"); },[]);
   const handleSelectMode = (mode: CreationMode) => {
