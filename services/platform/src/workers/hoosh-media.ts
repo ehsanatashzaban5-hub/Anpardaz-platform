@@ -28,6 +28,9 @@ async function processOne(){
  try{
   const result=await generateHooshMedia(pool,r.mode,r.model,r.prompt,r.options??{});
   await pool.query("UPDATE hoosh_media_jobs SET status='completed',mime_type=$1,file_name=$2,media_data=$3,text_output=$4,metadata=$5,lease_until=NULL,completed_at=NOW(),updated_at=NOW(),error=NULL WHERE id=$6",[result.mimeType,result.fileName,result.data,result.textOutput??null,JSON.stringify(result.metadata??{}),r.id]);
+  const label=r.mode==='video'?'ویدیو':r.mode==='music'?'موسیقی':r.mode==='voice'?'صدا':'تصویر';
+  const job=await pool.query<any>("SELECT conversation_id,identity_id FROM hoosh_media_jobs WHERE id=$1",[r.id]);
+  if(job.rows[0]?.conversation_id){await pool.query("INSERT INTO hoosh_messages(conversation_id,role,content,metadata) VALUES($1,'assistant',$2,$3)",[job.rows[0].conversation_id,label+" آماده شد.",JSON.stringify({mediaJobId:r.id,mode:r.mode,provider:r.provider,model:r.model})]);await pool.query("UPDATE hoosh_conversations SET updated_at=NOW() WHERE id=$1",[job.rows[0].conversation_id]);}
  }catch(e){
   const message=e instanceof Error?e.message:'MEDIA_GENERATION_FAILED';
   await pool.query("UPDATE hoosh_media_jobs SET status=CASE WHEN attempt_count >= $1 THEN 'failed' ELSE 'queued' END,error=$2,lease_until=NULL,updated_at=NOW(),completed_at=CASE WHEN attempt_count >= $1 THEN NOW() ELSE NULL END WHERE id=$3",[maxAttempts,message,r.id]);
