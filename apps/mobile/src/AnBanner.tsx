@@ -2167,6 +2167,7 @@ function ABPostFlow({ push }: {
   };
 
   const doSubmit = () => {
+    if(!contactMethods.phone&&!contactMethods.chat){setErrors(["حداقل یکی از روش‌های تماس تلفنی یا چت را فعال کنید."]);return;}
     submittedRef.current = { form, photos, selectedLeaf, postCity, dynFields, contactMethods };
     setErrors([]);
     setAdStatus("reviewing");
