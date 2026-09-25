@@ -1262,24 +1262,14 @@ const AB_CATS: ABCategory[] = [
   ]),
 ];
 
-/* ─── Mutable Ad/Chat/User Store (Backend-ready) ─────────────────── */
-// Module-level mutable store — components read from these, write via helpers.
-// localStorage keeps state across page refreshes. Swap helpers with API calls when backend is ready.
-
+/* ─── Live Ad/Chat/User Store ──────────────────────────────────────
+   Runtime source of truth is the Banner backend. Module state is memory-only. */
 let _ads: ABListing[] = [];
 let _convs: ABConversation[] = [];
 let _msgs: Record<string, ABMessage[]> = {};
 let _myUser: ABUser = { userId:"", name:"", avatar:"", mobile:"", verificationStatus:"unverified", accountType:"personal", createdAt:"", lastActive:"" };
 let _myFavs: string[] = [];
-
-function _tryParse<T>(key: string, fallback: T): T {
-  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
-}
-// Version-gated seed: bump to clear stale localStorage when seed data changes
-const AB_DATA_VERSION = "v4";
 let _currentUid = "default";
-const abKey = (k: string) => `ab2_${_currentUid}_${k}`;
-
 let _bannerUsers: ABUser[] = [];
 function mapApiListing(x: any): ABListing {
   const category = AB_CATS.find(c => c.name === x.category_name);
@@ -1297,9 +1287,9 @@ function mapApiListing(x: any): ABListing {
   };
 }
 function upsertBannerUser(id:string,name?:string) {
-  if (!id) return;
+  if (!id || !name?.trim()) return;
   if (_bannerUsers.some(u=>u.userId===id)) return;
-  _bannerUsers.push({userId:id,name:name||"کاربر آن بنر",avatar:"",mobile:"",verificationStatus:"unverified",accountType:"personal",createdAt:new Date().toISOString(),lastActive:new Date().toISOString()});
+  _bannerUsers.push({userId:id,name:name.trim(),avatar:"",mobile:"",verificationStatus:"unverified",accountType:"personal",createdAt:"",lastActive:""});
 }
 function abGetBannerUser(id:string){return _bannerUsers.find(u=>u.userId===id);}
 async function initAnBannerStore(uid: string) {
@@ -1331,11 +1321,11 @@ let _adsListeners: (() => void)[] = [];
 function _subscribeAds(fn: () => void) { _adsListeners.push(fn); return () => { _adsListeners = _adsListeners.filter(f => f !== fn); }; }
 function _notifyAds() { _adsListeners.forEach(f => f()); }
 
-function storeAds() { try { localStorage.setItem(abKey("ads"), JSON.stringify(_ads)); } catch {} _notifyAds(); }
-function storeConvs() { try { localStorage.setItem(abKey("convs"), JSON.stringify(_convs)); } catch {} }
-function storeMsgs() { try { localStorage.setItem(abKey("msgs"), JSON.stringify(_msgs)); } catch {} }
-function storeUser() { try { localStorage.setItem(abKey("user"), JSON.stringify(_myUser)); } catch {} }
-function storeFavs() { try { localStorage.setItem(abKey("favs"), JSON.stringify(_myFavs)); } catch {} }
+function storeAds() { _notifyAds(); }
+function storeConvs() { /* backend is source of truth */ }
+function storeMsgs() { /* backend is source of truth */ }
+function storeUser() { /* backend is source of truth */ }
+function storeFavs() { /* backend is source of truth */ }
 
 // --- Ad CRUD ---
 function abGetAds(): ABListing[] { return _ads; }
@@ -1433,17 +1423,12 @@ function useConvsVersion() {
 }
 
 // --- Postchi (An Banner system notification) store ---
-const INIT_POSTCHI: ABPostchiEvent[] = [
-  { eventId: "pe1", type: "system", title: "خوش آمدید به آن بنر", description: "اکنون می‌توانید آگهی ثبت کنید، با فروشندگان چت کنید و فعالیت‌های خود را دنبال کنید.", read: true, createdAt: "2026-09-01T08:00:00Z", color: "#2563EB" },
-  { eventId: "pe2", type: "security", title: "هشدار امنیتی", description: "ورود موفق به حساب کاربری از دستگاه جدید شناسایی شد.", read: false, createdAt: "2026-09-06T18:00:00Z", color: "#D97706" },
-];
-
-let _postchi: ABPostchiEvent[] = [...INIT_POSTCHI];
+let _postchi: ABPostchiEvent[] = [];
 let _postchiListeners: (() => void)[] = [];
 
 function _subscribePostchi(fn: () => void) { _postchiListeners.push(fn); return () => { _postchiListeners = _postchiListeners.filter(f => f !== fn); }; }
 function _notifyPostchi() { _postchiListeners.forEach(f => f()); }
-function storePostchi() { try { localStorage.setItem(abKey("postchi"), JSON.stringify(_postchi)); } catch {} _notifyPostchi(); }
+function storePostchi() { _notifyPostchi(); }
 function abGetPostchi(): ABPostchiEvent[] { return _postchi; }
 function abAddPostchiEvent(ev: ABPostchiEvent) { _postchi = [ev, ..._postchi]; storePostchi(); }
 function abMarkPostchiRead(id: string) { _postchi = _postchi.map(e => e.eventId === id ? { ...e, read: true } : e); storePostchi(); }
