@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { _ANP_BACK, useBackHandler } from "./backHandler";
 import AnBannerScreen from "./AnBanner";
 import AnHooshScreen from "./AnHoosh";
+import FinancialCenterLive from "./FinancialCenterLive";
 import anPardazLogo from "@/imports/ChatGPT_Image_Aug_10__2026__06_38_53_PM__3_.png";
 import logoHekmat from "@/imports/Bank-Hekmat-Iranian-Logo.png";
 import logoMehr from "@/imports/Bank-Mehr-Iran.png";
@@ -6072,7 +6073,7 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
       },100);
     }
     return next;
-  });
+  });};
   const pinStepLabel=()=>{
     if(pinModal==="enable")return pinStep==="enter-new"?"رمز جدید ۴ رقمی را وارد کنید":"رمز را تکرار کنید";
     if(pinModal==="change")return pinStep==="enter-current"?"رمز فعلی را وارد کنید":pinStep==="enter-new"?"رمز جدید را وارد کنید":"رمز جدید را تکرار کنید";
@@ -9808,7 +9809,7 @@ export default function App() {
   if(subPage==="card-balance")return <div key="card-balance" className={`app${lt} app-slide`} dir="rtl"><CardBalanceScreen user={user!} onBack={goBack} onDone={goHome}/><SNAV/></div>;
   if(subPage==="charge-payment")return <div key="charge-payment" className={`app${lt} app-slide`} dir="rtl"><ChargePaymentScreen data={chargePayData!} user={user!} onUpdate={updateWithTx} onBack={()=>setSubPage(chargePayOrigin)} onDone={goHome}/><SNAV/></div>;
   if(subPage==="cashback")return <div key="cashback" className={`app${lt} app-slide`} dir="rtl"><CashbackScreen user={user!} transactions={transactions} onBack={goBack} onUpdate={(u,tx)=>{setUser(u);const newTxs=[tx,...transactions];setTransactions(newTxs);if(u)DB.saveTx(u.phone,newTxs);DB.saveUser(u);}}/><SNAV/></div>;
-  if(subPage==="financial-center")return <div key="financial-center" className={`app${lt} app-slide`} dir="rtl"><FinancialCenterScreen transactions={transactions} onBack={goBack} user={user}/><SNAV/></div>;
+  if(subPage==="financial-center")return <div key="financial-center" className={`app${lt} app-slide`} dir="rtl"><FinancialCenterLive onBack={goBack}/><SNAV/></div>;
 function ComparisonPopup({ids,onClose,onMinimize,minimized,onProduct}:{ids:string[];onClose:()=>void;onMinimize:()=>void;minimized:boolean;onProduct:(pid:string)=>void}){
   const prods=ids.map(id=>MARKET_PRODUCTS.find(p=>p.id===id)).filter(Boolean) as AnProduct[];
   const [aiText,setAiText]=useState("");
