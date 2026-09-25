@@ -171,7 +171,7 @@ export default function WebPortal() {
     if (userRole === "guest") return;
     const token = localStorage.getItem("anpardaz:accessToken");
     if (!token) return;
-    const base = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\\/$/, "") ?? "";
+    const base = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
     if (!base) return;
     void fetch(`${base}/api/v1/user/settings`, { headers: { accept: "application/json", authorization: `Bearer ${token}` }, cache: "no-store" })
       .then(r => r.ok ? r.json() : null)
