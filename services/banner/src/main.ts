@@ -236,6 +236,47 @@ async function registerPrivate(app:FastifyInstance){
 }
 
 async function registerInternal(app:FastifyInstance){
+  app.get('/internal/v1/admin/alerts',{preHandler:requireAdminInternal},async(req)=>{
+    const q=req.query as any,limit=Math.min(500,Math.max(1,Number(q.limit??200)||200));
+    const r=await pool.query('SELECT * FROM banner_admin_alerts WHERE resolved_at IS NULL ORDER BY created_at DESC LIMIT $1',[limit]);return{alerts:r.rows};
+  });
+  app.patch('/internal/v1/admin/alerts/:id',{preHandler:requireAdminInternal},async(req,reply)=>{
+    const id=idParam((req.params as any).id),b=(req.body??{}) as any;if(!id||!b.adminIdentityId)return reply.code(400).send({error:'invalid_alert'});
+    const r=await pool.query('UPDATE banner_admin_alerts SET resolved_at=NOW(),resolved_by=$2 WHERE id=$1 RETURNING *',[id,b.adminIdentityId]);if(!r.rows[0])return reply.code(404).send({error:'alert_not_found'});return{alert:r.rows[0]};
+  });
+  app.get('/internal/v1/admin/templates',{preHandler:requireAdminInternal},async()=>{const r=await pool.query('SELECT * FROM banner_admin_message_templates ORDER BY id');return{templates:r.rows};});
+  app.post('/internal/v1/admin/templates',{preHandler:requireAdminInternal},async(req,reply)=>{
+    const b=(req.body??{}) as any;if(!clean(b.title,160)||!clean(b.body,4000)||!b.adminIdentityId)return reply.code(400).send({error:'invalid_template'});
+    const r=await pool.query('INSERT INTO banner_admin_message_templates(title,body,restriction_code,duration_hours,created_by,updated_by) VALUES($1,$2,$3,$4,$5,$5) RETURNING *',[clean(b.title,160),clean(b.body,4000),['none','chat','favorite','listing','message','contact','all'].includes(b.restrictionCode)?b.restrictionCode:'none',b.durationHours?Number(b.durationHours):null,b.adminIdentityId]);return{template:r.rows[0]};
+  });
+  app.patch('/internal/v1/admin/templates/:id',{preHandler:requireAdminInternal},async(req,reply)=>{
+    const id=idParam((req.params as any).id),b=(req.body??{}) as any;if(!id||!b.adminIdentityId)return reply.code(400).send({error:'invalid_template'});
+    const r=await pool.query('UPDATE banner_admin_message_templates SET title=COALESCE(NULLIF($1,\'\'),title),body=COALESCE(NULLIF($2,\'\'),body),restriction_code=COALESCE($3,restriction_code),duration_hours=$4,active=COALESCE($5,active),updated_by=$6,updated_at=NOW() WHERE id=$7 RETURNING *',[clean(b.title,160),clean(b.body,4000),b.restrictionCode??null,b.durationHours===undefined?null:Number(b.durationHours),b.active,b.adminIdentityId,id]);if(!r.rows[0])return reply.code(404).send({error:'template_not_found'});return{template:r.rows[0]};
+  });
+  app.post('/internal/v1/admin/users/:identityId/message',{preHandler:requireAdminInternal},async(req,reply)=>{
+    const identity=String((req.params as any).identityId),b=(req.body??{}) as any;if(!b.adminIdentityId)return reply.code(400).send({error:'admin_identity_required'});
+    let title=clean(b.title,160),body=clean(b.body,4000),template:any=null;if(b.templateId){const q=await pool.query('SELECT * FROM banner_admin_message_templates WHERE id=$1 AND active=TRUE',[Number(b.templateId)]);template=q.rows[0];}
+    if(template){title=title||template.title;body=body||template.body;}
+    if(!title||!body)return reply.code(400).send({error:'message_required'});
+    let restrictionId:any=null;
+    if(template?.restriction_code&&template.restriction_code!=='none'){
+      const dur=template.duration_hours?Number(template.duration_hours):null;
+      const q=await pool.query('INSERT INTO banner_restrictions(identity_id,restriction_code,reason,source_report_count,created_by,ends_at) VALUES($1,$2,$3,(SELECT violation_count FROM banner_profiles WHERE identity_id=$1),$4,$5) RETURNING *',[identity,template.restriction_code,body,b.adminIdentityId,dur?new Date(Date.now()+dur*3600000):null]);restrictionId=q.rows[0].id;
+      await pool.query('UPDATE banner_profiles SET account_status=CASE WHEN account_status=\'banned\' THEN account_status ELSE \'restricted\' END,restriction_flags=restriction_flags || jsonb_build_object($2,true),restriction_reason=$3,restricted_until=$4,updated_at=NOW() WHERE identity_id=$1',[identity,template.restriction_code,body,dur?new Date(Date.now()+dur*3600000):null]);
+    }
+    const m=await pool.query('INSERT INTO banner_user_messages(identity_id,sender_admin_identity_id,title,body,template_id,restriction_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',[identity,b.adminIdentityId,title,body,template?.id??null,restrictionId]);
+    await notify(identity,'system',title,body);await audit(b.adminIdentityId,'admin_user_message','user',identity,{templateId:template?.id??null,restrictionId});return{message:m.rows[0],restrictionId};
+  });
+  app.post('/internal/v1/admin/users/:identityId/restrict',{preHandler:requireAdminInternal},async(req,reply)=>{
+    const identity=String((req.params as any).identityId),b=(req.body??{}) as any,code=['chat','favorite','listing','message','contact','all'].includes(b.restrictionCode)?b.restrictionCode:null;if(!code||!b.adminIdentityId)return reply.code(400).send({error:'invalid_restriction'});
+    const ends=b.durationHours?new Date(Date.now()+Number(b.durationHours)*3600000):null;const r=await pool.query('INSERT INTO banner_restrictions(identity_id,restriction_code,reason,source_report_count,created_by,ends_at) VALUES($1,$2,$3,(SELECT violation_count FROM banner_profiles WHERE identity_id=$1),$4,$5) RETURNING *',[identity,code,clean(b.reason,1000)||'محدودیت مدیریتی',b.adminIdentityId,ends]);
+    await pool.query('UPDATE banner_profiles SET account_status=CASE WHEN account_status=\'banned\' THEN account_status ELSE \'restricted\' END,restriction_flags=restriction_flags || jsonb_build_object($2,true),restriction_reason=$3,restricted_until=$4,updated_at=NOW() WHERE identity_id=$1',[identity,code,clean(b.reason,1000)||'محدودیت مدیریتی',ends]);await notify(identity,'system','محدودیت حساب',clean(b.reason,1000)||'یک محدودیت مدیریتی برای حساب شما اعمال شد');await audit(b.adminIdentityId,'admin_restrict_user','user',identity,{restrictionId:r.rows[0].id,code});return{restriction:r.rows[0]};
+  });
+  app.post('/internal/v1/admin/users/:identityId/ban',{preHandler:requireAdminInternal},async(req,reply)=>{
+    const identity=String((req.params as any).identityId),b=(req.body??{}) as any;if(!b.adminIdentityId)return reply.code(400).send({error:'admin_identity_required'});
+    const r=await pool.query('UPDATE banner_profiles SET account_status=\'banned\',restriction_flags=jsonb_set(restriction_flags,\'{all}\',\'true\'::jsonb,true),restriction_reason=$2,restricted_until=NULL,updated_at=NOW() WHERE identity_id=$1 RETURNING *',[identity,clean(b.reason,1000)||'مسدودسازی دائمی توسط مدیریت']);if(!r.rows[0])return reply.code(404).send({error:'profile_not_found'});
+    await notify(identity,'system','مسدودسازی حساب',r.rows[0].restriction_reason);await audit(b.adminIdentityId,'admin_ban_user','user',identity,{permanent:true});return{profile:r.rows[0]};
+  });
   app.get('/internal/v1/admin/overview',{preHandler:requireAdminInternal},async()=>{const [l,p,t,u,a,rp]=await Promise.all([pool.query("SELECT COUNT(*)::int count FROM banner_listings WHERE status='published'"),pool.query("SELECT COUNT(*)::int count FROM banner_listings WHERE status='pending'"),pool.query("SELECT COUNT(*)::int count FROM banner_tickets WHERE status NOT IN ('resolved','closed')"),pool.query("SELECT COUNT(DISTINCT identity_id)::int count FROM banner_activity_events"),pool.query("SELECT COUNT(*)::int count FROM banner_audit_logs"),pool.query("SELECT COUNT(*)::int count FROM banner_reports WHERE status='pending'")]);return{publishedListings:l.rows[0].count,pendingListings:p.rows[0].count,openTickets:t.rows[0].count,activeUsers:u.rows[0].count,auditEvents:a.rows[0].count,pendingReports:rp.rows[0].count};});
   app.get('/internal/v1/admin/listings',{preHandler:requireAdminInternal},async(req)=>{const q=req.query as any,limit=Math.min(200,Math.max(1,Number(q.limit??100)||100));const r=await pool.query('SELECT id,identity_id,category_id,title,description,price,currency,condition,city,status,views,created_at,updated_at FROM banner_listings ORDER BY created_at DESC LIMIT $1',[limit]);return{listings:r.rows};});
   app.patch('/internal/v1/admin/listings/:id/status',{preHandler:requireAdminInternal},async(req,reply)=>{const id=idParam((req.params as any).id),b=(req.body??{}) as any;if(!id||!['pending','published','rejected','paused','sold','archived','deleted'].includes(b.status))return reply.code(400).send({error:'invalid_status'});const r=await pool.query('UPDATE banner_listings SET status=$1,moderation_reason=$2,updated_at=NOW() WHERE id=$3 RETURNING *',[b.status,clean(b.reason,1000)||null,id]);if(!r.rows[0])return reply.code(404).send({error:'listing_not_found'});await audit(b.actorIdentityId??null,'admin_listing_status','listing',String(id),{status:b.status,reason:b.reason??null});await notify(r.rows[0].identity_id,'system','وضعیت آگهی تغییر کرد','وضعیت آگهی شما به '+b.status+' تغییر کرد');return{listing:r.rows[0]};});
@@ -250,8 +291,16 @@ async function registerInternal(app:FastifyInstance){
   app.patch('/internal/v1/admin/reports/:id',{preHandler:requireAdminInternal},async(req,reply)=>{
     const id=idParam((req.params as any).id),b=(req.body??{}) as any;
     if(!id||!['pending','reviewed','resolved','rejected'].includes(b.status)||!b.adminIdentityId)return reply.code(400).send({error:'invalid_report_update'});
-    const r=await pool.query('UPDATE banner_reports SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING *',[b.status,id]);
+    const r=await pool.query(`UPDATE banner_reports SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING *`,[b.status,id]);
     if(!r.rows[0])return reply.code(404).send({error:'report_not_found'});
+    if(b.status==='resolved'){
+      const owner=await pool.query('SELECT l.identity_id FROM banner_reports br JOIN banner_listings l ON l.id=br.listing_id WHERE br.id=$1',[id]);
+      if(owner.rows[0]){
+        const v=await pool.query('UPDATE banner_profiles SET violation_count=violation_count+1,updated_at=NOW() WHERE identity_id=$1 RETURNING violation_count',[owner.rows[0].identity_id]);
+        const count=Number(v.rows[0]?.violation_count??0);
+        if(count===20||count===40) await pool.query('INSERT INTO banner_admin_alerts(alert_type,identity_id,title,description,threshold) VALUES(\'violation-threshold\',$1,$2,$3,$4)',[owner.rows[0].identity_id,'هشدار تعداد تخلفات','تعداد تخلفات تأییدشده کاربر به '+count+' رسید.',count]);
+      }
+    }
     await audit(b.adminIdentityId,'admin_report_status','report',String(id),{status:b.status});return{report:r.rows[0]};
   });
   app.get('/internal/v1/admin/activity',{preHandler:requireAdminInternal},async(req)=>{const q=req.query as any,limit=Math.min(1000,Math.max(1,Number(q.limit??500)||500)),identity=clean(q.identityId,80);const params:any[]=[];let where='';if(identity){params.push(identity);where='WHERE identity_id=$1';}params.push(limit);const r=await pool.query(`SELECT * FROM banner_activity_events ${where} ORDER BY occurred_at DESC LIMIT $${params.length}`,params);return{activities:r.rows};});
