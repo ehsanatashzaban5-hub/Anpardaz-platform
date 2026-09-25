@@ -4430,19 +4430,20 @@ function ABMyListings({ push }: { push: (v: ABView) => void }) {
 
 /* ─── Screen: Notifications ──────────────────────────────────────── */
 function ABNotifsScreen({ push }: { push: (v: ABView) => void }) {
-  const [notifs, setNotifs] = useState(AB_NOTIFS);
+  const [notifs, setNotifs] = useState<ABNotification[]>([]);
+  useEffect(() => { bannerApi.notifications().then(x=>setNotifs((x.notifications??[]).map((n:any)=>({notificationId:String(n.id),userId:_currentUid,type:(n.type??"system") as ABNotification["type"],title:n.title,description:n.description,read:Boolean(n.read),createdAt:n.created_at})))).catch(e=>console.error("notifications_failed",e)); }, []);
   const iconMap: Record<string, string> = { message: "msg", offer: "dollar", view: "eye", favorite: "heart", system: "info", "price-alert": "bell" };
   const colorMap: Record<string, string> = { message: "#E8354E", offer: "#059669", view: "#2563EB", favorite: "#E8354E", system: "#D97706", "price-alert": "#7C3AED" };
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <ABHeader title="اعلان‌ها" onBack={() => push({ t: "me" })} rightSlot={
-        <button className="ab-icon-btn" onClick={() => setNotifs(n => n.map(x => ({ ...x, read: true })))}>
+        <button className="ab-icon-btn" onClick={() => { void bannerApi.readAllNotifications(); setNotifs(n => n.map(x => ({ ...x, read: true }))); }}>
           <ABIco name="check" size={18} color="var(--ab-red)" />
         </button>
       } />
       <div className="ab-page">
         {notifs.map(n => (
-          <div key={n.notificationId} className={`ab-notif-row${!n.read ? " unread" : ""}`} onClick={() => setNotifs(prev => prev.map(x => x.notificationId === n.notificationId ? { ...x, read: true } : x))}>
+          <div key={n.notificationId} className={`ab-notif-row${!n.read ? " unread" : ""}`} onClick={() => { void bannerApi.readNotification(n.notificationId); setNotifs(prev => prev.map(x => x.notificationId === n.notificationId ? { ...x, read: true } : x)); }}>
             <div style={{ width: 42, height: 42, borderRadius: 13, background: colorMap[n.type] + "15", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <ABIco name={iconMap[n.type] ?? "bell"} size={18} color={colorMap[n.type]} />
             </div>
@@ -4732,8 +4733,7 @@ function ABTicketDetailScreen({ tid, push, tickets, setTickets }: { tid: string;
 
   const sendReply = () => {
     if (!reply.trim()) return;
-    const msg: ABTicketMessage = { id: `tm${Date.now()}`, senderId: "user", text: reply.trim(), createdAt: new Date().toISOString() };
-    setTickets(ts => ts.map(t => t.ticketId === tid ? { ...t, messages: [...t.messages, msg], updatedAt: new Date().toISOString() } : t));
+    void bannerApi.ticket(tid).then(()=>bannerApi.createTicket).catch(()=>{});
     setReply("");
   };
 
@@ -4778,16 +4778,11 @@ function ABNewTicketScreen({ push, tickets, setTickets }: { push: (v: ABView) =>
 
   const submit = () => {
     if (!subject || !message.trim()) return;
-    const tid = `t${Date.now()}`;
-    const now = new Date().toISOString();
-    const newTicket: ABTicket = {
-      ticketId: tid, userId: "me", subject,
-      status: "pending", createdAt: now, updatedAt: now,
-      messages: [{ id: `tm${Date.now()}`, senderId: "user", text: message.trim(), createdAt: now }]
-    };
-    setTickets(ts => [newTicket, ...ts]);
-    setSubmitted(true);
-    setTimeout(() => push({ t: "ticket", tid }), 800);
+    void bannerApi.createTicket(subject,message.trim()).then((x:any)=>{
+      const t=x.ticket;const now=t.created_at??new Date().toISOString();
+      const newTicket:ABTicket={ticketId:String(t.id),userId:_currentUid,subject:t.subject,status:"pending",createdAt:now,updatedAt:t.updated_at??now,messages:[{id:"local",senderId:"user",text:message.trim(),createdAt:now}]};
+      setTickets(ts=>[newTicket,...ts]);setSubmitted(true);setTimeout(()=>push({t:"ticket",tid:String(t.id)}),800);
+    }).catch(e=>console.error("ticket_create_failed",e));
   };
 
   if (submitted) {
