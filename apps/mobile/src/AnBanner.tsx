@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useBackHandler } from "./backHandler";
+import { bannerApi, bannerMediaUrl } from "./bannerApi";
 
 /* ═══════════════════════════════════════════════════════════════
    آن بنر  |  AN BANNER — Iranian Classifieds Marketplace
@@ -1346,22 +1347,49 @@ const AB_DATA_VERSION = "v3";
 let _currentUid = "default";
 const abKey = (k: string) => `ab2_${_currentUid}_${k}`;
 
-function initAnBannerStore(uid: string) {
-  if (_currentUid === uid) return;
+let _bannerUsers: ABUser[] = [];
+function mapApiListing(x: any): ABListing {
+  const category = AB_CATS.find(c => c.name === x.category_name);
+  return {
+    listingId: String(x.id), token: "", ownerId: String(x.identity_id),
+    categoryId: category?.categoryId ?? String(x.category_id), parentCategoryId: category?.parentId ?? "",
+    title: x.title, description: x.description ?? "", images: Array.isArray(x.media_ids) ? x.media_ids.map((id:number)=>bannerMediaUrl(id)) : [],
+    price: Number(x.price ?? 0), priceMode: x.price === null ? "negotiable" : "fixed",
+    condition: (["new","like-new","good","used","for-parts"].includes(x.condition) ? x.condition : "used") as ABListing["condition"],
+    cityId: x.city ?? "", provinceId: "", attributes: {}, status: x.status === "published" ? "active" : x.status,
+    createdAt: x.created_at, updatedAt: x.updated_at, expiresAt: x.expires_at ?? "",
+    viewCount: Number(x.views ?? 0), favoriteCount: 0, messageCount: 0,
+    contactEnabled: x.contact_enabled !== false, chatEnabled: x.chat_enabled !== false,
+    verificationStatus: "none",
+  };
+}
+function upsertBannerUser(id:string,name?:string) {
+  if (!id) return;
+  if (_bannerUsers.some(u=>u.userId===id)) return;
+  _bannerUsers.push({userId:id,name:name||"کاربر آن بنر",avatar:"",mobile:"",verificationStatus:"unverified",accountType:"personal",createdAt:new Date().toISOString(),lastActive:new Date().toISOString()});
+}
+function abGetBannerUser(id:string){return _bannerUsers.find(u=>u.userId===id);}
+async function initAnBannerStore(uid: string) {
   _currentUid = uid;
-  const verKey = abKey("data_ver");
+  _ads = []; _convs = []; _msgs = {}; _myFavs = []; _postchi = []; _bannerUsers = [];
   try {
-    if (localStorage.getItem(verKey) !== AB_DATA_VERSION) {
-      ["ads","convs","msgs","user","favs","city_sel","postchi"].forEach(k => localStorage.removeItem(abKey(k)));
-      localStorage.setItem(verKey, AB_DATA_VERSION);
+    const [listings,favorites,profile,conversations,notifications] = await Promise.all([
+      bannerApi.listings({limit:200}), bannerApi.favorites(), bannerApi.profile(), bannerApi.conversations(), bannerApi.notifications()
+    ]);
+    _ads = (listings.listings ?? []).map((x:any)=>{upsertBannerUser(String(x.identity_id),x.seller_display_name);return mapApiListing(x);});
+    _myFavs = (favorites.listings ?? []).map((x:any)=>String(x.id));
+    _myUser = {
+      userId: uid, name: profile?.profile?.display_name ?? "کاربر آن بنر", avatar: "", mobile: profile?.profile?.phone ?? "",
+      verificationStatus: "unverified", accountType: "personal", createdAt: profile?.profile?.created_at ?? new Date().toISOString(), lastActive: new Date().toISOString()
+    };
+    for (const conv of conversations.conversations ?? []) {
+      const cid=String(conv.conversation_id);
+      _convs.push({conversationId:cid,listingId:String(conv.listing_id),buyerId:String(conv.buyer_identity_id),sellerId:String(conv.seller_identity_id),createdAt:conv.created_at,lastMessageAt:conv.last_message_at,lastMessage:conv.last_message??"",status:conv.status==="archived"?"archived":"active",unreadCount:0});
     }
-  } catch {}
-  _ads = _tryParse<ABListing[]>(abKey("ads"), [...AB_LISTINGS]);
-  _convs = _tryParse<ABConversation[]>(abKey("convs"), [...AB_CONVERSATIONS]);
-  _msgs = _tryParse<Record<string, ABMessage[]>>(abKey("msgs"), { ...AB_MESSAGES });
-  _myUser = _tryParse<ABUser>(abKey("user"), { ...AB_USERS[0] });
-  _myFavs = _tryParse<string[]>(abKey("favs"), [...MY_FAVS]);
-  _postchi = _tryParse<ABPostchiEvent[]>(abKey("postchi"), INIT_POSTCHI);
+    for (const n of notifications.notifications ?? []) _postchi.push({eventId:String(n.id),type:n.type==="support-reply"?"support-reply":"system",title:n.title,description:n.description,read:Boolean(n.read),createdAt:n.created_at});
+  } catch (e) {
+    console.error("An Banner API unavailable",e);
+  }
   _notifyAds(); _notifyConvs(); _notifyPostchi();
 }
 
@@ -1602,7 +1630,7 @@ function ABCondBadge({ condition }: { condition: string }) {
 function ABListingCard({ listing, onTap, onFav, isFav, layout = "grid" }: {
   listing: ABListing; onTap: () => void; onFav?: () => void; isFav?: boolean; layout?: "grid" | "list";
 }) {
-  const owner = AB_USERS.find(u => u.userId === listing.ownerId);
+  const owner = abGetBannerUser(listing.ownerId);
   const city = cityNameById(listing.cityId);
 
   if (layout === "list") {
@@ -3872,7 +3900,7 @@ function ABMsgsTab({ push }: { push: (v: ABView) => void }) {
         ) : filteredConvs.map(conv => {
           const listing = abGetAds().find(l => l.listingId === conv.listingId);
           const otherUserId = conv.sellerId === _currentUid ? conv.buyerId : conv.sellerId;
-          const other = AB_USERS.find(u => u.userId === otherUserId);
+          const other = abGetBannerUser(otherUserId);
           const hasUnread = conv.unreadCount > 0;
           return (
             <div key={conv.conversationId} onClick={() => push({ t: "chat", cid: conv.conversationId })}
@@ -4620,7 +4648,7 @@ function ABSearchScreen({ initialQ, push, favs, toggleFav, citySelection }: {
 function ABProfileScreen({ uid, push, favs, toggleFav }: {
   uid: string; push: (v: ABView) => void; favs: string[]; toggleFav: (id: string) => void;
 }) {
-  const user = AB_USERS.find(u => u.userId === uid);
+  const user = uid === _myUser.userId ? _myUser : abGetBannerUser(uid);
   const biz = AB_BUSINESSES.find(b => b.ownerId === uid);
   const listings = abGetAds().filter(l => l.ownerId === uid && l.status === "active");
   if (!user) return <ABEmpty title="کاربر یافت نشد" />;
@@ -4932,10 +4960,10 @@ function ABTermsPage({ push }: { push: (v: ABView) => void }) {
 
 /* ─── Main AnBanner Screen ───────────────────────────────────────── */
 export default function AnBannerScreen({ onBack, userId, lightTheme }: { onBack: () => void; userId: string; lightTheme?: boolean }) {
-  useEffect(() => { if (userId) initAnBannerStore(userId); }, [userId]);
+  useEffect(() => { if (userId) void initAnBannerStore(userId); }, [userId]);
   const [tab, setTab] = useState<ABTab>("home");
   const [stack, setStack] = useState<ABView[]>([{ t: "home" }]);
-  const [favs, setFavs] = useState<string[]>(MY_FAVS);
+  const [favs, setFavs] = useState<string[]>([]);
   const [citySelection, setCitySelection] = useState<CitySelection>(() => {
     try {
       const raw = localStorage.getItem(abKey("city_sel"));
@@ -4948,7 +4976,8 @@ export default function AnBannerScreen({ onBack, userId, lightTheme }: { onBack:
     try { localStorage.setItem(abKey("city_sel"), JSON.stringify(sel)); } catch {}
   };
   const [showCitySelector, setShowCitySelector] = useState(false);
-  const [tickets, setTickets] = useState<ABTicket[]>(INIT_AB_TICKETS);
+  const [tickets, setTickets] = useState<ABTicket[]>([]);
+  useEffect(() => { if (!userId) return; bannerApi.tickets().then(x => setTickets((x.tickets??[]).map((t:any)=>({ticketId:String(t.id),userId,subject:t.subject,status:t.status==="open"?"pending":t.status==="resolved"?"answered":"closed",createdAt:t.created_at,updatedAt:t.updated_at,messages:[]})))).catch(e=>console.error("An Banner tickets unavailable",e)); }, [userId]);
 
   const push = (v: ABView) => setStack(s => [...s, v]);
   const pop = () => {
