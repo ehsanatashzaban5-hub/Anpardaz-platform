@@ -22,20 +22,20 @@ CREATE INDEX IF NOT EXISTS idx_financial_notifications_unread
 
 CREATE OR REPLACE VIEW financial_daily_summary AS
 SELECT
-  customer_id,
-  card_id,
+  t.customer_id,
+  t.card_id,
   MAX(c.last4) AS card_last4,
   MAX(c.bank_name) AS bank_name,
-  (occurred_at AT TIME ZONE 'Asia/Tehran')::date AS local_day,
-  direction,
-  COALESCE(category,'سایر') AS category,
-  currency,
-  SUM(amount) AS total,
+  (t.occurred_at AT TIME ZONE 'Asia/Tehran')::date AS local_day,
+  t.direction,
+  COALESCE(t.category,'سایر') AS category,
+  t.currency,
+  SUM(t.amount) AS total,
   COUNT(*)::bigint AS transaction_count
 FROM financial_card_transactions t
 JOIN cards c ON c.id=t.card_id
-GROUP BY customer_id, card_id, (occurred_at AT TIME ZONE 'Asia/Tehran')::date,
-         direction, COALESCE(category,'سایر'), currency;
+GROUP BY t.customer_id, t.card_id, (t.occurred_at AT TIME ZONE 'Asia/Tehran')::date,
+         t.direction, COALESCE(t.category,'سایر'), t.currency;
 
 INSERT INTO schema_migrations(version)
 VALUES ('018_financial_center_engine_and_notifications')
