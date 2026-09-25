@@ -2,7 +2,7 @@ import { createPublicKey, verify as verifyData } from 'node:crypto';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 
 export type AuthClaims = {
-  sub: string; email: string; role: string; iss: string; aud: 'anpardaz-ecosystem'; iat: number; exp: number;
+  sub: string; email: string; role: string; phone?: string; iss: string; aud: 'anpardaz-ecosystem'; iat: number; exp: number;
 };
 
 const PUBLIC_KEY_B64 = process.env.IDENTITY_PUBLIC_KEY_B64;
