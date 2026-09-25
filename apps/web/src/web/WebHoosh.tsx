@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import WI from "./WebIcons";
 import type { WebPage, AiModel, Chat, AiProject } from "./types";
 import { useIsMobile } from "./useResponsive";
