@@ -293,8 +293,8 @@ async function registerInternal(app:FastifyInstance){
   app.patch('/internal/v1/admin/reports/:id',{preHandler:requireAdminInternal},async(req,reply)=>{
     const id=idParam((req.params as any).id),b=(req.body??{}) as any;
     if(!id||!['pending','reviewed','resolved','rejected'].includes(b.status)||!b.adminIdentityId)return reply.code(400).send({error:'invalid_report_update'});
-    const r=await pool.query(`UPDATE banner_reports SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING *`,[b.status,id]);
-    if(!r.rows[0])return reply.code(404).send({error:'report_not_found'});
+    const r=await pool.query(`UPDATE banner_reports SET status=$1,updated_at=NOW() WHERE id=$2 AND status='pending' RETURNING *`,[b.status,id]);
+    if(!r.rows[0])return reply.code(404).send({error:'report_not_found_or_already_reviewed'});
     if(b.status==='resolved'||b.status==='rejected'){
       await pool.query('UPDATE banner_violation_reports SET status=$1,reviewed_at=NOW(),reviewed_by=$2 WHERE listing_id=(SELECT listing_id FROM banner_reports WHERE id=$3)',[b.status==='resolved'?'confirmed':'dismissed',b.adminIdentityId,id]);
     }
