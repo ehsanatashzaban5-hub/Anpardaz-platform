@@ -188,6 +188,20 @@ async function fetchUSDTRate():Promise<number|null>{
   try{const r=await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes?symbol=USDT/TOMAN`,{signal:AbortSignal.timeout(7000),cache:"no-store"});if(!r.ok)throw new Error("market_data_unavailable");const d=await r.json();const live=d?.quotes?.filter((q:any)=>!q.stale&&Number(q.lastPrice)>0);const preferred=live?.find((q:any)=>q.provider==="wallex")??live?.[0];return preferred?Number(preferred.lastPrice):null;}catch{return null}
 }
 type SarrafAssetRecord={id:number|string;symbol:string;status?:string};async function anpardazRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const res=await fetch(`${ANPARDAZ_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(data?.error??"anpardaz_request_failed"));return data;}
+type UserSettings={theme:"dark"|"light";notificationsEnabled:boolean;keySoundEnabled:boolean;fontScale:number;pinEnabled:boolean;updatedAt:string};
+async function userSettingsRequest(path:string,init:RequestInit={}){
+  const token=window.localStorage.getItem("anpardaz:accessToken")??"";
+  if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");
+  const headers=new Headers(init.headers);
+  headers.set("accept","application/json");
+  if(token)headers.set("authorization",`Bearer ${token}`);
+  if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");
+  const res=await fetch(`${ANPARDAZ_API_BASE}${path}`,{...init,headers,cache:"no-store"});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(String(data?.error??"user_settings_request_failed"));
+  return data as {settings?:UserSettings;pinEnabled?:boolean};
+}
+
 async function anpardazCardBalance(cardNumber:string,otp:string,cvv2:string,expiryMonth:string,expiryYear:string){return anpardazRequest("/api/v1/cards/balance",{method:"POST",body:JSON.stringify({cardNumber,otp,cvv2,expiryMonth,expiryYear,idempotencyKey:crypto.randomUUID()})});}
 async function anpardazTransfer(destinationExternal:string,amount:number,currency:string,description:string){return anpardazRequest("/api/v1/transfers",{method:"POST",body:JSON.stringify({destinationExternal,amount:String(amount),currency,description,idempotencyKey:crypto.randomUUID()})});}
 async function sarrafRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANSARRAF_API_BASE)throw new Error("ansarraf_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const r=await fetch(`${ANSARRAF_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data?.error??"ansarraf_request_failed"));return data;}async function sarrafAssets():Promise<SarrafAssetRecord[]>{const d=await sarrafRequest("/api/v1/assets");return Array.isArray(d?.assets)?d.assets:[]}function sarrafAssetId(assets:SarrafAssetRecord[],symbol:string){const aliases=symbol==="TMN"?["TMN","TOMAN","IRT","IRR"]:symbol==="USDT"?["USDT"]:[symbol];const a=assets.find(x=>aliases.includes(String(x.symbol).toUpperCase())&&x.status!=="disabled");if(!a)throw new Error(`asset_not_available:${symbol}`);return a.id;}async function sarrafPlaceOrder(baseSymbol:string,quoteSymbol:string,side:"buy"|"sell",orderType:"market"|"limit",quantity:number,price?:number,quoteAmount?:number){const assets=await sarrafAssets();const body:any={baseAssetId:sarrafAssetId(assets,baseSymbol),quoteAssetId:sarrafAssetId(assets,quoteSymbol),side,orderType,quantity:String(quantity),idempotencyKey:crypto.randomUUID()};if(orderType==="limit")body.price=String(price);else if(side==="buy")body.quoteAmount=String(quoteAmount??0);return sarrafRequest("/api/v1/orders",{method:"POST",body:JSON.stringify(body)});}async function sarrafWalletMap():Promise<Record<string,number>>{const d=await sarrafRequest("/api/v1/wallets");const out:Record<string,number>={};for(const w of d?.wallets??[])out[String(w.symbol).toUpperCase()]=Number(w.available_balance??0);return out;}async function sarrafOrders():Promise<any[]>{const d=await sarrafRequest("/api/v1/orders");return Array.isArray(d?.orders)?d.orders:[]}
@@ -6025,21 +6039,40 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
   const handlePinOpen=(mode:"enable"|"change"|"disable")=>{setPinModal(mode);setPinStep(mode==="enable"?"enter-new":"enter-current");setPinInput("");setPinNew("");setPinError("");};
   const handlePinDigit=(d:string)=>{if(pinInput.length<4)setPinInput(p=>{const next=p+d;
     if(next.length===4){
-      setTimeout(()=>{
+      setTimeout(async()=>{
         if(pinModal==="enable"){
           if(pinStep==="enter-new"){setPinNew(next);setPinStep("confirm-new");setPinInput("");}
-          else if(pinStep==="confirm-new"){if(next===pinNew){onUpdate({...user,pin:pinNew});DB.saveUser({...user,pin:pinNew});setPinModal(null);}else{setPinError("رمزها یکسان نیستند. دوباره امتحان کن.");setPinStep("enter-new");setPinNew("");setPinInput("");}}
+          else if(pinStep==="confirm-new"){
+            if(next===pinNew){
+              try{
+                await userSettingsRequest("/api/v1/user/settings/pin/enable",{method:"POST",body:JSON.stringify({newPin:pinNew})});
+                onUpdate({...user,pin:pinNew});DB.saveUser({...user,pin:pinNew});setPinModal(null);
+              }catch{setPinError("ذخیره رمز انجام نشد. دوباره تلاش کنید.");setPinInput("");}
+            }else{setPinError("رمزها یکسان نیستند. دوباره امتحان کن.");setPinStep("enter-new");setPinNew("");setPinInput("");}
+          }
         } else if(pinModal==="change"){
           if(pinStep==="enter-current"){if(next===user.pin){setPinStep("enter-new");setPinInput("");setPinError("");}else{setPinError("رمز اشتباه است.");setPinInput("");}}
           else if(pinStep==="enter-new"){setPinNew(next);setPinStep("confirm-new");setPinInput("");}
-          else if(pinStep==="confirm-new"){if(next===pinNew){onUpdate({...user,pin:pinNew});DB.saveUser({...user,pin:pinNew});setPinModal(null);}else{setPinError("رمزها یکسان نیستند.");setPinStep("enter-new");setPinNew("");setPinInput("");}}
+          else if(pinStep==="confirm-new"){
+            if(next===pinNew){
+              try{
+                await userSettingsRequest("/api/v1/user/settings/pin/change",{method:"POST",body:JSON.stringify({currentPin:user.pin,newPin:pinNew})});
+                onUpdate({...user,pin:pinNew});DB.saveUser({...user,pin:pinNew});setPinModal(null);
+              }catch{setPinError("رمز فعلی یا رمز جدید معتبر نیست.");setPinInput("");}
+            }else{setPinError("رمزها یکسان نیستند.");setPinStep("enter-new");setPinNew("");setPinInput("");}
+          }
         } else if(pinModal==="disable"){
-          if(next===user.pin){onUpdate({...user,pin:""});DB.saveUser({...user,pin:""});setPinModal(null);}else{setPinError("رمز اشتباه است.");setPinInput("");}
+          if(next===user.pin){
+            try{
+              await userSettingsRequest("/api/v1/user/settings/pin/disable",{method:"POST",body:JSON.stringify({currentPin:user.pin})});
+              onUpdate({...user,pin:""});DB.saveUser({...user,pin:""});setPinModal(null);
+            }catch{setPinError("غیرفعال‌سازی رمز انجام نشد.");setPinInput("");}
+          }else{setPinError("رمز اشتباه است.");setPinInput("");}
         }
       },100);
     }
     return next;
-  });};
+  });
   const pinStepLabel=()=>{
     if(pinModal==="enable")return pinStep==="enter-new"?"رمز جدید ۴ رقمی را وارد کنید":"رمز را تکرار کنید";
     if(pinModal==="change")return pinStep==="enter-current"?"رمز فعلی را وارد کنید":pinStep==="enter-new"?"رمز جدید را وارد کنید":"رمز جدید را تکرار کنید";
@@ -6053,9 +6086,28 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
   const toggleSmartNotif=(key:keyof typeof smartNotif)=>{const next={...smartNotif,[key]:!smartNotif[key]};setSmartNotif(next);localStorage.setItem("anp_smart_notif_settings",JSON.stringify(next));};
   const [fontScale,setFontScaleState]=useState(()=>Number(localStorage.getItem("anp_font_scale")||"0"));
   const [logoutConfirm,setLogoutConfirm]=useState(false);
-  const toggleNotifications=()=>setNotifications(v=>{const next=!v;localStorage.setItem(`anp_notifications_${user.uid}`,next?"on":"off");if(next)playChime();return next});
-  const toggleKeySound=()=>setKeySoundEnabled(v=>{const next=!v;localStorage.setItem("anp_key_sound",next?"on":"off");return next});
-  const setFontScale=(n:number)=>{setFontScaleState(n);localStorage.setItem("anp_font_scale",String(n));const root=document.getElementById("root");if(root)root.style.zoom=n===0?"":String(1+n*0.07);};
+  const persistSettings=async(patch:Partial<UserSettings>)=>{
+    try{await userSettingsRequest("/api/v1/user/settings",{method:"PATCH",body:JSON.stringify(patch)});}
+    catch{setPinError("ذخیره تنظیمات انجام نشد. اتصال سرور را بررسی کنید.");}
+  };
+  useEffect(()=>{
+    let active=true;
+    void userSettingsRequest("/api/v1/user/settings").then(({settings})=>{
+      if(!active||!settings)return;
+      setNotifications(settings.notificationsEnabled);
+      setKeySoundEnabled(settings.keySoundEnabled);
+      setFontScaleState(settings.fontScale);
+      localStorage.setItem(`anp_notifications_${user.uid}`,settings.notificationsEnabled?"on":"off");
+      localStorage.setItem("anp_key_sound",settings.keySoundEnabled?"on":"off");
+      localStorage.setItem("anp_font_scale",String(settings.fontScale));
+      const root=document.getElementById("root");
+      if(root)root.style.zoom=settings.fontScale===0?"":String(1+settings.fontScale*0.07);
+    }).catch(()=>{});
+    return()=>{active=false};
+  },[user.uid]);
+  const toggleNotifications=()=>setNotifications(v=>{const next=!v;localStorage.setItem(`anp_notifications_${user.uid}`,next?"on":"off");if(next)playChime();void persistSettings({notificationsEnabled:next});return next});
+  const toggleKeySound=()=>setKeySoundEnabled(v=>{const next=!v;localStorage.setItem("anp_key_sound",next?"on":"off");void persistSettings({keySoundEnabled:next});return next});
+  const setFontScale=(n:number)=>{setFontScaleState(n);localStorage.setItem("anp_font_scale",String(n));const root=document.getElementById("root");if(root)root.style.zoom=n===0?"":String(1+n*0.07);void persistSettings({fontScale:n});};
   const initials=(user.name?.[0]??"")+(user.family?.[0]??"")||"؟";
 
   if(modal==="info")return <div className="anp-full-page" dir="rtl"><div className="anp-page-header"><button className="back-btn" onClick={()=>setModal(null)}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">اطلاعات شخصی</h2><div style={{width:36}}/></div><div className="anp-page-body">{[["نام",user.name||"—"],["نام خانوادگی",user.family||"—"],["کد ملی",user.nationalId?toFaDigits(user.nationalId):"—"],["تاریخ تولد",user.birthDate?toFaDigits(user.birthDate):"—"],["موبایل",toFaDigits(user.phone)],["عضویت",user.registeredAt?new Date(user.registeredAt).toLocaleDateString("fa-IR"):"—"]].map(([k,v])=><div key={k} className="modal-detail"><span>{k}</span><b dir="ltr">{v}</b></div>)}<button className="primary-button" style={{marginTop:20}} onClick={()=>setModal(null)}>بازگشت</button></div></div>;
@@ -9348,8 +9400,24 @@ export default function App() {
   const prevRectsRef=useRef<Record<string,DOMRect>>({});
   const [confettiItems,setConfettiItems]=useState<{id:number;x:number;y:number;color:string;cx:number;cy:number}[]>([]);
 
-  const setLightTheme=(v:boolean)=>{setLightThemeState(v);localStorage.setItem("anp_theme",v?"light":"dark")};
+  const setLightTheme=(v:boolean)=>{
+    setLightThemeState(v);
+    localStorage.setItem("anp_theme",v?"light":"dark");
+    void userSettingsRequest("/api/v1/user/settings",{method:"PATCH",body:JSON.stringify({theme:v?"light":"dark"})}).catch(()=>{});
+  };
   useEffect(()=>{document.body.classList.toggle("light-theme",lightTheme)},[lightTheme]);
+  useEffect(()=>{
+    if(!user)return;
+    let active=true;
+    void userSettingsRequest("/api/v1/user/settings").then(({settings})=>{
+      if(!active||!settings)return;
+      setLightThemeState(settings.theme==="light");
+      localStorage.setItem("anp_theme",settings.theme);
+      const root=document.getElementById("root");
+      if(root)root.style.zoom=settings.fontScale===0?"":String(1+settings.fontScale*0.07);
+    }).catch(()=>{});
+    return()=>{active=false};
+  },[user?.uid]);
 
   // Long-press handlers for service buttons — 600ms, touch-slop aware
   const startLongPress=(id:string,e:React.TouchEvent|React.MouseEvent)=>{
