@@ -60,7 +60,7 @@ async function video(model:string,prompt:string,options:any):Promise<MediaResult
   let state:any=op;
   while(Date.now()<deadline){
     await new Promise(r=>setTimeout(r,Number(process.env.HOOSH_MEDIA_POLL_MS??5000)));
-    state=await jsonFetch(`${GEMINI_BASE}/${name`);
+    state=await jsonFetch(`${GEMINI_BASE}/${name}`);
     if(state?.done) break;
   }
   if(!state?.done) throw new Error('GEMINI_VIDEO_TIMEOUT');
