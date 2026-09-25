@@ -295,6 +295,9 @@ async function registerInternal(app:FastifyInstance){
     if(!id||!['pending','reviewed','resolved','rejected'].includes(b.status)||!b.adminIdentityId)return reply.code(400).send({error:'invalid_report_update'});
     const r=await pool.query(`UPDATE banner_reports SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING *`,[b.status,id]);
     if(!r.rows[0])return reply.code(404).send({error:'report_not_found'});
+    if(b.status==='resolved'||b.status==='rejected'){
+      await pool.query('UPDATE banner_violation_reports SET status=$1,reviewed_at=NOW(),reviewed_by=$2 WHERE listing_id=(SELECT listing_id FROM banner_reports WHERE id=$3)',[b.status==='resolved'?'confirmed':'dismissed',b.adminIdentityId,id]);
+    }
     if(b.status==='resolved'){
       const owner=await pool.query('SELECT l.identity_id FROM banner_reports br JOIN banner_listings l ON l.id=br.listing_id WHERE br.id=$1',[id]);
       if(owner.rows[0]){
