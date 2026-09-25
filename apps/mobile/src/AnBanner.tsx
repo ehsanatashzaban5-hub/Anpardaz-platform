@@ -2040,6 +2040,12 @@ function ABPostFlow({ push }: {
           const live=await bannerApi.myListings();
           _ads=(live.listings??[]).map((x:any)=>mapApiListing(x));
           _notifyAds();
+          for(let attempt=0;attempt<72&&!cancelled;attempt++){
+            const current=(await bannerApi.myListings()).listings?.find((x:any)=>String(x.id)===id);
+            if(current?.status==="published"){setAdStatus("published");break;}
+            if(current?.status==="rejected"){setErrors([current.moderation_reason||"آگهی توسط مدیریت رد شد."]);setAdStatus("draft");break;}
+            await new Promise(resolve=>setTimeout(resolve,5000));
+          }
         }
       }catch(e){
         if(!cancelled){setErrors([e instanceof Error?e.message:"banner_submit_failed"]);setAdStatus("draft");}
