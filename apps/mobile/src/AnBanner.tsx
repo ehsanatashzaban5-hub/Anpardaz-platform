@@ -1314,7 +1314,7 @@ async function initAnBannerStore(uid: string) {
       const cid=String(conv.conversation_id);
       _convs.push({conversationId:cid,listingId:String(conv.listing_id),buyerId:String(conv.buyer_identity_id),sellerId:String(conv.seller_identity_id),createdAt:conv.created_at,lastMessageAt:conv.last_message_at,lastMessage:conv.last_message??"",status:conv.status==="archived"?"archived":"active",unreadCount:0});
     }
-    await Promise.all(_convs.slice(0,50).map(async conv=>{try{const d=await bannerApi.conversation(conv.conversationId);_msgs[conv.conversationId]=(d.messages??[]).map((m:any)=>({messageId:String(m.message_id),conversationId:conv.conversationId,senderId:String(m.sender_identity_id),type:(m.message_type??"text") as ABMessage["type"],text:m.body||undefined,offerAmount:m.offer_amount?Number(m.offer_amount):undefined,media:m.media_mime?bannerMessageMediaUrl(m.message_id):undefined,createdAt:m.created_at,status:"delivered"}));}catch{}}));
+    await Promise.all(_convs.slice(0,50).map(async conv=>{try{const d=await bannerApi.conversation(conv.conversationId);_msgs[conv.conversationId]=await Promise.all((d.messages??[]).map(async(m:any)=>({messageId:String(m.message_id),conversationId:conv.conversationId,senderId:String(m.sender_identity_id),type:(m.message_type??"text") as ABMessage["type"],text:m.body||undefined,offerAmount:m.offer_amount?Number(m.offer_amount):undefined,media:m.media_mime?await bannerApi.messageMediaDataUrl(String(m.message_id)).catch(()=>undefined):undefined,createdAt:m.created_at,status:"delivered"})));}catch{}}));
     for (const n of notifications.notifications ?? []) _postchi.push({eventId:String(n.id),type:n.type==="support-reply"?"support-reply":"system",title:n.title,description:n.description,read:Boolean(n.read),createdAt:n.created_at});
   } catch (e) {
     console.error("An Banner API unavailable",e);
@@ -1335,10 +1335,10 @@ function storeFavs() { /* backend is source of truth */ }
 // --- Ad CRUD ---
 function abGetAds(): ABListing[] { return _ads; }
 function abAddAd(ad: ABListing) { _ads = [ad, ..._ads]; _notifyAds(); }
-async function abUpdateAd(ad: ABListing) { try{await bannerApi.updateListing(ad.listingId,{title:ad.title,description:ad.description,price:ad.price,city:ad.cityId,condition:ad.condition,attributes:ad.attributes});_ads=_ads.map(a=>a.listingId===ad.listingId?ad:a);_notifyAds();}catch(e){console.error("listing_update_failed",e);} }
+async function abUpdateAd(ad: ABListing) { try{await bannerApi.updateListing(ad.listingId,{title:ad.title,description:ad.description,price:ad.price,city:ad.cityId,condition:ad.condition,attributes:ad.attributes,contactEnabled:ad.contactEnabled,chatEnabled:ad.chatEnabled});_ads=_ads.map(a=>a.listingId===ad.listingId?ad:a);_notifyAds();}catch(e){console.error("listing_update_failed",e);} }
 async function abDeleteAd(id: string) { try{await bannerApi.deleteListing(id);_ads=_ads.filter(a=>a.listingId!==id);_notifyAds();}catch(e){console.error("listing_delete_failed",e);} }
 async function abCloseAd(id: string) { try{await bannerApi.updateListing(id,{status:"paused"});_ads=_ads.map(a=>a.listingId===id?{...a,status:"expired" as const,updatedAt:new Date().toISOString()}:a);_notifyAds();}catch(e){console.error("listing_pause_failed",e);} }
-async function abReopenAd(id: string) { try{await bannerApi.updateListing(id,{status:"published"});_ads=_ads.map(a=>a.listingId===id?{...a,status:"active" as const,updatedAt:new Date().toISOString()}:a);_notifyAds();}catch(e){console.error("listing_reopen_failed",e);} }
+async function abReopenAd(id: string) { try{await bannerApi.updateListing(id,{status:"pending"});_ads=_ads.map(a=>a.listingId===id?{...a,status:"pending" as const,updatedAt:new Date().toISOString()}:a);_notifyAds();}catch(e){console.error("listing_reopen_failed",e);} }
 
 // --- Conversation/Message CRUD ---
 function abGetConvs(): ABConversation[] { return _convs; }
@@ -1353,7 +1353,8 @@ async function abAddMsg(cid: string, msg: ABMessage) {
     }
     const response=await bannerApi.sendMessage(cid,{message:msg.text??msg.sticker??"",type:msg.type,mediaBase64,mediaMime,offerAmount:msg.offerAmount});
     const sm=response?.message;
-    const saved:ABMessage={...msg,messageId:String(sm?.message_id??msg.messageId),createdAt:sm?.created_at??msg.createdAt,status:"sent",media:sm?.message_id&&msg.media?bannerMessageMediaUrl(sm.message_id):msg.media};
+    const saved:ABMessage={...msg,messageId:String(sm?.message_id??msg.messageId),createdAt:sm?.created_at??msg.createdAt,status:"sent",media:msg.media?undefined:msg.media};
+    if(msg.media&&sm?.message_id){saved.media=await bannerApi.messageMediaDataUrl(String(sm.message_id)).catch(()=>undefined);}
     abAddMsgAndNotify(cid,saved);
   } catch(e) { console.error("An Banner message failed",e); }
 }
@@ -2026,7 +2027,7 @@ function ABPostFlow({ push }: {
         const price=data.form.priceMode==="fixed"?(Number(data.form.price.replace(/[^0-9۰-۹]/g,"").replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))))||0):null;
         const created=await bannerApi.createListing({
           categoryId:Number(cat.id),aiSuggestionId:aiSuggestionId,title:data.form.title.trim(),description:data.form.desc.trim(),price,
-          condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR",attributes:data.dynFields
+          condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR",attributes:data.dynFields,contactEnabled:data.contactMethods.phone,chatEnabled:data.contactMethods.chat
         });
         const id=String(created.listing.id);
         for(const src of data.photos){
@@ -2167,6 +2168,7 @@ function ABPostFlow({ push }: {
   };
 
   const doSubmit = () => {
+    if(!contactMethods.phone&&!contactMethods.chat){setErrors(["حداقل یکی از روش‌های تماس تلفنی یا چت را فعال کنید."]);return;}
     submittedRef.current = { form, photos, selectedLeaf, postCity, dynFields, contactMethods };
     setErrors([]);
     setAdStatus("reviewing");
@@ -3051,6 +3053,7 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
   const [recording, setRecording] = useState(false);
   const [recordingSecs, setRecordingSecs] = useState(0);
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
+  const chatImageRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const mediaRecRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -3073,6 +3076,13 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
   const sendSticker = (s:string) => {
     void abAddMsg(cid, { messageId: Date.now().toString(), conversationId: cid, senderId:_currentUid, type:"sticker", sticker:s, text:s, createdAt:new Date().toISOString(), status:"sent" });
     setShowStickers(false);
+  };
+  const sendImage = async (file: File) => {
+    if(!["image/jpeg","image/png","image/webp"].includes(file.type)){console.error("chat_image_type_rejected");return;}
+    if(file.size>8*1024*1024){console.error("chat_image_too_large");return;}
+    const url=URL.createObjectURL(file);
+    try { await abAddMsg(cid,{messageId:Date.now().toString(),conversationId:cid,senderId:_currentUid,type:"image",media:url,text:"",createdAt:new Date().toISOString(),status:"sent"}); }
+    finally { URL.revokeObjectURL(url); }
   };
   const sendOffer = () => {
     const amt=Number(offerVal.replace(/[^0-9]/g,"")); if(!amt)return;
@@ -3193,6 +3203,14 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
               </div>
             );
           }
+          if (msg.type === "image" && msg.media) {
+            return (
+              <div key={msg.messageId} style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "78%", display: "flex", flexDirection: "column", gap: 3 }}>
+                <img src={msg.media} alt="تصویر پیام" style={{ maxWidth: "280px", maxHeight: "360px", borderRadius: 14, objectFit: "cover", border: "1px solid var(--ab-border)" }} />
+                <div style={{ fontSize: 10, color: "var(--ab-muted)", fontFamily: "Vazirmatn,sans-serif", alignSelf: isMe ? "flex-end" : "flex-start" }}>{new Date(msg.createdAt).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"})}</div>
+              </div>
+            );
+          }
           if (msg.type === "voice") {
             const dur = msg.duration ?? 0;
             const isPlaying = playingMsgId === msg.messageId;
@@ -3279,6 +3297,10 @@ function ABChatView({ cid, push, pop }: { cid: string; push: (v: ABView) => void
       ) : (
         /* Normal Input bar */
         <div className="ab-chat-input-bar">
+          <input ref={chatImageRef} type="file" accept="image/jpeg,image/png,image/webp" style={{display:"none"}} onChange={e=>{const f=e.target.files?.[0];if(f)void sendImage(f);e.currentTarget.value="";}} />
+          <button className="ab-icon-btn" onClick={() => { setShowStickers(false); setOfferMode(false); chatImageRef.current?.click(); }} title="ارسال تصویر">
+            <ABIco name="image" size={20} color="var(--ab-muted)" />
+          </button>
           <button className="ab-icon-btn" onClick={() => { setShowStickers(!showStickers); setOfferMode(false); }}>
             <span style={{ fontSize: 20, lineHeight: 1 }}>😊</span>
           </button>
