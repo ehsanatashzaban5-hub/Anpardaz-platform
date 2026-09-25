@@ -79,6 +79,7 @@ interface Project {
 // ══════════════════════════════════════════════════════════════════
 let AI_MODELS: AIModel[] = [];
 let PROVIDERS: string[] = [];
+const PROVIDER_LABELS: Record<string,string> = { openai:"OpenAI", gemini:"Google", anthropic:"Anthropic", openai_compatible:"Compatible", qwen:"Qwen", deepseek:"DeepSeek", mistral:"Mistral", xai:"xAI", meta:"Meta" };
 const PROVIDER_COLORS: Record<string,string> = {
   openai:"#10A37F", gemini:"#4285F4", anthropic:"#C4956A",
   openai_compatible:"#8B5CF6", qwen:"#1677FF", deepseek:"#4FACFE",
@@ -91,7 +92,7 @@ function modelFromProvider(provider:any, modelId:string): AIModel {
   return {
     id:modelId,
     name:String(policy.labels?.[modelId]??modelId),
-    provider:String(provider?.id??provider?.name??provider?.type??"AI"),
+    provider:PROVIDER_LABELS[String(provider?.id??provider?.name??provider?.type??"").toLowerCase()]??String(provider?.id??provider?.name??provider?.type??"AI"),
     desc:String(policy.descriptions?.[modelId]??"مدل فعال‌شده توسط سرور آن هوش."),
     capabilities:caps.length?caps:["text"],
     providerColor:PROVIDER_COLORS[String(provider?.id??provider?.name??"").toLowerCase()]??"#8B5CF6",
@@ -582,7 +583,7 @@ function ProjectsView({ onOpenProject, onNewProject }: { onOpenProject:(p:Projec
 // ══════════════════════════════════════════════════════════════════
 // NEW PROJECT SHEET
 // ══════════════════════════════════════════════════════════════════
-function NewProjectSheet({ modelId, onClose }: { modelId:string; onClose:()=>void }) {
+function NewProjectSheet({ modelId, onCreate, onClose }: { modelId:string; onCreate:(title:string,description:string)=>Promise<void>; onClose:()=>void }) {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   return (
@@ -600,7 +601,7 @@ function NewProjectSheet({ modelId, onClose }: { modelId:string; onClose:()=>voi
           <div style={{fontSize:11,fontWeight:700,color:"var(--ah-muted)",marginBottom:6}}>توضیحات (اختیاری)</div>
           <textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="هدف و محتوای این پروژه را توضیح دهید..." rows={3} style={{width:"100%",background:"var(--ah-card)",border:"1px solid var(--ah-border)",borderRadius:12,padding:"11px 14px",color:"var(--ah-text)",fontSize:13,fontFamily:"Vazirmatn",outline:"none",resize:"none",boxSizing:"border-box"}}/>
         </div>
-        <button onClick={onClose} disabled={!title.trim()} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",cursor:title.trim()?"pointer":"default",background:title.trim()?"linear-gradient(135deg,#7c3aed,#5b21b6)":"var(--ah-border)",color:title.trim()?"#fff":"var(--ah-muted)",fontSize:14,fontWeight:800,fontFamily:"Vazirmatn"}}>
+        <button onClick={()=>void onCreate(title.trim(),desc.trim())} disabled={!title.trim()} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",cursor:title.trim()?"pointer":"default",background:title.trim()?"linear-gradient(135deg,#7c3aed,#5b21b6)":"var(--ah-border)",color:title.trim()?"#fff":"var(--ah-muted)",fontSize:14,fontWeight:800,fontFamily:"Vazirmatn"}}>
           ساخت پروژه
         </button>
       </div>
@@ -858,7 +859,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
             ? <ChatView messages={messages} input={input} onInputChange={setInput} onSend={send} deepThinking={deepThink} onToggleDeep={()=>setDeepThink(v=>!v)} mode={activeMode}/>
             : <HomeView activeMode={activeMode} onSelectMode={handleSelectMode} onSend={send} input={input} onInputChange={setInput} deepThinking={deepThink} onToggleDeep={()=>setDeepThink(v=>!v)} filterCat={filterCat} onFilterCat={setFilterCat}/>
         )}
-        {tab==="history"  && <HistoryView onOpenConv={c=>{setMessages([{id:"demo",role:"ai",text:c.preview,modelId:c.modelId,ts:new Date()}]);setTab("home");}} onNewChat={newChat}/>}
+        {tab==="history"  && <HistoryView onOpenConv={async c=>{try{setActiveConversationId(c.id);const d=await hooshApi(`/v1/hoosh/conversations/${c.id}`);setMessages((d.messages??[]).map((m:any)=>({id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at)})));setTab("home");}catch{}} onNewChat={newChat}/>}
         {tab==="projects" && <ProjectsView onOpenProject={()=>setTab("home")} onNewProject={()=>setShowNewProj(true)}/>}
         {tab==="explore"  && <ExploreView currentModelId={modelId} onSelectModel={id=>{setModelId(id);setTab("home");}}/>}
 
@@ -874,7 +875,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
 
         {/* ── OVERLAYS ── */}
         {showModels   && <ModelSheet current={modelId} onSelect={setModelId} onClose={()=>setShowModels(false)}/>}
-        {showNewProj  && <NewProjectSheet modelId={modelId} onClose={()=>setShowNewProj(false)}/>}
+        {showNewProj  && <NewProjectSheet modelId={modelId} onCreate={async(title,description)=>{ await hooshApi("/v1/hoosh/projects",{method:"POST",body:JSON.stringify({title,description,model:modelId,mode:activeMode?.id??"assistant"})}); await loadRuntime(); setShowNewProj(false); }} onClose={()=>setShowNewProj(false)}/>}
       </div>
     </>
   );
