@@ -4,10 +4,12 @@
 // ─────────────────────────────────────────────────
 import { useState, useMemo, useCallback, useEffect } from "react";
 import WI from "./WebIcons";
+import { CRYPTO_ASSETS } from "./mockData";
 import type { WebPage, CryptoAsset, KycStatus, OrderBookEntry } from "./types";
 import { useIsMobile } from "./useResponsive";
 
 const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+const getWebToken = () => typeof window !== "undefined" ? window.localStorage.getItem("anpardaz:accessToken") ?? "" : "";
 
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 const fmtP = (n: number) => n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits:2 }) : n.toPrecision(4);
@@ -23,8 +25,6 @@ const fmtVol = (n: number) => {
   return `$${n.toLocaleString()}`;
 };
 const clr = (n: number) => n >= 0 ? "#10b981" : "#f43f5e";
-const fmtChange = (n: number) => Number.isFinite(n) ? `${n > 0 ? "+" : ""}${n.toFixed(2)}%` : "—";
-const fmtMaybe = (n: number, formatter: (v:number)=>string) => Number.isFinite(n) ? formatter(n) : "—";
 
 type SarrafTab = "markets"|"trade-select"|"instant"|"spot"|"margin"|"assets"|"deposit"|"deposit-coin"|"withdraw"|"withdraw-coin"|"orders"|"transactions"|"fees"|"security"|"support"|"guide"|"forexbot";
 
@@ -60,16 +60,16 @@ const TAB_GROUPS = [
   ]},
 ];
 
-export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLoggedIn }: SarrafProps) {
+export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onAuthRequired, isLoggedIn }: SarrafProps) {
   const [tab, setTab]               = useState<SarrafTab>("markets");
-  const [liveAssets, setLiveAssets] = useState<CryptoAsset[]>([]);
-  const [selectedAsset, setAsset]   = useState<CryptoAsset|null>(null);
+  const [liveAssets, setLiveAssets] = useState<CryptoAsset[]>(() => CRYPTO_ASSETS.map(a => ({ ...a, price: 0, priceIrt: 0 })));
+  const [selectedAsset, setAsset]   = useState<CryptoAsset>(() => ({ ...CRYPTO_ASSETS[0], price: 0, priceIrt: 0 }));
   const [search, setSearch]         = useState("");
   const [sortBy, setSortBy]         = useState<"rank"|"price"|"change"|"volume">("rank");
   const [filterFav, setFilterFav]   = useState(false);
-  const [favorites, setFavorites]   = useState<Set<string>>(new Set());
+  const [favorites, setFavorites]   = useState<Set<string>>(new Set(["btc","eth","sol","bnb","usdt"]));
   const [tradeType, setTradeType]   = useState<"buy"|"sell">("buy");
-  const [tradeMode, setTradeMode]   = useState<"market"|"limit">("market");
+  const [tradeMode, setTradeMode]   = useState<"market"|"limit"|"stop-limit">("market");
   const [price, setPrice]           = useState("");
   const [amount, setAmount]         = useState("");
   const [coinDetail, setCoinDetail] = useState<CryptoAsset|null>(null);
@@ -82,71 +82,20 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
   const [backendKycStatus, setBackendKycStatus] = useState<KycStatus | null>(null);
   const isMobile = useIsMobile(900);
 
-  const logoColor = (symbol: string) => { let h = 0; for (const ch of symbol) h = (h * 31 + ch.charCodeAt(0)) % 360; return `hsl(${h} 55% 42%)`; };
-
-  useEffect(() => {
-    let active = true;
-    const loadMarkets = async () => {
-      try {
-        const [assetResponse, quoteResponse] = await Promise.all([
-          fetch(`${ANSARRAF_API_BASE}/api/v1/assets`, { signal: AbortSignal.timeout(7000), cache: "no-store" }),
-          fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes`, { signal: AbortSignal.timeout(7000), cache: "no-store" }),
-        ]);
-        if (!assetResponse.ok || !quoteResponse.ok) throw new Error("market_data_unavailable");
-        const assetBody = await assetResponse.json();
-        const quoteBody = await quoteResponse.json();
-        const rows = Array.isArray(assetBody?.assets) ? assetBody.assets : [];
-        const quotes = Array.isArray(quoteBody?.quotes) ? quoteBody.quotes.filter((q: any) => q.provider === "wallex" && !q.stale && Number(q.lastPrice) > 0) : [];
-        const bySymbol = new Map<string, any>();
-        for (const q of quotes) {
-          const current = bySymbol.get(q.symbol);
-          if (!current || q.provider === "wallex") bySymbol.set(q.symbol, q);
-        }
-        const tomanRate = Number(bySymbol.get("USDT/TOMAN")?.lastPrice || 0);
-        const mapped: CryptoAsset[] = rows.map((row: any) => {
-          const symbol = String(row.symbol).toUpperCase();
-          const usdt = bySymbol.get(`${symbol}/USDT`);
-          const toman = bySymbol.get(`${symbol}/TOMAN`);
-          const price = symbol === "USDT" ? tomanRate : Number(usdt?.lastPrice || 0);
-          const priceIrt = symbol === "USDT" ? tomanRate : Number(toman?.lastPrice || (price > 0 && tomanRate > 0 ? price * tomanRate : 0));
-          return {
-            id: String(row.id), symbol, name: String(row.name), nameFa: String(row.name), logoUrl: undefined,
-            logoColor: logoColor(symbol), price, priceIrt,
-            change24h: Number(usdt?.change24h ?? toman?.change24h ?? Number.NaN),
-            volume24h: Number(usdt?.volume24h ?? toman?.volume24h ?? Number.NaN),
-            marketCap: Number.NaN,
-            high24h: Number(usdt?.high24h ?? toman?.high24h ?? Number.NaN),
-            low24h: Number(usdt?.low24h ?? toman?.low24h ?? Number.NaN),
-            rank: 0,
-          };
-        }).filter((asset: CryptoAsset) => Number.isFinite(asset.price) && asset.price > 0);
-        if (!active) return;
-        setLiveAssets(mapped);
-        setAsset(previous => previous ? (mapped.find(a => a.id === previous.id) ?? mapped[0] ?? null) : (mapped[0] ?? null));
-      } catch {
-        if (active) setLiveAssets(previous => previous);
-      }
-    };
-    void loadMarkets();
-    const id = window.setInterval(() => void loadMarkets(), 5000);
-    return () => { active = false; window.clearInterval(id); };
-  }, []);
-
   useEffect(() => {
     if (!isLoggedIn) return;
-    const token = window.localStorage.getItem("anpardaz:accessToken") ?? "";
+    const token = getWebToken();
     if (!token) return;
     let active = true;
+    const headers = { authorization: `Bearer ${token}` };
     const loadAccount = async () => {
       try {
-        const headers = { authorization: `Bearer ${token}` };
-        const [walletR, orderR, tradeR, depositR, withdrawalR, kycR] = await Promise.all([
-          fetch(`${ANSARRAF_API_BASE}/api/v1/wallets`, { headers, cache:"no-store" }),
-          fetch(`${ANSARRAF_API_BASE}/api/v1/orders`, { headers, cache:"no-store" }),
-          fetch(`${ANSARRAF_API_BASE}/api/v1/trades`, { headers, cache:"no-store" }),
-          fetch(`${ANSARRAF_API_BASE}/api/v1/deposits`, { headers, cache:"no-store" }),
-          fetch(`${ANSARRAF_API_BASE}/api/v1/withdrawals`, { headers, cache:"no-store" }),
-          fetch(`${ANSARRAF_API_BASE}/api/v1/kyc`, { headers, cache:"no-store" }),
+        const [walletR, orderR, depositR, withdrawalR, kycR] = await Promise.all([
+          fetch(`${ANSARRAF_API_BASE}/api/v1/wallets`, { headers, cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/orders`, { headers, cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/deposits`, { headers, cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/withdrawals`, { headers, cache: "no-store" }),
+          fetch(`${ANSARRAF_API_BASE}/api/v1/kyc`, { headers, cache: "no-store" }),
         ]);
         if (!active) return;
         if (walletR.ok) setWallets((await walletR.json()).wallets ?? []);
@@ -154,18 +103,59 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
         if (depositR.ok) setDeposits((await depositR.json()).deposits ?? []);
         if (withdrawalR.ok) setWithdrawals((await withdrawalR.json()).withdrawals ?? []);
         if (kycR.ok) {
-          const status = String((await kycR.json()).kyc?.status ?? "").toUpperCase();
-          setBackendKycStatus(status === "VERIFIED" || status === "APPROVED" ? "verified" : status === "ADMIN_REVIEW" || status === "PROVIDER_CHECKING" || status === "SUBMITTED" ? "pending" : status ? "not_verified" : null);
+          const status = (await kycR.json()).kyc?.status;
+          if (status === "VERIFIED" || status === "verified") setBackendKycStatus("verified");
+          else if (status === "PENDING" || status === "pending" || status === "SUBMITTED" || status === "submitted") setBackendKycStatus("pending");
+          else if (status) setBackendKycStatus("not_verified");
         }
-        void tradeR;
       } catch {
-        // Protected account views stay empty when the backend is unavailable; no demo data is inserted.
+        // Protected account data remains empty rather than being replaced with demo data.
       }
     };
     void loadAccount();
     const id = window.setInterval(() => void loadAccount(), 5000);
     return () => { active = false; window.clearInterval(id); };
   }, [isLoggedIn]);
+
+  const effectiveKycStatus = backendKycStatus ?? initialKycStatus;
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const r = await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes`, { signal: AbortSignal.timeout(7000), cache: "no-store" });
+        if (!r.ok) throw new Error("market_data_unavailable");
+        const d = await r.json();
+        const quotes = Array.isArray(d?.quotes) ? d.quotes : [];
+        const live = quotes.filter((q: any) => !q.stale && Number(q.lastPrice) > 0);
+        const bySymbol = new Map<string, any>();
+        for (const q of live) {
+          const current = bySymbol.get(q.symbol);
+          if (!current || q.provider === "wallex") bySymbol.set(q.symbol, q);
+        }
+        const tomanRate = Number(bySymbol.get("USDT/TOMAN")?.lastPrice || 0);
+        if (!active) return;
+        setLiveAssets(previous => previous.map(a => {
+          if (a.symbol === "USDT") return { ...a, price: tomanRate, priceIrt: tomanRate };
+          const usdt = bySymbol.get(`${a.symbol}/USDT`);
+          const toman = bySymbol.get(`${a.symbol}/TOMAN`);
+          const price = usdt ? Number(usdt.lastPrice) : 0;
+          const priceIrt = toman ? Number(toman.lastPrice) : (price > 0 && tomanRate > 0 ? price * tomanRate : 0);
+          return { ...a, price, priceIrt };
+        }));
+      } catch {
+        // Keep verified backend data already rendered; never synthesize a mock quote.
+      }
+    };
+    void load();
+    const id = window.setInterval(() => void load(), 5000);
+    return () => { active = false; window.clearInterval(id); };
+  }, []);
+
+  useEffect(() => {
+    const next = liveAssets.find(a => a.id === selectedAsset.id);
+    if (next) setAsset(next);
+  }, [liveAssets, selectedAsset.id]);
 
   const filtered = useMemo(() => {
     let list = liveAssets.filter(a =>
@@ -176,9 +166,10 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
         a.nameFa.includes(search))
     );
     if (sortBy === "price")   list = [...list].sort((a,b) => b.price - a.price);
-
+    if (sortBy === "change")  list = [...list].sort((a,b) => b.change24h - a.change24h);
+    if (sortBy === "volume")  list = [...list].sort((a,b) => b.volume24h - a.volume24h);
     return list;
-  }, [liveAssets, search, filterFav, favorites, sortBy]);
+  }, [search, filterFav, favorites, sortBy]);
 
   const toggleFav = useCallback((id: string) => {
     setFavorites(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -187,42 +178,37 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
   const selectAndTrade = (a: CryptoAsset) => { setAsset(a); setTab("trade-select"); };
 
   const needsLogin = !isLoggedIn;
-  const effectiveKycStatus = backendKycStatus ?? kycStatus;
-  const needsKyc   = isLoggedIn && effectiveKycStatus !== "verified";
+  const needsKyc   = isLoggedIn && kycStatus !== "verified";
 
   const [asks, setAsks] = useState<OrderBookEntry[]>([]);
   const [bids, setBids] = useState<OrderBookEntry[]>([]);
   const [recentTrades, setRecentTrades] = useState<{ price:number; amount:number; side:"buy"|"sell"; time:string }[]>([]);
 
   useEffect(() => {
-    if (!selectedAsset) return;
     let active = true;
-    const loadBook = async () => {
+    const load = async () => {
+      if (!selectedAsset.symbol) return;
       try {
         const symbol = `${selectedAsset.symbol}/USDT`;
-      const [bookResponse, tradesResponse] = await Promise.all([
+        const [bookResponse, tradesResponse] = await Promise.all([
           fetch(`${ANSARRAF_API_BASE}/api/v1/orderbook?symbol=${encodeURIComponent(symbol)}&limit=20`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
           fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/trades?symbol=${encodeURIComponent(symbol)}&limit=20`, { signal: AbortSignal.timeout(5000), cache: "no-store" }),
         ]);
         if (!bookResponse.ok) throw new Error("orderbook_unavailable");
-        const book = await bookResponse.json();
-        const trades = tradesResponse.ok ? await tradesResponse.json() : null;
+        const d = await bookResponse.json();
+        const td = tradesResponse.ok ? await tradesResponse.json() : null;
         if (!active) return;
-        setBids(Array.isArray(book?.bids) ? book.bids.map((x:any)=>({ price:Number(x.price), amount:Number(x.amount), total:Number(x.total) })) : []);
-        setAsks(Array.isArray(book?.asks) ? book.asks.map((x:any)=>({ price:Number(x.price), amount:Number(x.amount), total:Number(x.total) })) : []);
-        setRecentTrades(Array.isArray(trades?.trades) ? trades.trades.map((x:any)=>({ price:Number(x.price), amount:Number(x.quantity), side:x.side === "sell" ? "sell" : "buy", time:new Date(x.created_at).toLocaleTimeString("fa-IR",{minute:"2-digit",second:"2-digit"}) })) : []);
+        setBids(Array.isArray(d?.bids) ? d.bids.map((x: any) => ({ price: Number(x.price), amount: Number(x.amount), total: Number(x.total) })) : []);
+        setAsks(Array.isArray(d?.asks) ? d.asks.map((x: any) => ({ price: Number(x.price), amount: Number(x.amount), total: Number(x.total) })) : []);
+        setRecentTrades(Array.isArray(td?.trades) ? td.trades.map((x: any) => ({ price: Number(x.price), amount: Number(x.quantity), side: x.side === "buy" ? "buy" : "sell", time: new Date(x.created_at).toLocaleTimeString("fa-IR", { minute: "2-digit", second: "2-digit" }) })) : []);
       } catch {
         if (active) { setBids([]); setAsks([]); setRecentTrades([]); }
       }
     };
-    void loadBook();
-    const id = window.setInterval(() => void loadBook(), 3000);
+    void load();
+    const id = window.setInterval(() => void load(), 3000);
     return () => { active = false; window.clearInterval(id); };
-  }, [selectedAsset?.symbol]);
-
-  if (!selectedAsset) return <div dir="rtl" style={{ minHeight:"60vh", display:"flex", alignItems:"center", justifyContent:"center", color:"var(--w-muted)" }}>در حال دریافت بازارهای واقعی آن صراف…</div>;
-
-  const PROTECTED_TABS: SarrafTab[] = ["assets","deposit","deposit-coin","withdraw","withdraw-coin","orders","transactions","security","forexbot"];
+  }, [selectedAsset.symbol]);  const PROTECTED_TABS: SarrafTab[] = ["assets","deposit","deposit-coin","withdraw","withdraw-coin","orders","transactions","security","forexbot"];
   const PROTECTED = PROTECTED_TABS.includes(tab);
 
   const navItems = TAB_GROUPS.flatMap(g => g.items);
@@ -290,7 +276,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 <div key={a.id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, cursor:"pointer" }} onClick={()=>{setAsset(a);setTab("trade-select");}}>
                   <span style={{ fontWeight:700, color:"var(--w-muted)" }}>{a.symbol}/USDT</span>
                   <span style={{ fontWeight:900 }}>${fmtP(a.price)}</span>
-                  <span style={{ color:clr(a.change24h), fontWeight:700, fontSize:11 }}>{fmtChange(a.change24h)}</span>
+                  <span style={{ color:clr(a.change24h), fontWeight:700, fontSize:11 }}>{a.change24h>0?"+":""}{a.change24h.toFixed(2)}%</span>
                 </div>
               ))}
             </div>
@@ -301,7 +287,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 <div key={a.id} style={{ display:"flex", alignItems:"center", gap:5, fontSize:11, cursor:"pointer", flexShrink:0 }} onClick={()=>{setAsset(a);setTab("trade-select");}}>
                   <span style={{ fontWeight:700, color:"var(--w-muted)" }}>{a.symbol}</span>
                   <span style={{ fontWeight:900 }}>${fmtP(a.price)}</span>
-                  <span style={{ color:Number.isFinite(a.change24h)?clr(a.change24h):"var(--w-muted)", fontWeight:700, fontSize:10 }}>{fmtChange(a.change24h)}</span>
+                  <span style={{ color:clr(a.change24h), fontWeight:700, fontSize:10 }}>{a.change24h>0?"+":""}{a.change24h.toFixed(1)}%</span>
                 </div>
               ))}
             </div>
@@ -360,14 +346,13 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
           )}
           {/* ── Instant Trade ── */}
           {tab === "instant" && (
-            <InstantTradeTab asset={selectedAsset} onBack={()=>setTab("trade-select")} isLoggedIn={isLoggedIn} onAuth={onAuthRequired}/>
+            <InstantTradeTab asset={selectedAsset} onBack={()=>setTab("trade-select")} isLoggedIn={isLoggedIn} onAuth={onAuthRequired} kycStatus={effectiveKycStatus}/>
           )}
           {/* ── Spot Trade ── */}
           {tab === "spot" && (
             <div style={{ display:"flex", gap:0, height:"calc(100vh - var(--w-header) - 52px)" }}>
               <TradeView
                 asset={selectedAsset} asks={asks} bids={bids}
-                recentTrades={recentTrades}
                 tradeType={tradeType} onTradeType={setTradeType}
                 tradeMode={tradeMode} onTradeMode={setTradeMode}
                 price={price} onPrice={setPrice}
@@ -376,7 +361,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 onAuth={onAuthRequired}
                 onSelectAsset={()=>setTab("markets")}
                 assets={liveAssets.slice(0,20)} onAssetChange={setAsset}
-                wallets={wallets}
+                recentTrades={recentTrades}
                 favorites={favorites} onToggleFav={toggleFav}
                 tradeKind="spot"
                 onBack={()=>setTab("trade-select")}
@@ -396,8 +381,6 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
                 onAuth={onAuthRequired}
                 onSelectAsset={()=>setTab("markets")}
                 assets={liveAssets.slice(0,20)} onAssetChange={setAsset}
-                wallets={wallets}
-                recentTrades={recentTrades}
                 favorites={favorites} onToggleFav={toggleFav}
                 tradeKind="margin"
                 onBack={()=>setTab("trade-select")}
@@ -421,7 +404,7 @@ export default function WebSarraf({ onNavigate, kycStatus, onAuthRequired, isLog
             <WithdrawTomanTab kycStatus={effectiveKycStatus}/>
           )}
           {tab === "withdraw-coin" && isLoggedIn && (
-            <WithdrawCoinTab assets={liveAssets} kycStatus={effectiveKycStatus}/>
+            <WithdrawCoinTab assets={CRYPTO_ASSETS} kycStatus={kycStatus}/>
           )}
           {tab === "orders" && isLoggedIn && (
             <OrdersTab orders={orders}/>
@@ -490,10 +473,10 @@ function MarketsTab({ assets, search, onSearch, sortBy, onSort, filterFav, onFil
           style={{ display:"flex", alignItems:"center", gap:5, padding:isMob?"7px 10px":"8px 14px", borderRadius:8, border:`1px solid ${filterFav?"rgba(251,191,36,0.5)":"var(--w-border)"}`, background:filterFav?"rgba(251,191,36,0.08)":"transparent", color:filterFav?"#f59e0b":"var(--w-muted)", fontSize:12, fontWeight:600, cursor:"pointer" }}>
           <WI n="star" s={13}/> {isMob?"":"علاقه‌مندی‌ها"}
         </button>
-        {(["price"] as const).map(s=>(
+        {(["rank","change","volume"] as const).map(s=>(
           <button key={s} onClick={()=>onSort(s)}
             style={{ padding:isMob?"7px 10px":"8px 14px", borderRadius:8, border:`1px solid ${sortBy===s?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:sortBy===s?"rgba(8,145,178,0.08)":"transparent", color:sortBy===s?"#0891b2":"var(--w-muted)", fontSize:12, fontWeight:600, cursor:"pointer" }}>
-            {s==="price"?"قیمت":"قیمت"}
+            {s==="rank"?"رتبه":s==="change"?"تغییر":"حجم"}
           </button>
         ))}
         {!isMob && <div style={{ fontSize:12, color:"var(--w-muted)", marginRight:"auto" }}>{FA(assets.length)} از {FA(totalCount)} ارز</div>}
@@ -518,7 +501,7 @@ function MarketsTab({ assets, search, onSearch, sortBy, onSort, filterFav, onFil
                   <button onClick={e=>{e.stopPropagation();onToggleFav(a.id);}} style={{ background:"none", border:"none", cursor:"pointer", color:favorites.has(a.id)?"#f59e0b":"var(--w-border)", padding:0, display:"flex" }}>
                     <WI n="star" s={12}/>
                   </button>
-                  {a.rank > 0 ? FA(a.rank) : "—"}
+                  {FA(a.rank)}
                 </div>
                 <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                   <div style={{ width:28, height:28, borderRadius:"50%", background:a.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:9, fontWeight:900, flexShrink:0 }}>{a.symbol.slice(0,3)}</div>
@@ -531,11 +514,11 @@ function MarketsTab({ assets, search, onSearch, sortBy, onSort, filterFav, onFil
                 <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{FA(Math.round(a.priceIrt/1000).toLocaleString())} ه</div>
                 <div style={{ textAlign:"center" }}>
                   <span style={{ fontSize:12, fontWeight:700, color:clr(a.change24h), background:a.change24h>=0?"rgba(16,185,129,0.08)":"rgba(244,63,94,0.08)", padding:"2px 7px", borderRadius:5 }}>
-                    {fmtChange(a.change24h)}
+                    {a.change24h>0?"+":""}{a.change24h.toFixed(2)}%
                   </span>
                 </div>
-                <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{fmtMaybe(a.volume24h, fmtVol)}</div>
-                <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{fmtMaybe(a.marketCap, fmtVol)}</div>
+                <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{fmtVol(a.volume24h)}</div>
+                <div style={{ fontSize:11, color:"var(--w-muted)", fontVariantNumeric:"tabular-nums" }}>{fmtVol(a.marketCap)}</div>
                 <div style={{ display:"flex", justifyContent:"center" }}>
                   <button onClick={e=>{e.stopPropagation();onSelectTrade(a);}} className="w-btn w-btn-muted" style={{ padding:"4px 12px", fontSize:11, borderRadius:6 }}>معامله</button>
                 </div>
@@ -634,11 +617,11 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
           <div className="w-card" style={{ padding:"18px" }}>
             <div style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", marginBottom:12 }}>آمار بازار</div>
             {[
-              ["رتبه بازار", a.rank > 0 ? `#${FA(a.rank)}` : "—"],
-              ["بالاترین ۲۴ه", Number.isFinite(a.high24h) ? `${fmtP(a.high24h)}` : "—"],
-              ["پایین‌ترین ۲۴ه", Number.isFinite(a.low24h) ? `${fmtP(a.low24h)}` : "—"],
-              ["حجم ۲۴ه", fmtMaybe(a.volume24h, fmtVol)],
-              ["مارکت کپ", fmtMaybe(a.marketCap, fmtVol)],
+              ["رتبه بازار", `#${FA(a.rank)}`],
+              ["بالاترین ۲۴ه", `$${fmtP(a.high24h)}`],
+              ["پایین‌ترین ۲۴ه", `$${fmtP(a.low24h)}`],
+              ["حجم ۲۴ه", fmtVol(a.volume24h)],
+              ["مارکت کپ", fmtVol(a.marketCap)],
               ["قیمت تومان", fmtIrt(a.priceIrt)],
             ].map(([k,v]) => (
               <div key={k as string} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid var(--w-border)", fontSize:13 }}>
@@ -663,10 +646,10 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
 }
 
 // ── Trade View ─────────────────────────────────────
-function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTradeType, tradeMode, onTradeMode, price, onPrice, amount, onAmount, isLoggedIn, needsKyc, onAuth, onSelectAsset, assets, onAssetChange, favorites, onToggleFav, tradeKind = "spot", onBack }: {
-  asset: CryptoAsset; asks: any[]; bids: any[]; recentTrades: { price:number; amount:number; side:"buy"|"sell"; time:string }[]; wallets:any[];
+function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tradeMode, onTradeMode, price, onPrice, amount, onAmount, isLoggedIn, needsKyc, onAuth, onSelectAsset, assets, onAssetChange, favorites, onToggleFav, tradeKind = "spot", onBack }: {
+  asset: CryptoAsset; asks: any[]; bids: any[]; recentTrades: { price:number; amount:number; side:"buy"|"sell"; time:string }[];
   tradeType:"buy"|"sell"; onTradeType:(t:"buy"|"sell")=>void;
-  tradeMode:"market"|"limit"; onTradeMode:(m:"market"|"limit")=>void;
+  tradeMode:"market"|"limit"|"stop-limit"; onTradeMode:(m:any)=>void;
   price:string; onPrice:(s:string)=>void;
   amount:string; onAmount:(s:string)=>void;
   isLoggedIn:boolean; needsKyc:boolean; onAuth:()=>void;
@@ -677,44 +660,51 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
   onBack?: ()=>void;
 }) {
   const [leverage, setLeverage] = useState(1);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState("");
-  const balanceSymbol = tradeType === "buy" ? "USDT" : asset.symbol.toUpperCase();
-  const wallet = wallets.find(w => String(w.symbol).toUpperCase() === balanceSymbol);
-  const availableBalance = Number(wallet?.available_balance ?? 0);
-  const submitOrder = async () => {
-    if (!isLoggedIn) return onAuth();
-    if (tradeKind === "margin") { setSubmitMessage("معاملات تعهدی هنوز در بک‌اند آن صراف فعال نشده است."); return; }
-    if (needsKyc) { setSubmitMessage("برای ثبت سفارش ابتدا احراز هویت را تکمیل کنید."); return; }
-    const qty = Number(amount);
-    const limitPrice = Number(price);
-    if (!Number.isFinite(qty) || qty <= 0) { setSubmitMessage("مقدار سفارش را وارد کنید."); return; }
-    if (tradeMode === "limit" && (!Number.isFinite(limitPrice) || limitPrice <= 0)) { setSubmitMessage("قیمت سفارش را وارد کنید."); return; }
-    const quoteAsset = assets.find(a => a.symbol.toUpperCase() === "USDT");
-    if (!quoteAsset) { setSubmitMessage("دارایی USDT در حساب صراف پیدا نشد."); return; }
-    const marketPrice = Number(asset.price);
-    if (tradeType === "buy" && tradeMode === "market" && (!Number.isFinite(marketPrice) || marketPrice <= 0)) { setSubmitMessage("قیمت لحظه‌ای این بازار در دسترس نیست."); return; }
-    const body:any = {
-      baseAssetId: Number(asset.id), quoteAssetId: Number(quoteAsset.id), side: tradeType,
-      orderType: tradeMode, quantity: qty.toString(),
-      ...(tradeMode === "limit" ? { price: limitPrice.toString() } : tradeType === "buy" ? { quoteAmount: (qty * marketPrice).toString() } : {}),
-      idempotencyKey: crypto.randomUUID(),
-    };
-    setSubmitting(true); setSubmitMessage("");
-    try {
-      const token = window.localStorage.getItem("anpardaz:accessToken") ?? "";
-      const response = await fetch(`${ANSARRAF_API_BASE}/api/v1/orders`, { method:"POST", headers:{ authorization:`Bearer ${token}`, "content-type":"application/json" }, body:JSON.stringify(body) });
-      const result = await response.json().catch(()=>({}));
-      if (!response.ok) throw new Error(result?.error ?? "order_failed");
-      onAmount(""); onPrice(""); setSubmitMessage("سفارش با موفقیت در آن صراف ثبت شد.");
-    } catch (error) {
-      const map:any = { insufficient_available_balance:"موجودی کافی نیست.", invalid_order:"اطلاعات سفارش نامعتبر است.", kyc_required:"احراز هویت لازم است." };
-      setSubmitMessage(map[(error as Error).message] ?? "ثبت سفارش انجام نشد.");
-    } finally { setSubmitting(false); }
-  };
+  const [orderBusy, setOrderBusy] = useState(false);
+  const [orderMessage, setOrderMessage] = useState("");
   const maxAsk = Math.max(...asks.map(a=>a.price));
   const minBid = Math.min(...bids.map(b=>b.price));
   const estimatedTotal = tradeMode==="market" ? asset.price*(parseFloat(amount)||0) : (parseFloat(price)||0)*(parseFloat(amount)||0);
+  const submitOrder = async () => {
+    if (!isLoggedIn) { onAuth(); return; }
+    if (needsKyc) { setOrderMessage("برای معامله، وضعیت احراز هویت حساب را تکمیل کنید."); return; }
+    if (tradeKind === "margin") { setOrderMessage("معامله تعهدی هنوز در API معاملاتی آن صراف فعال نشده است."); return; }
+    if (tradeMode === "stop-limit") { setOrderMessage("این نوع سفارش هنوز در API معاملاتی An Sarraf فعال نشده است."); return; }
+    const quantity = Number.parseFloat(amount);
+    const limitPrice = Number.parseFloat(price);
+    if (!Number.isFinite(quantity) || quantity <= 0) { setOrderMessage("مقدار سفارش را وارد کنید."); return; }
+    if (tradeMode === "limit" && (!Number.isFinite(limitPrice) || limitPrice <= 0)) { setOrderMessage("قیمت سفارش لیمیت را وارد کنید."); return; }
+    setOrderBusy(true); setOrderMessage("");
+    try {
+      const token = getWebToken();
+      const assetsResponse = await fetch(`${ANSARRAF_API_BASE}/api/v1/assets`, { cache: "no-store" });
+      if (!assetsResponse.ok) throw new Error("لیست دارایی‌های صرافی در دسترس نیست.");
+      const assetRows = (await assetsResponse.json()).assets ?? [];
+      const base = assetRows.find((x:any) => String(x.symbol).toUpperCase() === asset.symbol.toUpperCase());
+      const quote = assetRows.find((x:any) => String(x.symbol).toUpperCase() === "USDT");
+      if (!base || !quote) throw new Error("بازار انتخاب‌شده در زیرساخت صرافی فعال نیست.");
+      const quoteAmount = tradeMode === "market" && tradeType === "buy" ? String(estimatedTotal) : undefined;
+      const response = await fetch(`${ANSARRAF_API_BASE}/api/v1/orders`, {
+        method: "POST",
+        headers: { "content-type":"application/json", authorization:`Bearer ${token}` },
+        body: JSON.stringify({
+          baseAssetId: Number(base.id), quoteAssetId: Number(quote.id), side: tradeType,
+          orderType: tradeMode === "market" ? "market" : "limit", quantity:String(quantity),
+          price: tradeMode === "limit" ? String(limitPrice) : undefined, quoteAmount,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.error === "insufficient_balance" ? "موجودی کافی نیست." : body?.error ?? "ثبت سفارش ناموفق بود.");
+      setOrderMessage("سفارش با موفقیت در صرافی ثبت شد.");
+      onAmount(""); onPrice("");
+    } catch (e) {
+      setOrderMessage(e instanceof Error ? e.message : "ثبت سفارش ناموفق بود.");
+    } finally {
+      setOrderBusy(false);
+    }
+  };
+
   const isMob = useIsMobile(900);
 
   return (
@@ -732,7 +722,7 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
                 <div style={{ fontSize:11, fontWeight:700, color:asset.id===a.id?"#0891b2":"var(--w-text)" }}>{a.symbol}/USDT</div>
                 <div style={{ fontSize:10, color:"var(--w-muted)" }}>${fmtP(a.price)}</div>
               </div>
-              <span style={{ fontSize:10, color:clr(a.change24h), fontWeight:700 }}>{fmtChange(a.change24h)}</span>
+              <span style={{ fontSize:10, color:clr(a.change24h), fontWeight:700 }}>{a.change24h>0?"+":""}{a.change24h.toFixed(1)}%</span>
             </div>
           ))}
         </div>
@@ -753,17 +743,26 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
             <div style={{ fontSize:10, color:"var(--w-muted)" }}>{asset.nameFa}</div>
           </div>
           <div style={{ fontSize:isMob?18:22, fontWeight:900 }}>${fmtP(asset.price)}</div>
-          <span style={{ fontSize:13, fontWeight:700, color:Number.isFinite(asset.change24h)?clr(asset.change24h):"var(--w-muted)" }}>{asset.change24h>0?"+":""}{asset.change24h.toFixed(2)}%</span>
+          <span style={{ fontSize:13, fontWeight:700, color:clr(asset.change24h) }}>{asset.change24h>0?"+":""}{asset.change24h.toFixed(2)}%</span>
           {!isMob && [["بالا","high24h"],["پایین","low24h"],["حجم","volume24h"]].map(([l,k]) => (
             <div key={k} style={{ marginRight:8 }}>
               <div style={{ fontSize:10, color:"var(--w-muted)" }}>{l} ۲۴ه</div>
-              <div style={{ fontSize:11, fontWeight:700 }}>{k==="volume24h"?fmtVol((asset as any)[k]):Number.isFinite(Number((asset as any)[k])) ? `${fmtP(Number((asset as any)[k]))}` : "—"}</div>
+              <div style={{ fontSize:11, fontWeight:700 }}>{k==="volume24h"?fmtVol((asset as any)[k]):`$${fmtP((asset as any)[k])}`}</div>
             </div>
           ))}
         </div>
         {/* Chart */}
         <div style={{ height:260, background:"var(--w-card)", borderBottom:"1px solid var(--w-border)", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden" }}>
-<div style={{ height:"100%", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", color:"var(--w-muted)", fontSize:12 }}>نمودار تاریخی هنوز از API آن صراف ارائه نمی‌شود.</div>
+          <svg viewBox="0 0 600 180" style={{ position:"absolute", bottom:0, left:0, width:"100%", height:"100%" }}>
+            <defs>
+              <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#0891b2" stopOpacity="0.2"/>
+                <stop offset="100%" stopColor="#0891b2" stopOpacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,140 L40,130 L80,135 L120,100 L160,90 L200,70 L240,75 L280,55 L320,50 L360,35 L400,30 L440,20 L480,25 L520,15 L560,10 L600,5 L600,180 L0,180Z" fill="url(#chartFill)"/>
+            <path d="M0,140 L40,130 L80,135 L120,100 L160,90 L200,70 L240,75 L280,55 L320,50 L360,35 L400,30 L440,20 L480,25 L520,15 L560,10 L600,5" fill="none" stroke="#0891b2" strokeWidth="1.5"/>
+          </svg>
           <div style={{ position:"absolute", bottom:4, left:8, display:"flex", gap:4 }}>
             {["۱ه","۴ه","۱ر","۱ه","۱هف","۱م"].map(tf=>(
               <button key={tf} style={{ padding:"2px 8px", borderRadius:4, border:"none", background:"rgba(8,145,178,0.1)", color:"#0891b2", fontSize:10, fontWeight:700, cursor:"pointer" }}>{tf}</button>
@@ -813,9 +812,9 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
           </div>
           {/* Mode tabs */}
           <div style={{ display:"flex", gap:4, marginBottom:14 }}>
-            {(["market","limit"] as const).map(m=>(
+            {(["market","limit","stop-limit"] as const).map(m=>(
               <button key={m} onClick={()=>onTradeMode(m)} style={{ flex:1, padding:"5px 4px", borderRadius:6, border:"none", background:tradeMode===m?"var(--w-card)":"transparent", color:tradeMode===m?"var(--w-text)":"var(--w-muted)", fontWeight:tradeMode===m?700:400, fontSize:11, cursor:"pointer", fontFamily:"Vazirmatn", boxShadow:tradeMode===m?"var(--w-shadow)":"none" }}>
-                {m==="market"?"بازار":"لیمیت"}
+                {m==="market"?"بازار":m==="limit"?"لیمیت":"استاپ"}
               </button>
             ))}
           </div>
@@ -823,7 +822,7 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
           {isLoggedIn && (
             <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)", marginBottom:12 }}>
               <span>موجودی:</span>
-              <span style={{ fontWeight:700 }}>{Number.isFinite(availableBalance) ? `${availableBalance.toFixed(8)} ${balanceSymbol}` : `0 ${balanceSymbol}`}</span>
+              <span style={{ fontWeight:700 }}>{"—"}</span>
             </div>
           )}
           {/* Price input (for limit) */}
@@ -844,31 +843,10 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
               <span style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", fontSize:11, color:"var(--w-muted)", fontWeight:700 }}>{asset.symbol}</span>
             </div>
           </div>
-          {/* Percent buttons */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:4, marginBottom:12 }}>
-            {["25%","50%","75%","100%"].map(p=>(
-              <button key={p} onClick={()=>onAmount(((parseFloat(p)/100)*availableBalance).toFixed(8))} style={{ padding:"5px", borderRadius:6, border:"1px solid var(--w-border)", background:"transparent", color:"var(--w-muted)", fontSize:11, cursor:"pointer", fontFamily:"Vazirmatn", transition:"all 0.1s" }}
-                onMouseEnter={e=>(e.currentTarget.style.borderColor="var(--w-accent)")}
-                onMouseLeave={e=>(e.currentTarget.style.borderColor="var(--w-border)")}
-              >{p}</button>
-            ))}
-          </div>
-          {/* Margin leverage slider */}
+          <div style={{ marginBottom:12, fontSize:11, color:"var(--w-muted)" }}>موجودی واقعی در زمان ثبت سفارش توسط backend بررسی می‌شود.</div>
           {tradeKind === "margin" && (
-            <div style={{ marginBottom:12 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-                <label style={{ fontSize:11, color:"var(--w-muted)", fontWeight:600 }}>اهرم (Leverage)</label>
-                <span style={{ fontSize:14, fontWeight:900, color:"#f59e0b" }}>×{FA(leverage)}</span>
-              </div>
-              <input type="range" min={1} max={10} value={leverage} onChange={e=>setLeverage(+e.target.value)}
-                style={{ width:"100%", accentColor:"#f59e0b" }}
-              />
-              <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"var(--w-muted)", marginTop:3 }}>
-                <span>×۱</span><span>×۵</span><span>×۱۰</span>
-              </div>
-              <div style={{ marginTop:8, padding:"8px 10px", background:"rgba(245,158,11,0.08)", borderRadius:8, fontSize:11, color:"#d97706" }}>
-                قیمت تسویه: <strong>${fmtP(tradeType==="buy" ? asset.price*(1-0.9/leverage) : asset.price*(1+0.9/leverage))}</strong>
-              </div>
+            <div style={{ marginBottom:12, padding:"10px 12px", background:"rgba(217,119,6,.07)", borderRadius:8, fontSize:11, color:"#b45309", lineHeight:1.8 }}>
+              معامله تعهدی در backend فعلی فعال نیست و سفارش مارجین ارسال نخواهد شد.
             </div>
           )}
           {/* Total */}
@@ -892,16 +870,21 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
               <WI n="shield" s={15}/> تأیید هویت برای معامله
             </button>
           ) : (
-            <button onClick={submitOrder} disabled={submitting} className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, background:tradeType==="buy"?"#10b981":"#f43f5e", opacity:submitting?0.65:1 }}>
-              {submitting ? "در حال ثبت..." : tradeType==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
-            </button>
+            <>
+              <button onClick={submitOrder} disabled={orderBusy} className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, background:tradeType==="buy"?"#10b981":"#f43f5e", opacity:orderBusy?0.65:1 }}>
+                {orderBusy ? "در حال ثبت..." : tradeType==="buy"?`خرید ${asset.symbol}`:`فروش ${asset.symbol}`}
+              </button>
+              {orderMessage && <div style={{ marginTop:8, padding:"8px 10px", borderRadius:8, background:"var(--w-card2)", color:"var(--w-muted)", fontSize:11, lineHeight:1.7 }}>{orderMessage}</div>}
+            </>
           )}
         </div>
         {/* Recent trades */}
         <div style={{ padding:"14px", borderTop:"1px solid var(--w-border)", marginTop:"auto" }}>
           <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", marginBottom:8 }}>آخرین معاملات</div>
           {recentTrades.length===0 ? (
-            <div style={{ padding:"18px 8px", textAlign:"center", color:"var(--w-muted)", fontSize:11 }}>هنوز معامله‌ای برای این بازار ثبت نشده است.</div>
+            <div style={{ padding:"18px 8px", textAlign:"center", color:"var(--w-muted)", fontSize:11 }}>
+              هنوز معامله‌ای برای این بازار ثبت نشده است.
+            </div>
           ) : recentTrades.map((trade,i)=>(
             <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", fontSize:10, padding:"4px 0", borderBottom:"1px solid var(--w-border)", color:"var(--w-muted)" }}>
               <span style={{ color:trade.side==="buy"?"#10b981":"#f43f5e" }}>{fmtP(trade.price)}</span>
@@ -913,6 +896,8 @@ function TradeView({ asset, asks, bids, recentTrades, wallets, tradeType, onTrad
     </div>
   );
 }
+
+
 
 // ── Auth Gate ──────────────────────────────────────
 function AuthGate({ onAuth }: { onAuth:()=>void }) {
@@ -933,14 +918,14 @@ function AuthGate({ onAuth }: { onAuth:()=>void }) {
 // ── Assets Tab ─────────────────────────────────────
 function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDepositCoin, onWithdrawCoin }: { assets:CryptoAsset[]; wallets:any[]; kycStatus:KycStatus; onDeposit:()=>void; onWithdraw:()=>void; onDepositCoin:()=>void; onWithdrawCoin:()=>void; }) {
   const walletBySymbol = new Map(wallets.map(w => [String(w.symbol).toUpperCase(), w]));
-  const portfolioValue = wallets.reduce((sum,w) => sum + Number(w.total_balance ?? (Number(w.available_balance ?? 0) + Number(w.locked_balance ?? 0))) * (assets.find(a => a.symbol.toUpperCase() === String(w.symbol).toUpperCase())?.price ?? 0), 0);
+  const portfolioValue = wallets.reduce((sum,w) => sum + Number(w.total_balance ?? 0) * (assets.find(a => a.symbol.toUpperCase() === String(w.symbol).toUpperCase())?.price ?? 0), 0);
   return (
     <div style={{ padding:"20px 0" }}>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:24 }}>
         {[
           { label:"ارزش کل پورتفولیو", value:`$${portfolioValue.toFixed(2)}`, icon:"wallet", color:"#0891b2" },
-          { label:"تعداد دارایی‌ها", value:FA(wallets.length), icon:"trending-up", color:"#10b981" },
-          { label:"وضعیت داده", value:wallets.length ? "زنده" : "در انتظار ورود", icon:"bar-chart", color:"#7c3aed" },
+          { label:"تعداد دارایی‌ها", value:FA(wallets.length), icon:"coins", color:"#10b981" },
+          { label:"وضعیت داده", value:wallets.length ? "زنده" : "در انتظار ورود", icon:"activity", color:"#7c3aed" },
         ].map(c => (
           <div key={c.label} className="w-card" style={{ padding:"18px" }}>
             <div style={{ display:"flex", gap:10, alignItems:"center" }}>
@@ -976,7 +961,7 @@ function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDeposi
           <tbody>
             {assets.filter(a => walletBySymbol.has(a.symbol.toUpperCase())).map(a => {
               const wallet = walletBySymbol.get(a.symbol.toUpperCase());
-              const bal = Number(wallet?.total_balance ?? (Number(wallet?.available_balance ?? 0) + Number(wallet?.locked_balance ?? 0)));
+              const bal = Number(wallet?.total_balance ?? 0);
               return (
                 <tr key={a.id} style={{ borderBottom:"1px solid var(--w-border)" }}>
                   <td style={{ padding:"12px 14px" }}>
@@ -1000,7 +985,7 @@ function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDeposi
                 </tr>
               );
             })}
-            {wallets.length === 0 && <tr><td colSpan={5} style={{ padding:"40px", textAlign:"center", color:"var(--w-muted)" }}>هنوز موجودی واقعی از حساب شما دریافت نشده است.</td></tr>}
+            {wallets.length === 0 && <tr><td colSpan={6} style={{ padding:"40px", textAlign:"center", color:"var(--w-muted)" }}>هنوز موجودی واقعی از حساب شما دریافت نشده است.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -1022,51 +1007,74 @@ function KycGate({ kycStatus }: { kycStatus:KycStatus }) {
 }
 
 // ── Deposit Toman Tab ──────────────────────────────
-function DepositTomanTab({ kycStatus }: { kycStatus:KycStatus }) { if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>; return <div className="w-card" style={{maxWidth:560,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>واریز تومان</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>در Backend فعلی آن صراف، درگاه پرداخت تومان و حساب بانکی/شبا برای واریز کاربر فعال نشده است. تا زمان اتصال سرویس پرداخت، هیچ شماره حساب، شبا، سقف یا موجودی آزمایشی نمایش داده نمی‌شود.</p></div>; }
-
+function DepositTomanTab({ kycStatus }: { kycStatus:KycStatus }) {
+  if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>;
+  return <div style={{maxWidth:620,padding:"24px 0"}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:16}}>واریز تومان</h2><div className="w-card" style={{padding:24}}>
+    <div style={{fontSize:14,fontWeight:800,marginBottom:8}}>درگاه و حساب بانکی</div>
+    <div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>اتصال واقعی واریز تومان هنوز در API آن صراف فعال نشده است. اطلاعات حساب، شبا یا لینک درگاه ساختگی نمایش داده نمی‌شود.</div>
+  </div></div>;
+}
 // ── Deposit Coin Tab ───────────────────────────────
-function DepositCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) { if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>; return <div className="w-card" style={{maxWidth:560,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>واریز رمزارز</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>آدرس واریز واقعی از Backend/Provider فعلی صادر نمی‌شود. تا زمان فعال شدن سرویس آدرس کیف پول، آدرس نمونه یا ساختگی نمایش داده نمی‌شود.</p></div>; }
-
+function DepositCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) {
+  const [selAsset,setSelAsset]=useState(assets[0]),[network,setNetwork]=useState("TRC20"),[searchCoin,setSearchCoin]=useState("");
+  if(kycStatus!=="verified") return <KycGate kycStatus={kycStatus}/>;
+  const NETS:Record<string,string[]>={BTC:["BTC"],ETH:["ERC20"],BNB:["BEP20"],SOL:["SOL"],USDT:["TRC20","ERC20","BEP20"],USDC:["ERC20","BEP20"],default:["TRC20","ERC20","BEP20"]};
+  const nets=NETS[selAsset?.symbol]||NETS.default;
+  const filtered=assets.filter(a=>a.symbol.includes(searchCoin.toUpperCase())||a.nameFa.includes(searchCoin)).slice(0,30);
+  return <div style={{display:"flex",gap:20,padding:"24px 0",alignItems:"flex-start",flexWrap:"wrap"}}>
+    <div style={{width:220,flexShrink:0}}><div style={{fontSize:14,fontWeight:800,marginBottom:10}}>انتخاب رمزارز</div><input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{marginBottom:8,fontSize:12}}/>
+      <div className="w-card" style={{overflow:"hidden",maxHeight:360,overflowY:"auto"}}>{filtered.map(a=><div key={a.id} onClick={()=>{setSelAsset(a);setNetwork((NETS[a.symbol]||NETS.default)[0]);}} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:selAsset?.id===a.id?"rgba(8,145,178,.08)":"transparent",borderBottom:"1px solid var(--w-border)"}}><div style={{width:24,height:24,borderRadius:"50%",background:a.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:900}}>{a.symbol.slice(0,3)}</div><div><div style={{fontSize:12,fontWeight:700}}>{a.symbol}</div><div style={{fontSize:10,color:"var(--w-muted)"}}>{a.nameFa}</div></div></div>)}</div>
+    </div>
+    <div style={{flex:1,minWidth:300,maxWidth:600}}><h2 style={{fontSize:17,fontWeight:900,marginBottom:16}}>واریز {selAsset?.symbol}</h2><div className="w-card" style={{padding:22}}>
+      <div style={{padding:"12px 14px",background:"rgba(217,119,6,.07)",border:"1px solid rgba(217,119,6,.18)",borderRadius:9,fontSize:12,color:"#b45309",lineHeight:1.8}}>آدرس واریز واقعی از زیرساخت کیف‌پول در API فعلی ارائه نشده است؛ بنابراین هیچ آدرس ساختگی نمایش داده نمی‌شود.</div>
+      <div style={{marginTop:16,fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>شبکه انتخابی: <strong>{network}</strong>. پس از ارائه API آدرس کیف‌پول، این بخش مستقیماً به آن متصل می‌شود.</div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>{nets.map(n=><button key={n} onClick={()=>setNetwork(n)} className="w-btn w-btn-ghost" style={{padding:"7px 14px",color:network===n?"#0891b2":"var(--w-muted)"}}>{n}</button>)}</div>
+    </div></div>
+  </div>;
+}
 // ── Withdraw Toman Tab ─────────────────────────────
-function WithdrawTomanTab({ kycStatus }: { kycStatus:KycStatus }) { if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>; return <div className="w-card" style={{maxWidth:520,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>برداشت تومان</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>برداشت تومان در Backend فعلی آن صراف به سرویس بانکی متصل نشده است؛ بنابراین فرم ثبت برداشت یا شماره کارت مقصد فعال نیست.</p></div>; }
-
+function WithdrawTomanTab({ kycStatus }: { kycStatus:KycStatus }) {
+  if(kycStatus!=="verified") return <KycGate kycStatus={kycStatus}/>;
+  return <div style={{maxWidth:620,padding:"24px 0"}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:16}}>برداشت تومان</h2><div className="w-card" style={{padding:24}}><div style={{fontSize:14,fontWeight:800,marginBottom:8}}>سرویس برداشت بانکی</div><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>API برداشت تومان/کارت در سرویس آن صراف فعلاً در backend تعریف نشده است؛ هیچ موجودی، کارمزد یا شماره کارت ساختگی نمایش داده نمی‌شود.</div></div></div>;
+}
 // ── Withdraw Coin Tab ──────────────────────────────
 function WithdrawCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) {
-  const [selAsset,setSelAsset]=useState(assets[0]);
-  const [network,setNetwork]=useState("");
-  const [address,setAddress]=useState("");
-  const [wAmount,setWAmount]=useState("");
-  const [step,setStep]=useState<"form"|"confirm"|"done">("form");
-  const [otp,setOtp]=useState("");
-  const [searchCoin,setSearchCoin]=useState("");
-  const [submitting,setSubmitting]=useState(false);
-  const [message,setMessage]=useState("");
-  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus}/>;
-  const NETS:Record<string,string[]>={BTC:["BTC"],ETH:["ERC20"],BNB:["BEP20"],SOL:["SOL"],USDT:["TRC20","ERC20","BEP20"],default:["TRC20","ERC20","BEP20"]};
-  const nets=NETS[selAsset.symbol]||NETS.default;
-  const filtered=assets.filter(a=>a.symbol.includes(searchCoin.toUpperCase())||a.nameFa.includes(searchCoin)).slice(0,30);
+  const [selAsset,setSelAsset]=useState(assets[0]),[network,setNetwork]=useState("TRC20"),[address,setAddress]=useState(""),[wAmount,setWAmount]=useState(""),[memo,setMemo]=useState(""),[searchCoin,setSearchCoin]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
+  if(kycStatus!=="verified") return <KycGate kycStatus={kycStatus}/>;
+  const NETS:Record<string,string[]>={BTC:["BTC"],ETH:["ERC20"],BNB:["BEP20"],SOL:["SOL"],USDT:["TRC20","ERC20","BEP20"],USDC:["ERC20","BEP20"],default:["TRC20","ERC20","BEP20"]};
+  const nets=NETS[selAsset?.symbol]||NETS.default,filtered=assets.filter(a=>a.symbol.includes(searchCoin.toUpperCase())||a.nameFa.includes(searchCoin)).slice(0,30);
   const submit=async()=>{
-    if(otp.length!==6)return;
-    setSubmitting(true);setMessage("");
+    if(!address.trim()||!wAmount.trim()||Number(wAmount)<=0){setMessage("مقدار و آدرس مقصد را وارد کنید.");return;}
+    setBusy(true);setMessage("");
     try{
-      const token=window.localStorage.getItem("anpardaz:accessToken")??"";
-      const response=await fetch(ANSARRAF_API_BASE+"/api/v1/withdrawals",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({assetId:selAsset.id,amount:wAmount.trim(),network:network.trim(),destination:address.trim(),idempotencyKey:crypto.randomUUID()})});
-      const result=await response.json().catch(()=>({}));
-      if(!response.ok)throw new Error(result?.error??"withdrawal_failed");
-      setStep("done");
-    }catch(error){
-      const errors:any={insufficient_available_balance:"موجودی کافی نیست.",kyc_required:"احراز هویت لازم است.",asset_not_available:"این دارایی در آن صراف فعال نیست.",invalid_withdrawal:"اطلاعات برداشت نامعتبر است."};
-      setMessage(errors[(error as Error).message]??"ثبت برداشت انجام نشد.");
-    }finally{setSubmitting(false);}
+      const token=getWebToken(), ar=await fetch(ANSARRAF_API_BASE+"/api/v1/assets",{cache:"no-store"});
+      const rows=ar.ok?((await ar.json()).assets??[]):[], backendAsset=rows.find((x:any)=>String(x.symbol).toUpperCase()===selAsset.symbol.toUpperCase());
+      if(!backendAsset)throw new Error("دارایی انتخاب‌شده در زیرساخت صراف فعال نیست.");
+      const response=await fetch(ANSARRAF_API_BASE+"/api/v1/withdrawals",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({assetId:Number(backendAsset.id),amount:wAmount.trim(),network,destination:address.trim(),memo:memo.trim()||undefined,idempotencyKey:crypto.randomUUID()})});
+      const body=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(body?.error==="kyc_required"?"احراز هویت برای برداشت لازم است.":body?.error??"ثبت برداشت ناموفق بود.");
+      setMessage("درخواست برداشت در صراف ثبت شد و برای مراحل تأیید/پردازش به backend تحویل شد.");setAddress("");setWAmount("");setMemo("");
+    }catch(e){setMessage(e instanceof Error?e.message:"ثبت برداشت ناموفق بود.");}finally{setBusy(false);}
   };
-  if(step==="done")return <div style={{textAlign:"center",padding:"60px 24px"}}><div style={{width:64,height:64,borderRadius:"50%",background:"rgba(16,185,129,0.12)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",color:"#10b981"}}><WI n="check" s={30}/></div><div style={{fontSize:18,fontWeight:900,marginBottom:8}}>درخواست برداشت ثبت شد</div><div style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,marginBottom:24}}>درخواست شما در Backend آن صراف ثبت شده و مطابق فرآیند تأیید و ارسال بررسی می‌شود.</div><button onClick={()=>{setStep("form");setAddress("");setWAmount("");setOtp("");setMessage("");}} className="w-btn w-btn-ghost">برداشت جدید</button></div>;
-  if(step==="confirm")return <div style={{maxWidth:460,padding:"40px 0",margin:"0 auto"}}><div className="w-card" style={{padding:28}}><div style={{fontSize:16,fontWeight:900,marginBottom:14}}>تأیید درخواست برداشت</div><div style={{display:"grid",gap:9,fontSize:13,marginBottom:18}}><div>دارایی: <b>{selAsset.symbol}</b></div><div>شبکه: <b>{network}</b></div><div>مبلغ: <b>{wAmount}</b></div><div style={{wordBreak:"break-all"}}>مقصد: <b>{address}</b></div><div style={{color:"var(--w-muted)"}}>کارمزد شبکه از سرویس کیف پول دریافت می‌شود و مقدار ساختگی نمایش داده نمی‌شود.</div></div><input value={otp} onChange={e=>setOtp(e.target.value.replace(/\\D/g,"").slice(0,6))} maxLength={6} className="w-input" style={{textAlign:"center",fontSize:22,letterSpacing:7}} inputMode="numeric" placeholder="کد ۶ رقمی تأیید"/>{message&&<div style={{color:"#dc2626",fontSize:12,marginTop:9}}>{message}</div>}<div style={{display:"flex",gap:8,marginTop:16}}><button onClick={()=>setStep("form")} className="w-btn w-btn-ghost" style={{flex:1}}>بازگشت</button><button onClick={submit} disabled={otp.length!==6||submitting} className="w-btn w-btn-primary" style={{flex:1,opacity:otp.length===6&&!submitting?1:.5}}>{submitting?"در حال ثبت…":"تأیید و ثبت برداشت"}</button></div></div></div>;
-  return <div style={{display:"flex",gap:20,padding:"24px 0",alignItems:"flex-start"}}><div style={{width:220,flexShrink:0}}><div style={{fontSize:14,fontWeight:800,marginBottom:10}}>انتخاب رمزارز</div><input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{marginBottom:8,fontSize:12}}/><div style={{background:"var(--w-card)",border:"1px solid var(--w-border)",borderRadius:10,overflow:"hidden",maxHeight:360,overflowY:"auto"}}>{filtered.map(a=><div key={a.id} onClick={()=>{setSelAsset(a);const ns=NETS[a.symbol]||NETS.default;setNetwork(ns[0]);}} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:selAsset.id===a.id?"rgba(8,145,178,0.08)":"transparent",borderBottom:"1px solid var(--w-border)"}}><div style={{width:24,height:24,borderRadius:"50%",background:a.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:900,flexShrink:0}}>{a.symbol.slice(0,3)}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:700}}>{a.nameFa}</div><div style={{fontSize:10,color:"var(--w-muted)"}}>{a.symbol}</div></div></div>)}</div></div><div style={{flex:1,maxWidth:520}}><div className="w-card" style={{padding:20}}><h3 style={{margin:"0 0 16px",fontSize:17,fontWeight:900}}>برداشت {selAsset.symbol}</h3><label style={{fontSize:11,fontWeight:700,color:"var(--w-muted)"}}>شبکه</label><select value={network} onChange={e=>setNetwork(e.target.value)} className="w-input" style={{margin:"6px 0 14px"}}>{nets.map(n=><option key={n} value={n}>{n}</option>)}</select><label style={{fontSize:11,fontWeight:700,color:"var(--w-muted)"}}>آدرس مقصد</label><input value={address} onChange={e=>setAddress(e.target.value)} placeholder={"آدرس "+selAsset.symbol+" روی "+network} className="w-input" style={{fontFamily:"monospace",fontSize:12,margin:"6px 0 14px"}}/><label style={{fontSize:11,fontWeight:700,color:"var(--w-muted)"}}>مقدار ({selAsset.symbol})</label><input value={wAmount} onChange={e=>setWAmount(e.target.value)} placeholder="مقدار واقعی برداشت" className="w-input" style={{margin:"6px 0 14px"}} inputMode="decimal"/><div style={{padding:"10px 12px",background:"var(--w-card2)",borderRadius:9,fontSize:12,marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"var(--w-muted)"}}>کارمزد شبکه</span><b>—</b></div><div style={{fontSize:11,color:"var(--w-muted)",marginTop:5}}>کارمزد فقط پس از دریافت از سرویس کیف پول نمایش داده می‌شود.</div></div><div style={{padding:"10px 12px",background:"rgba(220,38,38,0.06)",borderRadius:9,fontSize:11,color:"#dc2626",marginBottom:12}}>آدرس را با دقت بررسی کنید. تراکنش‌های ارز دیجیتال برگشت‌پذیر نیستند.</div>{message&&<div style={{color:"#dc2626",fontSize:12,marginBottom:10}}>{message}</div>}<button disabled={!address.trim()||!wAmount.trim()||!network} onClick={()=>setStep("confirm")} className="w-btn w-btn-primary" style={{padding:"12px",opacity:address.trim()&&wAmount.trim()&&network?1:.5}}>ادامه و تأیید</button></div></div></div>;
+  return <div style={{display:"flex",gap:20,padding:"24px 0",alignItems:"flex-start",flexWrap:"wrap"}}>
+    <div style={{width:220,flexShrink:0}}><div style={{fontSize:14,fontWeight:800,marginBottom:10}}>انتخاب رمزارز</div><input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{marginBottom:8,fontSize:12}}/><div className="w-card" style={{overflow:"hidden",maxHeight:360,overflowY:"auto"}}>{filtered.map(a=><div key={a.id} onClick={()=>{setSelAsset(a);setNetwork((NETS[a.symbol]||NETS.default)[0]);}} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:selAsset?.id===a.id?"rgba(8,145,178,.08)":"transparent",borderBottom:"1px solid var(--w-border)"}}><div style={{width:24,height:24,borderRadius:"50%",background:a.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:900}}>{a.symbol.slice(0,3)}</div><div><div style={{fontSize:12,fontWeight:700}}>{a.symbol}</div><div style={{fontSize:10,color:"var(--w-muted)"}}>{a.nameFa}</div></div></div>)}</div></div>
+    <div style={{flex:1,minWidth:300,maxWidth:600}}><h2 style={{fontSize:17,fontWeight:900,marginBottom:16}}>برداشت {selAsset?.symbol}</h2><div className="w-card" style={{padding:22}}>
+      <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:700,color:"var(--w-muted)",marginBottom:5}}>شبکه</label><div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{nets.map(n=><button key={n} onClick={()=>setNetwork(n)} className="w-btn w-btn-ghost" style={{padding:"7px 14px",color:network===n?"#0891b2":"var(--w-muted)"}}>{n}</button>)}</div></div>
+      <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:700,color:"var(--w-muted)",marginBottom:5}}>آدرس مقصد</label><input value={address} onChange={e=>setAddress(e.target.value)} className="w-input" dir="ltr" placeholder="Destination address"/></div>
+      <div style={{marginBottom:12}}><label style={{display:"block",fontSize:11,fontWeight:700,color:"var(--w-muted)",marginBottom:5}}>مقدار</label><input value={wAmount} onChange={e=>setWAmount(e.target.value)} className="w-input" dir="ltr" inputMode="decimal" placeholder="0.00"/></div>
+      <div style={{marginBottom:14}}><label style={{display:"block",fontSize:11,fontWeight:700,color:"var(--w-muted)",marginBottom:5}}>Memo / Tag (اختیاری)</label><input value={memo} onChange={e=>setMemo(e.target.value)} className="w-input" dir="ltr"/></div>
+      <div style={{padding:"11px 13px",background:"rgba(220,38,38,.06)",borderRadius:9,fontSize:11,color:"#b91c1c",lineHeight:1.8,marginBottom:12}}>آدرس را با دقت بررسی کنید. تراکنش‌های رمزارزی برگشت‌پذیر نیستند.</div>
+      {message&&<div style={{padding:"9px 11px",borderRadius:9,background:"var(--w-card2)",fontSize:11,lineHeight:1.8,marginBottom:12}}>{message}</div>}
+      <button onClick={submit} disabled={busy||!address||!wAmount} className="w-btn w-btn-primary" style={{width:"100%",padding:12,opacity:busy||!address||!wAmount?0.65:1}}>{busy?"در حال ارسال...":"ثبت درخواست برداشت"}</button>
+    </div></div>
+  </div>;
 }
+
+// ── Orders Tab ─────────────────────────────────────
+
 // ── Orders Tab ─────────────────────────────────────
 function OrdersTab({ orders }: { orders:any[] }) {
   const [activeTab, setActiveTab] = useState<"open"|"history">("open");
-  const rows = orders.filter(o => activeTab === "open" ? ["open","partially_filled"].includes(o.status) : !["open","partially_filled"].includes(o.status));
   return (
     <div style={{ padding:"20px 0" }}>
       <div style={{ display:"flex", gap:12, marginBottom:16 }}>
@@ -1077,28 +1085,25 @@ function OrdersTab({ orders }: { orders:any[] }) {
         ))}
       </div>
       <div className="w-card" style={{ overflow:"hidden" }}>
-        {rows.length === 0 ? (
+        {orders.length===0 ? (
           <div style={{ padding:"60px", textAlign:"center", color:"var(--w-muted)" }}>
             <WI n="document" s={40} style={{ opacity:0.2, marginBottom:12 }}/>
-            <div style={{ fontSize:14, fontWeight:700 }}>{activeTab==="open"?"سفارش باز وجود ندارد":"تاریخچه‌ای یافت نشد"}</div>
-            <div style={{ fontSize:12, marginTop:4 }}>این بخش فقط سفارش‌های واقعی حساب شما را نمایش می‌دهد.</div>
+            <div style={{ fontSize:14, fontWeight:700 }}>سفارشی از حساب شما دریافت نشد</div>
+            <div style={{ fontSize:12, marginTop:4 }}>این بخش فقط داده واقعی An Sarraf را نمایش می‌دهد.</div>
           </div>
         ) : (
           <div style={{ overflowX:"auto" }}>
             <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
-              <thead><tr style={{ background:"var(--w-card2)" }}>{["شناسه","بازار","سمت","نوع","مقدار","قیمت","وضعیت","تاریخ"].map(h=><th key={h} style={{ padding:"10px 12px", textAlign:"right", color:"var(--w-muted)" }}>{h}</th>)}</tr></thead>
-              <tbody>{rows.map(o => (
-                <tr key={o.id} style={{ borderBottom:"1px solid var(--w-border)" }}>
-                  <td style={{ padding:"10px 12px", fontFamily:"monospace" }}>{o.id}</td>
-                  <td style={{ padding:"10px 12px" }}>{o.base_asset_id}/{o.quote_asset_id}</td>
-                  <td style={{ padding:"10px 12px", color:o.side==="buy"?"#10b981":"#f43f5e" }}>{o.side==="buy"?"خرید":"فروش"}</td>
-                  <td style={{ padding:"10px 12px" }}>{o.order_type}</td>
-                  <td style={{ padding:"10px 12px" }}>{o.quantity}</td>
-                  <td style={{ padding:"10px 12px" }}>{o.price ?? "بازار"}</td>
-                  <td style={{ padding:"10px 12px" }}>{o.status}</td>
-                  <td style={{ padding:"10px 12px" }}>{new Date(o.created_at).toLocaleString("fa-IR")}</td>
-                </tr>
-              ))}</tbody>
+              <thead><tr style={{ background:"var(--w-card2)" }}>{["شناسه","جفت ارز","سمت","نوع","مقدار","وضعیت","تاریخ"].map(h=><th key={h} style={{ padding:"10px 12px", textAlign:"right", color:"var(--w-muted)" }}>{h}</th>)}</tr></thead>
+              <tbody>{orders.filter(o=>activeTab==="open" ? ["open","partially_filled"].includes(o.status) : !["open","partially_filled"].includes(o.status)).map(o=><tr key={o.id} style={{ borderBottom:"1px solid var(--w-border)" }}>
+                <td style={{ padding:"10px 12px", fontFamily:"monospace" }}>{o.id}</td>
+                <td style={{ padding:"10px 12px" }}>{o.base_asset_id}/{o.quote_asset_id}</td>
+                <td style={{ padding:"10px 12px", color:o.side==="buy"?"#10b981":"#f43f5e" }}>{o.side==="buy"?"خرید":"فروش"}</td>
+                <td style={{ padding:"10px 12px" }}>{o.order_type}</td>
+                <td style={{ padding:"10px 12px" }}>{o.quantity}</td>
+                <td style={{ padding:"10px 12px" }}>{o.status}</td>
+                <td style={{ padding:"10px 12px" }}>{new Date(o.created_at).toLocaleString("fa-IR")}</td>
+              </tr>)}</tbody>
             </table>
           </div>
         )}
@@ -1120,27 +1125,45 @@ function TransactionsTab({ orders, deposits, withdrawals, onSelectTx }: { orders
     <div style={{ padding:"20px 0" }}>
       <div style={{ display:"flex", gap:8, marginBottom:16 }}>
         {["all","خرید","فروش","واریز","برداشت"].map(t=>(
-          <button key={t} onClick={()=>setTxType(t)} className="w-btn w-btn-muted" style={{ padding:"7px 16px", borderColor:txType===t?"rgba(8,145,178,0.4)":"var(--w-border)", color:txType===t?"#0891b2":"var(--w-muted)" }}>{t==="all"?"همه":t}</button>
+          <button key={t} onClick={()=>setTxType(t)} style={{ padding:"7px 16px", borderRadius:8, border:`1px solid ${txType===t?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:txType===t?"rgba(8,145,178,0.08)":"transparent", color:txType===t?"#0891b2":"var(--w-muted)", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"Vazirmatn" }}>
+            {t==="all"?"همه":t}
+          </button>
         ))}
+        <button style={{ marginRight:"auto", background:"none", border:"1px solid var(--w-border)", borderRadius:8, padding:"7px 14px", fontSize:12, cursor:"pointer", color:"var(--w-muted)", fontFamily:"Vazirmatn" }}>
+          <WI n="download" s={12}/> خروجی اکسل
+        </button>
       </div>
       <div className="w-card" style={{ overflow:"hidden" }}>
-        {filtered.length===0 ? (
-          <div style={{ padding:"60px", textAlign:"center", color:"var(--w-muted)" }}>هنوز تراکنش واقعی برای این حساب ثبت نشده است.</div>
-        ) : (
-          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-            <thead><tr style={{ background:"var(--w-card2)" }}>{["نوع","مقدار","تاریخ","وضعیت","شناسه","جزئیات"].map(h=><th key={h} style={{ padding:"10px 14px", textAlign:"right", color:"var(--w-muted)", fontSize:11 }}>{h}</th>)}</tr></thead>
-            <tbody>{filtered.map((tx,i)=>(
-              <tr key={tx.txid+"-"+i} style={{ borderBottom:"1px solid var(--w-border)", cursor:"pointer" }} onClick={()=>onSelectTx(tx)}>
-                <td style={{ padding:"12px 14px" }}><span style={{ padding:"3px 10px", borderRadius:6, background:`${tx.color}15`, color:tx.color, fontSize:12, fontWeight:700 }}>{tx.type}</span></td>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+          <thead>
+            <tr style={{ background:"var(--w-card2)" }}>
+              {["نوع","مقدار","تاریخ","وضعیت","شناسه","جزئیات"].map(h=>(
+                <th key={h} style={{ padding:"10px 14px", textAlign:"right", color:"var(--w-muted)", fontWeight:600, fontSize:11 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((tx,i)=>(
+              <tr key={i} style={{ borderBottom:"1px solid var(--w-border)", cursor:"pointer", transition:"background 0.1s" }}
+                onMouseEnter={e=>(e.currentTarget as HTMLTableRowElement).style.background="var(--w-hover)"}
+                onMouseLeave={e=>(e.currentTarget as HTMLTableRowElement).style.background="transparent"}
+              >
+                <td style={{ padding:"12px 14px" }}>
+                  <span style={{ padding:"3px 10px", borderRadius:6, background:`${tx.color}15`, color:tx.color, fontSize:12, fontWeight:700 }}>{tx.type}</span>
+                </td>
                 <td style={{ padding:"12px 14px", fontWeight:800, color:tx.color }}>{tx.amount}</td>
-                <td style={{ padding:"12px 14px" }}>{tx.date}</td>
-                <td style={{ padding:"12px 14px" }}>{tx.status}</td>
-                <td style={{ padding:"12px 14px", fontFamily:"monospace", fontSize:11 }}>{tx.txid}</td>
-                <td style={{ padding:"12px 14px" }}>مشاهده</td>
+                <td style={{ padding:"12px 14px", color:"var(--w-muted)", fontSize:12 }}>{tx.date}</td>
+                <td style={{ padding:"12px 14px" }}>
+                  <span style={{ padding:"2px 8px", borderRadius:5, background:tx.status==="موفق"?"rgba(16,185,129,0.1)":"rgba(217,119,6,0.1)", color:tx.status==="موفق"?"#10b981":"#d97706", fontSize:11, fontWeight:700 }}>{tx.status}</span>
+                </td>
+                <td style={{ padding:"12px 14px", fontSize:11, color:"var(--w-muted)", fontFamily:"monospace" }}>{tx.txid}</td>
+                <td style={{ padding:"12px 14px" }}>
+                  <button onClick={()=>onSelectTx(tx)} className="w-btn w-btn-muted" style={{ padding:"4px 12px", fontSize:11, borderRadius:6 }}>مشاهده</button>
+                </td>
               </tr>
-            ))}</tbody>
-          </table>
-        )}
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -1178,33 +1201,13 @@ function TxDetailView({ tx, onBack }: { tx:any; onBack:()=>void }) {
 
 // ── Fees Tab ───────────────────────────────────────
 function FeesTab() {
-  return (
-    <div style={{ padding:"24px 0", maxWidth:640 }}>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>کارمزدها</div>
-      <div className="w-card" style={{ padding:"22px" }}>
-        <div style={{ fontSize:13, fontWeight:800, marginBottom:8 }}>کارمزد واقعی حساب</div>
-        <div style={{ fontSize:12, color:"var(--w-muted)", lineHeight:1.9 }}>
-          نرخ کارمزد این حساب باید از تنظیمات واقعی بک‌اند و ارائه‌دهنده دریافت شود. هیچ نرخ یا سطح VIP ساختگی در رابط نمایش داده نمی‌شود.
-        </div>
-      </div>
-    </div>
-  );
+  return <div style={{padding:"24px 0",maxWidth:620}}><div style={{fontSize:18,fontWeight:900,marginBottom:16}}>کارمزدها</div><div className="w-card" style={{padding:22}}><div style={{fontSize:13,fontWeight:800,marginBottom:8}}>منبع کارمزد</div><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>نرخ کارمزد باید از تنظیمات واقعی سرویس/حسابداری صراف خوانده شود. جدول آزمایشی یا عدد ثابت در سایت نمایش داده نمی‌شود.</div></div></div>;
 }
-
 // ── Security Tab ───────────────────────────────────
 function SecurityTab() {
-  return (
-    <div style={{ padding:"24px 0", maxWidth:640 }}>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>امنیت حساب</div>
-      <div className="w-card" style={{ padding:"22px" }}>
-        <div style={{ fontSize:13, fontWeight:800, marginBottom:8 }}>مدیریت امنیت</div>
-        <div style={{ fontSize:12, color:"var(--w-muted)", lineHeight:1.9 }}>
-          وضعیت ۲FA، دستگاه‌ها و تنظیمات ضد فیشینگ تا زمان اتصال سرویس امنیت حساب از بک‌اند نمایش داده نمی‌شود.
-        </div>
-      </div>
-    </div>
-  );
+  return <div style={{padding:"24px 0",maxWidth:620}}><div style={{fontSize:18,fontWeight:900,marginBottom:16}}>امنیت حساب</div><div className="w-card" style={{padding:22}}><div style={{fontSize:13,fontWeight:800,marginBottom:8}}>تنظیمات امنیتی</div><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>API وب برای ۲FA، مدیریت دستگاه و ضد فیشینگ در قرارداد فعلی آن صراف ارائه نشده است؛ بنابراین وضعیت یا دکمهٔ ساختگی نمایش داده نمی‌شود.</div></div></div>;
 }
+// ── Trade Select Tab ───────────────────────────────
 
 // ── Trade Select Tab ───────────────────────────────
 function TradeSelectTab({ asset, onInstant, onSpot, onMargin, isLoggedIn, onAuth }: {
@@ -1214,7 +1217,7 @@ function TradeSelectTab({ asset, onInstant, onSpot, onMargin, isLoggedIn, onAuth
   const cards = [
     { id:"instant", label:"خرید/فروش لحظه‌ای", sublabel:"لحظه‌ای", icon:"swap", color:"#059669", desc:"خرید یا فروش آنی با قیمت بازار. ساده‌ترین روش معامله.", badge:"پیشنهادی", onClick: isLoggedIn ? onInstant : onAuth },
     { id:"spot", label:"معامله اسپات", sublabel:"اسپات", icon:"bar-chart", color:"#0891b2", desc:"معامله با دفتر سفارشات کامل. بازار، لیمیت و استاپ-لیمیت.", badge:"حرفه‌ای", onClick: onSpot },
-    { id:"margin", label:"معامله تعهدی", sublabel:"مارجین", icon:"trending-up", color:"#7c3aed", desc:"API اجرایی معاملات تعهدی هنوز در بک‌اند آن صراف فعال نشده است.", badge:"فعلاً غیرفعال", onClick: ()=>{} },
+    { id:"margin", label:"معامله تعهدی", sublabel:"مارجین", icon:"trending-up", color:"#7c3aed", desc:"معامله با اهرم تا ×۱۰. امکان Long و Short با استفاده از وام.", badge:"ریسک بالا", onClick: isLoggedIn ? onMargin : onAuth },
   ];
   return (
     <div style={{ padding:"32px 0" }}>
@@ -1247,67 +1250,112 @@ function TradeSelectTab({ asset, onInstant, onSpot, onMargin, isLoggedIn, onAuth
 }
 
 // ── Instant Trade Tab ──────────────────────────────
-function InstantTradeTab({ asset, onBack, isLoggedIn, onAuth }: { asset:CryptoAsset; onBack:()=>void; isLoggedIn:boolean; onAuth:()=>void }) {
-  const [side, setSide] = useState<"buy"|"sell">("buy");
-  const [amount, setAmount] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
-  const [done, setDone] = useState(false);
-  const estimated = side === "buy" ? (parseFloat(amount)||0)/asset.price : (parseFloat(amount)||0)*asset.price;
-  const submit = async () => {
-    if (!isLoggedIn) return onAuth();
-    const input = Number(amount);
-    if (!Number.isFinite(input) || input <= 0 || !Number.isFinite(asset.price) || asset.price <= 0) { setMessage("مقدار معامله معتبر نیست."); return; }
-    const token = window.localStorage.getItem("anpardaz:accessToken") ?? "";
-    if (!token) return onAuth();
-    setSubmitting(true); setMessage("");
-    try {
-      const headers = { authorization:"Bearer " + token, "content-type":"application/json" };
-      const [assetsR, kycR] = await Promise.all([
-        fetch(ANSARRAF_API_BASE + "/api/v1/assets", { headers, cache:"no-store" }),
-        fetch(ANSARRAF_API_BASE + "/api/v1/kyc", { headers, cache:"no-store" }),
-      ]);
-      const assetsBody = await assetsR.json().catch(()=>({}));
-      const kycBody = await kycR.json().catch(()=>({}));
-      const status = String(kycBody?.kyc?.status ?? "").toUpperCase();
-      if (status && !["VERIFIED","APPROVED"].includes(status)) { setMessage("برای معامله ابتدا احراز هویت را تکمیل و تأیید کنید."); return; }
-      const rows = Array.isArray(assetsBody?.assets) ? assetsBody.assets : [];
-      const quote = rows.find((x:any) => String(x.symbol).toUpperCase() === "USDT");
-      if (!quote) throw new Error("quote_asset_unavailable");
-      const quantity = side === "buy" ? input / asset.price : input;
-      const body:any = { baseAssetId:Number(asset.id), quoteAssetId:Number(quote.id), side, orderType:"market", quantity:quantity.toString(), idempotencyKey:crypto.randomUUID() };
-      if (side === "buy") body.quoteAmount = input.toString();
-      const response = await fetch(ANSARRAF_API_BASE + "/api/v1/orders", { method:"POST", headers, body:JSON.stringify(body) });
-      const result = await response.json().catch(()=>({}));
-      if (!response.ok) { const errors:any={insufficient_available_balance:"موجودی کافی نیست.",kyc_required:"احراز هویت لازم است.",invalid_order:"اطلاعات سفارش نامعتبر است."}; throw new Error(errors[result?.error] ?? "ثبت معامله انجام نشد."); }
-      setDone(true);
-    } catch (error) { setMessage((error as Error).message === "quote_asset_unavailable" ? "دارایی USDT در صراف در دسترس نیست." : ((error as Error).message || "ثبت معامله انجام نشد.")); }
-    finally { setSubmitting(false); }
+function InstantTradeTab({ asset, onBack, isLoggedIn, onAuth, kycStatus }: { asset:CryptoAsset; onBack:()=>void; isLoggedIn:boolean; onAuth:()=>void; kycStatus:KycStatus }) {
+  const [side,setSide]=useState<"buy"|"sell">("buy"),[amount,setAmount]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
+  const estimated=side==="buy"?(parseFloat(amount)||0)/(asset.price||1):(parseFloat(amount)||0)*(asset.price||0);
+  const submit=async()=>{
+    if(!isLoggedIn){onAuth();return;}
+    if(kycStatus!=="verified"){setMessage("برای معامله، ابتدا احراز هویت آن صراف را تکمیل کنید.");return;}
+    const entered=Number(amount);
+    if(!Number.isFinite(entered)||entered<=0){setMessage("مقدار معتبر وارد کنید.");return;}
+    if(!asset.price||asset.price<=0){setMessage("قیمت لحظه‌ای در دسترس نیست.");return;}
+    setBusy(true);setMessage("");
+    try{
+      const token=getWebToken(), ar=await fetch(ANSARRAF_API_BASE+"/api/v1/assets",{cache:"no-store"});
+      if(!ar.ok)throw new Error("لیست دارایی‌های صراف در دسترس نیست.");
+      const rows=(await ar.json()).assets??[],base=rows.find((x:any)=>String(x.symbol).toUpperCase()===asset.symbol.toUpperCase()),quote=rows.find((x:any)=>String(x.symbol).toUpperCase()==="USDT");
+      if(!base||!quote)throw new Error("بازار انتخاب‌شده در زیرساخت صراف فعال نیست.");
+      const quantity=side==="buy"?entered/asset.price:entered;
+      const response=await fetch(ANSARRAF_API_BASE+"/api/v1/orders",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({baseAssetId:Number(base.id),quoteAssetId:Number(quote.id),side,orderType:"market",quantity:String(quantity),quoteAmount:side==="buy"?String(entered):undefined,idempotencyKey:crypto.randomUUID()})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data?.error==="insufficient_available_balance"?"موجودی کافی نیست.":data?.error??"ثبت سفارش ناموفق بود.");
+      setMessage("سفارش واقعی در صراف ثبت شد. نتیجه نهایی را از بخش سفارشات/تراکنش‌ها پیگیری کنید.");setAmount("");
+    }catch(e){setMessage(e instanceof Error?e.message:"ثبت سفارش ناموفق بود.");}finally{setBusy(false);}
   };
-  if (done) return (
-    <div style={{ padding:"60px 24px", textAlign:"center", maxWidth:400, margin:"0 auto" }}>
-      <div style={{ width:72, height:72, borderRadius:"50%", background:"rgba(16,185,129,0.12)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", color:"#10b981", fontSize:40 }}>✓</div>
-      <div style={{ fontSize:22, fontWeight:900, marginBottom:8 }}>{side==="buy"?"خرید ثبت شد":"فروش ثبت شد"}</div>
-      <div style={{ fontSize:14, color:"var(--w-muted)", marginBottom:6 }}>{amount} {side==="buy"?"USDT":asset.symbol}</div>
-      <div style={{ fontSize:14, fontWeight:800, marginBottom:24 }}>سفارش واقعی در بک‌اند آن صراف ثبت شد.</div>
-      <div style={{ display:"flex", gap:8, justifyContent:"center" }}><button onClick={()=>{setDone(false);setAmount("");}} className="w-btn w-btn-ghost">معامله جدید</button><button onClick={onBack} className="w-btn w-btn-primary">بازگشت</button></div>
+  return <div style={{padding:"32px 0",maxWidth:460}}>
+    <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",cursor:"pointer",color:"var(--w-muted)",fontSize:13,marginBottom:20}}><WI n="arrow-right" s={13}/> انتخاب نوع معامله</button>
+    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}><div style={{width:44,height:44,borderRadius:"50%",background:asset.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:13}}>{asset.symbol.slice(0,3)}</div><div><div style={{fontSize:16,fontWeight:900}}>{asset.nameFa} ({asset.symbol})</div><div style={{fontSize:13,fontWeight:800,color:clr(asset.change24h)}}>{"$"}{fmtP(asset.price)} <span style={{fontSize:11}}>{asset.change24h>0?"+":""}{asset.change24h.toFixed(2)}%</span></div></div></div>
+    <div className="w-card" style={{padding:"24px"}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",background:"var(--w-card2)",borderRadius:10,padding:3,marginBottom:20}}><button onClick={()=>setSide("buy")} style={{padding:10,borderRadius:8,border:"none",background:side==="buy"?"#10b981":"transparent",color:side==="buy"?"#fff":"var(--w-muted)",fontWeight:800,cursor:"pointer"}}>خرید {asset.symbol}</button><button onClick={()=>setSide("sell")} style={{padding:10,borderRadius:8,border:"none",background:side==="sell"?"#f43f5e":"transparent",color:side==="sell"?"#fff":"var(--w-muted)",fontWeight:800,cursor:"pointer"}}>فروش {asset.symbol}</button></div>
+      <div style={{marginBottom:14}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--w-muted)",marginBottom:6}}><span>{side==="buy"?"پرداخت می‌کنید":"می‌فروشید"}</span><span>{side==="buy"?"USDT":asset.symbol}</span></div><input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" className="w-input" inputMode="decimal" dir="ltr"/></div>
+      {amount&&<div style={{padding:"12px 14px",background:"var(--w-card2)",borderRadius:9,marginBottom:16}}><div style={{display:"flex",justifyContent:"space-between",fontSize:13}}><span style={{color:"var(--w-muted"}}>برآورد</span><span style={{fontWeight:800}}>{estimated.toFixed(6)} {side==="buy"?asset.symbol:"USDT"}</span></div></div>}
+      {message&&<div style={{padding:"9px 11px",borderRadius:9,background:"var(--w-card2)",fontSize:11,lineHeight:1.8,marginBottom:12}}>{message}</div>}
+      {!isLoggedIn?<button onClick={onAuth} className="w-btn w-btn-primary" style={{width:"100%",padding:13}}>ورود برای معامله</button>:<button onClick={submit} disabled={busy||!amount} className="w-btn w-btn-primary" style={{width:"100%",padding:13,background:side==="buy"?"#10b981":"#f43f5e",opacity:busy||!amount?0.65:1}}>{busy?"در حال ثبت...":side==="buy"?"خرید "+asset.symbol:"فروش "+asset.symbol}</button>}
     </div>
-  );
+  </div>;
+}
+
+// ── Support Tab ────────────────────────────────────
+function SupportTab({ isLoggedIn, onAuth }: { isLoggedIn:boolean; onAuth:()=>void }) {
+  if(!isLoggedIn) return <div style={{textAlign:"center",padding:"60px 24px"}}><WI n="comment" s={40} style={{opacity:.2,marginBottom:16}}/><div style={{fontSize:16,fontWeight:800,marginBottom:8}}>ورود برای دسترسی به پشتیبانی</div><button onClick={onAuth} className="w-btn w-btn-primary" style={{padding:"10px 24px"}}>ورود / ثبت‌نام</button></div>;
+  return <div style={{padding:"24px 0",maxWidth:620}}><div className="w-card" style={{padding:22}}><div style={{fontSize:15,fontWeight:900,marginBottom:8}}>پشتیبانی آن صراف</div><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>API تیکت و چت پشتیبانی هنوز به سایت متصل نشده است؛ هیچ تیکت، پیام یا پاسخ ساختگی نمایش داده نمی‌شود.</div></div></div>;
+}
+// ── Guide Tab ──────────────────────────────────────
+
+// ── Guide Tab ──────────────────────────────────────
+function GuideTab() {
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(35);
+  const VIDEOS = [
+    { title:"آشنایی با آن صراف", duration:"۵:۳۲", done:true },
+    { title:"نحوه واریز و برداشت", duration:"۸:۱۵", done:true },
+    { title:"معامله اسپات برای مبتدیان", duration:"۱۲:۴۰", done:false },
+    { title:"معامله تعهدی (مارجین)", duration:"۱۵:۲۲", done:false },
+    { title:"فارکس بات: تنظیمات", duration:"۹:۵۸", done:false },
+    { title:"امنیت حساب و ۲FA", duration:"۶:۱۰", done:false },
+  ];
   return (
-    <div style={{ padding:"32px 0", maxWidth:440 }}>
-      <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:20 }}><WI n="arrow-right" s={13}/> انتخاب نوع معامله</button>
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}><div style={{ width:44, height:44, borderRadius:"50%", background:asset.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:900, fontSize:13 }}>{asset.symbol.slice(0,3)}</div><div><div style={{ fontSize:16, fontWeight:900 }}>{asset.nameFa} ({asset.symbol})</div><div style={{ fontSize:13, fontWeight:800, color:clr(asset.change24h) }}>{Number.isFinite(asset.change24h) ? (asset.change24h>0?"+":"") + asset.change24h.toFixed(2) + "%" : "—"} · ${fmtP(asset.price)}</div></div></div>
-      <div className="w-card" style={{ padding:"24px" }}>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", background:"var(--w-card2)", borderRadius:10, padding:3, marginBottom:20 }}><button onClick={()=>{setSide("buy");setMessage("")}} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="buy"?"#10b981":"transparent", color:side==="buy"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>خرید {asset.symbol}</button><button onClick={()=>{setSide("sell");setMessage("")}} style={{ padding:"10px", borderRadius:8, border:"none", background:side==="sell"?"#f43f5e":"transparent", color:side==="sell"?"#fff":"var(--w-muted)", fontWeight:800, fontSize:14, cursor:"pointer", fontFamily:"Vazirmatn" }}>فروش {asset.symbol}</button></div>
-        <div style={{ marginBottom:14 }}><div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--w-muted)", marginBottom:6 }}><span>{side==="buy"?"پرداخت می‌کنید":"می‌فروشید"}</span><span>موجودی از حساب واقعی دریافت می‌شود</span></div><div style={{ position:"relative" }}><input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" className="w-input" style={{ paddingLeft:56, fontSize:16 }} inputMode="decimal"/><span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:13, fontWeight:700, color:"var(--w-muted)" }}>{side==="buy"?"USDT":asset.symbol}</span></div></div>
-        {amount && <div style={{ padding:"12px 14px", background:"var(--w-card2)", borderRadius:9, marginBottom:16 }}><div style={{ display:"flex", justifyContent:"space-between", fontSize:13, marginBottom:4 }}><span style={{ color:"var(--w-muted)" }}>{side==="buy"?"دریافت می‌کنید":"معادل USDT"}</span><span style={{ fontWeight:800 }}>{estimated.toFixed(side==="buy"?6:2)} {side==="buy"?asset.symbol:"USDT"}</span></div><div style={{ fontSize:11, color:"var(--w-muted)" }}>قیمت بازار: ${fmtP(asset.price)} · کارمزد طبق تنظیمات واقعی حساب</div></div>}
-        {message && <div style={{ padding:"10px 12px", background:"rgba(244,63,94,0.08)", color:"#f43f5e", borderRadius:8, fontSize:12, marginBottom:12 }}>{message}</div>}
-        {!isLoggedIn ? <button onClick={onAuth} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e" }}><WI n="lock" s={15}/> ورود برای معامله</button> : <button disabled={!amount || submitting} onClick={submit} className="w-btn w-btn-primary" style={{ width:"100%", padding:"13px", background:side==="buy"?"#10b981":"#f43f5e", opacity:amount && !submitting?1:0.5, fontSize:15 }}>{submitting ? "در حال ثبت..." : (side==="buy"?"خرید ":"فروش ") + asset.symbol}</button>}
+    <div style={{ padding:"24px 0", display:"flex", gap:24, alignItems:"flex-start" }}>
+      <div style={{ flex:1 }}>
+        <div className="w-card" style={{ overflow:"hidden", marginBottom:16 }}>
+          <div style={{ height:320, background:"#0a0a12", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", cursor:"pointer" }} onClick={()=>setPlaying(!playing)}>
+            <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,rgba(8,145,178,0.15),rgba(124,58,237,0.1))" }}/>
+            {!playing ? (
+              <div style={{ width:72, height:72, borderRadius:"50%", background:"rgba(255,255,255,0.15)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <WI n="play" s={32} style={{ color:"#fff", marginRight:-4 }}/>
+              </div>
+            ) : (
+              <div style={{ display:"flex", gap:4 }}>
+                {[...Array(3)].map((_,i)=><div key={i} style={{ width:4, height:24+i*8, background:"#0891b2", borderRadius:2, animation:`pulse ${0.8+i*0.2}s ease-in-out infinite alternate` }}/>)}
+              </div>
+            )}
+            <div style={{ position:"absolute", bottom:12, right:16, fontSize:13, color:"rgba(255,255,255,0.8)", fontWeight:700 }}>معامله اسپات برای مبتدیان</div>
+          </div>
+          <div style={{ padding:"14px 16px" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+              <span style={{ fontSize:11, color:"var(--w-muted)" }}>۳:۵۲ / ۱۲:۴۰</span>
+              <div style={{ flex:1, height:4, background:"var(--w-card2)", borderRadius:4, overflow:"hidden", cursor:"pointer" }}
+                onClick={e=>{ const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); setProgress(((e.clientX-r.left)/r.width)*100); }}>
+                <div style={{ height:"100%", width:`${progress}%`, background:"#0891b2", transition:"width 0.1s" }}/>
+              </div>
+              <button onClick={()=>setPlaying(!playing)} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)" }}>
+                <WI n={playing?"pause":"play"} s={16}/>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{ width:280 }}>
+        <div style={{ fontSize:14, fontWeight:800, marginBottom:12 }}>فهرست دروس</div>
+        <div className="w-card" style={{ overflow:"hidden" }}>
+          {VIDEOS.map((v,i)=>(
+            <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom:i<VIDEOS.length-1?"1px solid var(--w-border)":"none", cursor:"pointer", background:i===2?"rgba(8,145,178,0.06)":"transparent" }}>
+              <div style={{ width:28, height:28, borderRadius:8, background:v.done?"rgba(16,185,129,0.12)":i===2?"rgba(8,145,178,0.12)":"var(--w-card2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, color:v.done?"#10b981":i===2?"#0891b2":"var(--w-muted)" }}>
+                {v.done ? <WI n="check" s={13}/> : <WI n="play" s={12}/>}
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:v.done||i===2?700:500, color:i===2?"#0891b2":"var(--w-text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.title}</div>
+                <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:1 }}>{v.duration}</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
-// ── Support Tab ────────────────────────────────────
-function SupportTab({ isLoggedIn, onAuth }: { isLoggedIn:boolean; onAuth:()=>void }) { if(!isLoggedIn)return <div style={{padding:"60px 20px",textAlign:"center"}}><h2>پشتیبانی آن صراف</h2><p style={{color:"var(--w-muted)"}}>برای دسترسی وارد حساب شوید.</p><button className="w-btn w-btn-primary" onClick={onAuth}>ورود</button></div>; return <div className="w-card" style={{maxWidth:640,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>پشتیبانی آن صراف</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>سامانه تیکت/چت پشتیبانی آن صراف هنوز به Backend پشتیبانی متصل نشده است. برای جلوگیری از ثبت یا پاسخ ساختگی، این بخش تا اتصال سرویس واقعی غیرفعال است.</p></div>; }
 
-function ForexBotTab({ asset:_asset }: { asset:CryptoAsset }) { return <div className="w-card" style={{maxWidth:640,padding:24,marginTop:24}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:10}}>فارکس بات</h2><p style={{fontSize:13,color:"var(--w-muted)",lineHeight:1.8,margin:0}}>Execution واقعی Forex Bot و ثبت سود/زیان در Backend آن صراف فعلاً وجود ندارد؛ تا زمان ساخت API اجرایی، این بخش فعال نیست و هیچ معامله یا سود ساختگی نمایش داده نمی‌شود.</p></div>; }
+// ── Forex Bot Tab ──────────────────────────────────
+function ForexBotTab({ asset }: { asset:CryptoAsset }) {
+  return <div style={{padding:"24px 0",maxWidth:620}}><div className="w-card" style={{padding:22}}><div style={{fontSize:16,fontWeight:900,marginBottom:8}}>فارکس بات آن صراف</div><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>این قابلیت در backend فعلی آن صراف API اجرایی ندارد؛ بنابراین سود، معاملات و وضعیت فعال به‌صورت ساختگی نمایش داده نمی‌شود.</div><div style={{marginTop:14,padding:"10px 12px",background:"var(--w-card2)",borderRadius:9,fontSize:11}}>دارایی انتخاب‌شده: {asset.symbol}/USDT</div></div></div>;
+}
