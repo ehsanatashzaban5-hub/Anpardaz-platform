@@ -48,7 +48,7 @@ export default function FinancialCenterLive({onBack}:Props){
         const rows=Array.from({length:buckets},(_,i)=>{
           const end=new Date(now);
           const start=new Date(now);
-          if(mode==="year"){start.setMonth(i,1);end.setMonth(i+1,0)}else if(mode==="month"){start.setDate(i+1);end.setDate(i+1)}else{start.setDate(now.getDate()-buckets+1+i);end.setDate(start.getDate())}
+          if(mode==="year"){start.setMonth(i,1);end.setMonth(i+1,0);end.setHours(23,59,59,999)}else if(mode==="month"){start.setDate(i+1);end.setDate(i+1);end.setHours(23,59,59,999)}else{start.setDate(now.getDate()-buckets+1+i);end.setDate(start.getDate());end.setHours(23,59,59,999)}
           const xs=(data?.transactions??[]).filter(t=>{const d=new Date(t.occurred_at);return d>=start&&d<=end});
           return {income:xs.filter(t=>t.direction==="income").reduce((a,t)=>a+Number(t.amount),0),expense:xs.filter(t=>t.direction==="expense").reduce((a,t)=>a+Number(t.amount),0)};
         });
