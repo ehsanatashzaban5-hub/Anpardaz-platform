@@ -4729,6 +4729,7 @@ function ABMyTicketsScreen({ push, tickets, setTickets }: { push: (v: ABView) =>
 function ABTicketDetailScreen({ tid, push, tickets, setTickets }: { tid: string; push: (v: ABView) => void; tickets: ABTicket[]; setTickets: React.Dispatch<React.SetStateAction<ABTicket[]>> }) {
   const ticket = tickets.find(t => t.ticketId === tid);
   const [reply, setReply] = useState("");
+  useEffect(()=>{if(!tid)return;void bannerApi.ticket(tid).then((x:any)=>{const t=x.ticket;setTickets(ts=>ts.map(v=>v.ticketId===tid?{...v,status:t.status==="open"?"pending":t.status==="resolved"?"answered":"closed",updatedAt:t.updated_at,messages:(x.messages??[]).map((m:any)=>({id:String(m.id),senderId:m.sender_type==="admin"?"support":"user",text:m.body,createdAt:m.created_at}))}:v));}).catch(e=>console.error("ticket_load_failed",e));},[tid]);
   if (!ticket) return <ABEmpty title="تیکت یافت نشد" icon="🎫" />;
 
   const sendReply = () => {
