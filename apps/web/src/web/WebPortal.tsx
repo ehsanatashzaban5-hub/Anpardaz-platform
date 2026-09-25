@@ -11,6 +11,7 @@ import WebBanner     from "./WebBanner";
 import WebHoosh      from "./WebHooshProduction";
 import WebFinancial  from "./WebFinancial";
 import WebContent, { type ContentSection } from "./WebContent";
+import WebSettings from "./WebSettings";
 import WebAuthModal, { WebKycModal } from "./WebAuth";
 import type { WebPage, UserRole } from "./types";
 
@@ -166,6 +167,18 @@ export default function WebPortal() {
   // Scroll to top on page change
   useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [page]);
 
+  useEffect(() => {
+    if (userRole === "guest") return;
+    const token = localStorage.getItem("anpardaz:accessToken");
+    if (!token) return;
+    const base = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\\/$/, "") ?? "";
+    if (!base) return;
+    void fetch(`${base}/api/v1/user/settings`, { headers: { accept: "application/json", authorization: `Bearer ${token}` }, cache: "no-store" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.settings?.theme) setDarkMode(d.settings.theme !== "light"); })
+      .catch(() => {});
+  }, [userRole]);
+
   // First-visit notice: shown once per browser and never forced again after dismissal.
   useEffect(() => {
     try {
@@ -189,7 +202,7 @@ export default function WebPortal() {
 
   const handleNavigate = useCallback((p: WebPage) => {
     // These pages require login
-    const protected_: WebPage[] = ["sarraf-trade","sarraf-assets","sarraf-deposit","sarraf-withdraw","market-orders","banner-post","kyc"];
+    const protected_: WebPage[] = ["sarraf-trade","sarraf-assets","sarraf-deposit","sarraf-withdraw","market-orders","banner-post","kyc","settings"];
     if (protected_.includes(p) && userRole === "guest") {
       setShowAuth(true);
       return;
