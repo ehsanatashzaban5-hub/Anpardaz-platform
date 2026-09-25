@@ -143,4 +143,19 @@ export function registerUserSettingsRoutes(app: FastifyInstance, pool: Pool) {
     );
     return { pinEnabled: false };
   });
+  app.post<{ Body: { pin?: string } }>('/api/v1/user/settings/pin/verify', { preHandler: requireAuth }, async (request, reply) => {
+    const auth = authOf(request);
+    if (!validPin(request.body?.pin)) return reply.code(400).send({ error: 'invalid_pin' });
+    await ensurePlatformUser(pool, auth);
+    const current = await pool.query<{ pin_hash: string | null; pin_enabled: boolean }>(
+      'SELECT pin_hash,pin_enabled FROM platform_user_settings WHERE identity_id=$1',
+      [auth.sub],
+    );
+    if (!current.rows[0]?.pin_enabled || !current.rows[0]?.pin_hash)
+      return reply.code(409).send({ error: 'pin_disabled' });
+    if (!(await verifyPin(request.body.pin, current.rows[0].pin_hash)))
+      return reply.code(401).send({ error: 'invalid_pin' });
+    return { verified: true };
+  });
+
 }
