@@ -7526,7 +7526,383 @@ function HelpSystem({onClose,userPhone,homeServices,homePlatforms}:{onClose:()=>
 }
 
 // ─── Financial Center Screen ──────────────────────────────────────────────────
-function FinancialCenterScreen(props:any){ return <FinancialCenterLive onBack={props.onBack}/>; }
+function FinancialCenterScreen({transactions,onBack,user}:{transactions:TxRecord[];onBack:()=>void;user:UserData}){\n  return <FinancialCenterLive onBack={onBack}/>;
+  type ViewMode="day"|"month"|"year";
+  type SelTxType={id:string;note?:string;type?:string;createdAt:string;isIncome:boolean;isExpense:boolean;isInternal:boolean;category:string;irr:number};
+  const [viewMode,setViewMode]=useState<ViewMode>("day");
+  const [selDate,setSelDate]=useState(()=>new Date());
+  const [selTx,setSelTx]=useState<SelTxType|null>(null);
+  useBackHandler(onBack);
+
+  const now=new Date();
+
+  // Classify a transaction into financial impact
+  const classify=(tx:TxRecord)=>{
+    const irr=tx.fromAsset==="toman"?tx.amount:tx.convertedAmount?tx.convertedAmount:tx.amount;
+    if(tx.type==="swap")return{isIncome:false,isExpense:false,isInternal:true,category:"صرافی",irr};
+    if(tx.type==="deposit")return{isIncome:true,isExpense:false,isInternal:false,category:"واریز",irr};
+    if(tx.type==="withdraw")return{isIncome:false,isExpense:true,isInternal:false,category:"برداشت",irr};
+    if(tx.type==="transfer")return{isIncome:false,isExpense:true,isInternal:false,category:"انتقال وجه",irr};
+    if(tx.type==="service"){
+      const n=(tx.note||"").toLowerCase();
+      if(n.includes("شارژ")||n.includes("بسته اینترنت"))return{isIncome:false,isExpense:true,isInternal:false,category:"شارژ",irr};
+      if(n.includes("قبض")||n.includes("برق")||n.includes("آب")||n.includes("گاز"))return{isIncome:false,isExpense:true,isInternal:false,category:"قبوض",irr};
+      if(n.includes("نیکوکاری"))return{isIncome:false,isExpense:true,isInternal:false,category:"نیکوکاری",irr};
+      if(n.includes("خلافی")||n.includes("عوارض")||n.includes("ترافیک"))return{isIncome:false,isExpense:true,isInternal:false,category:"حمل‌ونقل",irr};
+      if(n.includes("بیمه"))return{isIncome:false,isExpense:true,isInternal:false,category:"بیمه",irr};
+      return{isIncome:false,isExpense:true,isInternal:false,category:"سایر",irr};
+    }
+    return{isIncome:false,isExpense:false,isInternal:true,category:"سایر",irr};
+  };
+
+  const doneTxs=transactions.filter(tx=>tx.status==="done");
+
+  const isInDay=(tx:TxRecord,d:Date)=>{const t=new Date(tx.createdAt);return t.getFullYear()===d.getFullYear()&&t.getMonth()===d.getMonth()&&t.getDate()===d.getDate();};
+  const isInMonth=(tx:TxRecord,d:Date)=>{const t=new Date(tx.createdAt);return t.getFullYear()===d.getFullYear()&&t.getMonth()===d.getMonth();};
+  const isInYear=(tx:TxRecord,d:Date)=>{const t=new Date(tx.createdAt);return t.getFullYear()===d.getFullYear();};
+
+  const filteredTxs=doneTxs.filter(tx=>viewMode==="day"?isInDay(tx,selDate):viewMode==="month"?isInMonth(tx,selDate):isInYear(tx,selDate));
+  const classified=filteredTxs.map(tx=>({...tx,...classify(tx)}));
+
+  const income=classified.filter(x=>x.isIncome).reduce((a,x)=>a+x.irr,0);
+  const expense=classified.filter(x=>x.isExpense).reduce((a,x)=>a+x.irr,0);
+  const net=income-expense;
+  const hasData=income>0||expense>0;
+
+  /* ── Mock data shown when no real transactions exist ── */
+  const MOCK_INCOME_VAL=45000000;
+  const MOCK_EXPENSE_VAL=28500000;
+  const MOCK_NET=MOCK_INCOME_VAL-MOCK_EXPENSE_VAL;
+  const MOCK_CAT_TOTALS:Record<string,number>={قبوض:4800000,شارژ:1200000,"انتقال وجه":8500000,بیمه:3200000,حمل‌ونقل:2100000,نیکوکاری:500000,سایر:8200000};
+  const MOCK_CHART_YEAR=[
+    {label:"فرو",income:38000000,expense:24000000},
+    {label:"اسف",income:40000000,expense:27000000},
+    {label:"فرو",income:42000000,expense:25500000},
+    {label:"خرد",income:39000000,expense:29000000},
+    {label:"ارد",income:44000000,expense:26000000},
+    {label:"خرد",income:41000000,expense:28000000},
+    {label:"تیر",income:43000000,expense:27500000},
+    {label:"امر",income:45000000,expense:30000000},
+    {label:"شهر",income:47000000,expense:28000000},
+    {label:"مهر",income:46000000,expense:29500000},
+    {label:"آبا",income:44000000,expense:27000000},
+    {label:"آذر",income:45000000,expense:28500000},
+  ];
+  const MOCK_CHART_MONTH=Array.from({length:30},(_,i)=>({label:String(i+1),income:i===0?45000000:0,expense:[0,3800000,0,0,1200000,0,0,0,8500000,0,0,0,3200000,0,0,2100000,0,0,500000,0,0,0,0,0,4200000,0,0,0,0,4000000][i]||0}));
+  const MOCK_TXS=[
+    {id:"m1",note:"حقوق ماهانه",isIncome:true,isExpense:false,isInternal:false,category:"واریز",irr:45000000,createdAt:"2026-09-01T09:00:00Z"},
+    {id:"m2",note:"قبض برق",isIncome:false,isExpense:true,isInternal:false,category:"قبوض",irr:1800000,createdAt:"2026-09-05T11:00:00Z"},
+    {id:"m3",note:"انتقال وجه به همسر",isIncome:false,isExpense:true,isInternal:false,category:"انتقال وجه",irr:8500000,createdAt:"2026-09-08T14:30:00Z"},
+    {id:"m4",note:"بیمه تکمیلی",isIncome:false,isExpense:true,isInternal:false,category:"بیمه",irr:3200000,createdAt:"2026-09-10T10:00:00Z"},
+    {id:"m5",note:"شارژ سیم‌کارت",isIncome:false,isExpense:true,isInternal:false,category:"شارژ",irr:500000,createdAt:"2026-09-12T09:15:00Z"},
+    {id:"m6",note:"خلافی خودرو",isIncome:false,isExpense:true,isInternal:false,category:"حمل‌ونقل",irr:2100000,createdAt:"2026-09-15T16:00:00Z"},
+    {id:"m7",note:"نیکوکاری",isIncome:false,isExpense:true,isInternal:false,category:"نیکوکاری",irr:500000,createdAt:"2026-09-18T08:00:00Z"},
+    {id:"m8",note:"خرید اینترنتی",isIncome:false,isExpense:true,isInternal:false,category:"سایر",irr:4200000,createdAt:"2026-09-20T19:30:00Z"},
+    {id:"m9",note:"قبض آب و گاز",isIncome:false,isExpense:true,isInternal:false,category:"قبوض",irr:3000000,createdAt:"2026-09-22T12:00:00Z"},
+    {id:"m10",note:"هزینه‌های روزانه",isIncome:false,isExpense:true,isInternal:false,category:"سایر",irr:4000000,createdAt:"2026-09-25T20:00:00Z"},
+  ];
+
+  const isMock=!hasData;
+  const healthGood=isMock||(income>=expense);
+
+  // Spending categories
+  const CAT_DEFS=[
+    {id:"شارژ",color:"#34d399",svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>},
+    {id:"قبوض",color:"#a78bfa",svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>},
+    {id:"انتقال وجه",color:"#4a9eff",svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4a9eff" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>},
+    {id:"حمل‌ونقل",color:"#fb923c",svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="2" strokeLinecap="round"><path d="M5 17H3a2 2 0 0 1-2-2V9l3-6h12l3 6v6a2 2 0 0 1-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>},
+    {id:"بیمه",color:"#3b82f6",svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>},
+    {id:"نیکوکاری",color:"#f472b6",svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f472b6" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>},
+    {id:"برداشت",color:"#f5c23d",svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f5c23d" strokeWidth="2" strokeLinecap="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>},
+    {id:"سایر",color:"#94a3b8",svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>},
+  ];
+  const catTotals:Record<string,number>={};
+  classified.filter(x=>x.isExpense).forEach(x=>{catTotals[x.category]=(catTotals[x.category]||0)+x.irr;});
+  const totalCatExp=Object.values(catTotals).reduce((a,v)=>a+v,0)||1;
+
+  // Navigation
+  const isFutureBlocked=(d:Date)=>d>now;
+  const navPrev=()=>{
+    const d=new Date(selDate);
+    if(viewMode==="day")d.setDate(d.getDate()-1);
+    else if(viewMode==="month")d.setMonth(d.getMonth()-1);
+    else d.setFullYear(d.getFullYear()-1);
+    setSelDate(d);
+  };
+  const navNext=()=>{
+    const d=new Date(selDate);
+    if(viewMode==="day")d.setDate(d.getDate()+1);
+    else if(viewMode==="month")d.setMonth(d.getMonth()+1);
+    else d.setFullYear(d.getFullYear()+1);
+    if(!isFutureBlocked(d))setSelDate(d);
+  };
+  const canNext=()=>{
+    const d=new Date(selDate);
+    if(viewMode==="day")d.setDate(d.getDate()+1);
+    else if(viewMode==="month")d.setMonth(d.getMonth()+1);
+    else d.setFullYear(d.getFullYear()+1);
+    return !isFutureBlocked(d);
+  };
+  const dateLabel=viewMode==="day"
+    ?selDate.toLocaleDateString("fa-IR",{weekday:"long",year:"numeric",month:"long",day:"numeric"})
+    :viewMode==="month"
+      ?selDate.toLocaleDateString("fa-IR",{year:"numeric",month:"long"})
+      :selDate.toLocaleDateString("fa-IR",{year:"numeric"});
+
+  // Chart data builders
+  const mkBarData=(count:number,mkDate:(i:number)=>Date,getKey:(d:Date,tx:TxRecord)=>boolean,lbl:(d:Date)=>string)=>{
+    return Array.from({length:count},(_,i)=>{
+      const d=mkDate(i);
+      const m=doneTxs.filter(tx=>getKey(d,tx)).map(tx=>classify(tx));
+      return{label:lbl(d),income:m.filter(x=>x.isIncome).reduce((a,x)=>a+x.irr,0),expense:m.filter(x=>x.isExpense).reduce((a,x)=>a+x.irr,0)};
+    });
+  };
+
+  const chartData=viewMode==="year"
+    ?mkBarData(12,i=>new Date(selDate.getFullYear(),i,1),(d,tx)=>isInMonth(tx,d),d=>d.toLocaleDateString("fa-IR",{month:"narrow"}))
+    :viewMode==="month"
+      ?mkBarData(new Date(selDate.getFullYear(),selDate.getMonth()+1,0).getDate(),i=>new Date(selDate.getFullYear(),selDate.getMonth(),i+1),(d,tx)=>isInDay(tx,d),d=>toFaDigits(String(d.getDate())))
+      :mkBarData(7,i=>{const d=new Date(now);d.setDate(now.getDate()-6+i);return d;},(d,tx)=>isInDay(tx,d),d=>d.toLocaleDateString("fa-IR",{weekday:"narrow"}));
+
+  const maxBar=Math.max(...chartData.map(d=>Math.max(d.income,d.expense)),1);
+
+  /* display values — real if hasData, mock otherwise */
+  const dispIncome=hasData?income:MOCK_INCOME_VAL;
+  const dispExpense=hasData?expense:MOCK_EXPENSE_VAL;
+  const dispNet=hasData?net:MOCK_NET;
+  const dispCatTotals=hasData?catTotals:MOCK_CAT_TOTALS;
+  const dispTotalCatExp=hasData?totalCatExp:Object.values(MOCK_CAT_TOTALS).reduce((a,v)=>a+v,0)||1;
+  const dispChartData=hasData?chartData:viewMode==="year"?MOCK_CHART_YEAR:viewMode==="month"?MOCK_CHART_MONTH:MOCK_CHART_YEAR.slice(0,7).map((d,i)=>({label:["ش","ی","د","س","چ","پ","ج"][i],income:i===0?MOCK_INCOME_VAL:0,expense:MOCK_CHART_MONTH[i*4]?.expense||0}));
+  const dispMaxBar=Math.max(...dispChartData.map((d:{income:number;expense:number})=>Math.max(d.income,d.expense)),1);
+  const dispTxs=hasData?filteredTxs:MOCK_TXS;
+
+  const healthMsg=isMock
+    ?"این نمونه داده آموزشی است. با انجام تراکنش‌های واقعی، اطلاعات دقیق شما نمایش داده می‌شود."
+    :healthGood
+      ?"وضعیت دخل و خرجت خوبه، همین روند رو ادامه بده!"
+      :"هزینه‌هات این دوره بیشتر از درآمدت شده؛ بهتره مراقب مخارجت باشی.";
+
+  const cardStyle={background:"var(--card-bg)",border:"1px solid var(--border-color)",borderRadius:18,boxShadow:"0 2px 12px rgba(0,5,20,0.22),0 0 0 1px rgba(120,190,210,0.08)"};
+
+  return <div className="anp-full-page" dir="rtl">
+    <div className="anp-page-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="subscreen-title">مرکز مالی</h2>
+      <div style={{width:36}}/>
+    </div>
+
+    {/* Transaction detail sheet */}
+    {selTx&&(
+      <div style={{position:"fixed",inset:0,zIndex:900,display:"flex",flexDirection:"column",justifyContent:"flex-end"}} onClick={()=>setSelTx(null)}>
+        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",backdropFilter:"blur(4px)"}}/>
+        <div style={{position:"relative",background:"var(--card-bg)",borderRadius:"24px 24px 0 0",padding:"24px",zIndex:1,border:"1px solid var(--border-color)",maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{width:44,height:4,borderRadius:2,background:"var(--border-color)",margin:"0 auto 20px"}}/>
+          {/* Icon + amount */}
+          <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:20}}>
+            <div style={{width:56,height:56,borderRadius:18,background:selTx.isIncome?"rgba(0,214,176,0.12)":selTx.isInternal?"rgba(167,139,250,0.12)":"rgba(251,146,60,0.12)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:`1px solid ${selTx.isIncome?"rgba(0,214,176,0.2)":selTx.isInternal?"rgba(167,139,250,0.2)":"rgba(251,146,60,0.2)"}`}}>
+              {selTx.isIncome
+                ?<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                :selTx.isInternal
+                  ?<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round"><path d="M7 16V4m0 0L3 8m4-4 4 4"/><path d="M17 8v12m0 0 4-4m-4 4-4-4"/></svg>
+                  :<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="2" strokeLinecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>}
+            </div>
+            <div>
+              <div style={{fontSize:24,fontWeight:900,color:selTx.isIncome?"#34d399":selTx.isInternal?"#a78bfa":"#fb923c"}}>
+                {selTx.isIncome?"+":selTx.isInternal?"↔":"−"}{fa(Math.round(selTx.irr))} <span style={{fontSize:14,fontWeight:500}}>تومان</span>
+              </div>
+              <div style={{fontSize:13,color:"var(--text-secondary)",marginTop:3}}>{selTx.note||selTx.type||selTx.category}</div>
+            </div>
+          </div>
+          {/* Details */}
+          <div style={{...cardStyle,overflow:"hidden",marginBottom:16}}>
+            {[
+              {label:"دسته‌بندی",val:selTx.category},
+              {label:"نوع",val:selTx.isIncome?"درآمد":selTx.isInternal?"داخلی":"هزینه"},
+              {label:"تاریخ و ساعت",val:new Date(selTx.createdAt).toLocaleDateString("fa-IR",{year:"numeric",month:"long",day:"numeric"})+" · "+new Date(selTx.createdAt).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"})},
+              {label:"وضعیت",val:"تکمیل‌شده"},
+            ].map((row,i,arr)=>(
+              <div key={row.label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 16px",borderBottom:i<arr.length-1?"1px solid var(--border-faint)":"none"}}>
+                <span style={{fontSize:13,color:"var(--text-muted)"}}>{row.label}</span>
+                <span style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>{row.val}</span>
+              </div>
+            ))}
+          </div>
+          <button onClick={()=>setSelTx(null)} style={{width:"100%",padding:"15px",background:"var(--card-bg)",border:"1px solid var(--border-color)",borderRadius:14,color:"var(--text-secondary)",fontSize:14,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:700}}>بستن</button>
+        </div>
+      </div>
+    )}
+
+    <div className="anp-page-body" style={{paddingBottom:100}}>
+
+      {/* Financial health indicator */}
+      <div style={{display:"flex",alignItems:"center",gap:12,background:healthGood?"rgba(0,214,176,0.07)":"rgba(239,68,68,0.07)",border:`1px solid ${healthGood?"rgba(0,214,176,0.22)":"rgba(239,68,68,0.22)"}`,borderRadius:20,padding:"14px 16px",marginBottom:14,boxShadow:healthGood?"0 4px 20px rgba(0,214,176,0.08)":"0 4px 20px rgba(239,68,68,0.08)"}}>
+        <div style={{width:42,height:42,borderRadius:14,background:healthGood?"rgba(0,214,176,0.15)":"rgba(239,68,68,0.15)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:healthGood?"1px solid rgba(0,214,176,0.20)":"1px solid rgba(239,68,68,0.20)"}}>
+          {healthGood
+            ?<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            :<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}
+        </div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:12,fontWeight:800,color:healthGood?"#00D6B0":"#ef4444",marginBottom:4,letterSpacing:"0.02em"}}>{healthGood?"وضعیت مالی سالم":"هشدار مالی"}</div>
+          <div style={{fontSize:12,color:"var(--text-secondary)",lineHeight:1.75}}>{healthMsg}</div>
+        </div>
+      </div>
+
+      {/* View mode tabs */}
+      <div style={{display:"flex",gap:4,marginBottom:12,background:"var(--card-bg)",padding:"5px",borderRadius:16,border:"1px solid var(--border-color)",boxShadow:"0 1px 6px rgba(0,5,20,0.15)"}}>
+        {(["day","month","year"] as ViewMode[]).map(m=>(
+          <button key={m} onClick={()=>setViewMode(m)} style={{flex:1,padding:"10px 4px",borderRadius:12,border:"none",background:viewMode===m?"rgba(0,214,176,0.16)":"transparent",color:viewMode===m?"#00D6B0":"var(--text-muted)",fontSize:12,fontWeight:700,fontFamily:"Vazirmatn",cursor:"pointer",transition:"all 0.2s",boxShadow:viewMode===m?"0 2px 8px rgba(0,214,176,0.15)":"none"}}>
+            {m==="day"?"روزانه":m==="month"?"ماهانه":"سالانه"}
+          </button>
+        ))}
+      </div>
+
+      {/* Date navigator */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,...cardStyle,padding:"10px 14px"}}>
+        <button onClick={navPrev} style={{background:"none",border:"none",cursor:"pointer",color:"var(--accent)",padding:4,display:"flex"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+        <div style={{fontSize:12,fontWeight:700,color:"var(--text-primary)",textAlign:"center",flex:1,padding:"0 8px"}}>{dateLabel}</div>
+        <button onClick={navNext} disabled={!canNext()} style={{background:"none",border:"none",cursor:canNext()?"pointer":"default",color:canNext()?"var(--accent)":"var(--text-faint)",padding:4,display:"flex"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+      </div>
+
+      {/* Summary row */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+        {[
+          {label:"درآمد",val:dispIncome,color:"#34d399",bg:"rgba(52,211,153,0.08)"},
+          {label:"هزینه",val:dispExpense,color:"#fb923c",bg:"rgba(251,146,60,0.08)"},
+          {label:"خالص",val:dispNet,color:dispNet>=0?"#00D6B0":"#ef4444",bg:dispNet>=0?"rgba(0,214,176,0.08)":"rgba(239,68,68,0.08)"},
+        ].map(item=>(
+          <div key={item.label} style={{...cardStyle,padding:"14px 8px",textAlign:"center",background:item.bg}}>
+            <div style={{fontSize:10,fontWeight:600,color:"var(--text-muted)",marginBottom:6,letterSpacing:"0.02em"}}>{item.label}</div>
+            <div style={{fontSize:12,fontWeight:800,color:item.color,lineHeight:1.3}}>{fa(Math.abs(item.val))}</div>
+            {isMock&&<div style={{fontSize:8,color:"var(--text-faint)",marginTop:3}}>نمونه</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Chart */}
+      <div style={{...cardStyle,padding:"16px 12px 12px",marginBottom:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{fontSize:13,fontWeight:800,color:"var(--text-primary)"}}>نمودار مالی</div>
+            {isMock&&<span style={{fontSize:9,background:"rgba(0,214,176,0.12)",color:"#00D6B0",borderRadius:8,padding:"2px 8px",fontWeight:700,border:"1px solid rgba(0,214,176,0.18)"}}>نمونه</span>}
+          </div>
+          <div style={{display:"flex",gap:12}}>
+            <span style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"var(--text-secondary)"}}><span style={{width:8,height:8,borderRadius:3,background:"rgba(0,214,176,0.85)",display:"inline-block"}}/>درآمد</span>
+            <span style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"var(--text-secondary)"}}><span style={{width:8,height:8,borderRadius:3,background:"rgba(251,146,60,0.85)",display:"inline-block"}}/>هزینه</span>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"flex-end",gap:2,height:96,overflowX:"auto",paddingBottom:2}}>
+          {dispChartData.map((d:{label:string;income:number;expense:number},i:number)=>(
+            <div key={i} style={{flex:1,minWidth:viewMode==="month"?10:8,display:"flex",flexDirection:"column",alignItems:"center",gap:1,height:"100%",justifyContent:"flex-end"}}>
+              <div style={{width:"100%",display:"flex",flexDirection:"column",gap:1,justifyContent:"flex-end",height:"100%"}}>
+                {d.income>0&&<div style={{width:"100%",height:`${Math.max(3,Math.round(d.income/dispMaxBar*80))}px`,background:"linear-gradient(180deg,#00D6B0,rgba(0,214,176,0.4))",borderRadius:"4px 4px 0 0",transition:"height 0.4s cubic-bezier(.22,1,.36,1)"}}/>}
+                {d.expense>0&&<div style={{width:"100%",height:`${Math.max(3,Math.round(d.expense/dispMaxBar*80))}px`,background:"linear-gradient(180deg,#fb923c,rgba(251,146,60,0.4))",borderRadius:d.income>0?"0":"4px 4px 0 0",transition:"height 0.4s cubic-bezier(.22,1,.36,1)"}}/>}
+              </div>
+              <div style={{fontSize:7,color:"var(--text-faint)",whiteSpace:"nowrap",marginTop:3,overflow:"hidden",maxWidth:"100%",textAlign:"center"}}>{d.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* "درآمدم کجا رفت" */}
+      {(dispExpense>0)&&(
+        <div style={{...cardStyle,padding:"16px",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:800,color:"var(--text-primary)"}}>درآمدم کجا رفت؟</div>
+            {isMock&&<span style={{fontSize:9,background:"rgba(251,146,60,0.12)",color:"#fb923c",borderRadius:6,padding:"2px 7px",fontWeight:700}}>نمونه</span>}
+          </div>
+          {CAT_DEFS.map(c=>{
+            const amt=dispCatTotals[c.id]||0;
+            if(amt===0)return null;
+            const pct=Math.round(amt/dispTotalCatExp*100);
+            return <div key={c.id} style={{marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                <span style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--text-secondary)"}}>{c.svg}{c.id}</span>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <span style={{fontSize:10,color:"var(--text-muted)"}}>{fa(Math.round(amt))} ت</span>
+                  <span style={{fontSize:10,fontWeight:800,color:c.color}}>{toFaDigits(String(pct))}٪</span>
+                </div>
+              </div>
+              <div style={{height:6,borderRadius:3,background:"var(--border-color)",overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${c.color},${c.color}99)`,borderRadius:3,transition:"width .5s cubic-bezier(.22,1,.36,1)"}}/>
+              </div>
+            </div>;
+          })}
+        </div>
+      )}
+
+      {/* Transactions */}
+      <div style={{marginBottom:14}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+          <div style={{fontSize:13,fontWeight:800,color:"var(--text-primary)"}}>تراکنش‌ها</div>
+          {isMock&&<span style={{fontSize:9,background:"rgba(74,158,255,0.12)",color:"#4a9eff",borderRadius:6,padding:"2px 7px",fontWeight:700}}>نمونه</span>}
+        </div>
+        {dispTxs.length===0?(
+          <div style={{...cardStyle,padding:"28px",textAlign:"center",color:"var(--text-faint)",fontSize:12}}>هیچ تراکنشی در این بازه وجود ندارد</div>
+        ):(isMock?MOCK_TXS:filteredTxs.slice(0,30)).map((tx:typeof MOCK_TXS[0]|TxRecord)=>{
+          const cl=isMock?(tx as typeof MOCK_TXS[0]):classify(tx as TxRecord);
+          const catDef=CAT_DEFS.find(c=>c.id===cl.category);
+          const d=new Date((tx as {createdAt:string}).createdAt);
+          const txCl={...(tx as {id:string;note?:string;type?:string;createdAt:string}),...cl};
+          return <div key={(tx as {id:string}).id} onClick={()=>setSelTx(txCl)} style={{display:"flex",alignItems:"center",gap:12,...cardStyle,padding:"13px 14px",marginBottom:8,cursor:"pointer"}}>
+            <div style={{width:42,height:42,borderRadius:14,background:cl.isIncome?"rgba(0,214,176,0.12)":cl.isInternal?"rgba(167,139,250,0.12)":"rgba(251,146,60,0.12)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,border:`1px solid ${cl.isIncome?"rgba(0,214,176,0.18)":cl.isInternal?"rgba(167,139,250,0.18)":"rgba(251,146,60,0.18)"}`}}>
+              {cl.isIncome
+                ?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                :cl.isInternal
+                  ?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round"><path d="M7 16V4m0 0L3 8m4-4 4 4"/><path d="M17 8v12m0 0 4-4m-4 4-4-4"/></svg>
+                  :(catDef?.svg||<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/></svg>)}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{(tx as {note?:string}).note||(tx as {type:string}).type}</div>
+              <div style={{fontSize:10,color:"var(--text-muted)",marginTop:3}}>{d.toLocaleDateString("fa-IR")} · {d.toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"})}</div>
+            </div>
+            <div style={{flexShrink:0,textAlign:"left"}}>
+              <div style={{fontSize:13,fontWeight:800,color:cl.isIncome?"#34d399":cl.isInternal?"#a78bfa":"#fb923c"}}>
+                {cl.isIncome?"+":cl.isInternal?"↔":"−"}{fa(Math.round(cl.irr))}
+              </div>
+              <div style={{fontSize:9,color:"var(--text-faint)",marginTop:2}}>تومان</div>
+            </div>
+          </div>;
+        })}
+      </div>
+
+      {/* Auto-tracking message */}
+      <div style={{background:"rgba(0,214,176,0.05)",border:"1px solid rgba(0,214,176,0.16)",borderRadius:20,padding:"18px",marginBottom:12,boxShadow:"0 4px 20px rgba(0,214,176,0.07)"}}>
+        <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+          <div style={{width:36,height:36,borderRadius:12,background:"rgba(0,214,176,0.12)",border:"1px solid rgba(0,214,176,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00D6B0" strokeWidth="2" strokeLinecap="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </div>
+          <div>
+            <div style={{fontSize:12,fontWeight:800,color:"#00D6B0",marginBottom:6,letterSpacing:"0.02em"}}>ردیابی خودکار مالی</div>
+            <div style={{fontSize:12,color:"var(--text-secondary)",lineHeight:1.85}}>تمام ورود و خروج‌های پولی شما، حتی اگر در فروشگاهی با کارت بانکی خود خرید کنید یا در هر مکان دیگری پولی پرداخت یا دریافت کنید، و همچنین اگر در صرافی ارز دیجیتال پولی به دست آورید یا از دست بدهید، به‌صورت کاملاً خودکار در این صفحه محاسبه و تحلیل می‌شود.</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Data sources */}
+      <div style={{...cardStyle,padding:"14px 16px"}}>
+        <div style={{fontSize:12,fontWeight:800,color:"var(--text-primary)",marginBottom:10}}>منابع تراکنش خودکار</div>
+        {[
+          {svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>,text:"تراکنش‌های بانکی و کارت"},
+          {svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,text:"خرید با کارت در POS و فروشگاه‌ها"},
+          {svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>,text:"پرداخت‌های آنلاین و درگاه"},
+          {svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,text:"صرافی و ارزهای دیجیتال (USDT، BTC، ETH)"},
+          {svg:<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,text:"قبوض، شارژ، اینترنت و خدمات"},
+        ].map((item,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:i<4?"1px solid var(--border-faint)":"none"}}>
+            <span style={{display:"flex",alignItems:"center"}}>{item.svg}</span>
+            <span style={{fontSize:11,color:"var(--text-secondary)",flex:1}}>{item.text}</span>
+            <span style={{fontSize:9,color:"rgba(0,214,176,0.7)",background:"rgba(0,214,176,0.08)",borderRadius:5,padding:"2px 6px"}}>خودکار</span>
+          </div>
+        ))}
+      </div>
+
+    </div>
+  </div>;
+}
 
 // ─── AN MARKET ─────────────────────────────────────────────────────────────────
 type AnView=
