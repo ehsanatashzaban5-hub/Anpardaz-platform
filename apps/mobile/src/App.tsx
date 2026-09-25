@@ -4,6 +4,7 @@ import { _ANP_BACK, useBackHandler } from "./backHandler";
 import AnBannerScreen from "./AnBanner";
 import AnHooshScreen from "./AnHoosh";
 import FinancialCenterLive from "./FinancialCenterLive";
+import {financialApi} from "./financialApi";
 import anPardazLogo from "@/imports/ChatGPT_Image_Aug_10__2026__06_38_53_PM__3_.png";
 import logoHekmat from "@/imports/Bank-Hekmat-Iranian-Logo.png";
 import logoMehr from "@/imports/Bank-Mehr-Iran.png";
@@ -6107,6 +6108,13 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
     return()=>{active=false};
   },[user.uid]);
   const toggleNotifications=()=>setNotifications(v=>{const next=!v;localStorage.setItem(`anp_notifications_${user.uid}`,next?"on":"off");if(next)playChime();void persistSettings({notificationsEnabled:next});return next});
+  const loadFinancialNotifications=useCallback(async()=>{
+    try{const r=await financialApi.notifications();setFinancialNotifications(r.notifications??[]);setFinancialUnread(Number(r.unreadCount??0));}catch{}
+  },[]);
+  useEffect(()=>{void loadFinancialNotifications();const t=window.setInterval(()=>void loadFinancialNotifications(),60000);return()=>window.clearInterval(t)},[loadFinancialNotifications,user.uid]);
+  const openFinancialNotifications=async()=>{setShowFinancialNotifications(true);await loadFinancialNotifications();};
+  const readFinancialNotification=async(id:number)=>{try{await financialApi.readNotification(id);setFinancialNotifications(xs=>xs.map(x=>x.id===id?{...x,read_at:new Date().toISOString()}:x));setFinancialUnread(n=>Math.max(0,n-1));}catch{}};
+
   const toggleKeySound=()=>setKeySoundEnabled(v=>{const next=!v;localStorage.setItem("anp_key_sound",next?"on":"off");void persistSettings({keySoundEnabled:next});return next});
   const setFontScale=(n:number)=>{setFontScaleState(n);localStorage.setItem("anp_font_scale",String(n));const root=document.getElementById("root");if(root)root.style.zoom=n===0?"":String(1+n*0.07);void persistSettings({fontScale:n});};
   const initials=(user.name?.[0]??"")+(user.family?.[0]??"")||"؟";
@@ -9370,6 +9378,9 @@ export default function App() {
   const [transactions,setTransactions]=useState<TxRecord[]>([]);
   const [selectedTx,setSelectedTx]=useState<TxRecord|null>(null);
   const [menuOpen,setMenuOpen]=useState(false);
+  const [showFinancialNotifications,setShowFinancialNotifications]=useState(false);
+  const [financialNotifications,setFinancialNotifications]=useState<any[]>([]);
+  const [financialUnread,setFinancialUnread]=useState(0);
   const [showGlobalHelp,setShowGlobalHelp]=useState(false);
   const [showExitDialog,setShowExitDialog]=useState(false);
   const [pendingTour,setPendingTour]=useState(false);
@@ -9911,13 +9922,19 @@ function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;
         <button onClick={()=>setShowGlobalHelp(true)} aria-label="راهنما" data-help-id="help-btn" style={{width:36,height:36,borderRadius:11,background:"rgba(0,214,176,0.08)",border:"1px solid rgba(0,214,176,0.22)",color:"var(--accent)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </button>
+        <button onClick={()=>void openFinancialNotifications()} aria-label="اعلان‌های مالی" data-help-id="financial-notifications-btn" style={{position:"relative",width:36,height:36,borderRadius:11,background:"rgba(0,214,176,0.08)",border:"1px solid rgba(0,214,176,0.22)",color:"var(--accent)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <Icon name="bell" size={17}/>{financialUnread>0&&<span style={{position:"absolute",top:-4,right:-4,minWidth:16,height:16,padding:"0 4px",borderRadius:9,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",boxSizing:"border-box"}}>{financialUnread>99?"99+":financialUnread}</span>}
+        </button>
         <button className="header-notif-btn" onClick={()=>setMenuOpen(true)} aria-label="اطلاعات کاربری" data-help-id="avatar-btn">
           <div className="header-avatar-mini">
             {user.photo?<img src={user.photo} alt=""/>:<span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:60,fontSize:10,fontWeight:700}}>{(user.name||"").trim()||"؟"}</span>}
           </div>
         </button>
       </div>
-      {menuOpen&&<UserDrawerModal user={user} onClose={()=>setMenuOpen(false)} onLogout={()=>{setMenuOpen(false);handleLogout()}} />}
+      {menuOpen&&<UserDrawerModal user={user} onClose={()=>setMenuOpen(false)} onLogout={()=>{setMenuOpen(false);handleLogout()}} />}{showFinancialNotifications&&<div onClick={()=>setShowFinancialNotifications(false)} style={{position:"fixed",inset:0,zIndex:1200,background:"rgba(0,0,0,.42)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"72px 14px 20px"}}><div onClick={e=>e.stopPropagation()} dir="rtl" style={{width:"min(430px,100%)",maxHeight:"72vh",overflow:"auto",borderRadius:20,background:"var(--card-bg,#102535)",border:"1px solid var(--border-faint)",boxShadow:"0 20px 60px rgba(0,0,0,.35)"}}>
+  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",borderBottom:"1px solid var(--border-faint)"}}><b>اعلان‌های مالی</b><button onClick={()=>setShowFinancialNotifications(false)} style={{border:0,background:"transparent",color:"var(--text-muted)",fontSize:20}}>×</button></div>
+  {financialNotifications.length===0?<div style={{padding:28,textAlign:"center",color:"var(--text-muted)",fontSize:12}}>اعلان مالی جدیدی وجود ندارد.</div>:<div style={{display:"grid",gap:1}}>{financialNotifications.map(n=><button key={n.id} onClick={()=>void readFinancialNotification(Number(n.id))} style={{textAlign:"right",border:0,borderBottom:"1px solid var(--border-faint)",background:n.read_at?"transparent":"rgba(0,214,176,.06)",color:"var(--text-primary)",padding:"13px 16px",fontFamily:"Vazirmatn",cursor:"pointer"}}><div style={{fontWeight:800,fontSize:12}}>{n.title}</div><div style={{fontSize:11,color:"var(--text-muted)",lineHeight:1.7,marginTop:3}}>{n.body}</div><div style={{fontSize:9,color:"var(--text-faint)",marginTop:4}}>{n.created_at?new Date(n.created_at).toLocaleString("fa-IR"):""}</div></button>)}</div>}
+</div></div>}
       {showGlobalHelp&&<HelpSystem onClose={()=>setShowGlobalHelp(false)} userPhone={user?.phone} homeServices={homeServices} homePlatforms={homePlatforms}/>}
       {showExitDialog&&(
         <div style={{position:"fixed",inset:0,zIndex:9999,background:"rgba(0,0,0,0.65)",display:"flex",alignItems:"flex-end",justifyContent:"center",direction:"rtl"}} onClick={()=>setShowExitDialog(false)}>
