@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS banner_activity_events(
 
 CREATE TABLE IF NOT EXISTS banner_audit_logs(
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  identity_id UUID NOT NULL,
+  identity_id UUID,
   actor_identity_id UUID,
   action TEXT NOT NULL,
   resource_type TEXT NOT NULL,
