@@ -4958,7 +4958,10 @@ export default function AnBannerScreen({ onBack, userId, lightTheme }: { onBack:
   const startChat = (cid: string) => {
     setStack([{ t: "chat-list" }, { t: "chat", cid }]);
   };
-  const toggleFav = (id: string) => setFavs(f => f.includes(id) ? f.filter(x => x !== id) : [...f, id]);
+  const toggleFav = (id: string) => {
+    const next=favs.includes(id)?favs.filter(x=>x!==id):[...favs,id];setFavs(next);
+    void bannerApi.favorite(id).catch(e=>{console.error("favorite_failed",e);setFavs(favs);});
+  };
 
   const cur = stack[stack.length - 1];
 
