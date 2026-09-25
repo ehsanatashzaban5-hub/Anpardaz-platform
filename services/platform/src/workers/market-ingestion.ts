@@ -186,11 +186,18 @@ async function syncSource(store:Store,source:Source){
    const headers:Record<string,string>={};if(source.etag)headers["if-none-match"]=source.etag;if(source.last_modified)headers["if-modified-since"]=source.last_modified;
    let fetched:{data:any;headers:Headers;hash:string};
    let items:Item[]=[];
-   if(source.adapter==='jsonld'){
-     const html=await fetchText(source.endpoint_url,headers);fetched={data:null,headers:html.headers,hash:html.hash};items=jsonLdItems(html.body);
-   }else{
-     fetched=await fetchJson(source.endpoint_url,headers);items=mappedItems(fetched.data,source.mapping);
-   }
+   if(source.adapter==='jsonld'||source.adapter==='sitemap_jsonld'){
+     if(source.adapter==='sitemap_jsonld'){
+       const maxUrls=Math.max(1,Number(source.mapping?.maxUrls??300));
+       const pages=await fetchText(source.endpoint_url,headers);
+       const urls=[...pages.body.matchAll(/<loc>\\s*([^<]+?)\\s*<\\/loc>/gi)].map(m=>m[1].trim()).filter((u:string)=>/^https?:\\/\\//i.test(u)).slice(0,maxUrls);
+       const found:Item[]=[];
+       for(let i=0;i<urls.length;i+=4){const batch=urls.slice(i,i+4);const xs=await Promise.all(batch.map(async(u:string)=>{try{const p=await fetchText(u);return jsonLdProduct(p.body,u)}catch{return null}}));for(const x of xs)if(x)found.push(x);}
+       fetched={data:null,headers:pages.headers,hash:pages.hash};items=found;
+     }else{const html=await fetchText(source.endpoint_url,headers);fetched={data:null,headers:html.headers,hash:html.hash};items=jsonLdItems(html.body);}
+   }else if(source.adapter==='shopify_products_json'){
+     const x=await fetchJson(source.endpoint_url,headers);fetched=x;items=shopifyItems(x.data,source.endpoint_url);
+   }else{const x=await fetchPaginatedJson(source,headers);fetched=x;items=mappedItems(x.data,source.mapping);}
    discovered=items.length;
    const categories=(await pool.query("SELECT id,slug,name_fa FROM market_categories WHERE active=true ORDER BY sort_order,id")).rows;
    const seen=new Set<number>();
