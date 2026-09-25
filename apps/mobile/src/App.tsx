@@ -9362,7 +9362,6 @@ export default function App() {
   const prevRectsRef=useRef<Record<string,DOMRect>>({});
   const [confettiItems,setConfettiItems]=useState<{id:number;x:number;y:number;color:string;cx:number;cy:number}[]>([]);
 
-  const setLightTheme=(v:boolean)=>{setLightThemeState(v);localStorage.setItem("anp_theme",v?"light":"dark")};
   useEffect(()=>{document.body.classList.toggle("light-theme",lightTheme)},[lightTheme]);
 
   // Long-press handlers for service buttons — 600ms, touch-slop aware
