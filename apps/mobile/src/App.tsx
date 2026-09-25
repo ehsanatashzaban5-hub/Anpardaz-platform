@@ -6051,13 +6051,13 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
             }else{setPinError("رمزها یکسان نیستند. دوباره امتحان کن.");setPinStep("enter-new");setPinNew("");setPinInput("");}
           }
         } else if(pinModal==="change"){
-          if(pinStep==="enter-current"){if(next===user.pin){setPinCurrent(next);setPinStep("enter-new");setPinInput("");setPinError("");}else{setPinError("رمز اشتباه است.");setPinInput("");}}
+          if(pinStep==="enter-current"){try{await userSettingsRequest("/api/v1/user/settings/pin/verify",{method:"POST",body:JSON.stringify({pin:next})});setPinCurrent(next);setPinStep("enter-new");setPinInput("");setPinError("");}catch{setPinError("رمز اشتباه است.");setPinInput("");}}
           else if(pinStep==="enter-new"){setPinNew(next);setPinStep("confirm-new");setPinInput("");}
           else if(pinStep==="confirm-new"){
             if(next===pinNew){
               try{
-                await userSettingsRequest("/api/v1/user/settings/pin/change",{method:"POST",body:JSON.stringify({currentPin:user.pin,newPin:pinNew})});
-                onUpdate({...user,pin:pinNew});DB.saveUser({...user,pin:pinNew});setPinModal(null);
+                await userSettingsRequest("/api/v1/user/settings/pin/change",{method:"POST",body:JSON.stringify({currentPin:pinCurrent,newPin:pinNew})});
+                setPinEnabled(true);onUpdate({...user,pin:""});DB.saveUser({...user,pin:""});setPinModal(null);
               }catch{setPinError("رمز فعلی یا رمز جدید معتبر نیست.");setPinInput("");}
             }else{setPinError("رمزها یکسان نیستند.");setPinStep("enter-new");setPinNew("");setPinInput("");}
           }
