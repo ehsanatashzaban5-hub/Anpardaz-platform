@@ -83,7 +83,7 @@ async function registerPublic(app:FastifyInstance){
     return{listing:{...r.rows[0],views:r.rows[0].views+1},media:media.rows};
   });
   app.get('/api/v1/banner/listings/:id/contact',{preHandler:requireAuth},async(req,reply)=>{
-    const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
+    const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});if(!(await requireAllowed(a.sub,'contact')))return reply.code(403).send({error:'contact_restricted'});
     const r=await pool.query('SELECT l.identity_id,p.phone FROM banner_listings l LEFT JOIN banner_profiles p ON p.identity_id=l.identity_id WHERE l.id=$1 AND l.status=\'published\'',[id]);
     if(!r.rows[0]||r.rows[0].identity_id===a.sub||!r.rows[0].phone)return reply.code(404).send({error:'contact_not_available'});
     await activity(a.sub,'seller_contact_viewed','listing',String(id));await audit(a.sub,'seller_contact_viewed','listing',String(id),{});
