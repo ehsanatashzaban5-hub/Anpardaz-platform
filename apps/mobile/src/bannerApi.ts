@@ -11,6 +11,7 @@ export const bannerApi={
   async favorite(id:string){return call("/api/v1/banner/listings/"+encodeURIComponent(id)+"/favorite",{method:"POST"});},
   async contact(id:string){return call("/api/v1/banner/listings/"+encodeURIComponent(id)+"/contact") as Promise<{phone:string}>;},
   async reportListing(id:string,reason:string,description=""){return call("/api/v1/banner/listings/"+encodeURIComponent(id)+"/report",{method:"POST",body:JSON.stringify({reason,description})});},
+  async aiSuggest(title:string,description:string){return call("/api/v1/banner/ai/suggest",{method:"POST",body:JSON.stringify({title,description})}) as Promise<{suggestion:{id:number;categoryId:number;categoryName:string;condition:string|null;price:number|null;attributes:Record<string,string>;confidence:number}}>;},
   async createListing(body:any){return call("/api/v1/banner/listings",{method:"POST",body:JSON.stringify(body)});},
   async updateListing(id:string,body:any){return call("/api/v1/banner/listings/"+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify(body)});},
   async deleteListing(id:string){return call("/api/v1/banner/listings/"+encodeURIComponent(id),{method:"DELETE"});},
