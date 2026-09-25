@@ -1,7 +1,7 @@
 const BASE=((import.meta as any).env?.VITE_BANNER_API_URL as string|undefined)?.replace(/\/$/,"")??"";
 function token(){return localStorage.getItem("anpardaz:accessToken")??localStorage.getItem("accessToken")??"";}
 async function call(path:string,init:RequestInit={}){const t=token();if(!t)throw new Error("banner_auth_required");const r=await fetch(BASE+path,{...init,headers:{"content-type":"application/json",authorization:"Bearer "+t,...(init.headers??{})},cache:"no-store"});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body?.error??"banner_request_failed"));return body;}
-export type BannerApiListing={id:number;identity_id:string;category_id:number;category_name:string;title:string;description:string;price:number|null;currency:string;condition:string;city:string;status:string;views:number;created_at:string;updated_at:string;media_ids:number[]};
+export type BannerApiListing={id:number;identity_id:string;category_id:number;category_name:string;title:string;description:string;price:number|null;currency:string;condition:string;city:string;status:string;views:number;created_at:string;updated_at:string;media_ids:number[];attributes?:Record<string,unknown>;category_slug?:string;seller_display_name?:string};
 export const bannerApi={
   async listings(q:Record<string,string|number|undefined>={}){const s=new URLSearchParams();for(const[k,v]of Object.entries(q))if(v!==undefined&&v!=="")s.set(k,String(v));return call("/api/v1/banner/listings?"+s.toString()) as Promise<{listings:BannerApiListing[];total:number}>;},
   async categories(){return call("/api/v1/banner/categories") as Promise<{categories:any[]}>;},
@@ -9,6 +9,8 @@ export const bannerApi={
   async myListings(){return call("/api/v1/banner/me/listings") as Promise<{listings:BannerApiListing[]}>;},
   async favorites(){return call("/api/v1/banner/me/favorites") as Promise<{listings:BannerApiListing[]}>;},
   async favorite(id:string){return call("/api/v1/banner/listings/"+encodeURIComponent(id)+"/favorite",{method:"POST"});},
+  async contact(id:string){return call("/api/v1/banner/listings/"+encodeURIComponent(id)+"/contact") as Promise<{phone:string}>;},
+  async reportListing(id:string,reason:string,description=""){return call("/api/v1/banner/listings/"+encodeURIComponent(id)+"/report",{method:"POST",body:JSON.stringify({reason,description})});},
   async createListing(body:any){return call("/api/v1/banner/listings",{method:"POST",body:JSON.stringify(body)});},
   async updateListing(id:string,body:any){return call("/api/v1/banner/listings/"+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify(body)});},
   async deleteListing(id:string){return call("/api/v1/banner/listings/"+encodeURIComponent(id),{method:"DELETE"});},
