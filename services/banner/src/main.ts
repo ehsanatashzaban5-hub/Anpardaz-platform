@@ -40,7 +40,7 @@ async function registerPublic(app:FastifyInstance){
     const count=await pool.query(`SELECT COUNT(*)::int count FROM banner_listings l WHERE ${where.join(' AND ')}`,params);
     params.push(limit,offset);
     const rows=await pool.query(`SELECT l.id,l.identity_id,l.category_id,c.name category_name,p.display_name seller_display_name,l.title,l.description,l.price,l.currency,l.condition,l.city,l.created_at,l.updated_at,l.views,
-      COALESCE((SELECT json_agg(m.id ORDER BY m.sort_order,m.id) FROM banner_media m WHERE m.listing_id=l.id),'[]'::json) media_ids
+      COALESCE((SELECT json_agg(m.id ORDER BY m.sort_order,m.id) FROM banner_media m WHERE m.listing_id=l.id),'[]'::json) media_ids,l.attributes
       FROM banner_listings l LEFT JOIN banner_categories c ON c.id=l.category_id LEFT JOIN banner_profiles p ON p.identity_id=l.identity_id WHERE ${where.join(' AND ')} ORDER BY ${order} LIMIT $${params.length-1} OFFSET $${params.length}`,params);
     return{listings:rows.rows,page,limit,total:count.rows[0].count};
   });
@@ -52,6 +52,13 @@ async function registerPublic(app:FastifyInstance){
     const media=await pool.query('SELECT id,mime_type,filename,sort_order FROM banner_media WHERE listing_id=$1 ORDER BY sort_order,id',[id]);
     await audit(null,'view','listing',String(id),{public:true});
     return{listing:{...r.rows[0],views:r.rows[0].views+1},media:media.rows};
+  });
+  app.get('/api/v1/banner/listings/:id/contact',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
+    const r=await pool.query('SELECT l.identity_id,p.phone FROM banner_listings l LEFT JOIN banner_profiles p ON p.identity_id=l.identity_id WHERE l.id=$1 AND l.status=\'published\'',[id]);
+    if(!r.rows[0]||r.rows[0].identity_id===a.sub||!r.rows[0].phone)return reply.code(404).send({error:'contact_not_available'});
+    await activity(a.sub,'seller_contact_viewed','listing',String(id));await audit(a.sub,'seller_contact_viewed','listing',String(id),{});
+    return{phone:r.rows[0].phone};
   });
   app.get('/api/v1/banner/messages/:id/media',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
@@ -72,10 +79,10 @@ async function registerPrivate(app:FastifyInstance){
   app.get('/api/v1/banner/me/listings',{preHandler:requireAuth},async(req)=>{const a=auth(req);const r=await pool.query('SELECT l.id,l.title,l.status,l.price,l.currency,l.city,l.views,l.created_at,l.updated_at,c.name category_name FROM banner_listings l LEFT JOIN banner_categories c ON c.id=l.category_id WHERE l.identity_id=$1 ORDER BY l.created_at DESC',[a.sub]);return{listings:r.rows};});
   app.post('/api/v1/banner/listings',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),b=(req.body??{}) as any,title=clean(b.title,160),description=clean(b.description,5000),city=clean(b.city,80),condition=clean(b.condition,30),currency=clean(b.currency,3)||'IRR';
-    const categoryId=Number(b.categoryId);const price=b.price===null||b.price===undefined||b.price===''?null:Number(b.price);
-    if(!title||!description||!Number.isInteger(categoryId)||categoryId<1||price!==null&&(!Number.isFinite(price)||price<0)||!city)return reply.code(400).send({error:'invalid_listing'});
+    const attributes=typeof b.attributes==='object'&&b.attributes&&!Array.isArray(b.attributes)?Object.fromEntries(Object.entries(b.attributes).slice(0,40)):{};const categoryId=Number(b.categoryId);const price=b.price===null||b.price===undefined||b.price===''?null:Number(b.price);
+    if(!title||!description||!Number.isInteger(categoryId)||categoryId<1||JSON.stringify(attributes).length>20000||price!==null&&(!Number.isFinite(price)||price<0)||!city)return reply.code(400).send({error:'invalid_listing'});
     const cat=await pool.query('SELECT id FROM banner_categories WHERE id=$1 AND active=TRUE',[categoryId]);if(!cat.rows[0])return reply.code(400).send({error:'invalid_category'});
-    const r=await pool.query(`INSERT INTO banner_listings(identity_id,category_id,title,description,price,currency,condition,city,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING *`,[a.sub,categoryId,title,description,price,currency,condition||'used',city]);
+    const r=await pool.query(`INSERT INTO banner_listings(identity_id,category_id,title,description,price,currency,condition,city,attributes,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') RETURNING *`,[a.sub,categoryId,title,description,price,currency,condition||'used',city,attributes]);
     await activity(a.sub,'listing_created','listing',String(r.rows[0].id),{status:'pending'});await audit(a.sub,'create','listing',String(r.rows[0].id),{status:'pending'});return reply.code(201).send({listing:r.rows[0]});
   });
   app.patch('/api/v1/banner/listings/:id',{preHandler:requireAuth},async(req,reply)=>{
@@ -104,6 +111,18 @@ async function registerPrivate(app:FastifyInstance){
   app.get('/api/v1/banner/me/inquiries',{preHandler:requireAuth},async(req)=>{const a=auth(req);const r=await pool.query('SELECT i.*,l.title FROM banner_inquiries i JOIN banner_listings l ON l.id=i.listing_id WHERE i.buyer_identity_id=$1 OR i.seller_identity_id=$1 ORDER BY i.updated_at DESC',[a.sub]);return{inquiries:r.rows};});
   app.post('/api/v1/banner/inquiries/:id/reply',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),id=idParam((req.params as any).id),body=clean((req.body as any)?.message,2000);if(!id||!body)return reply.code(400).send({error:'invalid_reply'});const r=await pool.query('SELECT * FROM banner_inquiries WHERE id=$1 AND (buyer_identity_id=$2 OR seller_identity_id=$2)',[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'inquiry_not_found'});await pool.query('INSERT INTO banner_inquiry_messages(inquiry_id,sender_identity_id,body) VALUES($1,$2,$3)',[id,a.sub,body]);await pool.query('UPDATE banner_inquiries SET status=\'replied\',updated_at=NOW() WHERE id=$1',[id]);await activity(a.sub,'inquiry_reply','inquiry',String(id));return{ok:true};});
   app.get('/api/v1/banner/inquiries/:id',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});const r=await pool.query('SELECT * FROM banner_inquiries WHERE id=$1 AND (buyer_identity_id=$2 OR seller_identity_id=$2)',[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'inquiry_not_found'});const m=await pool.query('SELECT id,sender_identity_id,body,created_at FROM banner_inquiry_messages WHERE inquiry_id=$1 ORDER BY created_at',[id]);return{inquiry:r.rows[0],messages:m.rows};});
+  app.post('/api/v1/banner/listings/:id/report',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),id=idParam((req.params as any).id),b=(req.body??{}) as any,reason=clean(b.reason,120),description=clean(b.description,1000);
+    if(!id||!reason)return reply.code(400).send({error:'report_reason_required'});
+    const listing=await pool.query('SELECT identity_id FROM banner_listings WHERE id=$1 AND status=\'published\'',[id]);
+    if(!listing.rows[0])return reply.code(404).send({error:'listing_not_found'});
+    if(listing.rows[0].identity_id===a.sub)return reply.code(400).send({error:'cannot_report_own_listing'});
+    try{
+      const r=await pool.query('INSERT INTO banner_reports(reporter_identity_id,listing_id,reason,description) VALUES($1,$2,$3,$4) RETURNING *',[a.sub,id,reason,description||null]);
+      await activity(a.sub,'listing_reported','listing',String(id),{reportId:r.rows[0].id,reason});await audit(a.sub,'report','listing',String(id),{reason});
+      return reply.code(201).send({report:r.rows[0]});
+    }catch(e:any){if(e?.code==='23505')return reply.code(409).send({error:'report_already_exists'});throw e;}
+  });
   app.get('/api/v1/banner/me/notifications',{preHandler:requireAuth},async(req)=>{
     const a=auth(req);const r=await pool.query('SELECT id,type,title,description,read_at,created_at FROM banner_notifications WHERE identity_id=$1 ORDER BY created_at DESC LIMIT 200',[a.sub]);
     return{notifications:r.rows.map(x=>({...x,read:Boolean(x.read_at)}))};
@@ -118,10 +137,16 @@ async function registerPrivate(app:FastifyInstance){
   app.get('/api/v1/banner/me/conversations',{preHandler:requireAuth},async(req)=>{
     const a=auth(req);
     const r=await pool.query(`SELECT i.id::text conversation_id,i.listing_id,i.buyer_identity_id,i.seller_identity_id,
+      bp.display_name buyer_display_name,sp.display_name seller_display_name,
+      CASE WHEN bp.avatar_data IS NOT NULL THEN 'data:'||COALESCE(bp.avatar_mime,'image/jpeg')||';base64,'||encode(bp.avatar_data,'base64') END buyer_avatar_data_url,
+      CASE WHEN sp.avatar_data IS NOT NULL THEN 'data:'||COALESCE(sp.avatar_mime,'image/jpeg')||';base64,'||encode(sp.avatar_data,'base64') END seller_avatar_data_url,
       i.created_at,i.updated_at AS last_message_at,
       COALESCE((SELECT m.body FROM banner_inquiry_messages m WHERE m.inquiry_id=i.id ORDER BY m.created_at DESC LIMIT 1),i.message) AS last_message,
       CASE WHEN i.status='closed' THEN 'archived' ELSE 'active' END status
-      FROM banner_inquiries i WHERE i.buyer_identity_id=$1 OR i.seller_identity_id=$1 ORDER BY i.updated_at DESC`,[a.sub]);
+      FROM banner_inquiries i
+      LEFT JOIN banner_profiles bp ON bp.identity_id=i.buyer_identity_id
+      LEFT JOIN banner_profiles sp ON sp.identity_id=i.seller_identity_id
+      WHERE i.buyer_identity_id=$1 OR i.seller_identity_id=$1 ORDER BY i.updated_at DESC`,[a.sub]);
     return{conversations:r.rows};
   });
   app.get('/api/v1/banner/conversations/:id',{preHandler:requireAuth},async(req,reply)=>{
@@ -159,13 +184,24 @@ async function registerPrivate(app:FastifyInstance){
 }
 
 async function registerInternal(app:FastifyInstance){
-  app.get('/internal/v1/admin/overview',{preHandler:requireAdminInternal},async()=>{const [l,p,t,u,a]=await Promise.all([pool.query("SELECT COUNT(*)::int count FROM banner_listings WHERE status='published'"),pool.query("SELECT COUNT(*)::int count FROM banner_listings WHERE status='pending'"),pool.query("SELECT COUNT(*)::int count FROM banner_tickets WHERE status NOT IN ('resolved','closed')"),pool.query("SELECT COUNT(DISTINCT identity_id)::int count FROM banner_activity_events"),pool.query("SELECT COUNT(*)::int count FROM banner_audit_logs")]);return{publishedListings:l.rows[0].count,pendingListings:p.rows[0].count,openTickets:t.rows[0].count,activeUsers:u.rows[0].count,auditEvents:a.rows[0].count};});
+  app.get('/internal/v1/admin/overview',{preHandler:requireAdminInternal},async()=>{const [l,p,t,u,a,rp]=await Promise.all([pool.query("SELECT COUNT(*)::int count FROM banner_listings WHERE status='published'"),pool.query("SELECT COUNT(*)::int count FROM banner_listings WHERE status='pending'"),pool.query("SELECT COUNT(*)::int count FROM banner_tickets WHERE status NOT IN ('resolved','closed')"),pool.query("SELECT COUNT(DISTINCT identity_id)::int count FROM banner_activity_events"),pool.query("SELECT COUNT(*)::int count FROM banner_audit_logs"),pool.query("SELECT COUNT(*)::int count FROM banner_reports WHERE status='pending'")]);return{publishedListings:l.rows[0].count,pendingListings:p.rows[0].count,openTickets:t.rows[0].count,activeUsers:u.rows[0].count,auditEvents:a.rows[0].count,pendingReports:rp.rows[0].count};});
   app.get('/internal/v1/admin/listings',{preHandler:requireAdminInternal},async(req)=>{const q=req.query as any,limit=Math.min(200,Math.max(1,Number(q.limit??100)||100));const r=await pool.query('SELECT id,identity_id,category_id,title,description,price,currency,condition,city,status,views,created_at,updated_at FROM banner_listings ORDER BY created_at DESC LIMIT $1',[limit]);return{listings:r.rows};});
   app.patch('/internal/v1/admin/listings/:id/status',{preHandler:requireAdminInternal},async(req,reply)=>{const id=idParam((req.params as any).id),b=(req.body??{}) as any;if(!id||!['pending','published','rejected','paused','sold','archived','deleted'].includes(b.status))return reply.code(400).send({error:'invalid_status'});const r=await pool.query('UPDATE banner_listings SET status=$1,moderation_reason=$2,updated_at=NOW() WHERE id=$3 RETURNING *',[b.status,clean(b.reason,1000)||null,id]);if(!r.rows[0])return reply.code(404).send({error:'listing_not_found'});await audit(b.actorIdentityId??null,'admin_listing_status','listing',String(id),{status:b.status,reason:b.reason??null});await notify(r.rows[0].identity_id,'system','وضعیت آگهی تغییر کرد','وضعیت آگهی شما به '+b.status+' تغییر کرد');return{listing:r.rows[0]};});
   app.get('/internal/v1/admin/tickets',{preHandler:requireAdminInternal},async(req)=>{const q=req.query as any,limit=Math.min(200,Math.max(1,Number(q.limit??100)||100));const r=await pool.query('SELECT id,identity_id,subject,category,priority,status,assigned_admin_identity_id,created_at,updated_at FROM banner_tickets ORDER BY updated_at DESC LIMIT $1',[limit]);return{tickets:r.rows};});
   app.get('/internal/v1/admin/tickets/:id',{preHandler:requireAdminInternal},async(req,reply)=>{const id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});const r=await pool.query('SELECT * FROM banner_tickets WHERE id=$1',[id]);if(!r.rows[0])return reply.code(404).send({error:'ticket_not_found'});const m=await pool.query('SELECT id,sender_type,sender_identity_id,body,created_at FROM banner_ticket_messages WHERE ticket_id=$1 ORDER BY created_at',[id]);return{ticket:r.rows[0],messages:m.rows};});
   app.post('/internal/v1/admin/tickets/:id/reply',{preHandler:requireAdminInternal},async(req,reply)=>{const id=idParam((req.params as any).id),b=(req.body??{}) as any,body=clean(b.message,4000);if(!id||!body||!b.adminIdentityId)return reply.code(400).send({error:'invalid_reply'});const r=await pool.query('INSERT INTO banner_ticket_messages(ticket_id,sender_identity_id,sender_type,body,internal) VALUES($1,$2,\'admin\',$3,FALSE) RETURNING *',[id,b.adminIdentityId,body]);await pool.query('UPDATE banner_tickets SET status=\'pending\',assigned_admin_identity_id=$2,updated_at=NOW() WHERE id=$1',[id,b.adminIdentityId]);await audit(b.adminIdentityId,'admin_ticket_reply','ticket',String(id),{});const owner=await pool.query('SELECT identity_id FROM banner_tickets WHERE id=$1',[id]);if(owner.rows[0])await notify(owner.rows[0].identity_id,'support-reply','پاسخ پشتیبانی','پشتیبانی آن بنر به تیکت شما پاسخ داد');return{message:r.rows[0]};});
   app.patch('/internal/v1/admin/tickets/:id',{preHandler:requireAdminInternal},async(req,reply)=>{const id=idParam((req.params as any).id),b=(req.body??{}) as any;if(!id||!['open','pending','resolved','closed'].includes(b.status))return reply.code(400).send({error:'invalid_status'});const r=await pool.query('UPDATE banner_tickets SET status=$1,assigned_admin_identity_id=COALESCE($2,assigned_admin_identity_id),updated_at=NOW() WHERE id=$3 RETURNING *',[b.status,b.adminIdentityId??null,id]);if(!r.rows[0])return reply.code(404).send({error:'ticket_not_found'});await audit(b.adminIdentityId??'00000000-0000-0000-0000-000000000000','admin_ticket_status','ticket',String(id),{status:b.status});return{ticket:r.rows[0]};});
+  app.get('/internal/v1/admin/reports',{preHandler:requireAdminInternal},async(req)=>{
+    const q=req.query as any,limit=Math.min(500,Math.max(1,Number(q.limit??200)||200));
+    const r=await pool.query('SELECT r.*,l.title,l.identity_id listing_owner_identity_id FROM banner_reports r JOIN banner_listings l ON l.id=r.listing_id ORDER BY r.created_at DESC LIMIT $1',[limit]);return{reports:r.rows};
+  });
+  app.patch('/internal/v1/admin/reports/:id',{preHandler:requireAdminInternal},async(req,reply)=>{
+    const id=idParam((req.params as any).id),b=(req.body??{}) as any;
+    if(!id||!['pending','reviewed','resolved','rejected'].includes(b.status)||!b.adminIdentityId)return reply.code(400).send({error:'invalid_report_update'});
+    const r=await pool.query('UPDATE banner_reports SET status=$1,updated_at=NOW() WHERE id=$2 RETURNING *',[b.status,id]);
+    if(!r.rows[0])return reply.code(404).send({error:'report_not_found'});
+    await audit(b.adminIdentityId,'admin_report_status','report',String(id),{status:b.status});return{report:r.rows[0]};
+  });
   app.get('/internal/v1/admin/activity',{preHandler:requireAdminInternal},async(req)=>{const q=req.query as any,limit=Math.min(1000,Math.max(1,Number(q.limit??500)||500)),identity=clean(q.identityId,80);const params:any[]=[];let where='';if(identity){params.push(identity);where='WHERE identity_id=$1';}params.push(limit);const r=await pool.query(`SELECT * FROM banner_activity_events ${where} ORDER BY occurred_at DESC LIMIT $${params.length}`,params);return{activities:r.rows};});
   app.get('/internal/v1/admin/audit',{preHandler:requireAdminInternal},async(req)=>{const q=req.query as any,limit=Math.min(1000,Math.max(1,Number(q.limit??500)||500)),identity=clean(q.identityId,80);const params:any[]=[];let where='';if(identity){params.push(identity);where='WHERE identity_id=$1 OR actor_identity_id=$1';}params.push(limit);const r=await pool.query(`SELECT * FROM banner_audit_logs ${where} ORDER BY created_at DESC LIMIT $${params.length}`,params);return{audit:r.rows};});
   app.get('/internal/v1/admin/users/:identityId/summary',{preHandler:requireAdminInternal},async(req)=>{const identity=String((req.params as any).identityId);const [p,l,t,a,act]=await Promise.all([pool.query('SELECT * FROM banner_profiles WHERE identity_id=$1',[identity]),pool.query('SELECT id,title,status,price,currency,city,views,created_at,updated_at FROM banner_listings WHERE identity_id=$1 ORDER BY created_at DESC LIMIT 200',[identity]),pool.query('SELECT id,subject,status,priority,created_at,updated_at FROM banner_tickets WHERE identity_id=$1 ORDER BY updated_at DESC LIMIT 100',[identity]),pool.query('SELECT * FROM banner_audit_logs WHERE identity_id=$1 OR actor_identity_id=$1 ORDER BY created_at DESC LIMIT 200',[identity]),pool.query('SELECT * FROM banner_activity_events WHERE identity_id=$1 ORDER BY occurred_at DESC LIMIT 500',[identity])]);return{profile:p.rows[0]??null,listings:l.rows,tickets:t.rows,audit:a.rows,activity:act.rows};});

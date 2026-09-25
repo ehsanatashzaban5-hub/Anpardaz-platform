@@ -300,6 +300,21 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     });
     return reply.code(result.status).send(result.body);
   });
+  app.get('/api/v1/admin/ecosystem/banner/reports', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/reports' + (request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), { headers: bannerHeaders() });
+    return reply.code(result.status).send(result.body);
+  });
+  app.patch('/api/v1/admin/ecosystem/banner/reports/:id', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'banner.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const body = { ...(request.body as Record<string, unknown> ?? {}), adminIdentityId: req.auth.sub };
+    const result = await fetchJson(bannerBase() + '/internal/v1/admin/reports/' + encodeURIComponent((request.params as { id: string }).id), {
+      method: 'PATCH', headers: { ...bannerHeaders(), 'content-type': 'application/json' }, body: JSON.stringify(body),
+    });
+    return reply.code(result.status).send(result.body);
+  });
   app.get('/api/v1/admin/ecosystem/banner/activity', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });

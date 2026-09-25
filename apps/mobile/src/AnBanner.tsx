@@ -1262,24 +1262,14 @@ const AB_CATS: ABCategory[] = [
   ]),
 ];
 
-/* ─── Mutable Ad/Chat/User Store (Backend-ready) ─────────────────── */
-// Module-level mutable store — components read from these, write via helpers.
-// localStorage keeps state across page refreshes. Swap helpers with API calls when backend is ready.
-
+/* ─── Live Ad/Chat/User Store ──────────────────────────────────────
+   Runtime source of truth is the Banner backend. Module state is memory-only. */
 let _ads: ABListing[] = [];
 let _convs: ABConversation[] = [];
 let _msgs: Record<string, ABMessage[]> = {};
 let _myUser: ABUser = { userId:"", name:"", avatar:"", mobile:"", verificationStatus:"unverified", accountType:"personal", createdAt:"", lastActive:"" };
 let _myFavs: string[] = [];
-
-function _tryParse<T>(key: string, fallback: T): T {
-  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; }
-}
-// Version-gated seed: bump to clear stale localStorage when seed data changes
-const AB_DATA_VERSION = "v4";
 let _currentUid = "default";
-const abKey = (k: string) => `ab2_${_currentUid}_${k}`;
-
 let _bannerUsers: ABUser[] = [];
 function mapApiListing(x: any): ABListing {
   const category = AB_CATS.find(c => c.name === x.category_name);
@@ -1289,7 +1279,7 @@ function mapApiListing(x: any): ABListing {
     title: x.title, description: x.description ?? "", images: Array.isArray(x.media_ids) ? x.media_ids.map((id:number)=>bannerMediaUrl(id)) : [],
     price: Number(x.price ?? 0), priceMode: x.price === null ? "negotiable" : "fixed",
     condition: (["new","like-new","good","used","for-parts"].includes(x.condition) ? x.condition : "used") as ABListing["condition"],
-    cityId: x.city ?? "", provinceId: "", attributes: {}, status: x.status === "published" ? "active" : x.status,
+    cityId: x.city ?? "", provinceId: "", attributes: x.attributes && typeof x.attributes === "object" ? x.attributes : {}, status: x.status === "published" ? "active" : x.status,
     createdAt: x.created_at, updatedAt: x.updated_at, expiresAt: x.expires_at ?? "",
     viewCount: Number(x.views ?? 0), favoriteCount: 0, messageCount: 0,
     contactEnabled: x.contact_enabled !== false, chatEnabled: x.chat_enabled !== false,
@@ -1297,25 +1287,29 @@ function mapApiListing(x: any): ABListing {
   };
 }
 function upsertBannerUser(id:string,name?:string) {
-  if (!id) return;
+  if (!id || !name?.trim()) return;
   if (_bannerUsers.some(u=>u.userId===id)) return;
-  _bannerUsers.push({userId:id,name:name||"کاربر آن بنر",avatar:"",mobile:"",verificationStatus:"unverified",accountType:"personal",createdAt:new Date().toISOString(),lastActive:new Date().toISOString()});
+  _bannerUsers.push({userId:id,name:name.trim(),avatar:"",mobile:"",verificationStatus:"unverified",accountType:"personal",createdAt:"",lastActive:""});
 }
 function abGetBannerUser(id:string){return _bannerUsers.find(u=>u.userId===id);}
 async function initAnBannerStore(uid: string) {
   _currentUid = uid;
   _ads = []; _convs = []; _msgs = {}; _myFavs = []; _postchi = []; _bannerUsers = [];
   try {
-    const [listings,favorites,profile,conversations,notifications] = await Promise.all([
-      bannerApi.listings({limit:200}), bannerApi.favorites(), bannerApi.profile(), bannerApi.conversations(), bannerApi.notifications()
+    const [listings,myListings,favorites,profile,conversations,notifications] = await Promise.all([
+      bannerApi.listings({limit:200}), bannerApi.myListings(), bannerApi.favorites(), bannerApi.profile(), bannerApi.conversations(), bannerApi.notifications()
     ]);
-    _ads = (listings.listings ?? []).map((x:any)=>{upsertBannerUser(String(x.identity_id),x.seller_display_name);return mapApiListing(x);});
+    const livePublic=(listings.listings ?? []).map((x:any)=>{upsertBannerUser(String(x.identity_id),x.seller_display_name);return mapApiListing(x);});
+    const liveMine=(myListings.listings ?? []).map((x:any)=>mapApiListing(x));
+    const byId=new Map<string,ABListing>();for(const item of [...livePublic,...liveMine])byId.set(item.listingId,item);_ads=[...byId.values()];
     _myFavs = (favorites.listings ?? []).map((x:any)=>String(x.id));
     _myUser = {
-      userId: uid, name: profile?.profile?.display_name ?? "کاربر آن بنر", avatar: "", mobile: profile?.profile?.phone ?? "",
+      userId: uid, name: profile?.profile?.display_name ?? "کاربر آن بنر", avatar: profile?.profile?.avatar_data_url ?? "", mobile: profile?.profile?.phone ?? "",
       verificationStatus: "unverified", accountType: "personal", createdAt: profile?.profile?.created_at ?? new Date().toISOString(), lastActive: new Date().toISOString()
     };
     for (const conv of conversations.conversations ?? []) {
+      upsertBannerUser(String(conv.buyer_identity_id),conv.buyer_display_name);
+      upsertBannerUser(String(conv.seller_identity_id),conv.seller_display_name);
       const cid=String(conv.conversation_id);
       _convs.push({conversationId:cid,listingId:String(conv.listing_id),buyerId:String(conv.buyer_identity_id),sellerId:String(conv.seller_identity_id),createdAt:conv.created_at,lastMessageAt:conv.last_message_at,lastMessage:conv.last_message??"",status:conv.status==="archived"?"archived":"active",unreadCount:0});
     }
@@ -1331,16 +1325,16 @@ let _adsListeners: (() => void)[] = [];
 function _subscribeAds(fn: () => void) { _adsListeners.push(fn); return () => { _adsListeners = _adsListeners.filter(f => f !== fn); }; }
 function _notifyAds() { _adsListeners.forEach(f => f()); }
 
-function storeAds() { try { localStorage.setItem(abKey("ads"), JSON.stringify(_ads)); } catch {} _notifyAds(); }
-function storeConvs() { try { localStorage.setItem(abKey("convs"), JSON.stringify(_convs)); } catch {} }
-function storeMsgs() { try { localStorage.setItem(abKey("msgs"), JSON.stringify(_msgs)); } catch {} }
-function storeUser() { try { localStorage.setItem(abKey("user"), JSON.stringify(_myUser)); } catch {} }
-function storeFavs() { try { localStorage.setItem(abKey("favs"), JSON.stringify(_myFavs)); } catch {} }
+function storeAds() { _notifyAds(); }
+function storeConvs() { /* backend is source of truth */ }
+function storeMsgs() { /* backend is source of truth */ }
+function storeUser() { /* backend is source of truth */ }
+function storeFavs() { /* backend is source of truth */ }
 
 // --- Ad CRUD ---
 function abGetAds(): ABListing[] { return _ads; }
 function abAddAd(ad: ABListing) { _ads = [ad, ..._ads]; _notifyAds(); }
-async function abUpdateAd(ad: ABListing) { try{await bannerApi.updateListing(ad.listingId,{title:ad.title,description:ad.description,price:ad.price,city:ad.cityId,condition:ad.condition});_ads=_ads.map(a=>a.listingId===ad.listingId?ad:a);_notifyAds();}catch(e){console.error("listing_update_failed",e);} }
+async function abUpdateAd(ad: ABListing) { try{await bannerApi.updateListing(ad.listingId,{title:ad.title,description:ad.description,price:ad.price,city:ad.cityId,condition:ad.condition,attributes:ad.attributes});_ads=_ads.map(a=>a.listingId===ad.listingId?ad:a);_notifyAds();}catch(e){console.error("listing_update_failed",e);} }
 async function abDeleteAd(id: string) { try{await bannerApi.deleteListing(id);_ads=_ads.filter(a=>a.listingId!==id);_notifyAds();}catch(e){console.error("listing_delete_failed",e);} }
 async function abCloseAd(id: string) { try{await bannerApi.updateListing(id,{status:"paused"});_ads=_ads.map(a=>a.listingId===id?{...a,status:"expired" as const,updatedAt:new Date().toISOString()}:a);_notifyAds();}catch(e){console.error("listing_pause_failed",e);} }
 async function abReopenAd(id: string) { try{await bannerApi.updateListing(id,{status:"published"});_ads=_ads.map(a=>a.listingId===id?{...a,status:"active" as const,updatedAt:new Date().toISOString()}:a);_notifyAds();}catch(e){console.error("listing_reopen_failed",e);} }
@@ -1433,17 +1427,12 @@ function useConvsVersion() {
 }
 
 // --- Postchi (An Banner system notification) store ---
-const INIT_POSTCHI: ABPostchiEvent[] = [
-  { eventId: "pe1", type: "system", title: "خوش آمدید به آن بنر", description: "اکنون می‌توانید آگهی ثبت کنید، با فروشندگان چت کنید و فعالیت‌های خود را دنبال کنید.", read: true, createdAt: "2026-09-01T08:00:00Z", color: "#2563EB" },
-  { eventId: "pe2", type: "security", title: "هشدار امنیتی", description: "ورود موفق به حساب کاربری از دستگاه جدید شناسایی شد.", read: false, createdAt: "2026-09-06T18:00:00Z", color: "#D97706" },
-];
-
-let _postchi: ABPostchiEvent[] = [...INIT_POSTCHI];
+let _postchi: ABPostchiEvent[] = [];
 let _postchiListeners: (() => void)[] = [];
 
 function _subscribePostchi(fn: () => void) { _postchiListeners.push(fn); return () => { _postchiListeners = _postchiListeners.filter(f => f !== fn); }; }
 function _notifyPostchi() { _postchiListeners.forEach(f => f()); }
-function storePostchi() { try { localStorage.setItem(abKey("postchi"), JSON.stringify(_postchi)); } catch {} _notifyPostchi(); }
+function storePostchi() { _notifyPostchi(); }
 function abGetPostchi(): ABPostchiEvent[] { return _postchi; }
 function abAddPostchiEvent(ev: ABPostchiEvent) { _postchi = [ev, ..._postchi]; storePostchi(); }
 function abMarkPostchiRead(id: string) { _postchi = _postchi.map(e => e.eventId === id ? { ...e, read: true } : e); storePostchi(); }
@@ -1703,6 +1692,7 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
   const _v = useAdsVersion();
   const listing = abGetAds().find(l => l.listingId === lid);
   const [showPhone, setShowPhone] = useState(false);
+  const [ownerPhone, setOwnerPhone] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [reported, setReported] = useState(false);
 
@@ -1725,7 +1715,11 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
         <button className="ab-icon-btn" style={{ background: "rgba(255,255,255,0.88)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 11, flexShrink: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.18)" }} onClick={() => toggleFav(listing.listingId)}>
           <ABIco name={isFav ? "heartFill" : "heart"} size={20} color={isFav ? "#E8354E" : "#1a1a2e"} />
         </button>
-        <button className="ab-icon-btn" style={{ background: "rgba(255,255,255,0.88)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 11, flexShrink: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.18)" }}>
+        <button className="ab-icon-btn" style={{ background: "rgba(255,255,255,0.88)", backdropFilter: "blur(10px)", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 11, flexShrink: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.18)" }} onClick={() => {
+          const url=window.location.href;
+          if(navigator.share) void navigator.share({title:listing.title,url}).catch(()=>{});
+          else void navigator.clipboard?.writeText(url);
+        }}>
           <ABIco name="share" size={20} color="#1a1a2e" />
         </button>
         {onBackToPardaz && (
@@ -1796,7 +1790,7 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
             <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ab-text)", padding: "0 16px 12px" }}>فروشنده</div>
             <ABSellerCard user={owner} listing={listing}
               onProfile={() => push({ t: "profile", uid: owner.userId })}
-              onCall={() => setShowPhone(true)}
+              onCall={() => { void bannerApi.contact(listing.listingId).then(r=>{setOwnerPhone(r.phone);setShowPhone(true);}).catch(e=>console.error("seller_contact_failed",e)); }}
               onChat={() => { void abStartConv(listing).then(cid => { if (onStartChat) onStartChat(cid); else push({ t: "chat", cid }); }); }}
             />
             {isMyAd && (
@@ -1821,7 +1815,7 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
             {showPhone && (
               <div style={{ margin: "10px 16px 0", padding: "12px 16px", background: "var(--ab-green-light)", borderRadius: 12, border: "1px solid rgba(5,150,105,0.2)", display: "flex", alignItems: "center", gap: 10 }}>
                 <ABIco name="phone" size={18} color="var(--ab-green)" />
-                <span style={{ fontSize: 16, fontWeight: 700, color: "var(--ab-green)", letterSpacing: 1, direction: "ltr" }}>{owner.mobile}</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: "var(--ab-green)", letterSpacing: 1, direction: "ltr" }}>{ownerPhone}</span>
               </div>
             )}
           </div>
@@ -1829,7 +1823,12 @@ function ABListingDetail({ lid, push, pop, favs, toggleFav, isMyAd, onDelete, on
 
         {/* Report */}
         <div style={{ padding: "0 16px 16px" }}>
-          <button onClick={() => setReported(true)} style={{ width: "100%", padding: "11px", borderRadius: 11, border: "1px solid var(--ab-border)", background: "transparent", fontSize: 12, color: reported ? "var(--ab-muted)" : "var(--ab-red)", fontFamily: "Vazirmatn, sans-serif", cursor: reported ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <button onClick={() => {
+            if(reported)return;
+            const reason=window.prompt("دلیل گزارش تخلف را وارد کنید");
+            if(!reason?.trim())return;
+            void bannerApi.reportListing(listing.listingId,reason.trim()).then(()=>setReported(true)).catch(e=>console.error("listing_report_failed",e));
+          }} style={{ width: "100%", padding: "11px", borderRadius: 11, border: "1px solid var(--ab-border)", background: "transparent", fontSize: 12, color: reported ? "var(--ab-muted)" : "var(--ab-red)", fontFamily: "Vazirmatn, sans-serif", cursor: reported ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <ABIco name="report" size={14} color={reported ? "var(--ab-muted)" : "var(--ab-red)"} />
             {reported ? "گزارش ارسال شد" : "گزارش تخلف"}
           </button>
@@ -2025,7 +2024,7 @@ function ABPostFlow({ push }: {
         const price=data.form.priceMode==="fixed"?(Number(data.form.price.replace(/[^0-9۰-۹]/g,"").replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))))||0):null;
         const created=await bannerApi.createListing({
           categoryId:Number(cat.id),title:data.form.title.trim(),description:data.form.desc.trim(),price,
-          condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR"
+          condition:data.form.condition,city:cityNameById(data.postCity),currency:"IRR",attributes:data.dynFields
         });
         const id=String(created.listing.id);
         for(const src of data.photos){
@@ -2567,7 +2566,7 @@ function ABEditPostFlow({ push, lid }: { push: (v: ABView) => void; lid: string 
   const [form, setForm] = useState({
     title: existing?.title ?? "",
     desc: existing?.description ?? "",
-    price: existing ? (existing.price / 1000).toString() : "",
+    price: existing ? String(existing.price ?? "") : "",
     priceMode: (existing?.priceMode ?? "fixed") as "fixed"|"negotiable"|"free"|"swap",
     condition: (existing?.condition ?? "used") as "new"|"like-new"|"good"|"used"|"for-parts",
   });
@@ -4038,14 +4037,14 @@ export default function AnBannerScreen({ onBack, userId, lightTheme }: { onBack:
   const [favs, setFavs] = useState<string[]>([]);
   const [citySelection, setCitySelection] = useState<CitySelection>(() => {
     try {
-      const raw = localStorage.getItem(abKey("city_sel"));
+      const raw = localStorage.getItem("anpardaz:banner:city-selection");
       if (raw) return JSON.parse(raw) as CitySelection;
     } catch {}
     return { type: "all" };
   });
   const applyCity = (sel: CitySelection) => {
     setCitySelection(sel);
-    try { localStorage.setItem(abKey("city_sel"), JSON.stringify(sel)); } catch {}
+    try { localStorage.setItem("anpardaz:banner:city-selection", JSON.stringify(sel)); } catch {}
   };
   const [showCitySelector, setShowCitySelector] = useState(false);
   const [tickets, setTickets] = useState<ABTicket[]>([]);
