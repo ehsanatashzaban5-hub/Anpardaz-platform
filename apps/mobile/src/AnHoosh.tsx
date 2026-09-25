@@ -698,6 +698,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const [activeMode, setActiveMode] = useState<CreationMode|null>(null);
   const [filterCat, setFilterCat]   = useState("all");
   const [showNewProj, setShowNewProj] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<string|null>(null);
   const [refresh, setRefresh] = useState(0);
 
   useBackHandler(() => {
@@ -746,11 +747,12 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
   const send = useCallback(async()=>{
     const text=input.trim();
     if(!text||!modelId)return;
-    let conversationId=DEMO_CONVS.find(c=>c.id.startsWith("active-"))?.id;
+    let conversationId=activeConversationId;
     try{
       if(!conversationId){
         const d=await hooshApi("/v1/hoosh/conversations",{method:"POST",body:JSON.stringify({title:"مکالمه جدید",model:modelId,mode:activeMode?.id??"assistant"})});
         conversationId=String(d.conversation.id);
+        setActiveConversationId(conversationId);
         DEMO_CONVS.unshift({id:conversationId,title:"مکالمه جدید",preview:"",messages:[],modelId,modeId:activeMode?.id??"assistant",createdAt:d.conversation.created_at,updatedAt:d.conversation.updated_at,group:"today"});
       }
       const u:Message={id:`u-${Date.now()}`,role:"user",text,ts:new Date()};
@@ -772,9 +774,9 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
     }catch(e:any){
       setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:`err-${Date.now()}`,role:"ai",text:`خطا در اجرای آن هوش: ${e?.message??"AI_EXECUTION_FAILED"}`,modelId,ts:new Date()}]);
     }
-  },[input,modelId,activeMode]);
+  },[input,modelId,activeMode,activeConversationId]);
 
-  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setTab("home"); },[]);
+  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setActiveConversationId(null); setTab("home"); },[]);
   const handleSelectMode = (mode: CreationMode) => {
     if(mode.id==="__clear__"){ setActiveMode(null); return; }
     setActiveMode(prev => prev?.id===mode.id ? null : mode);
