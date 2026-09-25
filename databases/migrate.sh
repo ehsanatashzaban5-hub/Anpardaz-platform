@@ -43,5 +43,6 @@ run_migrations anpardaz-db "${ANPARDAZ_DB_NAME}" "${ANPARDAZ_DB_USER}" "${ANPARD
 run_migrations ansarraf-db "${ANSARRAF_DB_NAME}" "${ANSARRAF_DB_USER}" "${ANSARRAF_DB_PASSWORD}" ansarraf
 run_migrations platform-db "${PLATFORM_DB_NAME}" "${PLATFORM_DB_USER}" "${PLATFORM_DB_PASSWORD}" platform
 run_migrations accounting-db "${ACCOUNTING_DB_NAME}" "${ACCOUNTING_DB_USER}" "${ACCOUNTING_DB_PASSWORD}" accounting
+run_migrations banner-db "${BANNER_DB_NAME}" "${BANNER_DB_USER}" "${BANNER_DB_PASSWORD}" banner
 
 echo "All database migrations completed."
