@@ -1353,7 +1353,8 @@ async function abAddMsg(cid: string, msg: ABMessage) {
     }
     const response=await bannerApi.sendMessage(cid,{message:msg.text??msg.sticker??"",type:msg.type,mediaBase64,mediaMime,offerAmount:msg.offerAmount});
     const sm=response?.message;
-    const saved:ABMessage={...msg,messageId:String(sm?.message_id??msg.messageId),createdAt:sm?.created_at??msg.createdAt,status:"sent",media:sm?.message_id&&msg.media?bannerMessageMediaUrl(sm.message_id):msg.media};
+    const saved:ABMessage={...msg,messageId:String(sm?.message_id??msg.messageId),createdAt:sm?.created_at??msg.createdAt,status:"sent",media:msg.media?undefined:msg.media};
+    if(msg.media&&sm?.message_id){saved.media=await bannerApi.messageMediaDataUrl(String(sm.message_id)).catch(()=>undefined);}
     abAddMsgAndNotify(cid,saved);
   } catch(e) { console.error("An Banner message failed",e); }
 }
