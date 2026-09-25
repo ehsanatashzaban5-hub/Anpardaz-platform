@@ -4037,14 +4037,14 @@ export default function AnBannerScreen({ onBack, userId, lightTheme }: { onBack:
   const [favs, setFavs] = useState<string[]>([]);
   const [citySelection, setCitySelection] = useState<CitySelection>(() => {
     try {
-      const raw = localStorage.getItem(abKey("city_sel"));
+      const raw = localStorage.getItem("anpardaz:banner:city-selection");
       if (raw) return JSON.parse(raw) as CitySelection;
     } catch {}
     return { type: "all" };
   });
   const applyCity = (sel: CitySelection) => {
     setCitySelection(sel);
-    try { localStorage.setItem(abKey("city_sel"), JSON.stringify(sel)); } catch {}
+    try { localStorage.setItem("anpardaz:banner:city-selection", JSON.stringify(sel)); } catch {}
   };
   const [showCitySelector, setShowCitySelector] = useState(false);
   const [tickets, setTickets] = useState<ABTicket[]>([]);
