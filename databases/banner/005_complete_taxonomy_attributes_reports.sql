@@ -1,5 +1,7 @@
 BEGIN;
 -- Banner taxonomy is sourced from the canonical mobile An Banner taxonomy. No listing counts are persisted here.
+-- Disable legacy root categories that are not part of the canonical mobile taxonomy; existing rows remain for FK safety.
+UPDATE banner_categories SET active=FALSE WHERE parent_id IS NULL AND slug NOT IN ('realestate','vehicles','digital','home-kitchen','services','personal','entertainment','social','industrial','jobs');
 ALTER TABLE banner_listings ADD COLUMN IF NOT EXISTS attributes JSONB NOT NULL DEFAULT '{}'::jsonb;
 CREATE TABLE IF NOT EXISTS banner_reports(
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
