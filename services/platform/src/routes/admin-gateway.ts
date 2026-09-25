@@ -57,12 +57,14 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
       const ansarrafUrl = process.env.ANSARRAF_SERVICE_URL ?? 'http://localhost:4002';
       const anpardazUrl = process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001';
       const accountingUrl = process.env.ACCOUNTING_SERVICE_URL ?? 'http://localhost:4004';
+      const bannerUrl = process.env.BANNER_SERVICE_URL ?? 'http://localhost:4005';
       const ansarrafToken = process.env.ANSARRAF_INTERNAL_TOKEN;
       const anpardazToken = process.env.ANPARDAZ_INTERNAL_TOKEN;
       const accountingToken = process.env.ACCOUNTING_INTERNAL_TOKEN;
-      if (!ansarrafToken || !anpardazToken || !accountingToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
+      const bannerToken = process.env.BANNER_INTERNAL_TOKEN;
+      if (!ansarrafToken || !anpardazToken || !accountingToken || !bannerToken) return reply.code(503).send({ error: 'internal_service_credentials_not_configured' });
 
-      const [ansarraf, anpardaz, accounting] = await Promise.all([
+      const [ansarraf, anpardaz, accounting, banner] = await Promise.all([
         fetchJson(`${ansarrafUrl.replace(/\/$/, '')}/internal/v1/admin/users/${encodeURIComponent(identityId)}/summary`, {
           headers: { authorization: `Bearer ${ansarrafToken}` },
         }),
@@ -72,6 +74,9 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
         fetchJson(`${accountingUrl.replace(/\/$/, '')}/internal/v1/ledger/accounts?ownerIdentityId=${encodeURIComponent(identityId)}&limit=500`, {
           headers: { authorization: `Bearer ${accountingToken}` },
         }),
+        fetchJson(`${bannerUrl.replace(/\/$/, '')}/internal/v1/admin/users/${encodeURIComponent(identityId)}/summary`, {
+          headers: { authorization: `Bearer ${bannerToken}` },
+        }),
       ]);
 
       return {
@@ -80,6 +85,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
           ansarraf: ansarraf.ok ? ansarraf.body : { unavailable: true, status: ansarraf.status, error: ansarraf.body },
           anpardaz: anpardaz.ok ? anpardaz.body : { unavailable: true, status: anpardaz.status, error: anpardaz.body },
           accounting: accounting.ok ? accounting.body : { unavailable: true, status: accounting.status, error: accounting.body },
+          banner: banner.ok ? banner.body : { unavailable: true, status: banner.status, error: banner.body },
         },
       };
     },
