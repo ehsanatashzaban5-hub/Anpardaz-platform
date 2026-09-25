@@ -6066,7 +6066,7 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme:setLightTh
     if(!s.pin_enabled && /^\\d{4}$/.test(user.pin)) { await anpardazUpdatePin("enable",undefined,user.pin).catch(()=>{}); }
   }catch{}};
   useEffect(()=>{void applyServerSettings();},[user.uid]);
-  const toggleNotifications=async()=>{const next=!notifications;try{await anpardazUpdateSettings({notifications_enabled:next});setNotifications(next);localStorage.setItem(`anp_notifications_${user.uid}`,next?"on":"off");if(next)playChime();}catch{setSystemNotice("ذخیره تنظیم اعلان‌ها انجام نشد.");}};
+  const toggleNotifications=async()=>{const next=!notifications;try{await anpardazUpdateSettings({notifications_enabled:next});setNotifications(next);localStorage.setItem(`anp_notifications_${user.uid}`,next?"on":"off");if(next)playChime();}catch{console.warn("settings notifications persistence failed");}};
   const toggleKeySound=async()=>{const next=!keySoundEnabled;try{await anpardazUpdateSettings({keyboard_sound_enabled:next});setKeySoundEnabled(next);localStorage.setItem("anp_key_sound",next?"on":"off");}catch{console.warn("settings keyboard sound persistence failed");}};
   const setFontScale=async(n:number)=>{try{await anpardazUpdateSettings({font_scale:n});setFontScaleState(n);localStorage.setItem("anp_font_scale",String(n));const root=document.getElementById("root");if(root)root.style.zoom=n===0?"":String(1+n*0.07);}catch{console.warn("settings font scale persistence failed");}};
   const initials=(user.name?.[0]??"")+(user.family?.[0]??"")||"؟";
