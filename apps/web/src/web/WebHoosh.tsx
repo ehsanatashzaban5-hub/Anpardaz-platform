@@ -782,6 +782,7 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
     }catch(e:any){ setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:"err-"+Date.now(),role:"ai",text:"خطا در اجرای آن هوش: "+(e?.message??"AI_EXECUTION_FAILED"),modelId,ts:new Date()}]); }
   },[input,modelId,activeMode,activeConversationId]);
 
+  const openConversation = useCallback(async(c:Conversation)=>{ try{ setActiveConversationId(c.id); const d=await hooshApi("/v1/hoosh/conversations/"+c.id); setMessages((d.messages??[]).map((m:any)=>({id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at)}))); setTab("home"); }catch{} },[]);
   const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setActiveConversationId(null); setTab("home"); },[]);
   const handleSelectMode = (mode: CreationMode) => {
     if(mode.id==="__clear__"){ setActiveMode(null); return; }
@@ -875,8 +876,8 @@ export default function WebHoosh({ onNavigate }: HooshProps) {
             ? <ChatView messages={messages} input={input} onInputChange={setInput} onSend={send} deepThinking={deepThink} onToggleDeep={()=>setDeepThink(v=>!v)} mode={activeMode}/>
             : <HomeView activeMode={activeMode} onSelectMode={handleSelectMode} onSend={send} input={input} onInputChange={setInput} deepThinking={deepThink} onToggleDeep={()=>setDeepThink(v=>!v)} filterCat={filterCat} onFilterCat={setFilterCat}/>
         )}
-        {tab==="history"  && <HistoryView onOpenConv={async c=>{try{setActiveConversationId(c.id);const d=await hooshApi(`/v1/hoosh/conversations/${c.id}`);setMessages((d.messages??[]).map((m:any)=>({id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at),media:undefined})));setTab("home");}catch{}} onNewChat={newChat}/>}
-        {tab==="projects" && <ProjectsView onOpenProject={()=>setTab("home")} onNewProject={()=>setShowNewProj(true)}/>}
+        {tab==="history" && <HistoryView onOpenConv={openConversation} onNewChat={newChat}/>}
+                {tab==="projects" && <ProjectsView onOpenProject={()=>setTab("home")} onNewProject={()=>setShowNewProj(true)}/>}
         {tab==="explore"  && <ExploreView currentModelId={modelId} onSelectModel={id=>{setModelId(id);setTab("home");}}/>}
         {tab==="account" && <AccountView/>}
 
