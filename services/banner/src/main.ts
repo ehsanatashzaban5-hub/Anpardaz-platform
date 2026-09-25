@@ -120,7 +120,7 @@ async function registerPrivate(app:FastifyInstance){
   app.get('/api/v1/banner/conversations/:id',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
     const r=await pool.query('SELECT * FROM banner_inquiries WHERE id=$1 AND (buyer_identity_id=$2 OR seller_identity_id=$2)',[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'conversation_not_found'});
-    const m=await pool.query('SELECT id::text message_id,sender_identity_id,body,created_at FROM banner_inquiry_messages WHERE inquiry_id=$1 ORDER BY created_at',[id]);
+    const m=await pool.query('SELECT id::text message_id,sender_identity_id,body,message_type,media_mime,offer_amount,created_at FROM banner_inquiry_messages WHERE inquiry_id=$1 ORDER BY created_at',[id]);
     return{conversation:r.rows[0],messages:m.rows};
   });
   app.post('/api/v1/banner/conversations',{preHandler:requireAuth},async(req,reply)=>{
@@ -133,10 +133,10 @@ async function registerPrivate(app:FastifyInstance){
     await activity(a.sub,'conversation_created','inquiry',String(r.rows[0].id),{listingId:id});return reply.code(201).send({conversationId:String(r.rows[0].id),inquiry:r.rows[0]});
   });
   app.post('/api/v1/banner/conversations/:id/messages',{preHandler:requireAuth},async(req,reply)=>{
-    const a=auth(req),id=idParam((req.params as any).id),body=clean((req.body as any)?.message,2000);if(!id||!body)return reply.code(400).send({error:'invalid_message'});
+    const a=auth(req),id=idParam((req.params as any).id),b=(req.body??{}) as any,body=clean(b.message,2000),type=['text','image','offer','sticker','voice'].includes(b.type)?b.type:'text';if(!id||(type==='text'&&!body))return reply.code(400).send({error:'invalid_message'});
     const r=await pool.query('SELECT buyer_identity_id,seller_identity_id FROM banner_inquiries WHERE id=$1 AND (buyer_identity_id=$2 OR seller_identity_id=$2)',[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'conversation_not_found'});
     const recipient=r.rows[0].buyer_identity_id===a.sub?r.rows[0].seller_identity_id:r.rows[0].buyer_identity_id;
-    const m=await pool.query('INSERT INTO banner_inquiry_messages(inquiry_id,sender_identity_id,body) VALUES($1,$2,$3) RETURNING id::text message_id,sender_identity_id,body,created_at',[id,a.sub,body]);
+    const media=typeof b.mediaBase64==='string'&&b.mediaBase64?Buffer.from(b.mediaBase64,'base64'):null;if(media&&media.length>8*1024*1024)return reply.code(413).send({error:'media_too_large'});const m=await pool.query('INSERT INTO banner_inquiry_messages(inquiry_id,sender_identity_id,body,message_type,media_data,media_mime,offer_amount) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text message_id,sender_identity_id,body,message_type,media_mime,offer_amount,created_at',[id,a.sub,body,type,media,b.mediaMime??null,b.offerAmount??null]);
     await pool.query('UPDATE banner_inquiries SET status=\'replied\',updated_at=NOW() WHERE id=$1',[id]);
     await notify(recipient,'message','پیام جدید','در گفت‌وگوی آن بنر پیام جدیدی دارید');
     await activity(a.sub,'message_sent','inquiry',String(id));return reply.code(201).send({message:m.rows[0]});
