@@ -6633,7 +6633,8 @@ function AnMarketHome({onProduct,onCat,onGoCats,onSearch,compareMode,compareSele
   const highValue=[...MARKET_PRODUCTS].sort((a,b)=>b.reviews-a.reviews).slice(0,30);
   const mostReviewed=[...MARKET_PRODUCTS].sort((a,b)=>b.reviews-a.reviews).slice(5,35);
 
-  const TRENDING=["لپ‌تاپ ایسوس","گوشی سامسونگ","تلویزیون ۵۵ اینچ","هدفون بی‌سیم","یخچال سامسونگ","دوربین کانن","ایرپاد اپل","ربات جارو","ماشین ظرفشویی","تبلت سامسونگ","مانیتور گیمینگ","کفش اسپرت","ساعت هوشمند","دستبند فیتنس","کتری هوشمند"];
+  const [trending,setTrending]=useState<string[]>([]);
+  useEffect(()=>{let active=true;(async()=>{try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/trending?limit=15",{cache:"no-store"});if(!r.ok)return;const d=await r.json();const items=Array.isArray(d?.items)?d.items.map((x:any)=>String(x.query??"").trim()).filter(Boolean):[];if(active)setTrending(items);}catch{} })();return()=>{active=false};},[]);
 
   /* Auto-scroll ref for price-drop deals */
   const dealsScrollRef=useRef<HTMLDivElement>(null);
@@ -6721,7 +6722,7 @@ function AnMarketHome({onProduct,onCat,onGoCats,onSearch,compareMode,compareSele
         {/* Trending searches — infinite auto-scroll marquee */}
         <div className="am-marquee-wrap" style={{paddingBottom:2}}>
           <div className="am-marquee-track">
-            {[...TRENDING,...TRENDING].map((t,i)=>(
+            {[...trending,...trending].map((t,i)=>(
               <button key={i} onClick={()=>onSearch(t)} className="am-trending-pill" style={{flexShrink:0}}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2.5" strokeLinecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
                 {t}
