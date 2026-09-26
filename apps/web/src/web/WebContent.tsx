@@ -47,7 +47,7 @@ export type ContentSection = "news" | "education" | "video";
 interface Props { section: ContentSection; onNavigate: (p: WebPage) => void; }
 
 export default function WebContent({ section, onNavigate }: Props) {
-  const API=(import.meta.env.VITE_PLATFORM_API_URL??"").replace(/\\/$/,"");
+  const API=(import.meta.env.VITE_PLATFORM_API_URL??"").replace(/\/$/,"");
   const [liveNews,setLiveNews]=useState<any[]>([]);
   const [liveVideos,setLiveVideos]=useState<any[]>([]);
   const [loadingLive,setLoadingLive]=useState(true);
