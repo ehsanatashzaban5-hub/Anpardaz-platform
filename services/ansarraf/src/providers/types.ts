@@ -31,6 +31,10 @@ export type ProviderWithdrawalRequest={
   clientWithdrawalId:string;
 };
 
+export type ProviderDepositEvent={providerEventId:string;asset:string;network:string|null;amount:string;address:string|null;memo:string|null;txHash:string|null;confirmations:number;requiredConfirmations:number;status:string;raw:any};
+
+export type ProviderDepositAddress={asset:string;network:string;address:string;memo:string|null;raw:any};
+
 export type ProviderWithdrawalResult={
   providerWithdrawalId:string|null;
   status:'PROCESSING'|'COMPLETED'|'FAILED'|'UNKNOWN';
@@ -49,4 +53,6 @@ export interface LiquidityProviderAdapter{
   cancelOrder(clientOrderId:string,providerOrderId?:string|null):Promise<ProviderOrderResult>;
   submitWithdrawal(request:ProviderWithdrawalRequest):Promise<ProviderWithdrawalResult>;
   getWithdrawal(providerWithdrawalId:string):Promise<ProviderWithdrawalResult>;
+  getDepositAddress(asset:string,network:string):Promise<ProviderDepositAddress>;
+  listDeposits(page?:number,perPage?:number):Promise<ProviderDepositEvent[]>;
 }
