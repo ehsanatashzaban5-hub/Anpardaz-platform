@@ -6046,7 +6046,7 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
   const [pinModal,setPinModal]=useState<null|"enable"|"change"|"disable">(null);
   const [pinStep,setPinStep]=useState<"enter-current"|"enter-new"|"confirm-new">("enter-current");
   const [pinInput,setPinInput]=useState("");
-  const [pinNew,setPinNew]=useState("");
+  const [pinNew,setPinNew]=useState("");\n  const [pinCurrent,setPinCurrent]=useState("");
   const [pinError,setPinError]=useState("");\n  const [pinEnabled,setPinEnabled]=useState(false);\n  const [verifiedProfile,setVerifiedProfile]=useState<{fullName:string;nationalId:string;mobile:string;birthDate:string|null;verifiedAt:string|null}|null>(null);\n  const [deletingCard,setDeletingCard]=useState<string|null>(null);
   const handlePinOpen=(mode:"enable"|"change"|"disable")=>{setPinModal(mode);setPinStep(mode==="enable"?"enter-new":"enter-current");setPinInput("");setPinNew("");setPinError("");};
   const handlePinDigit=(d:string)=>{if(pinInput.length<4)setPinInput(p=>{const next=p+d;
@@ -6068,7 +6068,7 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
           else if(pinStep==="confirm-new"){
             if(next===pinNew){
               try{
-                await userSettingsRequest("/api/v1/user/settings/pin/change",{method:"POST",body:JSON.stringify({currentPin:user.pin,newPin:pinNew})});
+                await userSettingsRequest("/api/v1/user/settings/pin/change",{method:"POST",body:JSON.stringify({currentPin:pinCurrent,newPin:pinNew})});
                 onUpdate({...user,pin:pinNew});DB.saveUser({...user,pin:pinNew});setPinModal(null);
               }catch{setPinError("رمز فعلی یا رمز جدید معتبر نیست.");setPinInput("");}
             }else{setPinError("رمزها یکسان نیستند.");setPinStep("enter-new");setPinNew("");setPinInput("");}
