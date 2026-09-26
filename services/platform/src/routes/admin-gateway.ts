@@ -180,6 +180,15 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
+  app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/withdrawals/:id/complete-toman', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/withdrawals/' + encodeURIComponent(request.params.id) + '/complete-toman', {
+      method: 'POST', headers: forwardUser(request), body: JSON.stringify(request.body ?? {}),
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
   app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/withdrawals/:id/reconcile', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'reconciliation.write'))) return reply.code(403).send({ error: 'forbidden' });
