@@ -14,6 +14,25 @@ const allowed=new Set<string>([
   'tehran_traffic','sana','judiciary_bill','property_registration','cashback',
 ]);
 
+
+async function ledgerAccount(base:string,token:string,code:string,name:string,type:'asset'|'liability',currency:string){
+  const headers={authorization:'Bearer '+token};
+  let r=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers,signal:AbortSignal.timeout(8000)});
+  if(r.ok)return Number((await r.json() as any).account.id);
+  if(r.status!==404)throw new Error('account_lookup_failed');
+  r=await fetch(base+'/internal/v1/ledger/accounts',{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify({accountCode:code,accountName:name,accountType:type,currency}),signal:AbortSignal.timeout(8000)});
+  if(r.ok)return Number((await r.json() as any).account.id);
+  if(r.status===409){r=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers,signal:AbortSignal.timeout(8000)});if(r.ok)return Number((await r.json() as any).account.id);}
+  throw new Error('account_create_failed');
+}
+async function postServiceAccounting(customerId:number,operationId:string,amount:string,currency:string){
+  const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!base||!token)throw new Error('accounting_service_not_configured');
+  const provider=await ledgerAccount(base,token,'anpardaz.provider.FINTECH.asset.'+currency,'An Pardaz fintech provider '+currency,'asset',currency);
+  const customer=await ledgerAccount(base,token,'anpardaz.customer.'+customerId+'.liability.'+currency,'An Pardaz customer '+customerId+' '+currency,'liability',currency);
+  const r=await fetch(base+'/internal/v1/ledger/transactions',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({referenceType:'anpardaz_service',referenceId:operationId,operationId,idempotencyKey:'anpardaz:service:'+operationId,description:'An Pardaz fintech service settlement',entries:[{accountId:customer,direction:'debit',amount,currency},{accountId:provider,direction:'credit',amount,currency}]}),signal:AbortSignal.timeout(10000)});
+  if(!r.ok)throw new Error('accounting_post_failed');
+}
+
 function providerOr503(reply:FastifyReply) {
   try { return new FintechProvider(); }
   catch { void reply.code(503).send({error:'fintech_provider_not_configured'}); return null; }
@@ -87,15 +106,23 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
     const provider=providerOr503(reply);if(!provider)return;
     await pool.query("UPDATE fintech_service_operations SET status='processing',provider_code='fintech',updated_at=NOW() WHERE operation_id=$1",[operationId]);
     const result=await provider.execute({serviceCode,operationId,payload});
-    const status=result.status;
+    let status=result.status;
+    let accountingStatus='pending';
+    if(status==='completed'){
+      const rawAmount=(result.data as any)?.amount??(result.data as any)?.amountPaid??payload.amount;
+      const amount=typeof rawAmount==='number'?String(rawAmount):typeof rawAmount==='string'&&/^(?:0|[1-9]\d{0,15})(?:\.\d{1,8})?$/.test(rawAmount)?rawAmount:null;
+      if(!amount||amount==='0'){status='manual_review';accountingStatus='failed';}
+      else{try{await postServiceAccounting(customerId,operationId,amount,'IRR');accountingStatus='posted';}catch(e){status='manual_review';accountingStatus='failed';}}
+    }else if(status==='failed'||status==='manual_review')accountingStatus='failed';
+    else accountingStatus='pending';
     const updated=(await pool.query(
       `UPDATE fintech_service_operations
        SET status=$1,provider_operation_id=COALESCE($2,provider_operation_id),
            external_reference=COALESCE($3,external_reference),
-           failure_code=$4,failure_message=$5,response_metadata=$6,updated_at=NOW(),
+           failure_code=$4,failure_message=$5,response_metadata=$6,accounting_status=$7,updated_at=NOW(),
            completed_at=CASE WHEN $1='completed' THEN NOW() ELSE completed_at END
-       WHERE operation_id=$7 RETURNING *`,
-      [status,result.providerOperationId??null,result.externalReference??null,result.errorCode??null,result.errorMessage??null,JSON.stringify(result.data??{}),operationId],
+       WHERE operation_id=$8 RETURNING *`,
+      [status,result.providerOperationId??null,result.externalReference??null,result.errorCode??null,status==='manual_review'&&accountingStatus==='failed'?'ACCOUNTING_REQUIRED':result.errorMessage??null,JSON.stringify(result.data??{}),accountingStatus,operationId],
     )).rows[0];
     return {operation:updated};
   });
