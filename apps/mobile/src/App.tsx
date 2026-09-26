@@ -9622,7 +9622,9 @@ export default function App() {
   const [obLegalAccepted,setObLegalAccepted]=useState(false);
 
   if(appState==="splash")return <SplashScreen/>;
-  if(appState==="login")return <PhoneLogin onSend={(p)=>{setPendingPhone(p);setAppState("otp")}}/>;\n  if(appState==="otp")return <OTPVerify phone={pendingPhone} onVerified={handleVerified} onBack={()=>setAppState("login")}/>;\n  if(appState==="onboard-photo")return <OnboardPhoto onDone={p=>{setObPhoto(p);setObLegalAccepted(true);setAppState("onboard-profile")}} onBack={()=>setAppState("otp")} initialAccepted={obLegalAccepted}/>;
+  if(appState==="login")return <PhoneLogin onSend={(p)=>{setPendingPhone(p);setAppState("otp")}}/>;
+  if(appState==="otp")return <OTPVerify phone={pendingPhone} onVerified={handleVerified} onBack={()=>setAppState("login")}/>;
+  if(appState==="onboard-photo")return <OnboardPhoto onDone={p=>{setObPhoto(p);setObLegalAccepted(true);setAppState("onboard-profile")}} onBack={()=>setAppState("otp")} initialAccepted={obLegalAccepted}/>;
   if(appState==="onboard-profile")return <OnboardProfile onDone={d=>{setObProfile(d);setAppState("onboard-pin")}} onBack={()=>setAppState("onboard-photo")} initialData={obProfile}/>;
   if(appState==="unlock-pin"&&user)return <PinUnlock user={user} onVerified={()=>setAppState("ready")}/>;
   if(appState==="onboard-pin")return <OnboardPin onDone={pin=>{setPendingPin(pin);setAppState("verify-anim")}} onSkip={()=>{setPendingPin("");setAppState("verify-anim")}} onBack={()=>setAppState("onboard-profile")}/>;
