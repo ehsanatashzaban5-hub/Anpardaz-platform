@@ -3085,6 +3085,7 @@ function CarServicesScreen({onBack}:{onBack:()=>void}){
         <div style={{background:`${s.statusColor}25`,borderRadius:8,padding:"4px 10px",fontSize:11,color:s.statusColor,marginLeft:8,flexShrink:0}}>{s.status}</div>
         <Icon name="arrow" size={16}/>
       </button>)}
+      {!loading&&orgs.length===0&&<div style={{padding:16,textAlign:"center",color:"var(--text-muted)"}}>فهرست سازمان‌های خیریه از سرویس مربوطه در دسترس نیست.</div>}
       <div style={{marginTop:8}}>
         <div style={{textAlign:"center"}}><button style={{background:"none",border:"none",color:"#00D6B0",fontSize:12,cursor:"pointer",fontFamily:"Vazirmatn"}}>مدیریت پلاک‌ها ←</button></div>
       </div>
@@ -3372,23 +3373,16 @@ function CharityLogo({id}:{id:string}){
 
 // ─── Charity Screen ───────────────────────────────────────────────────────────
 function CharityScreen({onBack,onGoToPayment}:{onBack:()=>void;onGoToPayment:(data:{orgId:string;orgName:string;amount:string})=>void}){
-  const [selected,setSelected]=useState<string|null>(null);const [amount,setAmount]=useState("");const [errModal,setErrModal]=useState("");
+  const [selected,setSelected]=useState<string|null>(null);const [amount,setAmount]=useState("");const [errModal,setErrModal]=useState("");const [orgs,setOrgs]=useState<any[]>([]);const [presets,setPresets]=useState<string[]>([]);const [loading,setLoading]=useState(true);
   const charityAmt=parseInt(toLatinDigits(amount).replace(/\D/g,""))||0;
-  const orgs=[
-    {id:"red-crescent",name:"هلال احمر",desc:"کمک به آسیب‌دیدگان حوادث"},
-    {id:"komite",name:"کمیته امداد امام خمینی",desc:"حمایت از نیازمندان"},
-    {id:"children",name:"انجمن حمایت از کودکان",desc:"کمک به کودکان بی‌سرپرست"},
-    {id:"environment",name:"سازمان محیط زیست",desc:"کمک به حفظ طبیعت"},
-    {id:"barekat",name:"بنیاد برکت",desc:"توانمندسازی محرومان"},
-  ];
-  const presets=["۱۰,۰۰۰ ریال","۵۰,۰۰۰ ریال","۱۰۰,۰۰۰ ریال","۵۰۰,۰۰۰ ریال"];
+  useEffect(()=>{let active=true;(async()=>{try{const r=await fetchLiveServiceCatalog("charity","charity","");const raw=await fetch(ANPARDAZ_API_BASE+"/api/v1/services/catalog?serviceCode=charity&operator=charity",{headers:{authorization:"Bearer "+(localStorage.getItem("anpardaz:accessToken")??"")},cache:"no-store"});const d=await raw.json();if(!raw.ok)throw new Error();const items=Array.isArray(d?.items)?d.items:[];const ps=Array.isArray(d?.presets)?d.presets.map((x:any)=>String(x)):[];if(active){setOrgs(items.map((x:any)=>({id:String(x.id??x.code),name:String(x.name??x.title??""),desc:String(x.desc??x.description??"")})).filter((x:any)=>x.id&&x.name));setPresets(ps)}}catch{if(active){setOrgs([]);setPresets([])}}finally{if(active)setLoading(false)}})();return()=>{active=false}},[]);
   const donate=()=>{if(!selected){setErrModal("لطفاً یک سازمان خیریه انتخاب کنید.");return}if(!amount){setErrModal("مبلغ کمک را انتخاب یا وارد کنید.");return}onGoToPayment({orgId:selected!,orgName:orgs.find(o=>o.id===selected)!.name,amount})};
   return <>
   <div className="subscreen" dir="rtl">
     <div className="subscreen-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">نیکوکاری</h2><div style={{width:36}}/></div>
     <div className="subscreen-body" style={{overflowY:"auto"}}>
       <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)",marginBottom:12}}>انتخاب سازمان خیریه</div>
-      {orgs.map(org=><button key={org.id} onClick={()=>setSelected(selected===org.id?null:org.id)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:selected===org.id?"rgba(0,214,176,0.08)":"var(--card-bg)",border:`1px solid ${selected===org.id?"#00D6B0":"var(--border-color)"}`,borderRadius:14,padding:"12px 14px",marginBottom:8,cursor:"pointer",color:"var(--text-primary)",textAlign:"right",transition:"all 0.2s",boxShadow:selected===org.id?"0 0 16px rgba(0,214,176,0.2)":"none"}}>
+      {loading?<div style={{padding:24,textAlign:"center",color:"var(--text-muted)"}}>در حال دریافت فهرست واقعی سازمان‌ها...</div>:orgs.map(org=><button key={org.id} onClick={()=>setSelected(selected===org.id?null:org.id)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",background:selected===org.id?"rgba(0,214,176,0.08)":"var(--card-bg)",border:`1px solid ${selected===org.id?"#00D6B0":"var(--border-color)"}`,borderRadius:14,padding:"12px 14px",marginBottom:8,cursor:"pointer",color:"var(--text-primary)",textAlign:"right",transition:"all 0.2s",boxShadow:selected===org.id?"0 0 16px rgba(0,214,176,0.2)":"none"}}>
         <div style={{flexShrink:0,borderRadius:12,overflow:"hidden",width:48,height:48}}><CharityLogo id={org.id}/></div>
         <div style={{flex:1}}>
           <div style={{fontSize:13,fontWeight:700,color:"var(--text-primary)"}}>{org.name}</div>
