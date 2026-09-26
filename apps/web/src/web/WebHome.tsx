@@ -45,7 +45,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
       fetch(API+"/api/v1/news?limit=3&category=education",{cache:"no-store"}).then(r=>r.ok?r.json():{items:[]}),
       fetch(API+"/api/v1/content/videos?limit=4",{cache:"no-store"}).then(r=>r.ok?r.json():{videos:[]}),
       fetch((((import.meta.env as any).VITE_ANSARRAF_API_URL??"") as string).replace(/\/$/,"")+"/api/v1/market-data/quotes",{cache:"no-store"}).then(r=>r.ok?r.json():{quotes:[]})
-    ]).then(([n,e,v,q])=>{if(!active)return;setNews(n.items??[]);setEducation(e.items??[]);setVideos(v.videos??[]);setAssets(q.quotes??q.items??[])}).catch(()=>{});
+    ]).then(([n,e,v,q])=>{if(!active)return;setNews(n.items??[]);setEducation(e.items??[]);setVideos(v.videos??[]);setAssets((q.quotes??q.items??[]).map((x:any)=>({id:String(x.symbol),symbol:String(x.base_asset??x.symbol??"—"),name:String(x.base_asset??x.symbol??"—"),nameFa:String(x.base_asset??x.symbol??"—"),price:Number(x.last_price??0),change24h:Number(x.change24h??0),volume24h:Number(x.volume_24h??0),marketCap:0,logoColor:"#0891b2"})))}).catch(()=>{});
     return()=>{active=false};
   },[API]);
   return (
