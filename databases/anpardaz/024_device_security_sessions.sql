@@ -6,3 +6,7 @@ CREATE TABLE IF NOT EXISTS device_security_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_device_security_sessions_customer
   ON device_security_sessions(customer_id);
+
+INSERT INTO schema_migrations(version)
+VALUES ('024_device_security_sessions')
+ON CONFLICT(version) DO NOTHING;
