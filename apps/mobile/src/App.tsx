@@ -269,8 +269,6 @@ function normalizeIranianPhone(tel:string):string{
 }
 const fa=(v:number|string)=>new Intl.NumberFormat("fa-IR").format(Number(v));
 const faFixed=(v:number,d=4)=>new Intl.NumberFormat("fa-IR",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
-function genId(){return"TX"+Date.now().toString(36).toUpperCase()}
-
 // ─── Mobile Back-Button Stack ──────────────────────────────────────────────────
 // Screens push a handler when mounted; the topmost handler wins on back-press.
 
@@ -1530,7 +1528,7 @@ function TransferScreen({user,onUpdate,transactions,onBack,onDone}:{user:UserDat
     setStep2Err("");setProcessing(true);
     anpardazTransfer(destClean,amountNum,"IRR",note).then((result)=>{
       const tr=result?.transfer;const status=String(tr?.status??"processing");
-      const tx:TxRecord={id:String(tr?.id??tr?.operation_id??genId()),userId:user.phone,type:"transfer",fromAsset:"toman",toAsset:"toman",amount:amountNum,fee:0,status:status==="completed"?"done":status==="failed"?"failed":"pending",createdAt:String(tr?.created_at??new Date().toISOString()),toAddress:destClean,fromCard:srcCard.id,note:`${srcCard.bank||""} · ${note||"انتقال وجه"} · ${srcCard.number.slice(-4)}`,source:"app"};
+      const tx:TxRecord={id:String(tr?.id??tr?.operation_id??""),userId:user.phone,type:"transfer",fromAsset:"toman",toAsset:"toman",amount:amountNum,fee:0,status:status==="completed"?"done":status==="failed"?"failed":"pending",createdAt:String(tr?.created_at??new Date().toISOString()),toAddress:destClean,fromCard:srcCard.id,note:`${srcCard.bank||""} · ${note||"انتقال وجه"} · ${srcCard.number.slice(-4)}`,source:"app"};
       onUpdate(user,tx);playChime();setProcessing(false);
       setReceipt({title:status==="completed"?"انتقال با موفقیت انجام شد":status==="failed"?"انتقال ناموفق بود":"انتقال در حال پردازش است",amount:`${fa(amountNum)} ریال`,destination:toFaDigits(fmtCard(destClean)),status:status==="completed"?"success":status==="failed"?"failed":"pending",detail:`کد عملیات: ${String(tr?.operation_id??result?.operationId??"—")}`});
     }).catch((e)=>{setProcessing(false);setStep2Err(e instanceof Error?e.message:"انتقال وجه انجام نشد")});
