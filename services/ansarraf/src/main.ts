@@ -14,10 +14,11 @@ import { ProviderExecutionWorker } from './provider-execution-worker.js';
 import { ProviderWithdrawalWorker } from './provider-withdrawal-worker.js';
 import { ProviderReconciliationWorker } from './provider-reconciliation.js';
 import { validateAnSarrafProductionConfig } from './production-config.js';
+import { registerManualFundingAdminRoutes } from './routes/manual-funding-admin.js';
 
 const isProduction=process.env.NODE_ENV==='production';
 validateAnSarrafProductionConfig(process.env);
-const requiredProduction=['DATABASE_URL','CORS_ORIGIN','IDENTITY_SERVICE_URL','IDENTITY_ISSUER','IDENTITY_PUBLIC_KEY_B64','ANSARRAF_INTERNAL_TOKEN','ACCOUNTING_SERVICE_URL','ACCOUNTING_INTERNAL_TOKEN'];
+const requiredProduction=['DATABASE_URL','CORS_ORIGIN','IDENTITY_SERVICE_URL','IDENTITY_ISSUER','IDENTITY_PUBLIC_KEY_B64','ANSARRAF_INTERNAL_TOKEN','ACCOUNTING_SERVICE_URL','ACCOUNTING_INTERNAL_TOKEN','ANPARDAZ_SERVICE_URL','ANPARDAZ_INTERNAL_TOKEN'];
 if(isProduction){
   for(const name of requiredProduction){
     const value=process.env[name];
@@ -70,6 +71,7 @@ if(pool){
   registerSettlementRoutes(app,pool);
   registerMatchingRoutes(app,pool);
   registerInternalAdminRoutes(app,pool);
+  registerManualFundingAdminRoutes(app,pool);
   registerKycRoutes(app,pool);
   app.get('/api/v1/auth/me',{preHandler:requireAuth},async(request)=>{
     const auth=(request as typeof request&{auth:any}).auth;
