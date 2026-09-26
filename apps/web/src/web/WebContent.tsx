@@ -10,11 +10,12 @@ const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶
 const fmtDur = (s: number) => `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
 
 const NEWS_CATS = [
-  { id:"all",          label:"همه اخبار",       icon:"newspaper" },
-  { id:"crypto-news",  label:"ارزهای دیجیتال",  icon:"zap" },
-  { id:"ai-news",      label:"هوش مصنوعی",      icon:"cpu" },
-  { id:"tech-news",    label:"تکنولوژی",         icon:"monitor" },
-  { id:"product-news", label:"محصولات جدید",     icon:"package" },
+  { id:"all",          label:"همه اخبار ایران",   icon:"newspaper" },
+  { id:"iran-news",    label:"اخبار ایران",       icon:"map-pin" },
+  { id:"crypto-news",  label:"ارزهای دیجیتال",    icon:"zap" },
+  { id:"ai-news",      label:"هوش مصنوعی",        icon:"cpu" },
+  { id:"tech-news",    label:"تکنولوژی",          icon:"monitor" },
+  { id:"product-news", label:"محصولات جدید",      icon:"package" },
 ];
 
 const EDU_CATS = [
