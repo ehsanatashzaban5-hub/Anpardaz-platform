@@ -76,15 +76,21 @@ export async function submitKyc(pool:Pool,customerId:KycCustomerId,input:unknown
   id=String(q.rows[0]?.id);
   await pool.query("UPDATE kyc_profiles SET status='PROVIDER_CHECKING',submitted_data_encrypted=$2,submitted_data_hash=$3,submitted_at=NOW(),updated_at=NOW(),admin_id=NULL,admin_decision_reason=NULL,rejected_at=NULL WHERE id=$1",[id,encrypt(data),digest(data)]);
   await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,actor_id,action,previous_status,new_status,operation_id) VALUES($1,'customer',$2,'SUBMITTED',$3,'PROVIDER_CHECKING',$4)",[id,actorId,q.rows[0]?.status??'DRAFT',operationId??null]);
-  try{
-    const p=await providerCheck(data);
-    const next=p.status==='verified'&&p.identityMatch&&p.mobileMatch?'ADMIN_REVIEW':p.status==='rejected'?'PROVIDER_REJECTED':'REQUIRES_ACTION';
-    await pool.query('UPDATE kyc_profiles SET status=$2,provider_code=$3,provider_reference=$4,provider_identity_match=$5,provider_mobile_match=$6,provider_status=$7,provider_checked_at=NOW(),updated_at=NOW() WHERE id=$1',[id,next,process.env.KYC_PROVIDER_CODE,p.reference,p.identityMatch,p.mobileMatch,p.status]);
-    await pool.query("INSERT INTO kyc_provider_events(kyc_profile_id,provider_code,provider_reference,event_type,identity_match,mobile_match,provider_status,error_code) VALUES($1,$2,$3,'IDENTITY_MATCH_RESULT',$4,$5,$6,$7)",[id,process.env.KYC_PROVIDER_CODE,p.reference,p.identityMatch,p.mobileMatch,p.status,p.statusCode]);
-    await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,previous_status,new_status,provider_reference) VALUES($1,'provider','PROVIDER_RESULT','PROVIDER_CHECKING',$2,$3)",[id,next,p.reference]);
-  }catch(e){
-    await pool.query("UPDATE kyc_profiles SET status='REQUIRES_ACTION',provider_status='error',updated_at=NOW() WHERE id=$1",[id]);
-    await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,previous_status,new_status,reason) VALUES($1,'system','PROVIDER_ERROR','PROVIDER_CHECKING','REQUIRES_ACTION',$2)",[id,e instanceof Error?e.message:'provider_error']);
+  const providerConfigured=Boolean(process.env.KYC_PROVIDER_URL&&process.env.KYC_PROVIDER_CODE&&process.env.KYC_PROVIDER_API_KEY);
+  if(!providerConfigured){
+    await pool.query("UPDATE kyc_profiles SET status='ADMIN_REVIEW',provider_status='manual_review',updated_at=NOW() WHERE id=$1",[id]);
+    await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,previous_status,new_status,reason) VALUES($1,'system','MANUAL_KYC_REVIEW','PROVIDER_CHECKING','ADMIN_REVIEW',$2)",[id,'No external KYC provider configured; routed to manual admin review']);
+  }else{
+    try{
+      const p=await providerCheck(data);
+      const next=p.status==='verified'&&p.identityMatch&&p.mobileMatch?'ADMIN_REVIEW':p.status==='rejected'?'PROVIDER_REJECTED':'REQUIRES_ACTION';
+      await pool.query('UPDATE kyc_profiles SET status=$2,provider_code=$3,provider_reference=$4,provider_identity_match=$5,provider_mobile_match=$6,provider_status=$7,provider_checked_at=NOW(),updated_at=NOW() WHERE id=$1',[id,next,process.env.KYC_PROVIDER_CODE,p.reference,p.identityMatch,p.mobileMatch,p.status]);
+      await pool.query("INSERT INTO kyc_provider_events(kyc_profile_id,provider_code,provider_reference,event_type,identity_match,mobile_match,provider_status,error_code) VALUES($1,$2,$3,'IDENTITY_MATCH_RESULT',$4,$5,$6,$7)",[id,process.env.KYC_PROVIDER_CODE,p.reference,p.identityMatch,p.mobileMatch,p.status,p.statusCode]);
+      await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,previous_status,new_status,provider_reference) VALUES($1,'provider','PROVIDER_RESULT','PROVIDER_CHECKING',$2,$3)",[id,next,p.reference]);
+    }catch(e){
+      await pool.query("UPDATE kyc_profiles SET status='REQUIRES_ACTION',provider_status='error',updated_at=NOW() WHERE id=$1",[id]);
+      await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,action,previous_status,new_status,reason) VALUES($1,'system','PROVIDER_ERROR','PROVIDER_CHECKING','REQUIRES_ACTION',$2)",[id,e instanceof Error?e.message:'provider_error']);
+    }
   }
   return getKycById(pool,id,false);
 }
