@@ -140,6 +140,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
    const kyc=await ensureKycRequired(pool,customer);if(!kyc.allowed)return reply.code(403).send({error:'kyc_required',kycStatus:kyc.status});
    const asset=(await pool.query("SELECT id,symbol,asset_type FROM assets WHERE id=$1 AND status='active'",[b.assetId])).rows[0];
    if(!asset)return reply.code(400).send({error:'asset_not_available'});
+   if(asset.asset_type!=='fiat')return reply.code(400).send({error:'crypto_deposit_must_use_wallex_provider_flow'});
    let sourceCardId:number|null=null;
    if(asset.asset_type==='fiat'){
      sourceCardId=Number.isSafeInteger(Number(b.sourceCardId))?Number(b.sourceCardId):0;
