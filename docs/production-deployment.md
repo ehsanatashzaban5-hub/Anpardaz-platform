@@ -32,7 +32,7 @@ Production is split into four independently deployable service groups:
 
 For each VPS, copy its matching `*.env.example` to an environment-only file, replace all placeholders, build the service image and start its compose file.
 
-Run database migrations from the corresponding database host/network before enabling authenticated traffic. The migration runner is idempotent and applies migrations in filename order.
+Run database migrations from the corresponding database host/network before enabling authenticated traffic. Ensure the platform migration `073_phone_otp_auth` is applied before enabling phone login. The migration runner is idempotent and applies migrations in filename order.
 
 ## Secrets
 
@@ -43,6 +43,9 @@ Generate unique high-entropy secrets per environment. Never use repository place
 - Accounting internal service credential
 - Database passwords
 - Any external provider credentials
+- Phone OTP provider credentials (`PHONE_OTP_ENABLED`, `OTP_HASH_SECRET`, Kavenegar API key/sender)
+- An Pardaz accounting service URL/token
+- An Sarraf KYC encryption key; if no external KYC provider is available, explicitly enable `KYC_MANUAL_REVIEW_ENABLED=true`
 
 Do not store production secrets in GitHub source files. Use the VPS secret manager or protected environment configuration.
 
@@ -56,6 +59,9 @@ After deployment verify:
 - Authentication registration/login works only over HTTPS.
 - Public traffic cannot reach PostgreSQL or internal backend ports directly.
 - Accounting transaction creation is idempotent and rejects invalid decimal amounts, mixed currencies and unbalanced journals.
+- An Pardaz banking-provider outbox worker is running and no transfer/top-up can remain silently stuck without a retry/manual-review outcome.
+- Main-platform support tickets are visible and replyable from the admin panel.
+- No production UI is allowed to synthesize financial balances, transaction receipts, market quotes or provider success states.
 - A posted accounting transaction cannot be edited or deleted; a reversal creates a new balanced transaction.
 - Community moderation actions are authenticated, permission-checked and audited.
 
