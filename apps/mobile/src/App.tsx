@@ -1940,6 +1940,8 @@ function MciPrepaidInternetScreen({phone,simType,onBack,onGoToPayment}:{phone:st
 type RightelPkg={id:string;name:string;dur:string;durFilter:string;type:"internet"|"call"|"sms"|"roaming"|"combo";price:string;desc?:string;badge?:"recent"|"special"};
 const _RT_SPECIAL:RightelPkg[]=[];
 const _RT_PKGS:RightelPkg[]=[];
+const _RT_POST_SPECIAL:RightelPkg[]=[];
+const _RT_POST_PKGS:RightelPkg[]=[];
 const _RT_POST_DUR_FILTERS=["روزانه","هفتگی","سه روزه","پانزده روزه","ماهانه","دو ماهه","سه ماهه","شش ماهه","یک ساله"];
 const _RT_POST_TYPE_OPTS:[string,string,string][]=[["internet","اینترنت","📶"],["call","مکالمه","📞"],["sms","پیامک","💬"],["combo","ترکیبی","📦"],["roaming","رومینگ","🌍"]];
 
@@ -1947,13 +1949,12 @@ function RightelPostpaidInternetScreen({phone,onBack,onGoToPayment}:{phone:strin
   const [durFilter,setDurFilter]=useState<string|null>(null);
   const [typeFilter,setTypeFilter]=useState<string|null>(null);
   const [sortBy,setSortBy]=useState<string|null>(null);
-  const [loading,setLoading]=useState(true);
+  const {items:livePkgs,loading}=useLiveServiceCatalog("rightel","postpaid");
   const [showSort,setShowSort]=useState(false);
   const [showType,setShowType]=useState(false);
   const [selId,setSelId]=useState<string|null>(null);
-  useEffect(()=>{const t=setTimeout(()=>setLoading(false),900);return()=>clearTimeout(t);},[]);
 
-  const filtered=[..._RT_POST_PKGS].filter(p=>{
+  const filtered=[...livePkgs].filter(p=>{
     if(durFilter&&p.durFilter!==durFilter)return false;
     if(typeFilter&&p.type!==typeFilter)return false;
     return true;
@@ -1966,7 +1967,7 @@ function RightelPostpaidInternetScreen({phone,onBack,onGoToPayment}:{phone:strin
     return 0;
   });
   const showSpecial=!durFilter&&!typeFilter;
-  const selPkg=[..._RT_POST_PKGS,..._RT_POST_SPECIAL].find(p=>p.id===selId)??null;
+  const selPkg=livePkgs.find(p=>p.id===selId)??null;
 
   const typeLabels:{[k:string]:string}={internet:"اینترنت",call:"مکالمه",sms:"پیامک",roaming:"رومینگ",combo:"ترکیبی"};
   const typeColors:{[k:string]:[string,string]}={internet:["rgba(0,214,176,0.12)","rgba(0,214,176,0.75)"],call:["rgba(160,100,255,0.12)","rgba(180,140,255,0.85)"],sms:["rgba(250,180,50,0.12)","rgba(250,180,50,0.9)"],combo:["rgba(100,200,120,0.12)","rgba(120,220,140,0.85)"],roaming:["rgba(100,160,255,0.12)","rgba(100,200,255,0.85)"]};
