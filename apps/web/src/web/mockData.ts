@@ -1,162 +1,17 @@
-// ─────────────────────────────────────────────────
-// An Pardaz Web Portal — Mock / Seed Data
-// ALL structures are API-ready.
-// Replace with real fetch() / service calls without
-// touching component code.
-// ─────────────────────────────────────────────────
-import type {
-  Article, Video, Product, BannerAd, BannerCategory,
-  AiModel, AiProvider, Chat, AiProject,
-  FooterConfig, Author, Seller,
-} from "./types";
+import type { FooterConfig } from "./types";
 
-// ── Footer / contact ──────────────────────────────
 export const FOOTER_CONFIG: FooterConfig = {
-  website:"https://anpardaz.ir", phone:"021-00000000",
-  email:"info@anpardaz.ir", address:"تهران، شرکت دیار آتیه گشا",
-  telegram:"https://t.me/anpardaz", instagram:"https://instagram.com/anpardaz",
-  linkedin:"https://linkedin.com/company/anpardaz",
-  youtube:"https://youtube.com/@anpardaz", twitter:"https://x.com/anpardaz",
-  googlePlayUrl:"#", bazaarUrl:"#", myketUrl:"#", appStoreUrl:"#",
+  website: "https://anpardaz.ir",
+  phone: "",
+  email: "info@anpardaz.ir",
+  address: "",
+  telegram: "",
+  instagram: "",
+  linkedin: "",
+  youtube: "",
+  twitter: "",
+  googlePlayUrl: "",
+  bazaarUrl: "",
+  myketUrl: "",
+  appStoreUrl: "",
 };
-
-export const NEWS_ARTICLES: Article[] = [
-  { id:"n1", type:"news", category:"crypto-news",   title:"بیت‌کوین به مرز ۱۱۰ هزار دلار نزدیک شد", summary:"بیت‌کوین در بیست‌وچهار ساعت گذشته رشد ۲.۴ درصدی را ثبت کرد و به مرز ۱۰۸ هزار دلار رسید. تحلیلگران بازار از تداوم روند صعودی تا مرز ۱۱۰ هزار دلار خبر می‌دهند.", thumbnail:undefined, author:AUTHOR_DESK, publishedAt:"۱۴۰۳/۰۶/۱۵", readingTime:3, views:14820, likes:341, comments:28, shares:95, tags:["بیت‌کوین","بازار"], hashtags:["#bitcoin","#crypto"], seo:{title:"بیت‌کوین ۱۱۰ هزار دلار",description:"",keywords:["bitcoin","btc"],slug:"bitcoin-110k"}, status:"published" },
-  { id:"n2", type:"news", category:"ai-news",       title:"OpenAI مدل o3 را برای همه کاربران آزاد کرد", summary:"شرکت OpenAI اعلام کرد مدل استدلالی o3 از این پس برای تمام کاربران ChatGPT در دسترس است. این مدل عملکرد چشمگیری در حل مسائل ریاضی و برنامه‌نویسی دارد.", thumbnail:undefined, author:AUTHOR_DESK, publishedAt:"۱۴۰۳/۰۶/۱۴", readingTime:4, views:22100, likes:512, comments:67, shares:188, tags:["OpenAI","هوش مصنوعی"], hashtags:["#openai","#o3"], seo:{title:"OpenAI مدل o3",description:"",keywords:["openai","o3"],slug:"openai-o3-release"}, status:"published" },
-  { id:"n3", type:"news", category:"product-news",  title:"آن هوش نسخه ۲.۰ با پشتیبانی از ۲۲ مدل هوش مصنوعی منتشر شد", summary:"آن پرداز از نسخه جدید پلتفرم هوش مصنوعی خود با پشتیبانی از ۲۲ مدل پیشرفته رونمایی کرد. این نسخه شامل قابلیت‌های جدیدی مانند ساخت ویدیو، موسیقی و صداگذاری است.", thumbnail:undefined, author:AUTHOR_AP, publishedAt:"۱۴۰۳/۰۶/۱۵", readingTime:5, views:8940, likes:278, comments:44, shares:121, tags:["آن هوش","محصول"], hashtags:["#anhoosh","#anpardaz"], seo:{title:"آن هوش ۲.۰",description:"",keywords:["anhoosh"],slug:"anhoosh-v2"}, status:"published" },
-  { id:"n4", type:"news", category:"tech-news",     title:"اپل از پردازنده M5 Ultra با ۱۶۸ هسته گرافیکی رونمایی کرد", summary:"اپل در رویداد سالانه خود از قدرتمندترین پردازنده تاریخ مک‌بوک رونمایی کرد. پردازنده M5 Ultra با ۱۶۸ هسته گرافیکی و ۳۲ هسته پردازش عصبی ارائه می‌شود.", thumbnail:undefined, author:AUTHOR_DESK, publishedAt:"۱۴۰۳/۰۶/۱۳", readingTime:3, views:18300, likes:421, comments:55, shares:203, tags:["اپل","تکنولوژی"], hashtags:["#apple","#m5"], seo:{title:"اپل M5 Ultra",description:"",keywords:["apple","m5"],slug:"apple-m5-ultra"}, status:"published" },
-  { id:"n5", type:"news", category:"crypto-news",   title:"صندوق ETF اتریوم رکورد جدید جذب سرمایه را ثبت کرد", summary:"صندوق‌های ETF اتریوم در هفته گذشته بیش از ۲ میلیارد دلار سرمایه جذب کردند که بالاترین رقم هفتگی از زمان راه‌اندازی این صندوق‌هاست.", thumbnail:undefined, author:AUTHOR_DESK, publishedAt:"۱۴۰۳/۰۶/۱۲", readingTime:4, views:11200, likes:198, comments:31, shares:78, tags:["اتریوم","ETF"], hashtags:["#ethereum","#etf"], seo:{title:"ETF اتریوم رکورد",description:"",keywords:["ethereum","etf"],slug:"ethereum-etf-record"}, status:"published" },
-  { id:"n6", type:"news", category:"ai-news",       title:"Google Gemini 2.5 Pro کانتکست ۱ میلیون توکن دارد", summary:"گوگل نسخه نهایی Gemini 2.5 Pro را با پنجره کانتکست ۱ میلیون توکن و قابلیت‌های بهبودیافته تحلیل سند و تصویر معرفی کرد.", thumbnail:undefined, author:AUTHOR_DESK, publishedAt:"۱۴۰۳/۰۶/۱۱", readingTime:3, views:16800, likes:334, comments:48, shares:112, tags:["گوگل","جمینای"], hashtags:["#google","#gemini"], seo:{title:"Gemini 2.5 Pro",description:"",keywords:["google","gemini"],slug:"gemini-25-pro"}, status:"published" },
-  { id:"n7", type:"news", category:"crypto-news",   title:"سولانا در رقابت با اتریوم از مرز ۲۰۰ دلار گذشت", summary:"سولانا در ۲۴ ساعت گذشته بیش از ۵ درصد رشد کرد و از مرز ۲۰۰ دلار عبور کرد. حجم معاملات روزانه این شبکه نیز به بالاترین رقم ۶ ماه اخیر رسید.", thumbnail:undefined, author:AUTHOR_DESK, publishedAt:"۱۴۰۳/۰۶/۱۰", readingTime:3, views:9400, likes:214, comments:32, shares:74, tags:["سولانا","رقابت"], hashtags:["#solana","#sol"], seo:{title:"سولانا ۲۰۰ دلار",description:"",keywords:["solana","sol"],slug:"solana-200"}, status:"published" },
-  { id:"n8", type:"news", category:"tech-news",     title:"OpenAI محصول جدید GPT-5 با قابلیت‌های ویدیویی معرفی کرد", summary:"شرکت OpenAI از مدل جدید GPT-5 با پشتیبانی از ورودی و خروجی ویدیو، قابلیت‌های تصویرسازی و حافظه دائمی رونمایی کرد.", thumbnail:undefined, author:AUTHOR_DESK, publishedAt:"۱۴۰۳/۰۶/۰۹", readingTime:5, views:31200, likes:789, comments:124, shares:342, tags:["GPT-5","ویدیو"], hashtags:["#gpt5","#openai"], seo:{title:"GPT-5 معرفی",description:"",keywords:["gpt5"],slug:"gpt5-launch"}, status:"published" },
-];
-
-// ── Education articles ────────────────────────────
-export const EDU_ARTICLES: Article[] = [
-  { id:"e1", type:"education", category:"crypto-edu", level:"beginner",     title:"بیت‌کوین چیست؟ راهنمای جامع برای مبتدیان",           summary:"در این مقاله به زبان ساده توضیح می‌دهیم بیت‌کوین چیست، چگونه کار می‌کند و چرا مهم است.", thumbnail:undefined, author:AUTHOR_EDU, publishedAt:"۱۴۰۳/۰۵/۲۰", readingTime:8,  views:42100, likes:1240, comments:186, shares:543, tags:["بیت‌کوین","مبتدی"],   hashtags:["#bitcoin","#crypto101"], seo:{title:"بیت‌کوین چیست",description:"",keywords:["bitcoin"],slug:"what-is-bitcoin"}, status:"published" },
-  { id:"e2", type:"education", category:"ai-edu",     level:"beginner",     title:"هوش مصنوعی و یادگیری ماشین: تفاوت‌ها و کاربردها",   summary:"آشنایی با مفاهیم پایه هوش مصنوعی، یادگیری ماشین و یادگیری عمیق به زبان ساده.",           thumbnail:undefined, author:AUTHOR_EDU, publishedAt:"۱۴۰۳/۰۵/۱۸", readingTime:10, views:28400, likes:890,  comments:124, shares:312, tags:["هوش مصنوعی","آموزش"],  hashtags:["#ai","#machinelearning"], seo:{title:"هوش مصنوعی مبتدی",description:"",keywords:["ai","ml"],slug:"ai-beginners-guide"}, status:"published" },
-  { id:"e3", type:"education", category:"forex-edu",  level:"intermediate", title:"اندیکاتور RSI و کاربرد آن در تحلیل تکنیکال",         summary:"آموزش کامل اندیکاتور RSI، نحوه محاسبه، تفسیر سیگنال‌های خرید و فروش.",               thumbnail:undefined, author:AUTHOR_EDU, publishedAt:"۱۴۰۳/۰۵/۱۵", readingTime:12, views:19800, likes:654,  comments:97,  shares:218, tags:["فارکس","RSI"],          hashtags:["#forex","#rsi","#ta"], seo:{title:"آموزش RSI",description:"",keywords:["rsi","forex"],slug:"rsi-indicator-guide"}, status:"published" },
-  { id:"e4", type:"education", category:"crypto-edu", level:"advanced",     title:"استراتژی‌های مدیریت ریسک در معاملات رمزارز",         summary:"بررسی جامع روش‌های مدیریت ریسک در بازار کریپتو: حد ضرر، سایز پوزیشن، تنوع‌بخشی.",  thumbnail:undefined, author:AUTHOR_EDU, publishedAt:"۱۴۰۳/۰۵/۱۲", readingTime:15, views:14200, likes:512,  comments:78,  shares:189, tags:["مدیریت ریسک","کریپتو"], hashtags:["#riskmanagement"], seo:{title:"مدیریت ریسک کریپتو",description:"",keywords:["ریسک","کریپتو"],slug:"crypto-risk-management"}, status:"published" },
-  { id:"e5", type:"education", category:"ai-edu",     level:"intermediate", title:"پرامپت‌نویسی پیشرفته با ChatGPT و Claude",            summary:"تکنیک‌های حرفه‌ای نوشتن پرامپت برای دریافت بهترین نتایج از مدل‌های هوش مصنوعی.",  thumbnail:undefined, author:AUTHOR_EDU, publishedAt:"۱۴۰۳/۰۵/۱۰", readingTime:11, views:31500, likes:978,  comments:142, shares:387, tags:["پرامپت","ChatGPT"],    hashtags:["#prompting","#ai"], seo:{title:"پرامپت‌نویسی پیشرفته",description:"",keywords:["prompt","chatgpt"],slug:"advanced-prompting"}, status:"published" },
-  { id:"e6", type:"education", category:"forex-edu",  level:"beginner",     title:"فارکس چیست؟ آشنایی با بازار ارز خارجی",              summary:"راهنمای جامع مبتدیان برای آشنایی با بازار فارکس: جفت‌ارزها، پیپ، لات، اهرم.",      thumbnail:undefined, author:AUTHOR_EDU, publishedAt:"۱۴۰۳/۰۵/۰۸", readingTime:9,  views:23100, likes:712,  comments:108, shares:267, tags:["فارکس","مبتدی"],        hashtags:["#forex","#fx"], seo:{title:"فارکس چیست",description:"",keywords:["forex","fx"],slug:"what-is-forex"}, status:"published" },
-  { id:"e7", type:"education", category:"crypto-edu", level:"intermediate", title:"بلاک‌چین چگونه کار می‌کند؟ راهنمای کامل",             summary:"توضیح مفهوم بلاک‌چین، نحوه اجماع، استخراج، کارمزد و دیفای از صفر تا صد.",         thumbnail:undefined, author:AUTHOR_EDU, publishedAt:"۱۴۰۳/۰۴/۲۵", readingTime:14, views:18600, likes:624,  comments:98,  shares:243, tags:["بلاک‌چین"],             hashtags:["#blockchain"], seo:{title:"بلاک‌چین چیست",description:"",keywords:["blockchain"],slug:"how-blockchain-works"}, status:"published" },
-  { id:"e8", type:"education", category:"ai-edu",     level:"advanced",     title:"معماری Transformer و GPT از صفر تا صد",               summary:"بررسی فنی معماری Transformer، مکانیزم توجه، آموزش مدل‌های زبانی و نحوه کار GPT.",  thumbnail:undefined, author:AUTHOR_EDU, publishedAt:"۱۴۰۳/۰۴/۲۰", readingTime:20, views:9800,  likes:412,  comments:68,  shares:178, tags:["ترنسفورمر","GPT"],     hashtags:["#transformer","#gpt"], seo:{title:"معماری Transformer",description:"",keywords:["transformer","gpt"],slug:"transformer-architecture"}, status:"published" },
-];
-
-// ── Videos ────────────────────────────────────────
-const dummyAuthor: Author = { id:"v0", name:"آن پرداز", avatarUrl:undefined };
-export const VIDEOS: Video[] = [
-  { id:"v1", title:"آموزش جامع خرید بیت‌کوین در آن صراف",      slug:"buy-bitcoin-sarraf",    description:"نحوه ثبت‌نام، احراز هویت و خرید اولین بیت‌کوین در پلتفرم آن صراف گام به گام.", thumbnailUrl:"", duration:842,  category:"video-edu",     author:dummyAuthor, publishedAt:"۱۴۰۳/۰۶/۱۰", views:28400, likes:940,  comments:112, shares:321, tags:["آن صراف","بیت‌کوین"], keywords:["خرید","btc"],      hashtags:["#sarraf","#bitcoin"],       seo:{title:"خرید بیت‌کوین آن صراف",description:"",keywords:["bitcoin","sarraf"],slug:"buy-bitcoin-sarraf"}, status:"published" },
-  { id:"v2", title:"آن هوش چیست؟ معرفی پلتفرم هوش مصنوعی",      slug:"anhoosh-intro",         description:"معرفی کامل پلتفرم آن هوش؛ چگونه از ۲۲ مدل AI برای کار، آموزش و خلاقیت استفاده کنید.", thumbnailUrl:"", duration:614,  category:"video-company", author:dummyAuthor, publishedAt:"۱۴۰۳/۰۶/۱۲", views:19200, likes:720,  comments:88,  shares:241, tags:["آن هوش","معرفی"],     keywords:["anhoosh","ai"],    hashtags:["#anhoosh","#ai"],            seo:{title:"آن هوش چیست",description:"",keywords:["anhoosh"],slug:"anhoosh-intro"}, status:"published" },
-  { id:"v3", title:"تحلیل تکنیکال اتریوم — هفته سوم شهریور",    slug:"eth-analysis-sha-w3",   description:"تحلیل نمودار اتریوم در تایم‌فریم روزانه و هفتگی؛ سطوح حمایت، مقاومت و الگوهای قیمتی.", thumbnailUrl:"", duration:1124, category:"video-news",    author:dummyAuthor, publishedAt:"۱۴۰۳/۰۶/۱۵", views:14600, likes:512,  comments:74,  shares:188, tags:["اتریوم","تحلیل"],     keywords:["eth","تحلیل"],     hashtags:["#eth","#analysis"],         seo:{title:"تحلیل اتریوم",description:"",keywords:["eth"],slug:"eth-analysis"}, status:"published" },
-  { id:"v4", title:"معرفی آن مارکت — بازار آنلاین آن پرداز",     slug:"anmarket-intro",        description:"آن مارکت مارکت‌پلیس اختصاصی آن پرداز است. نحوه خرید، فروش و مدیریت فروشگاه.", thumbnailUrl:"", duration:528,  category:"video-company", author:dummyAuthor, publishedAt:"۱۴۰۳/۰۶/۰۸", views:9800,  likes:388,  comments:51,  shares:132, tags:["آن مارکت","معرفی"],   keywords:["anmarket","shop"], hashtags:["#anmarket"],                seo:{title:"آن مارکت",description:"",keywords:["anmarket"],slug:"anmarket-intro"}, status:"published" },
-  { id:"v5", title:"آموزش مدیریت ریسک در معاملات رمزارز",        slug:"crypto-risk-video",     description:"آموزش ویدیویی کامل مدیریت ریسک در بازار کریپتو؛ حد ضرر، تنوع‌بخشی و روانشناسی معامله‌گری.", thumbnailUrl:"", duration:2180, category:"video-edu",     author:dummyAuthor, publishedAt:"۱۴۰۳/۰۶/۰۵", views:22100, likes:840,  comments:134, shares:378, tags:["ریسک","کریپتو"],       keywords:["risk","crypto"],   hashtags:["#riskmanagement"],          seo:{title:"مدیریت ریسک ویدیو",description:"",keywords:["risk"],slug:"crypto-risk-video"}, status:"published" },
-  { id:"v6", title:"نحوه ثبت آگهی در آن بنر — آموزش گام به گام", slug:"anbanner-post-guide",   description:"راهنمای کامل ثبت آگهی در آن بنر؛ از انتخاب دسته‌بندی تا تأیید اپراتور.", thumbnailUrl:"", duration:744,  category:"video-company", author:dummyAuthor, publishedAt:"۱۴۰۳/۰۶/۰۲", views:7200,  likes:294,  comments:38,  shares:97,  tags:["آن بنر","آگهی"],       keywords:["anbanner","آگهی"], hashtags:["#anbanner","#ad"],           seo:{title:"ثبت آگهی آن بنر",description:"",keywords:["anbanner"],slug:"anbanner-post-guide"}, status:"published" },
-  { id:"v7", title:"معرفی آن بنر — سامانه آگهی آن پرداز",        slug:"anbanner-intro",        description:"آن بنر سامانه آگهی دیجیتال آن پرداز است. مسکن، خودرو، استخدام و بیش از ۸ دسته‌بندی.", thumbnailUrl:"", duration:480,  category:"video-company", author:dummyAuthor, publishedAt:"۱۴۰۳/۰۵/۲۸", views:5400,  likes:218,  comments:27,  shares:68,  tags:["آن بنر"],              keywords:["anbanner"],        hashtags:["#anbanner"],                seo:{title:"آن بنر",description:"",keywords:["anbanner"],slug:"anbanner-intro"}, status:"published" },
-  { id:"v8", title:"آموزش استفاده از مدل Claude Opus در آن هوش", slug:"claude-opus-tutorial",  description:"راهنمای کامل استفاده از Claude Opus برای نوشتن، کدنویسی و تحلیل در پلتفرم آن هوش.", thumbnailUrl:"", duration:1342, category:"video-edu",     author:dummyAuthor, publishedAt:"۱۴۰۳/۰۵/۲۵", views:12400, likes:524,  comments:84,  shares:219, tags:["Claude","آن هوش"],    keywords:["claude","anhoosh"], hashtags:["#claude","#anhoosh"],        seo:{title:"Claude Opus آموزش",description:"",keywords:["claude"],slug:"claude-opus-tutorial"}, status:"published" },
-];
-
-// ── Products (An Market — NOT classifieds) ────────
-const dummySeller: Seller = { id:"s1", name:"An Market Official", nameFa:"آن مارکت رسمی", rating:4.9, reviewCount:12400, salesCount:28000, isVerified:true, joinedAt:"۱۴۰۱/۰۱/۰۱" };
-const seller2: Seller     = { id:"s2", name:"Diyar Atiyeh Store", nameFa:"فروشگاه دیار",   rating:4.7, reviewCount:3400,  salesCount:8200,  isVerified:true, joinedAt:"۱۴۰۲/۰۴/۱۵" };
-export const PRODUCTS: Product[] = [
-  { id:"p1",  title:"iPhone 16 Pro Max 256GB", titleFa:"آیفون ۱۶ پرو مکس ۲۵۶ گیگ",    description:"آیفون ۱۶ پرو مکس با دوربین ۴۸ مگاپیکسل، تراشه A18 Pro و باتری ۴۴۵۰ میلی‌آمپری", price:98_000_000,  originalPrice:108_000_000, discount:9,  images:[], category:"موبایل",   brand:"Apple",    condition:"new",  seller:dummySeller, rating:4.9, reviewCount:412, stock:8,  sold:1840, isFavorite:false, tags:["اپل","آیفون"],       specs:{"رم":"8GB",  "حافظه":"256GB","رنگ":"تیتانیوم مشکی"} },
-  { id:"p2",  title:"Samsung Galaxy S25 Ultra",titleFa:"سامسونگ گلکسی اس ۲۵ اولترا",   description:"گوشی فلگشیپ سامسونگ با قلم S Pen، دوربین ۲۰۰ مگاپیکسل و پردازنده Snapdragon 8 Elite", price:87_000_000,  images:[],                             category:"موبایل",   brand:"Samsung",  condition:"new",  seller:dummySeller, rating:4.7, reviewCount:298, stock:12, sold:920,  isFavorite:false, tags:["سامسونگ"],             specs:{"رم":"12GB", "حافظه":"512GB"} },
-  { id:"p3",  title:"MacBook Pro 16 M4 Pro",   titleFa:"مک‌بوک پرو ۱۶ اینچ M4 Pro",   description:"مک‌بوک پرو ۱۶ اینچ با تراشه M4 Pro، نمایشگر Liquid Retina XDR و ۲۲ ساعت شارژدهی", price:165_000_000, images:[],                             category:"لپ‌تاپ",   brand:"Apple",    condition:"new",  seller:dummySeller, rating:4.9, reviewCount:184, stock:5,  sold:480,  isFavorite:false, tags:["اپل","مک"],            specs:{"رم":"24GB", "حافظه":"512GB","پردازنده":"M4 Pro"} },
-  { id:"p4",  title:"AirPods Pro 2nd Gen",     titleFa:"ایرپادز پرو نسل دوم",          description:"ایرپادز پرو با حذف نویز فعال نسل جدید، شفافیت تطبیقی و باتری ۳۰ ساعته", price:9_800_000,   originalPrice:11_200_000,  discount:13, images:[], category:"هدفون",    brand:"Apple",    condition:"new",  seller:dummySeller, rating:4.8, reviewCount:621, stock:31, sold:4800, isFavorite:false, tags:["ایرپادز","اپل"] },
-  { id:"p5",  title:"Sony WH-1000XM5",         titleFa:"سونی WH-1000XM5",              description:"هدفون Over-Ear سونی با بهترین حذف نویز در رده‌اش، ۳۰ ساعت باتری و کیفیت صدای HD Bluetooth", price:12_400_000,  images:[],                             category:"هدفون",    brand:"Sony",     condition:"new",  seller:seller2,     rating:4.9, reviewCount:328, stock:18, sold:2100, isFavorite:false, tags:["سونی","هدفون"] },
-  { id:"p6",  title:"iPad Pro M4 11 inch",     titleFa:"آیپد پرو M4 یازده اینچ",      description:"آیپد پرو با تراشه M4، نمایشگر Ultra Retina XDR OLED و پشتیبانی از Apple Pencil Pro", price:75_000_000,  images:[],                             category:"تبلت",     brand:"Apple",    condition:"new",  seller:dummySeller, rating:4.8, reviewCount:214, stock:10, sold:620,  isFavorite:false, tags:["آیپد","اپل"] },
-  { id:"p7",  title:"ASUS ROG Strix G16",      titleFa:"لپ‌تاپ گیمینگ ایسوس ROG G16", description:"لپ‌تاپ گیمینگ ایسوس با پردازنده Core i9، RTX 4080، نمایشگر ۱۶۵ هرتز QHD", price:145_000_000, images:[],                             category:"لپ‌تاپ",   brand:"ASUS",     condition:"new",  seller:seller2,     rating:4.7, reviewCount:98,  stock:4,  sold:210,  isFavorite:false, tags:["گیمینگ","ایسوس"],      specs:{"رم":"32GB", "حافظه":"1TB SSD"} },
-  { id:"p8",  title:"DJI Mini 4 Pro",          titleFa:"درون DJI Mini 4 Pro",           description:"کوادکوپتر فوق‌سبک DJI با دوربین ۴K/60fps، مانع‌یابی ۳۶۰ درجه و پرواز تا ۳۴ دقیقه", price:28_000_000,  images:[],                             category:"تکنولوژی", brand:"DJI",      condition:"new",  seller:seller2,     rating:4.8, reviewCount:142, stock:7,  sold:380,  isFavorite:false, tags:["درون","DJI"] },
-  { id:"p9",  title:"Samsung 65\" QLED 4K",    titleFa:"تلویزیون ۶۵ اینچ سامسونگ QLED",description:"تلویزیون ۶۵ اینچ سامسونگ با پنل QLED، تکنولوژی Quantum Dot و بلندگوی Dolby Atmos", price:72_000_000,  images:[],                             category:"خانه",     brand:"Samsung",  condition:"new",  seller:dummySeller, rating:4.6, reviewCount:187, stock:6,  sold:340,  isFavorite:false, tags:["تلویزیون","سامسونگ"] },
-  { id:"p10", title:"PlayStation 5 Pro",       titleFa:"پلی‌استیشن ۵ پرو",             description:"کنسول بازی PS5 Pro با GPU ارتقایافته، پشتیبانی از ۸K و حذف اشعه پیشرفته", price:48_000_000,  images:[],                             category:"بازی",     brand:"Sony",     condition:"new",  seller:dummySeller, rating:4.9, reviewCount:356, stock:3,  sold:1240, isFavorite:false, tags:["PS5","سونی"] },
-  { id:"p11", title:"Xiaomi 14 Ultra",         titleFa:"شیائومی ۱۴ اولترا",            description:"گوشی فلگشیپ شیائومی با دوربین Leica، Snapdragon 8 Gen 3 و شارژ سریع ۹۰W", price:52_000_000,  images:[],                             category:"موبایل",   brand:"Xiaomi",   condition:"new",  seller:seller2,     rating:4.7, reviewCount:168, stock:9,  sold:480,  isFavorite:false, tags:["شیائومی","Leica"] },
-  { id:"p12", title:"Apple Watch Ultra 2",     titleFa:"اپل واچ اولترا ۲",             description:"ساعت هوشمند اپل با بدنه تیتانیوم، GPS دقیق، مقاومت در برابر آب تا ۱۰۰ متر", price:32_000_000,  images:[],                             category:"پوشیدنی",  brand:"Apple",    condition:"new",  seller:dummySeller, rating:4.8, reviewCount:243, stock:14, sold:720,  isFavorite:false, tags:["اپل واچ","ساعت هوشمند"] },
-];
-
-export const PRODUCT_CATEGORIES = [
-  { id:"موبایل",    nameFa:"موبایل",          icon:"phone",        count:2840  },
-  { id:"لپ‌تاپ",    nameFa:"لپ‌تاپ",           icon:"cpu",          count:1420  },
-  { id:"هدفون",    nameFa:"هدفون و صدا",       icon:"headphones",   count:980   },
-  { id:"تبلت",     nameFa:"تبلت",             icon:"image",        count:640   },
-  { id:"پوشیدنی",  nameFa:"پوشیدنی",          icon:"clock",        count:480   },
-  { id:"بازی",     nameFa:"گیمینگ",           icon:"trophy",       count:780   },
-  { id:"خانه",     nameFa:"لوازم خانگی",       icon:"building",     count:2100  },
-  { id:"تکنولوژی", nameFa:"تکنولوژی",          icon:"sparkle",      count:1640  },
-];
-
-// ── Banner Ads (classifieds) ──────────────────────
-export const BANNER_ADS: BannerAd[] = [
-  { id:"b1", title:"آپارتمان ۱۱۰ متری نوساز — نیاوران",  description:"آپارتمان ۱۱۰ متری، ۳ خواب، طبقه سوم، آسانسور، پارکینگ، انباری. محیط آرام و دسترسی عالی.", price:18_500_000_000, images:[], category:"مسکن",    subcategory:"آپارتمان", city:"تهران", district:"نیاوران",   seller:dummySeller, views:2840, isFavorite:false, postedAt:"۱۴۰۳/۰۶/۱۴", status:"active", isNegotiable:true },
-  { id:"b2", title:"پژو ۲۰۸ مدل ۱۴۰۲ — کم‌کارکرد",      description:"پژو ۲۰۸، مدل ۱۴۰۲، تمام ایمنی، دوگانه‌سوز فابریک، بیمه یک‌ساله، بدون تصادف.",          price:1_120_000_000,  images:[], category:"خودرو",   subcategory:"سواری",   city:"تهران", district:"پونک",      seller:dummySeller, views:4210, isFavorite:false, postedAt:"۱۴۰۳/۰۶/۱۳", status:"active", isNegotiable:false },
-  { id:"b3", title:"استخدام برنامه‌نویس React.js",        description:"شرکت فناوری در تهران به برنامه‌نویس ارشد React با حداقل ۳ سال سابقه نیاز دارد. حقوق توافقی.", price:undefined,      images:[], category:"استخدام", subcategory:"IT",      city:"تهران", district:"ونک",       seller:dummySeller, views:1890, isFavorite:false, postedAt:"۱۴۰۳/۰۶/۱۵", status:"active", isNegotiable:false },
-  { id:"b4", title:"فروش لپ‌تاپ Lenovo ThinkPad X1",     description:"لپ‌تاپ لنوو X1 Carbon نسل ۱۱، Core i7، رم ۱۶ گیگ، SSD 512، در حد نو.",                    price:42_000_000,     images:[], category:"دیجیتال", subcategory:"لپ‌تاپ",  city:"اصفهان",district:"چهارباغ", seller:dummySeller, views:982,  isFavorite:false, postedAt:"۱۴۰۳/۰۶/۱۲", status:"active", isNegotiable:true },
-  { id:"b5", title:"اجاره دفتر ۸۰ متری — ونک",           description:"دفتر اداری ۸۰ متری، طبقه چهارم، آسانسور، سیستم گرمایشی مرکزی، موقعیت تجاری عالی.",       price:42_000_000,     images:[], category:"مسکن",    subcategory:"اداری",   city:"تهران", district:"ونک",       seller:dummySeller, views:1640, isFavorite:false, postedAt:"۱۴۰۳/۰۶/۱۱", status:"active", isNegotiable:false },
-  { id:"b6", title:"دوچرخه کوهستان کربن فیبر",           description:"دوچرخه کوهستان تخصصی با فریم کربن فیبر، دنده شیمانو XTR، فورک Rock Shox.",                  price:38_500_000,     images:[], category:"ورزش",    subcategory:"دوچرخه",  city:"شیراز", district:"",          seller:dummySeller, views:728,  isFavorite:false, postedAt:"۱۴۰۳/۰۶/۱۰", status:"active", isNegotiable:true },
-  { id:"b7", title:"ویلا ۳۰۰ متری با استخر — لواسان",    description:"ویلا ۳۰۰ متری، ۴ خواب، استخر اختصاصی، باغ ۴۰۰ متری، نگهبانی. موقعیت عالی لواسان.", price:82_000_000_000, images:[], category:"مسکن",    subcategory:"ویلا",    city:"تهران", district:"لواسان",    seller:dummySeller, views:3480, isFavorite:false, postedAt:"۱۴۰۳/۰۶/۰۸", status:"active", isNegotiable:true },
-  { id:"b8", title:"تدریس خصوصی ریاضی — دانشگاه تهران", description:"استاد دانشگاه تدریس خصوصی ریاضی، آمار و حساب را در سطوح مختلف به عهده می‌گیرد.",           price:1_800_000,      images:[], category:"خدمات",   subcategory:"تدریس",   city:"تهران", district:"انقلاب",    seller:seller2,     views:584,  isFavorite:false, postedAt:"۱۴۰۳/۰۶/۰۷", status:"active", isNegotiable:false },
-];
-
-export const BANNER_CATEGORIES: BannerCategory[] = [
-  { id:"property", name:"property", nameFa:"مسکن و ملک",  icon:"building",  adCount:18420 },
-  { id:"vehicle",  name:"vehicle",  nameFa:"خودرو",        icon:"car",       adCount:24180 },
-  { id:"digital",  name:"digital",  nameFa:"دیجیتال",      icon:"device",    adCount:12840 },
-  { id:"jobs",     name:"jobs",     nameFa:"استخدام",      icon:"briefcase", adCount:8920  },
-  { id:"service",  name:"service",  nameFa:"خدمات",        icon:"tools",     adCount:15600 },
-  { id:"sports",   name:"sports",   nameFa:"ورزش",         icon:"trophy",    adCount:5240  },
-  { id:"home",     name:"home",     nameFa:"خانه و باغ",   icon:"sofa",      adCount:9310  },
-  { id:"clothing", name:"clothing", nameFa:"پوشاک",        icon:"hanger",    adCount:7820  },
-];
-
-// ── AI Providers (22 models across 8 providers) ───
-export const AI_PROVIDERS: AiProvider[] = [
-  { id:"openai",    name:"OpenAI",    color:"#10A37F", bgColor:"#0d1a14" },
-  { id:"anthropic", name:"Anthropic", color:"#C4956A", bgColor:"#1a120a" },
-  { id:"google",    name:"Google",    color:"#4285F4", bgColor:"#0a0f1a" },
-  { id:"xai",       name:"xAI",       color:"#E0E0E0", bgColor:"#111111" },
-  { id:"deepseek",  name:"DeepSeek",  color:"#4FACFE", bgColor:"#070d1a" },
-  { id:"meta",      name:"Meta",      color:"#0668E1", bgColor:"#060e1f" },
-  { id:"mistral",   name:"Mistral",   color:"#FF7000", bgColor:"#1a0d00" },
-  { id:"qwen",      name:"Qwen",      color:"#1677FF", bgColor:"#050d1a" },
-];
-
-export const AI_MODELS: AiModel[] = [
-  { id:"gpt-4o-mini",   name:"GPT-4o Mini",       providerId:"openai",    descFa:"سریع، مقرون‌به‌صرفه، برای کارهای روزمره",      capabilities:["fast","writing","translation","coding"],  contextWindow:"128K", isAvailable:true },
-  { id:"gpt-4o",        name:"GPT-4o",             providerId:"openai",    descFa:"قوی برای تحلیل تصویر، کدنویسی و تحقیق",        capabilities:["vision","coding","writing","reasoning"],  contextWindow:"128K", isAvailable:true },
-  { id:"o3",            name:"o3",                 providerId:"openai",    descFa:"استدلال عمیق برای مسائل ریاضی و علمی",           capabilities:["reasoning","coding","math"],              contextWindow:"200K", badge:"new", isAvailable:true },
-  { id:"o3-mini",       name:"o3 Mini",            providerId:"openai",    descFa:"استدلال سریع با کیفیت بالا",                     capabilities:["reasoning","coding","fast"],              contextWindow:"200K", badge:"new", isAvailable:true },
-  { id:"claude-haiku",  name:"Claude Haiku 4.5",   providerId:"anthropic", descFa:"سریع‌ترین مدل آنتروپیک برای کارهای عملی",       capabilities:["fast","writing","coding"],                contextWindow:"200K", isAvailable:true },
-  { id:"claude-sonnet", name:"Claude Sonnet 5",    providerId:"anthropic", descFa:"توازن ایده‌آل هوش و سرعت، انتخاب اول",          capabilities:["coding","writing","vision","reasoning"],  contextWindow:"200K", isAvailable:true },
-  { id:"claude-opus",   name:"Claude Opus 5",      providerId:"anthropic", descFa:"قدرتمندترین مدل برای پروژه‌های پیچیده",          capabilities:["coding","reasoning","writing","vision"],  contextWindow:"200K", badge:"pro", isAvailable:true },
-  { id:"gemini-flash",  name:"Gemini 2.0 Flash",   providerId:"google",    descFa:"سریع با کیفیت بالا و توانایی چندمدالی",          capabilities:["fast","vision","coding"],                 contextWindow:"1M",  badge:"new", isAvailable:true },
-  { id:"gemini-pro",    name:"Gemini 2.5 Pro",     providerId:"google",    descFa:"تحقیق عمیق با کانتکست ۱ میلیون توکن",            capabilities:["reasoning","vision","doc-analysis"],     contextWindow:"1M",  isAvailable:true },
-  { id:"gemini-ultra",  name:"Gemini 2.5 Ultra",   providerId:"google",    descFa:"قدرتمندترین مدل گوگل با کانتکست ۲ میلیون",      capabilities:["reasoning","vision","coding","math"],    contextWindow:"2M",  badge:"pro", isAvailable:true },
-  { id:"grok-3",        name:"Grok 3",             providerId:"xai",       descFa:"دسترسی اینترنت زنده، استدلال پیشرفته",           capabilities:["reasoning","vision","search"],            contextWindow:"131K", badge:"new", isAvailable:true },
-  { id:"grok-3-mini",   name:"Grok 3 Mini",        providerId:"xai",       descFa:"سریع با قابلیت استدلال",                         capabilities:["reasoning","fast","coding"],              contextWindow:"131K", isAvailable:true },
-  { id:"deepseek-r2",   name:"DeepSeek R2",        providerId:"deepseek",  descFa:"استدلال عمیق در علوم، ریاضیات و کدنویسی",        capabilities:["reasoning","coding","math"],              contextWindow:"128K", isAvailable:true },
-  { id:"deepseek-v3",   name:"DeepSeek V3",        providerId:"deepseek",  descFa:"مدل قوی چندمنظوره با کارایی بالا",               capabilities:["coding","writing","reasoning"],           contextWindow:"128K", isAvailable:true },
-  { id:"llama-4-scout", name:"Llama 4 Scout",      providerId:"meta",      descFa:"چندمدالی با کانتکست ۱۰ میلیون توکن",             capabilities:["vision","coding","fast"],                 contextWindow:"10M",  badge:"new", isAvailable:true },
-  { id:"llama-4-maverick", name:"Llama 4 Maverick", providerId:"meta",      descFa:"قدرتمند برای کارهای خلاقانه و استدلال",           capabilities:["reasoning","writing","coding"],           contextWindow:"1M",  isAvailable:true } as AiModel,
-  { id:"mistral-large", name:"Mistral Large 2",    providerId:"mistral",   descFa:"قوی در کدنویسی، استدلال و چندزبانه",             capabilities:["coding","reasoning","writing"],           contextWindow:"128K", isAvailable:true },
-  { id:"mistral-small", name:"Mistral Small 3",    providerId:"mistral",   descFa:"سریع و مقرون‌به‌صرفه برای وظایف روزمره",         capabilities:["fast","writing","translation"],           contextWindow:"128K", isAvailable:true },
-  { id:"pixtral",       name:"Pixtral Large",      providerId:"mistral",   descFa:"تخصصی در تحلیل تصویر و چندمدالی",               capabilities:["vision","doc-analysis","writing"],        contextWindow:"128K", isAvailable:true },
-  { id:"qwen-max",      name:"Qwen 2.5 Max",       providerId:"qwen",      descFa:"چندزبانه و چندمدالی قوی از علی‌بابا",            capabilities:["coding","reasoning","vision"],            contextWindow:"1M",  isAvailable:true },
-  { id:"qwen-coder",    name:"Qwen 2.5 Coder",     providerId:"qwen",      descFa:"متخصص کدنویسی با پشتیبانی ۹۲ زبان برنامه‌نویسی", capabilities:["coding","math","reasoning"],              contextWindow:"128K", isAvailable:true },
-  { id:"qwen-vl",       name:"Qwen 2.5 VL",        providerId:"qwen",      descFa:"چندمدالی پیشرفته برای تصویر و ویدیو",            capabilities:["vision","video","doc-analysis"],         contextWindow:"128K", badge:"new", isAvailable:true },
-];
-
-// ── Demo chats ─────────────────────────────────────
-export const DEMO_CHATS: Chat[] = [
-  { id:"c1", title:"تحلیل بازار کریپتو هفته جاری",  preview:"بیت‌کوین در هفته جاری با فشار فروش نهنگ‌ها روبرو شد...", modelId:"gemini-pro",    modeId:"analyze",  messages:[], createdAt:"۱۴۰۳/۰۶/۱۵", updatedAt:"۱۴۰۳/۰۶/۱۵" },
-  { id:"c2", title:"اسکریپت ویدیوی تبلیغاتی",       preview:"بسیار خوب! اسکریپت ۳۰ ثانیه‌ای آن پرداز آماده شد...", modelId:"claude-sonnet", modeId:"write",    messages:[], createdAt:"۱۴۰۳/۰۶/۱۴", updatedAt:"۱۴۰۳/۰۶/۱۴" },
-  { id:"c3", title:"API پرداخت با Python",            preview:"import requests\nbase_url = 'https://api.anpardaz.ir'...", modelId:"claude-opus",  modeId:"code",     messages:[], createdAt:"۱۴۰۳/۰۶/۱۳", updatedAt:"۱۴۰۳/۰۶/۱۳" },
-  { id:"c4", title:"ترجمه قرارداد همکاری",           preview:"این قرارداد بین طرفین منعقد می‌شود...",                 modelId:"gpt-4o",        modeId:"translate",messages:[], createdAt:"۱۴۰۳/۰۶/۱۰", updatedAt:"۱۴۰۳/۰۶/۱۰" },
-  { id:"c5", title:"طراحی لوگو آن پرداز",            preview:"برای لوگوی آن پرداز پیشنهاد می‌دهم...",                modelId:"gpt-4o",        modeId:"image",    messages:[], createdAt:"۱۴۰۳/۰۶/۰۸", updatedAt:"۱۴۰۳/۰۶/۰۸" },
-  { id:"c6", title:"پرامپت SEO محتوا",               preview:"برای بهینه‌سازی محتوای سایت آن پرداز...",              modelId:"claude-sonnet", modeId:"write",    messages:[], createdAt:"۱۴۰۳/۰۶/۰۵", updatedAt:"۱۴۰۳/۰۶/۰۵" },
-];
-
-export const DEMO_PROJECTS: AiProject[] = [
-  { id:"pr1", title:"راه‌اندازی فروشگاه آنلاین",  description:"طراحی، کدنویسی و بازاریابی پلتفرم فروش آنلاین با Next.js و Prisma", modelId:"claude-opus",   chatIds:["c2","c3"], accentColor:"#7c3aed", createdAt:"۱۴۰۳/۰۶/۰۱", updatedAt:"۱۴۰۳/۰۶/۱۵" },
-  { id:"pr2", title:"کمپین بازاریابی فصلی",       description:"تولید محتوا، اسکریپت ویدیو و پست‌های شبکه اجتماعی",               modelId:"claude-sonnet", chatIds:["c1"],       accentColor:"#0891b2", createdAt:"۱۴۰۳/۰۵/۲۰", updatedAt:"۱۴۰۳/۰۶/۱۴" },
-  { id:"pr3", title:"تحقیق بازار ارز دیجیتال",   description:"تحلیل رقبا، گزارش هفتگی و پیش‌بینی قیمت کریپتو",                modelId:"gemini-pro",    chatIds:["c4","c6"], accentColor:"#059669", createdAt:"۱۴۰۳/۰۵/۱۵", updatedAt:"۱۴۰۳/۰۶/۱۳" },
-];
