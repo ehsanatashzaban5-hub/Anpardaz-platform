@@ -198,7 +198,10 @@ type SarrafAssetRecord={id:number|string;symbol:string;status?:string};async fun
     if(!regionRes.ok||region?.allowed!==true){setNotice("استفاده از این خدمات فقط با IP ایران مجاز است. لطفاً با یک IP ایران دوباره تلاش کنید.");return false;}
     if(!browserSupportsWebAuthn()){setNotice("برای استفاده از خدمات، ابتدا حداقل یک قفل امن روی گوشی خود فعال کنید؛ مانند الگو، رمز عبور، PIN یا اثر انگشت. این دستگاه یا مرورگر امکان بررسی امن قفل صفحه را ندارد.");return false;}
     const existingToken=sessionStorage.getItem("anpardaz:deviceSecurityToken")??"";
-    if(existingToken)return true;
+    const verifiedAt=Number(sessionStorage.getItem("anpardaz:deviceSecurityVerifiedAt")??"0");
+    if(existingToken&&Number.isFinite(verifiedAt)&&Date.now()-verifiedAt<13*60*1000)return true;
+    sessionStorage.removeItem("anpardaz:deviceSecurityToken");
+    sessionStorage.removeItem("anpardaz:deviceSecurityVerifiedAt");
     const status=await anpardazRequest("/api/v1/device-security/status");
     let deviceToken="";
     if(status?.registered){
@@ -214,6 +217,7 @@ type SarrafAssetRecord={id:number|string;symbol:string;status?:string};async fun
     }
     if(!deviceToken){setNotice("تأیید قفل امن گوشی انجام نشد. لطفاً حداقل یک الگو، PIN، رمز عبور یا اثر انگشت روی گوشی فعال کنید و دوباره تلاش کنید.");return false;}
     sessionStorage.setItem("anpardaz:deviceSecurityToken",deviceToken);
+    sessionStorage.setItem("anpardaz:deviceSecurityVerifiedAt",String(Date.now()));
     return true;
   }catch(error){
     const name=String((error as any)?.name??"");
