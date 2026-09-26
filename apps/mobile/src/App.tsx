@@ -4814,9 +4814,8 @@ function SupportModal({onClose}:{onClose:()=>void}){
       <div style={{width:36}}/>
     </div>
     <div className="anp-page-body">
-      <p style={{fontSize:13,color:"var(--text-muted)",marginBottom:20,textAlign:"center"}}>برای راهنمایی با شماره‌های زیر تماس بگیرید.</p>
-      <a href="tel:09375437106" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"rgba(0,214,176,0.1)",border:"1px solid rgba(0,214,176,0.25)",borderRadius:14,padding:"14px",color:"#00D6B0",textDecoration:"none",marginBottom:12,fontWeight:700,direction:"ltr"}}><Icon name="phone" size={20}/>۰۹۳۷۵۴۳۷۱۰۶</a>
-      <a href="tel:09051826963" style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"rgba(0,214,176,0.1)",border:"1px solid rgba(0,214,176,0.25)",borderRadius:14,padding:"14px",color:"#00D6B0",textDecoration:"none",marginBottom:20,fontWeight:700,direction:"ltr"}}><Icon name="phone" size={20}/>۰۹۰۵۱۸۲۶۹۶۳</a>
+      <p style={{fontSize:13,color:"var(--text-muted)",marginBottom:20,textAlign:"center",lineHeight:1.9}}>اطلاعات تماس تلفنی فقط در صورتی نمایش داده می‌شود که از سرویس رسمی آن‌پرداز دریافت شده باشد. در حال حاضر برای جلوگیری از نمایش اطلاعات غیرقابل‌تأیید، پشتیبانی را از مسیر رسمی تیکت انجام دهید.</p>
+      <button className="primary-button" style={{width:"100%",marginBottom:12}} onClick={onClose}>بازگشت</button>
       <button className="outline-button" style={{width:"100%"}} onClick={onClose}>بازگشت</button>
     </div>
   </div>;
