@@ -22,7 +22,7 @@ VALUES
 ('داروکده','darukade','darukade.com','https://www.darukade.com/','beauty-health',true,'unknown','manual','verified'),
 ('داروبیار','darubiar','darubiar.com','https://www.darubiar.com/','beauty-health',true,'unknown','manual','verified'),
 ('لافارر','lafarrerr','lafarrerr.com','https://lafarrerr.com/','beauty-health',true,'unknown','manual','verified')
-ON CONFLICT(domain) DO UPDATE SET
+ON CONFLICT(slug) DO UPDATE SET
   name=EXCLUDED.name,
   homepage_url=EXCLUDED.homepage_url,
   category_hint=EXCLUDED.category_hint,
