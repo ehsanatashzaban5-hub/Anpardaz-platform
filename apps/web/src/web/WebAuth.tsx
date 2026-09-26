@@ -11,8 +11,9 @@ type AuthStep = "phone" | "otp" | "done";
 
 interface Props {
   onClose: () => void;
-  onSuccess: (phone: string) => void;
+  onSuccess: (accessToken: string, email: string) => void;
 }
+const API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")??"";
 
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 
@@ -34,19 +35,30 @@ export default function WebAuthModal({ onClose, onSuccess }: Props) {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [countdown]);
 
-  const submitPhone = () => {
+  const submitPhone = async () => {
     if (!/^09\d{9}$/.test(phone)) { setPhoneErr("شماره موبایل معتبر نیست"); return; }
-    setPhoneErr("");
-    setLoading(true);
-    setTimeout(() => { setLoading(false); setStep("otp"); setCountdown(120); otpRefs.current[0]?.focus(); }, 900);
+    if (!API) { setPhoneErr("اتصال احراز هویت در دسترس نیست."); return; }
+    setPhoneErr(""); setLoading(true);
+    try {
+      const r=await fetch(API+"/api/v1/auth/phone/request-otp",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({phone}),cache:"no-store"});
+      const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(String(d?.error||"otp_request_failed"));
+      setStep("otp"); setCountdown(Number(d?.expiresInSeconds??120)); otpRefs.current[0]?.focus();
+    } catch(e) { setPhoneErr(e instanceof Error&&e.message==="phone_otp_disabled"?"ورود با پیامک هنوز برای این محیط فعال نشده است.":"ارسال کد تأیید انجام نشد."); }
+    finally { setLoading(false); }
   };
 
-  const submitOtp = () => {
+  const submitOtp = async () => {
     const code = otp.join("");
     if (code.length < 6) { setOtpErr("کد تأیید ناقص است"); return; }
-    setOtpErr("");
-    setLoading(true);
-    setTimeout(() => { setLoading(false); setStep("done"); setTimeout(() => onSuccess(phone), 800); }, 900);
+    if (!API) { setOtpErr("اتصال احراز هویت در دسترس نیست."); return; }
+    setOtpErr(""); setLoading(true);
+    try {
+      const r=await fetch(API+"/api/v1/auth/phone/verify-otp",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({phone,code}),cache:"no-store"});
+      const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(String(d?.error||"otp_verify_failed"));
+      const token=String(d?.accessToken||""); if(!token)throw new Error("token_missing");
+      setStep("done"); setTimeout(()=>onSuccess(token,String(d?.phone||phone)+"@users.anpardaz.ir"),500);
+    } catch { setOtpErr("کد تأیید صحیح نیست یا منقضی شده است."); }
+    finally { setLoading(false); }
   };
 
   const handleOtpKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
