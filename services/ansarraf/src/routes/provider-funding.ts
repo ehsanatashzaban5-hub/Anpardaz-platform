@@ -26,12 +26,13 @@ export function registerProviderFundingRoutes(app:FastifyInstance,pool:Pool){
     const adapter=registry.get(providerCode);if(!adapter)return reply.code(503).send({error:'provider_not_configured'});
     const address=await adapter.getDepositAddress(symbol,network);if(!address.address)return reply.code(503).send({error:'provider_deposit_address_unavailable'});
     const others=(await pool.query("SELECT customer_id FROM provider_deposit_addresses WHERE provider_id=$1 AND asset_id=$2 AND network=$3 AND address=$4 AND status='ACTIVE' AND customer_id<>$5",[provider.id,asset.id,network,address.address,customer])).rows;
-    const safe=others.length===0||Boolean(address.memo);
+    const memoIsUnique=Boolean(address.memo)&&others.every((x:any)=>String(x.memo??'')!==String(address.memo));
+    const safe=others.length===0||memoIsUnique;
     const row=(await pool.query(`INSERT INTO provider_deposit_addresses(provider_id,customer_id,asset_id,network,address,memo,provider_reference)
       VALUES($1,$2,$3,$4,$5,$6,$7)
       ON CONFLICT(provider_id,customer_id,asset_id,network) DO UPDATE SET address=EXCLUDED.address,memo=EXCLUDED.memo,provider_reference=EXCLUDED.provider_reference,status='ACTIVE'
       RETURNING *`,[provider.id,customer,asset.id,network,address.address,address.memo??null,null])).rows[0];
-    return{provider:providerCode,address:row.address,memo:row.memo,network,safeForAutomaticAttribution:safe,requiresAdminReview:!safe,message:safe?'واریز پس از تأیید شبکه و بررسی مدیر ثبت می‌شود.':'این آدرس بین چند کاربر مشترک است؛ تراکنش به‌صورت خودکار به موجودی هیچ کاربری اضافه نمی‌شود و باید مدیر آن را تطبیق دهد.'};
+    return{provider:providerCode,address:row.address,memo:row.memo,network,safeForAutomaticAttribution:safe,requiresAdminReview:!safe,message:safe?'این آدرس در حال حاضر برای این کاربر قابل تطبیق است؛ اعتباردهی فقط پس از تأیید شبکه انجام می‌شود.':'این آدرس بین چند کاربر مشترک است؛ تا زمانی که شناسه اختصاصی و قابل‌اعتماد (آدرس اختصاصی یا memo/tag یکتا) نداشته باشیم، تراکنش به‌صورت خودکار به موجودی هیچ کاربری اضافه نمی‌شود و باید مدیر آن را تطبیق دهد.'};
   });
 
   app.get('/api/v1/admin/crypto-deposits',{preHandler:requireAuth},async(req,reply)=>{
