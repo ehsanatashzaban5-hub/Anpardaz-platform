@@ -195,17 +195,26 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
       return reply.code(400).send({error:'invalid_topup'});
     const own=await pool.query("SELECT id,currency FROM accounts WHERE id=$1 AND customer_id=$2 AND status='active'",[b.accountId,c]);
     if(!own.rows[0]||own.rows[0].currency!==b.currency)return reply.code(400).send({error:'invalid_account'});
+    const requestFingerprint=fp({accountId:Number(b.accountId),amount:String(b.amount),currency:b.currency,provider:String(b.provider??'FINNOTECH')});
+    const existing=(await pool.query(
+      'SELECT * FROM topup_requests WHERE customer_id=$1 AND idempotency_key=$2',[c,b.idempotencyKey]
+    )).rows[0];
+    if(existing){
+      if(existing.request_fingerprint&&existing.request_fingerprint!==requestFingerprint)return reply.code(409).send({error:'idempotency_key_reused'});
+      return {topup:existing,operationId:existing.operation_id??null,idempotent:true};
+    }
     const operationId=randomUUID();
     try{
       const x=await pool.query(
-        'INSERT INTO topup_requests(customer_id,account_id,amount,currency,provider,idempotency_key,operation_id) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',
-        [c,b.accountId,b.amount,b.currency,b.provider??'FINNOTECH',b.idempotencyKey,operationId]
+        'INSERT INTO topup_requests(customer_id,account_id,amount,currency,provider,idempotency_key,request_fingerprint,operation_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',
+        [c,b.accountId,b.amount,b.currency,b.provider??'FINNOTECH',b.idempotencyKey,requestFingerprint,operationId]
       );
       await pool.query("INSERT INTO banking_provider_outbox(operation_id,operation_type) VALUES($1,'topup')",[operationId]);
       return reply.code(202).send({topup:x.rows[0],operationId,queued:true});
     }catch(e:any){
       if(e?.code==='23505'){
         const x=await pool.query('SELECT * FROM topup_requests WHERE customer_id=$1 AND idempotency_key=$2',[c,b.idempotencyKey]);
+        if(x.rows[0]?.request_fingerprint&&x.rows[0].request_fingerprint!==requestFingerprint)return reply.code(409).send({error:'idempotency_key_reused'});
         return {topup:x.rows[0],operationId:x.rows[0]?.operation_id??null,idempotent:true};
       }
       throw e;
