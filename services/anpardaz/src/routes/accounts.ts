@@ -58,7 +58,23 @@ export function registerAccountRoutes(app:FastifyInstance,pool:Pool){
        FROM topup_requests WHERE customer_id=$1
      UNION ALL
      SELECT id::text,'service',
-       COALESCE((response_metadata->>'amount'),(request_metadata->'payload'->>'amount'),'0')::text,
+       CASE WHEN COALESCE((response_metadata->>'amount'),(request_metadata->'payload'->>'amount')) ~ '^[0-9]+(?:\\.[0-9]+)?
+       'IRR',status,operation_id,service_code,created_at
+       FROM fintech_service_operations WHERE customer_id=$1
+     ORDER BY created_at DESC LIMIT $2`,[customerId,limit]);
+   return {activities:result.rows};
+ });
+
+ app.get<{Params:Params}>('/api/v1/accounts/:id/transactions',{preHandler:requireAuth},async(request,reply)=>{
+   const auth=(request as FastifyRequest&{auth:any}).auth;const id=Number(request.params.id);
+   if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_account_id'});
+   const customerId=await ensureCustomer(pool,auth);
+   const owner=await pool.query('SELECT id FROM accounts WHERE id=$1 AND customer_id=$2',[id,customerId]);
+   if(!owner.rows[0])return reply.code(404).send({error:'account_not_found'});
+   const r=await pool.query('SELECT id,transaction_type,amount,currency,status,reference,description,created_at FROM transactions WHERE account_id=$1 ORDER BY created_at DESC LIMIT 100',[id]);
+   return {transactions:r.rows};
+ });
+} THEN COALESCE((response_metadata->>'amount'),(request_metadata->'payload'->>'amount')) ELSE '0' END,
        'IRR',status,operation_id,service_code,created_at
        FROM fintech_service_operations WHERE customer_id=$1
      ORDER BY created_at DESC LIMIT $2`,[customerId,limit]);
