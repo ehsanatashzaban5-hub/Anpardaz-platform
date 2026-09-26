@@ -11,10 +11,11 @@ const fmtPrice = (n: number) => n.toLocaleString("en-US");
 
 // ── Platform cards ────────────────────────────────
 const PLATFORMS = [
-  { id:"sarraf",    label:"آن صراف",   desc:"پیشرفته‌ترین صرافی دیجیتال ایران. خرید، فروش و نگهداری رمزارز با امنیت بانکی.", icon:"sarraf",   color:"#0891b2", grad:"linear-gradient(135deg,rgba(8,145,178,0.12),rgba(6,182,212,0.05))", border:"rgba(8,145,178,0.22)", stats:"۲۰۰+ رمزارز" },
-  { id:"market",    label:"آن مارکت", desc:"بازار آنلاین محصولات فناوری و دیجیتال با بهترین قیمت و ضمانت اصالت کالا.", icon:"market",   color:"#d97706", grad:"linear-gradient(135deg,rgba(217,119,6,0.12),rgba(245,158,11,0.05))",  border:"rgba(217,119,6,0.22)",  stats:"۵۰۰+ محصول" },
-  { id:"banner",    label:"آن بنر",   desc:"سامانه آگهی‌های ایران. ثبت و مشاهده آگهی در تمام شهرهای کشور.", icon:"banner",   color:"#e8354e", grad:"linear-gradient(135deg,rgba(232,53,78,0.12),rgba(244,63,94,0.05))",   border:"rgba(232,53,78,0.22)",  stats:"۱۰۰K+ آگهی" },
-  { id:"hoosh",     label:"آن هوش",   desc:"پلتفرم هوش مصنوعی با ۲۲ مدل پیشرفته. ساخت ویدیو، تصویر، کد و محتوا.", icon:"hoosh",    color:"#7c3aed", grad:"linear-gradient(135deg,rgba(124,58,237,0.12),rgba(139,92,246,0.05))",  border:"rgba(124,58,237,0.22)",  stats:"۲۲ مدل AI" },
+  { id:"sarraf", label:"آن صراف", desc:"خرید و فروش رمزارز با زیرساخت واقعی.", icon:"sarraf", color:"#0891b2", grad:"linear-gradient(135deg,rgba(8,145,178,0.12),rgba(6,182,212,0.05))", border:"rgba(8,145,178,0.22)" },
+  { id:"market", label:"آن مارکت", desc:"بازار آنلاین محصولات فناوری و دیجیتال.", icon:"market", color:"#d97706", grad:"linear-gradient(135deg,rgba(217,119,6,0.12),rgba(245,158,11,0.05))", border:"rgba(217,119,6,0.22)" },
+  { id:"banner", label:"آن بنر", desc:"سامانه آگهی‌های ایران.", icon:"banner", color:"#e8354e", grad:"linear-gradient(135deg,rgba(232,53,78,0.12),rgba(244,63,94,0.05))", border:"rgba(232,53,78,0.22)" },
+  { id:"hoosh", label:"آن هوش", desc:"پلتفرم هوش مصنوعی و تولید محتوا.", icon:"hoosh", color:"#7c3aed", grad:"linear-gradient(135deg,rgba(124,58,237,0.12),rgba(139,92,246,0.05))", border:"rgba(124,58,237,0.22)" },
+];
 
 // ── Feature categories (homepage discovery) ───────
 const FEATURES = [
