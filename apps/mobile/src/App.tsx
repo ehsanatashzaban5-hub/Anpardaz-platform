@@ -3308,7 +3308,7 @@ function CarServicesScreen({onBack}:{onBack:()=>void}){
 // ─── Sana Registration Screen ─────────────────────────────────────────────────
 function SanaScreen({onBack}:{onBack:()=>void}){
   const [nationalId,setNationalId]=useState("");const [phone,setPhone]=useState("");const [done,setDone]=useState(false);const [processing,setProcessing]=useState(false);const [errModal,setErrModal]=useState("");
-  const submit=async()=>{if(!nationalId||!phone){setErrModal("تمام فیلدها الزامی است.");return}setProcessing(true);setTimeout(()=>{setProcessing(false);setDone(true)},3000)};
+  const submit=()=>{if(!nationalId||!phone){setErrModal("تمام فیلدها الزامی است.");return}setErrModal("ثبت ثنا تا زمان اتصال سرویس واقعی دفاتر خدمات قضایی در دسترس نیست.");};
   return <>
   {processing&&<AnPardazLoadingOverlay text="در حال ثبت اطلاعات..."/>}
   <div className="subscreen" dir="rtl">
