@@ -6670,7 +6670,7 @@ function AnMarketHome({onProduct,onCat,onGoCats,onSearch,compareMode,compareSele
           </div>
           <div style={{flex:1}}>
             <div style={{fontSize:17,fontWeight:900,color:"var(--am-text)",letterSpacing:"-0.01em"}}>آن مارکت</div>
-            <div style={{fontSize:11,color:"var(--am-muted)"}}>مقایسه قیمت از صدها فروشگاه معتبر</div>
+            <div style={{fontSize:11,color:"var(--am-muted)"}}>مقایسه قیمت از فروشگاه‌های متصل</div>
           </div>
           {onBack&&(
             <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:5,background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:20,padding:"5px 12px 5px 10px",cursor:"pointer",fontFamily:"Vazirmatn",fontSize:11,fontWeight:700,color:"var(--am-text2)",boxShadow:"var(--am-shadow)",flexShrink:0,whiteSpace:"nowrap" as const}}>
@@ -6688,7 +6688,7 @@ function AnMarketHome({onProduct,onCat,onGoCats,onSearch,compareMode,compareSele
               value={searchQ}
               onChange={e=>setSearchQ(e.target.value)}
               onKeyDown={e=>{if(e.key==="Enter")handleSearch();}}
-              placeholder="جستجو در بیش از ۱ میلیون محصول..."
+              placeholder="جستجو در محصولات واقعی..."
               className="am-home-search"
             />
             <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleImgChange}/>
@@ -6868,7 +6868,7 @@ function AnAssistantChat({onProduct,compareMode,compareSelected,onCompareToggle,
   onBack?:()=>void;
 }){
   const [msgs,setMsgs]=useState<{id:string;role:"user"|"ai";text:string;img?:string}[]>([
-    {id:"init",role:"ai",text:"سلام! من دستیار هوشمند خرید آن مارکت هستم. بگو چه محصولی می‌خوای — بودجه‌ات، کاربردت، برند مورد علاقه‌ات — من از صدها فروشگاه بهترین گزینه‌ها رو برات پیدا می‌کنم."}
+    {id:"init",role:"ai",text:"سلام! من دستیار هوشمند خرید آن مارکت هستم. بگو چه محصولی می‌خوای — بودجه‌ات، کاربردت، برند مورد علاقه‌ات — من از محصولات و پیشنهادهای واقعی آن مارکت بهترین گزینه‌ها رو پیدا می‌کنم."}
   ]);
   const [input,setInput]=useState("");
   const [thinking,setThinking]=useState(false);
