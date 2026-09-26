@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import type {Pool} from 'pg';
 import {AiGateway} from './ai-gateway.js';
 
-const strip=(s:string)=>s.replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\\s+/g,' ').trim();
+const strip=(s:string)=>s.replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim();
 const tag=(xml:string,name:string)=>{const m=xml.match(new RegExp('<(?:[\\w-]+:)?'+name+'[^>]*>([\\s\\S]*?)</(?:[\\w-]+:)?'+name+'>','i'));return m?strip(m[1]):''};
 const items=(xml:string)=>Array.from(xml.matchAll(/<(item|entry)\\b[\\s\\S]*?<\\/(item|entry)>/gi)).map(m=>m[0]);
 const itemField=(x:string,name:string)=>{const m=x.match(new RegExp('<(?:[\\w-]+:)?'+name+'[^>]*>([\\s\\S]*?)</(?:[\\w-]+:)?'+name+'>','i'));if(m)return strip(m[1]);const a=x.match(new RegExp('<(?:[\\w-]+:)?'+name+'[^>]*href=["']([^"']+)["']','i'));return a?.[1]??''};
