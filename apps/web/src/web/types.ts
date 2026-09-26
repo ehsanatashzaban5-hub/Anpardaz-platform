@@ -26,7 +26,6 @@ export type WebPage =
   | "market" | "market-product" | "market-category" | "market-orders"
   | "banner" | "banner-detail" | "banner-post"
   | "hoosh"
-  | "financial"
   | "news" | "news-article"
   | "education" | "education-article"
   | "video" | "video-detail"
@@ -261,15 +260,6 @@ export interface AiProject {
   accentColor: string;
   createdAt: string;
   updatedAt: string;
-}
-
-// ── Financial Center ──────────────────────────────
-export interface MarketIndex {
-  name: string;
-  nameFa: string;
-  value: number;
-  change: number;
-  changePercent: number;
 }
 
 // ── Comments / Social ─────────────────────────────
