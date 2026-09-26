@@ -7581,21 +7581,19 @@ function FinancialCenterScreen({transactions,onBack,user}:{transactions:TxRecord
 
   const maxBar=Math.max(...chartData.map(d=>Math.max(d.income,d.expense)),1);
 
-  /* display values — real if hasData, mock otherwise */
-  const dispIncome=hasData?income:MOCK_INCOME_VAL;
-  const dispExpense=hasData?expense:MOCK_EXPENSE_VAL;
-  const dispNet=hasData?net:MOCK_NET;
-  const dispCatTotals=hasData?catTotals:MOCK_CAT_TOTALS;
-  const dispTotalCatExp=hasData?totalCatExp:Object.values(MOCK_CAT_TOTALS).reduce((a,v)=>a+v,0)||1;
-  const dispChartData=hasData?chartData:viewMode==="year"?MOCK_CHART_YEAR:viewMode==="month"?MOCK_CHART_MONTH:MOCK_CHART_YEAR.slice(0,7).map((d,i)=>({label:["ش","ی","د","س","چ","پ","ج"][i],income:i===0?MOCK_INCOME_VAL:0,expense:MOCK_CHART_MONTH[i*4]?.expense||0}));
+  /* Never synthesize financial data. Until the server returns real records, render an empty state. */
+  const dispIncome=hasData?income:0;
+  const dispExpense=hasData?expense:0;
+  const dispNet=hasData?net:0;
+  const dispCatTotals=hasData?catTotals:{};
+  const dispTotalCatExp=hasData?totalCatExp:0;
+  const dispChartData=hasData?chartData:[];
   const dispMaxBar=Math.max(...dispChartData.map((d:{income:number;expense:number})=>Math.max(d.income,d.expense)),1);
-  const dispTxs=hasData?filteredTxs:MOCK_TXS;
+  const dispTxs=hasData?filteredTxs:[];
 
-  const healthMsg=isMock
-    ?"این نمونه داده آموزشی است. با انجام تراکنش‌های واقعی، اطلاعات دقیق شما نمایش داده می‌شود."
-    :healthGood
-      ?"وضعیت دخل و خرجت خوبه، همین روند رو ادامه بده!"
-      :"هزینه‌هات این دوره بیشتر از درآمدت شده؛ بهتره مراقب مخارجت باشی.";
+  const healthMsg=hasData
+    ?(healthGood?"وضعیت دخل و خرجت خوبه، همین روند رو ادامه بده!":"هزینه‌هات این دوره بیشتر از درآمدت شده؛ بهتره مراقب مخارجت باشی.")
+    :"هنوز داده مالی کافی از سرور دریافت نشده است.";
 
   const cardStyle={background:"var(--card-bg)",border:"1px solid var(--border-color)",borderRadius:18,boxShadow:"0 2px 12px rgba(0,5,20,0.22),0 0 0 1px rgba(120,190,210,0.08)"};
 
