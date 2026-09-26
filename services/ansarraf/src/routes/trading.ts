@@ -144,7 +144,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
    if(asset.asset_type==='fiat'){
      sourceCardId=Number.isSafeInteger(Number(b.sourceCardId))?Number(b.sourceCardId):0;
      if(!sourceCardId)return reply.code(400).send({error:'registered_source_card_required'});
-     const base=(process.env.ANPARDAZ_SERVICE_URL??'').replace(/\\/$/,'');const token=process.env.ANPARDAZ_INTERNAL_TOKEN;
+     const base=(process.env.ANPARDAZ_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ANPARDAZ_INTERNAL_TOKEN;
      if(!base||!token)return reply.code(503).send({error:'anpardaz_card_verification_not_configured'});
      const cr=await fetch(base+'/internal/v1/admin/cards/lookup?identityId='+encodeURIComponent(r(req).auth.sub),{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(5000)});
      const cb=await cr.json().catch(()=>({})) as any;
