@@ -218,6 +218,26 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
       ORDER BY w.created_at DESC LIMIT 500`,[status]);
    return{withdrawals:rows.rows};
  });
+ app.post('/api/v1/admin/withdrawals/:id/complete-toman',{preHandler:requireAuth},async(req,reply)=>{
+   const auth=r(req).auth;if(!['admin','super_admin','operator'].includes(auth.role))return reply.code(403).send({error:'forbidden'});
+   const wid=Number((req.params as any).id);const reference=String((req.body as any)?.payoutReference??'').trim();
+   if(!Number.isSafeInteger(wid)||wid<=0||!reference)return reply.code(400).send({error:'withdrawal_id_and_payout_reference_required'});
+   const client=await pool.connect();try{
+     await client.query('BEGIN');
+     const w=(await client.query("SELECT w.*,a.symbol,a.asset_type FROM withdrawals w JOIN assets a ON a.id=w.asset_id WHERE w.id=$1 FOR UPDATE",[wid])).rows[0];
+     if(!w)throw new Error('withdrawal_not_found');if(w.asset_type!=='fiat')throw new Error('toman_completion_only');if(w.approval_status!=='APPROVED'||w.status!=='processing')throw new Error('withdrawal_not_ready_for_toman_payout');
+     const reservation=(await client.query("SELECT * FROM withdrawal_reservations WHERE withdrawal_id=$1 AND status='active' FOR UPDATE",[wid])).rows[0];if(!reservation)throw new Error('withdrawal_reservation_missing');
+     const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!base||!token)throw new Error('accounting_service_not_configured');
+     const getAccount=async(code:string,name:string,type:string)=>{let q=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers:{authorization:'Bearer '+token}});if(q.ok)return Number((await q.json() as any).account.id);q=await fetch(base+'/internal/v1/ledger/accounts',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({accountCode:code,accountName:name,accountType:type,currency:w.symbol})});if(q.status===409)q=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers:{authorization:'Bearer '+token}});if(!q.ok)throw new Error('accounting_account_failed');return Number((await q.json() as any).account.id);};
+     const customerAccount=await getAccount('ansarraf.customer.'+w.customer_id+'.asset.'+w.symbol,'An Sarraf customer '+w.customer_id+' '+w.symbol,'liability');
+     const cashAccount=await getAccount('ansarraf.cash.bank_toman.'+w.symbol,'An Sarraf bank cash '+w.symbol,'asset');
+     const ledger=await fetch(base+'/internal/v1/ledger/transactions',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({referenceType:'ansarraf_toman_withdrawal',referenceId:String(wid),operationId:String(w.operation_id),idempotencyKey:'ansarraf:toman-withdrawal:'+wid,description:'Admin-approved Toman withdrawal payout',entries:[{accountId:customerAccount,direction:'debit',amount:String(w.amount),currency:w.symbol},{accountId:cashAccount,direction:'credit',amount:String(w.amount),currency:w.symbol}]})});if(!ledger.ok)throw new Error('accounting_post_failed');
+     await client.query('UPDATE wallets SET locked_balance=locked_balance-$1 WHERE id=$2 AND locked_balance >= $1',[w.amount,reservation.wallet_id]);
+     await client.query("UPDATE withdrawal_reservations SET status='captured',resolved_at=NOW() WHERE id=$1",[reservation.id]);
+     const out=(await client.query("UPDATE withdrawals SET status='completed',completed_at=NOW(),external_reference=$2 WHERE id=$1 RETURNING *",[wid,reference])).rows[0];
+     await client.query('COMMIT');return{withdrawal:out};
+   }catch(e){await client.query('ROLLBACK');return reply.code(400).send({error:e instanceof Error?e.message:'toman_withdrawal_completion_failed'});}finally{client.release();}
+ });
  app.post('/api/v1/admin/withdrawals/:id/reconcile',{preHandler:requireAuth},async(req,reply)=>{
    if(!['admin','super_admin','operator'].includes(r(req).auth.role))return reply.code(403).send({error:'forbidden'});
    const wid=Number((req.params as any).id);
@@ -282,20 +302,23 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      const count=Number((await client.query(
        "SELECT COUNT(*)::int AS count FROM withdrawal_approvals WHERE withdrawal_id=$1 AND decision='APPROVED'",[wid])).rows[0].count);
      if(count>=requiredCount){
-       await client.query("UPDATE withdrawals SET admin_review_status='APPROVED',reviewed_by=$2,reviewed_at=NOW() WHERE id=$1",[wid,auth.sub]);
-       const provider=await client.query("SELECT id FROM liquidity_providers WHERE code=$1 AND status='ACTIVE' FOR UPDATE",[process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX']);
-       if(!provider.rows[0])throw new Error('provider_not_active');
-       await client.query(
-         `UPDATE withdrawals
-          SET approval_status='APPROVED',approved_count=$2,approved_by=$3,approved_at=NOW(),
-              liquidity_provider_id=$4,status='processing'
-          WHERE id=$1`,
-         [wid,count,auth.sub,provider.rows[0].id]);
-       await client.query(
-         `INSERT INTO provider_withdrawal_outbox(withdrawal_id,event_type,idempotency_key,payload)
-          VALUES($1,'provider.withdrawal.submit',$2,$3)
-          ON CONFLICT(idempotency_key) DO NOTHING`,
-         [wid,'ansarraf:withdrawal-submit:'+wid,{withdrawalId:wid,operationId:w.operation_id,providerCode:process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX'}]);
+       const asset=(await client.query("SELECT id,symbol,asset_type FROM assets WHERE id=$1",[w.asset_id])).rows[0];
+       if(!asset)throw new Error('asset_not_available');
+       if(asset.asset_type==='fiat'){
+         await client.query("UPDATE withdrawals SET admin_review_status='APPROVED',reviewed_by=$2,reviewed_at=NOW(),approval_status='APPROVED',approved_count=$3,approved_by=$2,approved_at=NOW(),status='processing' WHERE id=$1",[wid,auth.sub,count]);
+       }else{
+         await client.query("UPDATE withdrawals SET admin_review_status='APPROVED',reviewed_by=$2,reviewed_at=NOW() WHERE id=$1",[wid,auth.sub]);
+         const provider=await client.query("SELECT id FROM liquidity_providers WHERE code=$1 AND status='ACTIVE' FOR UPDATE",[process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX']);
+         if(!provider.rows[0])throw new Error('provider_not_active');
+         await client.query(
+           `UPDATE withdrawals SET approval_status='APPROVED',approved_count=$2,approved_by=$3,approved_at=NOW(),liquidity_provider_id=$4,status='processing' WHERE id=$1`,
+           [wid,count,auth.sub,provider.rows[0].id]);
+         await client.query(
+           `INSERT INTO provider_withdrawal_outbox(withdrawal_id,event_type,idempotency_key,payload)
+            VALUES($1,'provider.withdrawal.submit',$2,$3)
+            ON CONFLICT(idempotency_key) DO NOTHING`,
+           [wid,'ansarraf:withdrawal-submit:'+wid,{withdrawalId:wid,operationId:w.operation_id,providerCode:process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX'}]);
+       }
      }else{
        await client.query("UPDATE withdrawals SET approved_count=$2,approval_required_count=$3 WHERE id=$1",[wid,count,requiredCount]);
      }
