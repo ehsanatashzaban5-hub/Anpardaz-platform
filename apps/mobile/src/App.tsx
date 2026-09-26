@@ -54,6 +54,32 @@ const AUTH_API_BASE = ((import.meta as any).env?.VITE_PLATFORM_API_URL as string
 
 const ANMARKET_PLATFORM_API_BASE=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")??"";
 
+async function fetchLiveServiceCatalog(serviceCode:string,operator:string,simType:string){
+  if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");
+  const token=localStorage.getItem("anpardaz:accessToken")??"";
+  const url=`${ANPARDAZ_API_BASE}/api/v1/services/catalog?serviceCode=${encodeURIComponent(serviceCode)}&operator=${encodeURIComponent(operator)}&simType=${encodeURIComponent(simType)}`;
+  const r=await fetch(url,{headers:{accept:"application/json",authorization:`Bearer ${token}`},cache:"no-store",signal:AbortSignal.timeout(10000)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(String(d?.error??"service_catalog_unavailable"));
+  return (Array.isArray(d?.items)?d.items:[]).map((x:any,i:number)=>({
+    id:String(x.id??x.code??x.packageId??`provider-${i}`),
+    name:String(x.name??x.title??x.label??""),
+    dur:String(x.dur??x.duration??x.durationLabel??""),
+    durFilter:String(x.durFilter??x.durationLabel??x.duration??""),
+    type:String(x.type??x.packageType??"internet"),
+    price:String(x.price??x.amount??x.priceRial??""),
+    info:x.info??x.description??undefined,
+    desc:x.desc??x.description??undefined,
+    special:Boolean(x.special??x.isSpecial),
+    badge:x.badge??(x.isSpecial?"special":undefined),
+  })).filter((x:any)=>x.name&&x.price);
+}
+function useLiveServiceCatalog(operator:string,simType:string){
+  const [items,setItems]=useState<any[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
+  useEffect(()=>{let active=true;setLoading(true);setError("");fetchLiveServiceCatalog("internet_package",operator,simType).then(v=>{if(active)setItems(v)}).catch(e=>{if(active){setItems([]);setError(String(e?.message??"service_catalog_unavailable"))}}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[operator,simType]);
+  return {items,loading,error};
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 type AppState = "splash" | "login" | "otp" | "unlock-pin" | "onboard-photo" | "onboard-profile" | "onboard-pin" | "verify-anim" | "ready";
 type MainTab = "home" | "history" | "profile";
@@ -1683,39 +1709,7 @@ function TransferScreen({user,onUpdate,transactions,onBack,onDone}:{user:UserDat
 
 // ─── Internet Package Screens (Irancell + MCI) ────────────────────────────────
 type IrancellPkg={id:string;name:string;dur:string;durFilter:"روزانه"|"هفتگی"|"پانزده روزه"|"ماهانه"|"سه ماهه"|"چهار ماهه";type:"internet"|"call";price:string;info?:string;special?:boolean};
-const _IC_PKGS:IrancellPkg[]=[
-  // هفتگی — اینترنت
-  {id:"w1",name:"هفتگی ۲۰۰ مگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۸۱,۹۰۰"},
-  {id:"w2",name:"هفتگی ۷۵۰ مگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۵۷,۴۰۰",special:true},
-  {id:"w3",name:"هفتگی ۱.۵ گیگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۰۶,۷۰۰"},
-  {id:"w4",name:"هفتگی ۲.۵ گیگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۴۶,۶۰۰",special:true},
-  {id:"w5",name:"هفتگی ۴ گیگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۳۰۴,۴۰۰"},
-  // ۱۵ روزه — اینترنت
-  {id:"f1",name:"۱۵ روزه ۴۰۰ مگ",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۱۳۳,۷۰۰",info:"مدت زمان بسته ۱۵ روز می‌باشد"},
-  {id:"f2",name:"۷۵۰ مگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۱۷۰,۷۰۰",info:"مدت زمان بسته ۱۵ روز می‌باشد"},
-  {id:"f3",name:"بسته ۱.۵ گیگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۱۸,۱۰۰",info:"مدت زمان بسته ۱۵ روز می‌باشد",special:true},
-  {id:"f4",name:"بسته ۲.۵ گیگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۷۵,۰۰۰",info:"مدت زمان بسته ۱۵ روز می‌باشد"},
-  {id:"f5",name:"بسته ۵.۵ گیگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۳۱۳,۰۰۰",info:"مدت زمان بسته ۱۵ روز می‌باشد",special:true},
-  // ماهانه — اینترنت
-  {id:"m0",name:"ماهانه ۱ گیگ",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱۹۹,۱۰۰"},
-  {id:"m1",name:"۸ گیگ اینترنت ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۶۹,۰۰۰",special:true},
-  {id:"m2",name:"۸ گیگ اینترنت ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۷۳,۰۰۰"},
-  {id:"m3",name:"۸ گیگ اینترنت ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۶۸۷,۰۰۰"},
-  {id:"m4",name:"۱۵ گیگ اینترنت ۷ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۸۲۸,۰۰۰"},
-  {id:"m5",name:"۳ گیگ اینترنت ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۸۵۴,۰۰۰"},
-  {id:"m6",name:"۱ گیگ اینترنت ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۹۸۷,۰۰۰"},
-  // سه ماهه
-  {id:"t1",name:"۴۵ گیگ سه ماهه",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۳,۴۵۸,۰۰۰",special:true},
-  {id:"t2",name:"۶۰ گیگ سه ماهه",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۴,۶۵۵,۰۰۰"},
-  {id:"t3",name:"۸۰ گیگ سه ماهه",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۶,۱۳۵,۰۰۰"},
-  // چهار ماهه
-  {id:"q1",name:"۱۰۰ گیگ چهار ماهه",dur:"چهار ماهه",durFilter:"چهار ماهه",type:"internet",price:"۷,۵۵۰,۰۰۰"},
-  // مکالمه — call
-  {id:"c1",name:"بسته یکماهه ۱۰۰ دقیقه‌ای داخل شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۷۷,۷۴۰"},
-  {id:"c2",name:"بسته یکماهه ۲۰۰ دقیقه‌ای داخل شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۱۴۴,۰۴۰"},
-  {id:"c3",name:"بسته یکماهه ۴۰۰ دقیقه‌ای داخل شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۲۶۶,۷۶۰"},
-  {id:"c4",name:"بسته یکماهه ۸۰۰ دقیقه‌ای داخل شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۴۹۴,۰۰۰"},
-];
+const _IC_PKGS:IrancellPkg[]=[];
 const _IC_DUR_FILTERS=["روزانه","هفتگی","۱۵ روزه","ماهانه","سه ماهه","پیشنهاد ویژه"] as const;
 
 // shared sub-components for both operator screens
@@ -1750,7 +1744,7 @@ function IrancellPkgView({phone,simType,onBack,onGoToPayment}:{phone:string;simT
   const [pkgType,setPkgType]=useState<"internet"|"call"|null>(null);
   const [sortBy,setSortBy]=useState<"price-asc"|"price-desc"|null>(null);
   const [selId,setSelId]=useState<string|null>(null);
-  const [loading,setLoading]=useState(true);
+  const {items:livePkgs,loading}=useLiveServiceCatalog("irancell",simType);
   const [showSort,setShowSort]=useState(false);
   const [showType,setShowType]=useState(false);
   useEffect(()=>{const t=setTimeout(()=>setLoading(false),900);return()=>clearTimeout(t);},[]);
@@ -1762,7 +1756,7 @@ function IrancellPkgView({phone,simType,onBack,onGoToPayment}:{phone:string;simT
     if(pkgType)return p.type===pkgType;
     return true;
   }).sort((a,b)=>{if(!sortBy)return 0;const pa=parseFloat(a.price.replace(/[^0-9]/g,""));const pb=parseFloat(b.price.replace(/[^0-9]/g,""));return sortBy==="price-asc"?pa-pb:pb-pa;});
-  const selPkg=_IC_PKGS.find(p=>p.id===selId)??null;
+  const selPkg=livePkgs.find(p=>p.id===selId)??null;
   const buy=()=>{if(!selPkg)return;onGoToPayment({phone,operator,amount:`${selPkg.name} — ${selPkg.price} ریال`,type:"internet"});};
   const IcCard=({p}:{p:IrancellPkg})=>{const isSel=selId===p.id;const volMatch=p.name.match(/[\d.]+\s*(?:گیگ(?:ابایت)?|مگ(?:ابایت)?|GB|MB)/i);const volLabel=volMatch?volMatch[0]:null;return <button onClick={()=>setSelId(isSel?null:p.id)} className={`anp-ic-card${isSel?" anp-ic-card--sel":""}`} style={{display:"flex",alignItems:"center",width:"100%",background:isSel?"rgba(0,214,176,0.1)":"var(--card-bg,rgba(255,255,255,0.05))",border:`1.5px solid ${isSel?"#00D6B0":"var(--border-light,rgba(255,255,255,0.09))"}`,borderRadius:18,padding:"16px 14px",cursor:"pointer",textAlign:"right",marginBottom:10,transition:"all .15s",fontFamily:"Vazirmatn",position:"relative",boxSizing:"border-box",boxShadow:isSel?"0 0 0 3px rgba(0,214,176,0.1)":"none"}}>
     {p.special&&<div style={{position:"absolute",top:-1,right:14,background:"rgba(0,214,176,0.18)",border:"1px solid rgba(0,214,176,0.4)",color:"#00D6B0",fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:"0 0 8px 8px",fontFamily:"Vazirmatn"}}>پیشنهاد ویژه</div>}
@@ -1821,48 +1815,8 @@ function IrancellPkgView({phone,simType,onBack,onGoToPayment}:{phone:string;simT
 
 // ─── MCI (Hamrah Aval) Prepaid Package Screen ─────────────────────────────────
 type MciPkg={id:string;name:string;dur:string;durFilter:string;type:"internet"|"call"|"sms";price:string;desc?:string;badge?:"recent"|"special"};
-const _MCI_SPECIAL:MciPkg[]=[
-  {id:"sp1",name:"آلفا+ ۱ ماهه ۵ گیگ",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۴۴۷,۶۰۰",badge:"recent"},
-  {id:"sp2",name:"۵۰ گیگ یک ماهه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳,۸۳۵,۰۰۰",badge:"special"},
-  {id:"sp3",name:"بسته ۳۰ روزه ۶ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۳۳,۹۰۰",badge:"special"},
-];
-const _MCI_PKGS:MciPkg[]=[
-  // روزانه
-  {id:"da1",name:"بسته ۱ روزه ۵۰۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۹۲,۸۰۰"},
-  {id:"da2",name:"بسته ۱ روزه ۷۵۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۱۱,۸۰۰"},
-  {id:"da3",name:"بسته ۱ روزه ۱ گیگ",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۲۱,۳۰۰"},
-  {id:"da4",name:"بسته ۱ روزه ۲ گیگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۵۹,۳۰۰"},
-  // هفتگی
-  {id:"wk1",name:"بسته ۷ روزه ۲۰۰ مگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۸۱,۹۰۰"},
-  {id:"wk2",name:"بسته ۷ روزه ۳۰۰ مگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۰۴,۲۰۰"},
-  {id:"wk3",name:"بسته ۷ روزه ۵۰۰ مگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۳۲,۷۰۰"},
-  {id:"wk4",name:"بسته ۷ روزه ۷۵۰ مگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۵۷,۲۰۰"},
-  {id:"wk5",name:"بسته ۷ روزه ۱.۵ گیگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۰۶,۷۰۰"},
-  {id:"wk6",name:"بسته ۷ روزه ۲.۵ گیگ",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۴۶,۶۰۰"},
-  // سه روزه
-  {id:"td1",name:"۳ روزه ۱۵۰ مگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۶۱,۲۰۰"},
-  {id:"td2",name:"۳ روزه ۲۵۰ مگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۸۳,۴۰۰"},
-  {id:"td3",name:"۳ روزه ۴۰۰ مگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۱۰۰,۵۰۰"},
-  {id:"td4",name:"۳ روزه ۷۵۰ مگ",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۱۲۷,۰۰۰"},
-  {id:"td5",name:"۳ روزه ۱.۵ گیگ",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۱۷۰,۷۰۰"},
-  {id:"td6",name:"بسته پیامک همراهی",dur:"سه روزه",durFilter:"سه روزه",type:"sms",price:"۱۶,۹۰۰",desc:"بسته پیامک همراهی سه روزه با ۹۰ پیامک (فارسی و انگلیسی)"},
-  // پانزده روزه
-  {id:"fd1",name:"۷۵۰ مگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۱۷۰,۷۰۰"},
-  {id:"fd2",name:"۱.۵ گیگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۱۸,۱۰۰"},
-  {id:"fd3",name:"۲.۵ گیگ ۱۵ روزه",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۷۵,۰۰۰"},
-  // ماهانه
-  {id:"mn1",name:"آلفا+ ۱ ماهه ۵ گیگ",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۴۴۷,۶۰۰",badge:"recent"},
-  {id:"mn2",name:"بسته ۳۰ روزه ۶ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۳۳,۹۰۰",badge:"special"},
-  {id:"mn3",name:"بسته مکالمه همراهی",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۲۱۰,۰۰۰",desc:"بسته مکالمه همراهی ۳۰ روزه ۶۰۰ دقیقه"},
-  {id:"mn4",name:"بسته اینترنت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱,۶۲۸,۴۰۰",desc:"بسته اینترنت همراهی، ۳۰ روزه، ۳۰ گیگابایت"},
-  {id:"mn5",name:"۵۰ گیگ یک ماهه",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳,۸۳۵,۰۰۰",badge:"special"},
-  {id:"mn6",name:"بسته اینترنت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲,۸۰۰,۰۰۰",desc:"بسته اینترنت همراهی، ۳۰ روزه، ۵۰ گیگابایت"},
-  {id:"mn7",name:"بسته اینترنت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳,۱۵۰,۰۰۰",desc:"بسته اینترنت همراهی، ۳۰ روزه، ۶۰ گیگابایت"},
-  // سه ماهه
-  {id:"tm1",name:"سه ماهه ۴۵ گیگ",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۳,۴۵۸,۰۰۰"},
-  {id:"tm2",name:"۶۰ گیگ سه ماهه",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۴,۶۰۵,۰۰۰"},
-  {id:"tm3",name:"۸۰ گیگ سه ماهه",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۶,۱۳۵,۰۰۰"},
-];
+const _MCI_SPECIAL:MciPkg[]=[];
+const _MCI_PKGS:MciPkg[]=[];
 const _MCI_DUR_FILTERS=["روزانه","هفتگی","سه روزه","پانزده روزه","ماهانه","سه ماهه"];
 
 function MciPrepaidInternetScreen({phone,simType,onBack,onGoToPayment}:{phone:string;simType:"postpaid"|"prepaid";onBack:()=>void;onGoToPayment:(d:{phone:string;operator:Operator|null;amount:string;type:"internet"})=>void}){
@@ -1870,20 +1824,19 @@ function MciPrepaidInternetScreen({phone,simType,onBack,onGoToPayment}:{phone:st
   const [pkgType,setPkgType]=useState<"internet"|"call"|"sms"|null>(null);
   const [sortBy,setSortBy]=useState<"price-asc"|"price-desc"|null>(null);
   const [selId,setSelId]=useState<string|null>(null);
-  const [loading,setLoading]=useState(true);
+  const {items:livePkgs,loading}=useLiveServiceCatalog("mci",simType);
   const [showSort,setShowSort]=useState(false);
   const [showType,setShowType]=useState(false);
-  useEffect(()=>{const t=setTimeout(()=>setLoading(false),1000);return()=>clearTimeout(t);},[]);
   const operator=OPERATORS.mci;
 
-  const allPkgs=[..._MCI_PKGS];
+  const allPkgs=livePkgs;
   const filtered=(durFilter||pkgType?allPkgs.filter(p=>{
     const durOk=!durFilter||p.durFilter===durFilter;
     const typeOk=!pkgType||p.type===pkgType;
     return durOk&&typeOk;
   }):allPkgs).sort((a,b)=>{if(!sortBy)return 0;const pa=parseFloat(a.price.replace(/[^0-9]/g,""));const pb=parseFloat(b.price.replace(/[^0-9]/g,""));return sortBy==="price-asc"?pa-pb:pb-pa;});
 
-  const selPkg=[..._MCI_SPECIAL,..._MCI_PKGS].find(p=>p.id===selId)??null;
+  const selPkg=livePkgs.find(p=>p.id===selId)??null;
   const buy=()=>{if(!selPkg)return;onGoToPayment({phone,operator,amount:`${selPkg.name} — ${selPkg.price} ریال`,type:"internet"});};
 
   const Badge=({type}:{type:"recent"|"special"})=>type==="recent"?null:<span style={{display:"inline-flex",alignItems:"center",padding:"2px 9px",borderRadius:8,fontSize:10,fontWeight:700,fontFamily:"Vazirmatn",background:"rgba(0,214,176,0.12)",color:"#00D6B0",border:"1px solid rgba(0,214,176,0.3)"}}>پیشنهاد آن‌پرداز</span>;
@@ -1986,134 +1939,8 @@ function MciPrepaidInternetScreen({phone,simType,onBack,onGoToPayment}:{phone:st
 
 // ─── Rightel Prepaid Package Screen ──────────────────────────────────────────
 type RightelPkg={id:string;name:string;dur:string;durFilter:string;type:"internet"|"call"|"sms"|"roaming"|"combo";price:string;desc?:string;badge?:"recent"|"special"};
-const _RT_SPECIAL:RightelPkg[]=[
-  {id:"rs1",name:"۳۰روزه ۳ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳۳۸,۴۰۰",badge:"recent"},
-  {id:"rs2",name:"۳۰ روزه ۵۰ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲,۹۰۰,۰۰۰",badge:"special"},
-  {id:"rs3",name:"۳۰ روزه ۲۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱,۵۱۰,۰۰۰",badge:"special"},
-];
-const _RT_PKGS:RightelPkg[]=[
-  // روزانه
-  {id:"rd1",name:"روزانه ۱۰۰ مگ",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۳۸,۲۰۰"},
-  {id:"rd2",name:"۱ روزه ۳۰۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۶۹,۳۰۰"},
-  {id:"rd3",name:"۱ روزه ۵۰۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۸۷,۷۰۰"},
-  {id:"rd4",name:"۱ روزه ۱ گیگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۱۷,۵۰۰"},
-  {id:"rd5",name:"۱ روزه ۳ گیگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۷۹,۸۰۰"},
-  // سه روزه
-  {id:"r3d1",name:"۳ روزه ۱۵۰ مگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۶۱,۴۰۰"},
-  {id:"r3d2",name:"۳ روزه ۱ گیگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۱۵۴,۳۰۰"},
-  {id:"r3d3",name:"۳ روزه ۳ گیگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۲۲۵,۱۰۰"},
-  // هفتگی
-  {id:"rw1",name:"۷ روزه ۵۰۰ مگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۳۰,۲۰۰"},
-  {id:"rw2",name:"۷ روزه ۱ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۷۹,۸۰۰"},
-  {id:"rw3",name:"۷ روزه ۳ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۶۳,۳۰۰"},
-  {id:"rw4",name:"۷ روزه ۶ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۳۵۸,۲۰۰"},
-  // پانزده روزه
-  {id:"rf1",name:"۱۵ روزه (۱.۵ گیگابایت)",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۰۸,۱۰۰"},
-  {id:"rf2",name:"۱۵ روزه ۵ گیگابایت",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۳۳۸,۴۰۰"},
-  // ماهانه اینترنت
-  {id:"rm1",name:"۳۰ روزه ۱ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱۸۶,۹۰۰"},
-  {id:"rm2",name:"۳۰ روزه ۲ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲۵۴,۸۰۰"},
-  {id:"rm3",name:"۳۰روزه ۳ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳۳۸,۴۰۰",badge:"recent"},
-  {id:"rm4",name:"۳۰ روزه ۴ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳۷۶,۶۰۰"},
-  {id:"rm5",name:"ماهانه ۵ گیگ",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۴۱۴,۸۰۰"},
-  {id:"rm6",name:"۳۰ روزه ۷ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۲۳,۰۰۰"},
-  {id:"rm7",name:"۳۰ روزه ۸ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۸۴,۰۰۰"},
-  {id:"rm8",name:"۳۰ روزه ۱۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۹۹۹,۰۰۰"},
-  {id:"rm9",name:"۳۰ روزه ۲۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱,۵۱۰,۰۰۰",badge:"special"},
-  {id:"rm10",name:"۳۰ روزه ۵۰ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲,۹۰۰,۰۰۰",badge:"special"},
-  // دو ماهه
-  {id:"r2m1",name:"۶۰ روزه ۳۵ گیگابایت",dur:"دو ماهه",durFilter:"دو ماهه",type:"internet",price:"۲,۶۶۰,۰۰۰"},
-  // سه ماهه
-  {id:"r3m1",name:"۹۰ روزه ۴۵ گیگابایت",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۳,۳۳۰,۰۰۰"},
-  {id:"r3m2",name:"۹۰ روزه ۶۰ گیگابایت",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۴,۳۳۰,۰۰۰"},
-  // یک ساله
-  {id:"ry1",name:"۳۶۵ روزه ۱۵۰ گیگابایت",dur:"یک ساله",durFilter:"یک ساله",type:"internet",price:"۸,۸۵۰,۰۰۰"},
-  {id:"ry2",name:"۳۶۵ روزه ۳۰۰ گیگابایت",dur:"یک ساله",durFilter:"یک ساله",type:"internet",price:"۱۶,۹۰۰,۰۰۰"},
-  // پیامک
-  {id:"rsms1",name:"۳۰ روزه ۲۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۴۴,۰۰۰"},
-  {id:"rsms2",name:"۳۰ روزه ۵۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۱۰۰,۰۰۰"},
-  {id:"rsms3",name:"۳۰ روزه ۱۰۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۱۷۰,۰۰۰"},
-  {id:"rsms4",name:"۳۰ روزه ۲۰۰ پیامک",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۴۵,۰۰۰"},
-  {id:"rsms5",name:"۱ ماهه ۵۰۰ پیامک فارسی-انگلیسی",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۱۳۳,۵۰۰"},
-  // مکالمه
-  {id:"rcl1",name:"۱۵۰ دقیقه تماس صوتی درون و برون شبکه ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۹۸,۰۰۰"},
-  {id:"rcl2",name:"۳۰ روزه ۵۰۰ دقیقه مکالمه درون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۲۲۴,۰۰۰"},
-  {id:"rcl3",name:"۵۰۰ دقیقه تماس صوتی درون و برون شبکه ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۳۲۰,۰۰۰"},
-  {id:"rcl4",name:"۳۰ روزه ۱۰۰۰ دقیقه مکالمه درون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۳۹۰,۰۰۰"},
-  // رومینگ
-  {id:"rro1",name:"عراق ۱۰۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۹۹۰,۰۰۰",desc:"رومینگ عراق"},
-  {id:"rro2",name:"عراق ۳۵۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۳,۳۰۰,۰۰۰",desc:"رومینگ عراق"},
-  {id:"rro3",name:"عراق ۷۵۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۶,۵۰۰,۰۰۰",desc:"رومینگ عراق"},
-];
-const _RT_DUR_FILTERS=["روزانه","هفتگی","ماهانه","سه ماهه","یک ساله"];
-const _RT_TYPE_OPTS:[string,string,string,string][]=[["internet","اینترنت","📶",""],["call","مکالمه","📞",""],["sms","پیامک","💬",""],["roaming","رومینگ","🌍",""]];
-const _RT_SORT_OPTS:[string,string][]=[["price-asc","ارزان‌ترین"],["price-desc","گران‌ترین"],["special","پیشنهادی"],["popular","محبوب‌ترین"]];
-
-// ─── Rightel Postpaid data ────────────────────────────────────────────────────
-const _RT_POST_SPECIAL:RightelPkg[]=[
-  {id:"ps1",name:"۳۰ روزه ۲۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱,۵۱۰,۰۰۰",badge:"special"},
-  {id:"ps2",name:"۳۰ روزه ۵۰ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲,۹۰۰,۰۰۰",badge:"special"},
-];
-const _RT_POST_PKGS:RightelPkg[]=[
-  // ماهانه — اینترنت
-  {id:"pm1",name:"۳۰ روزه ۱ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱۸۶,۹۰۰"},
-  {id:"pm2",name:"۳۰ روزه ۲ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲۵۴,۸۰۰"},
-  {id:"pm3",name:"۳۰ روزه ۳ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳۳۸,۴۰۰"},
-  {id:"pm4",name:"۳۰ روزه ۴ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۳۷۶,۶۰۰"},
-  {id:"pm5",name:"ماهانه ۵ گیگ",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۴۱۴,۸۰۰"},
-  {id:"pm6",name:"۳۰ روزه ۷ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۲۳,۰۰۰"},
-  {id:"pm7",name:"۳۰ روزه ۸ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۵۸۴,۰۰۰"},
-  {id:"pm8",name:"۳۰ روزه ۱۰ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۶۹۹,۰۰۰"},
-  {id:"pm9",name:"۳۰ روزه ۱۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۹۹۹,۰۰۰"},
-  {id:"pm10",name:"۳۰ روزه ۲۵ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۱,۵۱۰,۰۰۰",badge:"special"},
-  {id:"pm11",name:"۳۰ روزه ۵۰ گیگابایت",dur:"ماهانه",durFilter:"ماهانه",type:"internet",price:"۲,۹۰۰,۰۰۰",badge:"special"},
-  // دو ماهه
-  {id:"pb1",name:"۶۰ روزه ۳۵ گیگابایت",dur:"دو ماهه",durFilter:"دو ماهه",type:"internet",price:"۲,۶۶۰,۰۰۰"},
-  // سه ماهه
-  {id:"pt1",name:"۹۰ روزه ۴۵ گیگابایت",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۳,۳۳۰,۰۰۰"},
-  {id:"pt2",name:"۹۰ روزه ۶۰ گیگابایت",dur:"سه ماهه",durFilter:"سه ماهه",type:"internet",price:"۴,۳۳۰,۰۰۰"},
-  // شش ماهه
-  {id:"ph1",name:"۱۸۰ روزه ۵۰ گیگابایت",dur:"شش ماهه",durFilter:"شش ماهه",type:"internet",price:"۳,۵۰۰,۰۰۰"},
-  {id:"ph2",name:"۱۸۰ روزه ۸۰ گیگابایت",dur:"شش ماهه",durFilter:"شش ماهه",type:"internet",price:"۵,۳۰۰,۰۰۰"},
-  // یک ساله
-  {id:"py1",name:"۳۶۵ روزه ۱۵۰ گیگابایت",dur:"یک ساله",durFilter:"یک ساله",type:"internet",price:"۸,۸۵۰,۰۰۰"},
-  {id:"py2",name:"۳۶۵ روزه ۳۰۰ گیگابایت",dur:"یک ساله",durFilter:"یک ساله",type:"internet",price:"۱۶,۹۰۰,۰۰۰"},
-  // پانزده روزه
-  {id:"pf1",name:"۱۵ روزه (۱.۵ گیگابایت)",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۲۰۸,۱۰۰"},
-  {id:"pf2",name:"۱۵ روزه ۳ گیگابایت",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۳۰۱,۶۰۰"},
-  {id:"pf3",name:"۱۵ روزه ۵ گیگابایت",dur:"پانزده روزه",durFilter:"پانزده روزه",type:"internet",price:"۳۳۸,۴۰۰"},
-  // هفتگی — اینترنت
-  {id:"pw1",name:"۷ روزه ۵۰۰ مگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۳۰,۲۰۰"},
-  {id:"pw2",name:"۷ روزه ۱ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۱۷۹,۸۰۰"},
-  {id:"pw3",name:"۷ روزه ۳ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۲۶۳,۳۰۰"},
-  {id:"pw4",name:"۷ روزه ۶ گیگابایت",dur:"هفتگی",durFilter:"هفتگی",type:"internet",price:"۳۵۸,۲۰۰"},
-  // سه روزه
-  {id:"p3d1",name:"۳ روزه ۱۵۰ مگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۶۱,۴۰۰"},
-  {id:"p3d2",name:"۳ روزه ۱ گیگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۱۵۴,۳۰۰"},
-  {id:"p3d3",name:"۳ روزه ۳ گیگابایت",dur:"سه روزه",durFilter:"سه روزه",type:"internet",price:"۲۲۵,۱۰۰"},
-  // روزانه
-  {id:"pd1",name:"روزانه ۱۰۰ مگ",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۳۸,۲۰۰"},
-  {id:"pd2",name:"۱ روزه ۳۰۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۶۹,۳۰۰"},
-  {id:"pd3",name:"۱ روزه ۵۰۰ مگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۸۷,۷۰۰"},
-  {id:"pd4",name:"۱ روزه ۱ گیگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۱۷,۵۰۰"},
-  {id:"pd5",name:"۱ روزه ۳ گیگابایت",dur:"روزانه",durFilter:"روزانه",type:"internet",price:"۱۷۹,۸۰۰"},
-  // پیامک
-  {id:"psms1",name:"۳۰ روزه ۲۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۴۰,۰۰۰"},
-  {id:"psms2",name:"۳۰ روزه ۵۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۹۰,۰۰۰"},
-  {id:"psms3",name:"۳۰ روزه ۱۰۰۰ پیامک درون و برون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۱۶۰,۰۰۰"},
-  {id:"psms4",name:"۱ ماهه ۲۰۰ پیامک فارسی-انگلیسی",dur:"ماهانه",durFilter:"ماهانه",type:"sms",price:"۴۰,۰۰۰"},
-  // مکالمه
-  {id:"pcl1",name:"۱۵۰ دقیقه تماس صوتی درون و برون شبکه ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۹۸,۰۰۰"},
-  {id:"pcl2",name:"۳۰ روزه ۵۰۰ دقیقه مکالمه درون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۲۲۴,۰۰۰"},
-  {id:"pcl3",name:"۵۰۰ دقیقه تماس صوتی درون و برون شبکه ۳۰ روزه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۳۲۰,۰۰۰"},
-  {id:"pcl4",name:"۳۰ روزه ۱۰۰۰ دقیقه مکالمه درون شبکه",dur:"ماهانه",durFilter:"ماهانه",type:"call",price:"۳۹۰,۰۰۰"},
-  // ترکیبی
-  {id:"pcb1",name:"۳۰ دقیقه مکالمه + ۲۰ پیامک ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"combo",price:"۷,۰۹۰,۰۰۰",desc:"۲۰ پیامک"},
-  // رومینگ
-  {id:"pro1",name:"عراق ۱۰۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۹۹۰,۰۰۰",desc:"عراق ۱۰۰ مگابایت ۷ روزه"},
-  {id:"pro2",name:"عراق ۳۵۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۳,۳۰۰,۰۰۰",desc:"عراق ۳۵۰ مگابایت ۷ روزه"},
-  {id:"pro3",name:"عراق ۷۵۰ مگابایت ۷ روزه",dur:"هفتگی",durFilter:"هفتگی",type:"roaming",price:"۶,۵۰۰,۰۰۰",desc:"عراق ۷۵۰ مگابایت ۷ روزه"},
-];
+const _RT_SPECIAL:RightelPkg[]=[];
+const _RT_PKGS:RightelPkg[]=[];
 const _RT_POST_DUR_FILTERS=["روزانه","هفتگی","سه روزه","پانزده روزه","ماهانه","دو ماهه","سه ماهه","شش ماهه","یک ساله"];
 const _RT_POST_TYPE_OPTS:[string,string,string][]=[["internet","اینترنت","📶"],["call","مکالمه","📞"],["sms","پیامک","💬"],["combo","ترکیبی","📦"],["roaming","رومینگ","🌍"]];
 
@@ -2305,7 +2132,7 @@ function RightelPrepaidInternetScreen({phone,onBack,onGoToPayment}:{phone:string
     return 0;
   });
   const showSpecial=!durFilter&&!typeFilter;
-  const selPkg=[..._RT_PKGS,..._RT_SPECIAL].find(p=>p.id===selId)??null;
+  const selPkg=livePkgs.find(p=>p.id===selId)??null;
 
   const RTBadge=({type}:{type:"recent"|"special"})=>type==="recent"?null:<span style={{display:"inline-flex",padding:"2px 9px",borderRadius:8,fontSize:10,fontWeight:700,fontFamily:"Vazirmatn",background:"rgba(0,214,176,0.12)",color:"#00D6B0",border:"1px solid rgba(0,214,176,0.3)"}}>پیشنهاد آن‌پرداز</span>;
 
@@ -2544,17 +2371,18 @@ function BillsScreen({onBack,onGoToPayment}:{onBack:()=>void;onGoToPayment:(d:{b
     setPhoneErr("");return true;
   };
 
-  const inquire=()=>{
-    if(sel?.usePhone){
-      if(!validatePhone())return;
-    } else {
-      if(!inputVal.trim()){setBillErrModal(`لطفاً ${sel?.inputLabel} را وارد کنید.`);return;}
-    }
-    setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);
-      onGoToPayment({billType:selected,billName:sel?.name??"قبض",billIcon:selected,amount:"۱۲۰٬۰۰۰",inputVal,ownerName:titleVal||"مشترک"});
-    },2000);
+  const inquire=async()=>{
+    if(sel?.usePhone){if(!validatePhone())return;}else if(!inputVal.trim()){setBillErrModal(`لطفاً ${sel?.inputLabel} را وارد کنید.`);return;}
+    if(!ANPARDAZ_API_BASE){setBillErrModal("اتصال سرویس استعلام قبض در دسترس نیست.");return;}
+    const token=localStorage.getItem("anpardaz:accessToken")??"";setProcessing(true);setBillErrModal("");
+    try{
+      const r=await fetch(ANPARDAZ_API_BASE+"/api/v1/services/bill_payment/inquiry",{method:"POST",headers:{accept:"application/json","content-type":"application/json",authorization:`Bearer ${token}`},body:JSON.stringify({billType:selected,inputValue:inputVal.trim(),title:titleVal.trim()||null}),cache:"no-store",signal:AbortSignal.timeout(15000)});
+      const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(d?.error??"bill_inquiry_unavailable"));
+      const q=d?.inquiry??d;const amount=String(q?.amount??q?.payableAmount??q?.billAmount??"");
+      if(!amount||!/^[0-9]+(?:\\.[0-9]+)?$/.test(amount)||Number(amount)<=0)throw new Error("bill_amount_unavailable");
+      setResult(amount);onGoToPayment({billType:selected,billName:sel?.name??"قبض",billIcon:selected,amount,inputVal,ownerName:titleVal||"مشترک"});
+    }catch(e){setBillErrModal(e instanceof Error&&e.message==="bill_amount_unavailable"?"مبلغ واقعی قبض از سرویس استعلام دریافت نشد.":"استعلام قبض در حال حاضر در دسترس نیست. لطفاً دوباره تلاش کنید.");}
+    finally{setProcessing(false)}
   };
 
   const switchBill=(id:string)=>{
@@ -3712,7 +3540,7 @@ function ExchangePopup({children,onClose,onBack}:{children:ReactNode;onClose:()=
 function ExchangeSupportCenter({onBack}:{onBack:()=>void}){return <div className="exchange-support-page"><div className="exchange-support-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><b>مرکز پشتیبانی آن صراف</b><small>سرویس پشتیبانی</small></div><img src={anPardazLogo} alt="آن‌پرداز"/></div><div className="exchange-empty" style={{padding:24,textAlign:"center",lineHeight:1.9}}>سامانه تیکت هنوز به Backend پشتیبانی متصل نشده است؛ برای جلوگیری از ثبت یا نمایش اطلاعات ساختگی، این بخش فعلاً غیرفعال است.</div></div>}
 function ExchangeChat({onBack}:{onBack:()=>void}){return <div className="exchange-chat"><div className="exchange-support-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><b>چت با پشتیبانی</b><small>سرویس پشتیبانی</small></div><img src={anPardazLogo} alt="آن‌پرداز"/></div><div className="exchange-empty" style={{padding:24,textAlign:"center",lineHeight:1.9}}>چت زنده تا اتصال Backend پشتیبانی فعال نشده است؛ هیچ پاسخ، وضعیت آنلاین یا پیام ساختگی نمایش داده نمی‌شود.</div></div>}
 function ExchangeFeesPage({onBack}:{onBack:()=>void}){const [kind,setKind]=useState("خرید سریع"),[amount,setAmount]=useState(""),[calculated,setCalculated]=useState<number|null>(null),[faq,setFaq]=useState<string|null>(null),[showKindPicker,setShowKindPicker]=useState(false);const feeRate=kind==="انتقال داخلی"||kind.includes("واریز")?0:((kind==="خرید سریع"||kind==="فروش سریع") ? .004 : .003);const calc=()=>setCalculated((Number(toLatinDigits(amount))||0)*feeRate);const FeeTable=({headers,rows}:{headers:string[];rows:string[][]})=><div className="fee-table"><div className="fee-tr">{headers.map(h=><b key={h}>{h}</b>)}</div>{rows.map((r,i)=><div className="fee-tr" key={i}>{r.map((c,j)=><span key={j}>{c}</span>)}</div>)}</div>;return <div className="exchange-content-page"><header className="exchange-content-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><h1>کارمزدها</h1><p>تمامی کارمزدهای صرافی به صورت شفاف در این صفحه نمایش داده می‌شوند.</p></div><img src={anPardazLogo} alt="صرافی آن‌پرداز"/></header><section className="exchange-section"><h2>کارمزد معاملات</h2><FeeTable headers={["حجم معاملات ۳۰ روز اخیر","کارمزد سفارش‌گذار (Maker)","کارمزد سفارش‌بردار (Taker)"]} rows={[["کمتر از ۵۰ میلیون تومان","0.35%","0.40%"],["۵۰ تا ۲۰۰ میلیون تومان","0.30%","0.35%"],["۲۰۰ تا ۵۰۰ میلیون تومان","0.25%","0.30%"],["۵۰۰ میلیون تا ۱ میلیارد تومان","0.20%","0.25%"],["بیشتر از ۱ میلیارد تومان","0.15%","0.20%"]]}/><p className="fee-note">با افزایش حجم معاملات، کارمزد شما کاهش خواهد یافت.</p></section><section className="fee-split"><div className="exchange-section"><h2>کارمزد واریز تومان</h2><p>واریز تومان به صرافی کاملاً رایگان است.</p><span className="free-badge">بدون کارمزد</span></div><div className="exchange-section"><h2>کارمزد واریز تتر</h2><p>واریز تتر به صرافی بدون کارمزد است.</p><span className="free-badge">بدون کارمزد</span></div><div className="exchange-section"><h2>انتقال داخلی</h2><p>انتقال دارایی بین کاربران آن‌پرداز کاملاً رایگان است.</p><span className="free-badge">رایگان</span></div></section><section className="exchange-section"><h2>کارمزد برداشت تومان</h2><p>کارمزد برداشت تومان مطابق قوانین شبکه بانکی محاسبه می‌شود.</p><FeeTable headers={["مبلغ برداشت","کارمزد"]} rows={[["تا ۶۰۰ هزار تومان","1٪"],["۶۰۰ هزار تا ۲۰ میلیون تومان","۶,۰۰۰ تومان"],["بیش از ۲۰ میلیون تومان","۰.۰۱٪ مبلغ تراکنش (حداکثر ۷,۵۰۰ تومان)"]]}/></section><section className="exchange-section"><h2>کارمزد برداشت تتر</h2><FeeTable headers={["شبکه","کارمزد برداشت","حداقل برداشت"]} rows={[["TRC20","1 USDT","10 USDT"],["BEP20","0.5 USDT","10 USDT"],["ERC20","5 USDT","20 USDT"]]}/></section><section className="exchange-section"><h2>کارمزد خرید و فروش سریع</h2><div className="fee-line"><span>کارمزد خرید سریع: <b>0.40٪</b></span><span>کارمزد فروش سریع: <b>0.40٪</b></span></div><p className="fee-note">کارمزد قبل از ثبت نهایی سفارش به شما نمایش داده خواهد شد.</p></section><section className="exchange-section calculator"><h2>محاسبه‌گر کارمزد</h2><div style={{marginBottom:4}}><div className="fee-kind-label" style={{fontSize:12,marginBottom:6,fontWeight:600}}>نوع معامله</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{["خرید سریع","فروش سریع","معامله اسپات","واریز تومان","انتقال داخلی"].map(x=><button key={x} className={kind===x?"fee-kind-btn selected":"fee-kind-btn"} onClick={()=>{setKind(x);setCalculated(null);}} style={{padding:"8px 14px",borderRadius:10,cursor:"pointer",fontFamily:"Vazirmatn",fontSize:13,fontWeight:kind===x?700:500}}>{x}</button>)}</div></div><input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} inputMode="decimal" placeholder="مبلغ معامله (تومان)"/><button className="primary-button" onClick={calc}>محاسبه کارمزد</button>{calculated!==null&&<div className="calculator-result"><div><span>کارمزد</span><b>{fa(Math.round(calculated))} تومان</b></div><div><span>مبلغ نهایی پرداختی</span><b>{fa(Math.round((Number(amount)||0)+calculated))} تومان</b></div><div><span>مبلغ نهایی دریافتی</span><b>{fa(Math.round((Number(amount)||0)-calculated))} تومان</b></div></div>}</section><section className="exchange-section faq"><h2>سؤالات متداول</h2>{[["کارمزد معاملات چگونه محاسبه می‌شود؟","کارمزد هر سفارش براساس حجم معاملات ۳۰ روز اخیر و نوع سفارش محاسبه می‌شود."],["چگونه می‌توانم کارمزد کمتری پرداخت کنم؟","با افزایش حجم معاملات ماهانه، سطح کارمزدی شما به‌صورت خودکار کاهش می‌یابد."],["کارمزد برداشت تتر چقدر است؟","کارمزد برداشت به شبکه انتخابی بستگی دارد و پیش از تأیید نمایش داده می‌شود."],["آیا واریز تومان کارمزد دارد؟","خیر، واریز تومان به صرافی آن‌پرداز رایگان است."]].map(([q,a])=><button key={q} onClick={()=>setFaq(faq===q?null:q)}><b>{q}</b><span>{faq===q?"−":"+"}</span>{faq===q&&<p>{a}</p>}</button>)}</section></div>}
-function ExchangeVideoGuide({onBack}:{onBack:()=>void}){const videoRef=useRef<HTMLVideoElement>(null),[playing,setPlaying]=useState(false),[position,setPosition]=useState(()=>Number(localStorage.getItem("anp_exchange_video_position")||0)),[duration,setDuration]=useState(0),[volume,setVolume]=useState(.8),[muted,setMuted]=useState(false),[error,setError]=useState(false),[askResume,setAskResume]=useState(Number(localStorage.getItem("anp_exchange_video_position")||0)>0);const source="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";const fmt=(n:number)=>`${String(Math.floor(n/60)).padStart(2,"0")}:${String(Math.floor(n%60)).padStart(2,"0")}`;const seek=(v:number)=>{const el=videoRef.current;if(el){el.currentTime=Math.max(0,Math.min(duration,v));setPosition(el.currentTime)}};const toggle=()=>{const el=videoRef.current;if(!el)return;if(el.paused){el.play().then(()=>setPlaying(true)).catch(()=>setError(true))}else{el.pause();setPlaying(false)}};return <div className="exchange-content-page video-guide"><header className="exchange-content-head"><button className="back-btn" onClick={()=>{localStorage.setItem("anp_exchange_video_position",String(position));onBack()}}><Icon name="arrow" size={18}/></button><div><h1>راهنمای استفاده</h1><p>برای آشنایی با امکانات صرافی، ویدئوی آموزشی زیر را مشاهده کنید.</p></div><img src={anPardazLogo} alt="صرافی آن‌پرداز"/></header>{askResume&&<div style={{margin:"0 0 14px",padding:"16px",borderRadius:14,background:"rgba(0,214,176,0.07)",border:"1px solid rgba(0,214,176,0.2)",direction:"rtl"}}><div style={{fontSize:14,fontWeight:700,color:"#00D6B0",marginBottom:12}}>ادامه مشاهده از آخرین موقعیت؟</div><div className="confirm-actions"><button className="outline-button" onClick={()=>{seek(0);setAskResume(false)}}>شروع از ابتدا</button><button className="primary-button" onClick={()=>setAskResume(false)}>ادامه</button></div></div>}<section className="video-shell">{source?<video ref={videoRef} src={source} onLoadedMetadata={e=>{setDuration(e.currentTarget.duration);seek(position)}} onTimeUpdate={e=>{setPosition(e.currentTarget.currentTime);localStorage.setItem("anp_exchange_video_position",String(e.currentTarget.currentTime))}} onEnded={()=>setPlaying(false)} onError={()=>setError(true)}/>:<div className="video-placeholder"><Icon name="chart" size={48}/><b>ویدئوی آموزشی به‌زودی بارگذاری می‌شود</b><small>این بخش برای جایگزینی آسان فایل ویدئو آماده است.</small></div>}{error&&<div className="video-error">خطا در بارگذاری ویدئو <button onClick={()=>{setError(false);videoRef.current?.load()}}>تلاش مجدد</button></div>}<div className="video-controls"><button onClick={()=>seek(position-10)}>−۱۰</button><button className="video-play" onClick={toggle}>{playing?"Pause":"Play"}</button><button onClick={()=>seek(position+10)}>+۱۰</button><input type="range" min="0" max={duration||1} value={position} onChange={e=>seek(Number(e.target.value))}/><span>{fmt(position)} / {fmt(duration)}</span><button onClick={()=>{setMuted(!muted);if(videoRef.current)videoRef.current.muted=!muted}}>{muted?"🔇":"🔊"}</button><input className="volume" type="range" min="0" max="1" step=".05" value={volume} onChange={e=>{const v=Number(e.target.value);setVolume(v);if(videoRef.current)videoRef.current.volume=v}}/><button onClick={()=>videoRef.current?.requestFullscreen?.()}>⛶</button></div></section><button className="outline-button video-close" onClick={onBack}>بستن</button></div>}
+function ExchangeVideoGuide({onBack}:{onBack:()=>void}){const videoRef=useRef<HTMLVideoElement>(null),[playing,setPlaying]=useState(false),[position,setPosition]=useState(()=>Number(localStorage.getItem("anp_exchange_video_position")||0)),[duration,setDuration]=useState(0),[volume,setVolume]=useState(.8),[muted,setMuted]=useState(false),[error,setError]=useState(false),[askResume,setAskResume]=useState(Number(localStorage.getItem("anp_exchange_video_position")||0)>0);const [source,setSource]=useState("");useEffect(()=>{let active=true;(async()=>{try{const r=await fetch((ANPARDAZ_API_BASE||"")+"/api/v1/content/videos?limit=20&category=exchange-guide",{cache:"no-store"});if(!r.ok)return;const d=await r.json();const v=(d.videos??[])[0];if(active&&v?.id)setSource((ANPARDAZ_API_BASE||"")+"/api/v1/content/videos/"+encodeURIComponent(v.id));}catch{}})();return()=>{active=false}},[]);const fmt=(n:number)=>`${String(Math.floor(n/60)).padStart(2,"0")}:${String(Math.floor(n%60)).padStart(2,"0")}`;const seek=(v:number)=>{const el=videoRef.current;if(el){el.currentTime=Math.max(0,Math.min(duration,v));setPosition(el.currentTime)}};const toggle=()=>{const el=videoRef.current;if(!el)return;if(el.paused){el.play().then(()=>setPlaying(true)).catch(()=>setError(true))}else{el.pause();setPlaying(false)}};return <div className="exchange-content-page video-guide"><header className="exchange-content-head"><button className="back-btn" onClick={()=>{localStorage.setItem("anp_exchange_video_position",String(position));onBack()}}><Icon name="arrow" size={18}/></button><div><h1>راهنمای استفاده</h1><p>برای آشنایی با امکانات صرافی، ویدئوی آموزشی زیر را مشاهده کنید.</p></div><img src={anPardazLogo} alt="صرافی آن‌پرداز"/></header>{askResume&&<div style={{margin:"0 0 14px",padding:"16px",borderRadius:14,background:"rgba(0,214,176,0.07)",border:"1px solid rgba(0,214,176,0.2)",direction:"rtl"}}><div style={{fontSize:14,fontWeight:700,color:"#00D6B0",marginBottom:12}}>ادامه مشاهده از آخرین موقعیت؟</div><div className="confirm-actions"><button className="outline-button" onClick={()=>{seek(0);setAskResume(false)}}>شروع از ابتدا</button><button className="primary-button" onClick={()=>setAskResume(false)}>ادامه</button></div></div>}<section className="video-shell">{source?<video ref={videoRef} src={source} onLoadedMetadata={e=>{setDuration(e.currentTarget.duration);seek(position)}} onTimeUpdate={e=>{setPosition(e.currentTarget.currentTime);localStorage.setItem("anp_exchange_video_position",String(e.currentTarget.currentTime))}} onEnded={()=>setPlaying(false)} onError={()=>setError(true)}/>:<div className="video-placeholder"><Icon name="chart" size={48}/><b>ویدئوی آموزشی به‌زودی بارگذاری می‌شود</b><small>این بخش برای جایگزینی آسان فایل ویدئو آماده است.</small></div>}{error&&<div className="video-error">خطا در بارگذاری ویدئو <button onClick={()=>{setError(false);videoRef.current?.load()}}>تلاش مجدد</button></div>}<div className="video-controls"><button onClick={()=>seek(position-10)}>−۱۰</button><button className="video-play" onClick={toggle}>{playing?"Pause":"Play"}</button><button onClick={()=>seek(position+10)}>+۱۰</button><input type="range" min="0" max={duration||1} value={position} onChange={e=>seek(Number(e.target.value))}/><span>{fmt(position)} / {fmt(duration)}</span><button onClick={()=>{setMuted(!muted);if(videoRef.current)videoRef.current.muted=!muted}}>{muted?"🔇":"🔊"}</button><input className="volume" type="range" min="0" max="1" step=".05" value={volume} onChange={e=>{const v=Number(e.target.value);setVolume(v);if(videoRef.current)videoRef.current.volume=v}}/><button onClick={()=>videoRef.current?.requestFullscreen?.()}>⛶</button></div></section><button className="outline-button video-close" onClick={onBack}>بستن</button></div>}
 
 const TMN_FLAG_LOGO=(()=>{const s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><defs><clipPath id="tc"><circle cx="15" cy="15" r="15"/></clipPath></defs><g clip-path="url(#tc)"><rect y="0" width="30" height="10" fill="#1a7f3c"/><rect y="10" width="30" height="10" fill="#f5f5f5"/><rect y="20" width="30" height="11" fill="#c0392b"/></g></svg>';return`data:image/svg+xml;base64,${btoa(s)}`;})();
 function ExchangeInstantTrade({initialAsset,user,coins,onBack,onUpdate}:{initialAsset:string;user:UserData;coins:typeof EX_COINS;onBack:()=>void;onUpdate:(u:UserData,tx:TxRecord)=>void}){
