@@ -66,16 +66,23 @@ async function providerCheck(data:KycSubmission){
 
 export async function submitKyc(pool:Pool,customerId:KycCustomerId,input:unknown,actorId:string,operationId?:string){
   const data=validateKycSubmission(input);
-  let q=await pool.query('SELECT id,status FROM kyc_profiles WHERE customer_id=$1 FOR UPDATE',[customerId]);
+  const client=await pool.connect();
   let id:string;
-  if(!q.rows[0]){
-    q=await pool.query("INSERT INTO kyc_profiles(customer_id,status) VALUES($1,'DRAFT') RETURNING id,status",[customerId]);
-  }else if(!['KYC_REQUIRED','DRAFT','REQUIRES_ACTION','REJECTED'].includes(q.rows[0].status)){
-    throw new Error('kyc_submission_not_allowed');
-  }
-  id=String(q.rows[0]?.id);
-  await pool.query("UPDATE kyc_profiles SET status='PROVIDER_CHECKING',submitted_data_encrypted=$2,submitted_data_hash=$3,submitted_at=NOW(),updated_at=NOW(),admin_id=NULL,admin_decision_reason=NULL,rejected_at=NULL WHERE id=$1",[id,encrypt(data),digest(data)]);
-  await pool.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,actor_id,action,previous_status,new_status,operation_id) VALUES($1,'customer',$2,'SUBMITTED',$3,'PROVIDER_CHECKING',$4)",[id,actorId,q.rows[0]?.status??'DRAFT',operationId??null]);
+  let previousStatus='DRAFT';
+  try{
+    await client.query('BEGIN');
+    let q=await client.query('SELECT id,status FROM kyc_profiles WHERE customer_id=$1 FOR UPDATE',[customerId]);
+    if(!q.rows[0]){
+      q=await client.query("INSERT INTO kyc_profiles(customer_id,status) VALUES($1,'DRAFT') RETURNING id,status",[customerId]);
+    }else if(!['KYC_REQUIRED','DRAFT','REQUIRES_ACTION','REJECTED'].includes(q.rows[0].status)){
+      throw new Error('kyc_submission_not_allowed');
+    }
+    id=String(q.rows[0].id);
+    previousStatus=String(q.rows[0].status??'DRAFT');
+    await client.query("UPDATE kyc_profiles SET status='PROVIDER_CHECKING',submitted_data_encrypted=$2,submitted_data_hash=$3,submitted_at=NOW(),updated_at=NOW(),admin_id=NULL,admin_decision_reason=NULL,rejected_at=NULL WHERE id=$1",[id,encrypt(data),digest(data)]);
+    await client.query("INSERT INTO kyc_audit_events(kyc_profile_id,actor_type,actor_id,action,previous_status,new_status,operation_id) VALUES($1,'customer',$2,'SUBMITTED',$3,'PROVIDER_CHECKING',$4)",[id,actorId,previousStatus,operationId??null]);
+    await client.query('COMMIT');
+  }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   const providerConfigured=Boolean(process.env.KYC_PROVIDER_URL&&process.env.KYC_PROVIDER_CODE&&process.env.KYC_PROVIDER_API_KEY);
   if(!providerConfigured){
     await pool.query("UPDATE kyc_profiles SET status='ADMIN_REVIEW',provider_status='manual_review',updated_at=NOW() WHERE id=$1",[id]);
