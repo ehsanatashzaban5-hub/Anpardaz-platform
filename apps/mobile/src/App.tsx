@@ -246,6 +246,7 @@ async function userSettingsRequest(path:string,init:RequestInit={}){
   return data as {settings?:UserSettings;pinEnabled?:boolean};
 }
 
+async function anpardazAccounts():Promise<any[]>{const d=await anpardazRequest("/api/v1/accounts");return Array.isArray(d?.accounts)?d.accounts:[];}
 async function anpardazCards():Promise<BankCard[]>{
   const d=await anpardazRequest("/api/v1/cards");
   return Array.isArray(d?.cards)?d.cards.map((x:any)=>({id:String(x.id),number:String(x.number??"•••• "+String(x.last4??"")),bank:String(x.bank_name??"بانک"),holderName:String(x.holder_name??""),registrationStatus:String(x.registration_status??"verified")})): [];
@@ -8657,6 +8658,8 @@ export default function App() {
       document.removeEventListener("touchcancel",onEnd);
     };
   },[]);
+
+  useEffect(()=>{let active=true;const hydrate=async()=>{if(!user||!localStorage.getItem("anpardaz:accessToken"))return;try{const [profile,cards,accounts]=await Promise.all([anpardazRequest("/api/v1/customer/profile"),anpardazCards(),anpardazAccounts()]);if(!active)return;const p=profile?.profile??{};const toman=accounts.find((a:any)=>String(a.currency).trim()==="IRR"||String(a.currency).trim()==="TMN"||String(a.currency).trim()==="TOMAN");const usdt=accounts.find((a:any)=>String(a.currency).trim()==="USDT");const next={...user,name:String(p.first_name??user.name??""),family:String(p.last_name??user.family??""),nationalId:String(p.national_id??user.nationalId??""),birthDate:p.birth_date?String(p.birth_date).slice(0,10):user.birthDate,phone:String(p.phone??user.phone),cards,tomanBalance:Number(toman?.balance??0),usdtBalance:Number(usdt?.balance??0)};DB.saveUser(next);setUser(next);}catch{/* Keep cached non-financial profile only; financial values remain server-backed on next successful refresh. */}};void hydrate();const timer=window.setInterval(()=>void hydrate(),30000);return()=>{active=false;window.clearInterval(timer)}},[user?.uid]);
 
   useEffect(()=>{const t=setTimeout(()=>{const phone=DB.currentPhone();if(phone){const u=DB.getUser(phone);if(u){setUser(u);setTransactions(DB.getTx(phone));const hs=localStorage.getItem(`anp_home_services_${u.uid}`);if(hs){try{const p=JSON.parse(hs);if(Array.isArray(p)){// Migrate: ensure all DEFAULT_HOME_SERVICES are present (add missing ones)
               const merged=[...p,...DEFAULT_HOME_SERVICES.filter(id=>!p.includes(id))];
