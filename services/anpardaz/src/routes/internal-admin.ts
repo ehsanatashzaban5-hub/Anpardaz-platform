@@ -51,6 +51,16 @@ export function registerInternalAdminRoutes(app:FastifyInstance,pool:Pool){
     return {operations:rows.rows};
   });
 
+  app.get('/internal/v1/admin/cards/lifecycle/:identityId',async(request,reply)=>{
+    if(!authorized(request))return reply.code(401).send({error:'unauthorized'});
+    const identityId=(request.params as {identityId:string}).identityId?.trim();
+    if(!identityId)return reply.code(400).send({error:'invalid_identity_id'});
+    const customer=(await pool.query('SELECT id,identity_id,email FROM customers WHERE identity_id=$1 LIMIT 1',[identityId])).rows[0];
+    if(!customer)return reply.code(404).send({error:'customer_not_found'});
+    const rows=await pool.query('SELECT id,card_id,action,provider,provider_reference,last4,bank_name,actor_type,actor_identity_id,reason,metadata,created_at FROM card_lifecycle_audit WHERE customer_id=$1 ORDER BY created_at DESC LIMIT 500',[customer.id]);
+    return {history:rows.rows};
+  });
+
   app.get('/internal/v1/admin/banking/operations',async(request,reply)=>{
     if(!authorized(request))return reply.code(401).send({error:'unauthorized'});
     const q=request.query as {status?:string;limit?:string}; const limit=Math.min(Math.max(Number(q.limit??500)||500,1),2000);
