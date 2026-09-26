@@ -92,8 +92,8 @@ import './index.css'
       indicator.style.transform = "translateY(14px)";
       indicator.style.opacity = "1";
       setTimeout(() => {
-        collapse();
-        setTimeout(() => { refreshing = false; }, 300);
+        // This indicator must correspond to a real refresh, not a cosmetic spinner.
+        window.location.reload();
       }, 750);
     } else {
       collapse();
