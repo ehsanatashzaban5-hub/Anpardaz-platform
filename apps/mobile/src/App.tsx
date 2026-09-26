@@ -4815,45 +4815,11 @@ function SupportModal({onClose}:{onClose:()=>void}){
     </div>
     <div className="anp-page-body">
       <p style={{fontSize:13,color:"var(--text-muted)",marginBottom:20,textAlign:"center",lineHeight:1.9}}>اطلاعات تماس تلفنی فقط در صورتی نمایش داده می‌شود که از سرویس رسمی آن‌پرداز دریافت شده باشد. در حال حاضر برای جلوگیری از نمایش اطلاعات غیرقابل‌تأیید، پشتیبانی را از مسیر رسمی تیکت انجام دهید.</p>
-      <button className="primary-button" style={{width:"100%",marginBottom:12}} onClick={onClose}>بازگشت</button>
       <button className="outline-button" style={{width:"100%"}} onClick={onClose}>بازگشت</button>
     </div>
   </div>;
 }
 
-function AddCardModal({onAdd,onClose}:{onAdd:(c:BankCard)=>void;onClose:()=>void}){
-  const [num,setNum]=useState("");const [bank,setBank]=useState("");const [holder,setHolder]=useState("");const [err,setErr]=useState("");
-  const fmt=(v:string)=>v.replace(/\D/g,"").slice(0,16).replace(/(.{4})/g,"$1 ").trim();
-  const detectedBank=detectBank(num.replace(/\s/g,""));
-  const save=()=>{if(num.replace(/\s/g,"").length!==16){setErr("شماره کارت باید ۱۶ رقم باشد.");return}if(!bank||!holder){setErr("تمام فیلدها الزامی است.");return}onAdd({id:genId(),number:num.replace(/\s/g,""),bank,holderName:holder})};
-  useBackHandler(onClose);
-  return <div className="anp-full-page" dir="rtl">
-    <div className="anp-page-header">
-      <button className="back-btn" onClick={onClose}><Icon name="arrow" size={20}/></button>
-      <h2 className="subscreen-title">افزودن کارت بانکی</h2>
-      <div style={{width:36}}/>
-    </div>
-    <div className="anp-page-body">
-      <div className="bank-card-preview" style={{marginBottom:20}}><span>آن‌پرداز</span><b>{num?toFaDigits(fmt(num)):"•••• •••• •••• ••••"}</b><small>{holder||"نام صاحب کارت"}</small><em>{bank||"نام بانک"}</em></div>
-      <div className="fl-grid" style={{marginBottom:16}}>
-        <div>
-          <div style={{fontSize:12,color:"var(--text-muted)",marginBottom:4,paddingRight:2}}>شماره کارت</div>
-          <div className="auth-input-wrap" style={{position:"relative"}}>
-            {detectedBank&&<div style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",zIndex:2,pointerEvents:"none"}}><BankLogo bankName={detectedBank} size={28} rounded={7}/></div>}
-            <input className="auth-input ltr" style={detectedBank?{paddingRight:44}:undefined} value={toFaDigits(fmt(num))} onChange={e=>{const c=toLatinDigits(e.target.value).replace(/\s/g,"");setNum(c);const d=detectBank(c);if(d&&!bank)setBank(d);}} inputMode="numeric" placeholder="xxxx xxxx xxxx xxxx" dir="ltr"/>
-          </div>
-        </div>
-        <FloatInput label="نام بانک" value={bank} onChange={v=>setBank(v)} dir="rtl"/>
-        <FloatInput label="نام صاحب کارت" value={holder} onChange={v=>setHolder(v)} dir="rtl"/>
-      </div>
-      {err&&<p className="field-err">{err}</p>}
-      <button className="primary-button" onClick={save}>ذخیره کارت</button>
-      <button className="outline-button" style={{width:"100%",marginTop:8}} onClick={onClose}>انصراف</button>
-      </div>
-    </div>;
-}
-
-// ─── Profile Page ─────────────────────────────────────────────────────────────
 function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:UserData;onUpdate:(u:UserData)=>void;onLogout:()=>void;lightTheme:boolean;setLightTheme:(v:boolean)=>void}){
   const [modal,setModal]=useState<null|"info"|"addcard"|"addcard-shaparak"|"support"|"settings">(null);
   const [pinModal,setPinModal]=useState<null|"enable"|"change"|"disable">(null); const [pinCurrent,setPinCurrent]=useState("");
