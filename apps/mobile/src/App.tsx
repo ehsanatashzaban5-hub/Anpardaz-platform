@@ -4938,7 +4938,7 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexB
         const assetId=sarrafAssetId(assets,asset);
         const result=await sarrafRequest("/api/v1/withdrawals",{method:"POST",body:JSON.stringify({assetId,amount:String(value),network:network.trim(),destination:addr.trim(),idempotencyKey:crypto.randomUUID()})});
         setNotice(`درخواست برداشت در آن صراف ثبت شد. شناسه: ${String(result?.withdrawal?.id??result?.withdrawalId??"—")}`);
-      }catch(e){setNotice(e instanceof Error?e.message:"ثبت برداشت انجام نشد.");}
+      }catch(e){setNotice(e instanceof Error?e.message:"ثبت برداشت انجام نشد.");throw e;}
     };
     setWithdrawSummary({amount:`${toFaDigits(amt)} ${asset==="USDT"?"دلار تتر":asset}`,destination:`شبکه ${network} · ${addr.slice(0,8)}...`,network,address:addr});
     go("withdraw-confirm");
