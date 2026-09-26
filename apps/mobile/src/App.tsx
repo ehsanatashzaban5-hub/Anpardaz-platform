@@ -6831,7 +6831,7 @@ function CashbackScreen({user,transactions,onBack,onUpdate}:{user:UserData;trans
   const [visibleCount,setVisibleCount]=useState(10);
   const [complaintCat,setComplaintCat]=useState("");
   const [complaintText,setComplaintText]=useState("");
-  const [complaintSent,setComplaintSent]=useState(false);
+  const [complaintSent,setComplaintSent]=useState(false); const [complaintTrack,setComplaintTrack]=useState(""); const [complaintError,setComplaintError]=useState("");
   const [blinkTick,setBlinkTick]=useState(true);
   const scrollRef=useRef<HTMLDivElement>(null);
   const [showWithdraw,setShowWithdraw]=useState(false);
@@ -6896,7 +6896,7 @@ function CashbackScreen({user,transactions,onBack,onUpdate}:{user:UserData;trans
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00D6B0" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
             <div style={{fontSize:18,fontWeight:900,color:"#00D6B0",marginBottom:8}}>اعتراض ثبت شد</div>
-            <div style={{fontSize:13,color:"var(--text-muted)",marginBottom:6}}>شماره پیگیری: {toFaDigits(String(1000000+Math.floor(Math.random()*9000000)))}</div>
+            <div style={{fontSize:13,color:"var(--text-muted)",marginBottom:6}}>شماره پیگیری: {complaintTrack?toFaDigits(complaintTrack):"—"}</div>
             <p style={{fontSize:13,color:"var(--text-muted)",lineHeight:1.9,marginBottom:24}}>تیم پشتیبانی آن‌پرداز ظرف ۴۸ ساعت کاری بررسی می‌کند.</p>
             <button className="primary-button" style={{width:"100%"}} onClick={()=>{setComplaintSent(false);setComplaintCat("");setComplaintText("");setSub("home")}}>بازگشت</button>
           </div>
@@ -6917,7 +6917,7 @@ function CashbackScreen({user,transactions,onBack,onUpdate}:{user:UserData;trans
               <div style={{fontSize:14,fontWeight:800,color:"var(--text-primary)",marginBottom:10}}>توضیحات</div>
               <textarea value={complaintText} onChange={e=>setComplaintText(e.target.value)} placeholder="جزئیات اعتراض خود را بنویسید..." style={{width:"100%",minHeight:100,background:"rgba(0,0,0,0.2)",border:"1px solid var(--border-color)",borderRadius:10,color:"var(--text-primary)",fontFamily:"Vazirmatn",fontSize:13,padding:"12px",boxSizing:"border-box",resize:"none",outline:"none",lineHeight:1.8}}/>
             </div>
-            <button className="primary-button" style={{width:"100%"}} disabled={!complaintCat||!complaintText.trim()} onClick={()=>setComplaintSent(true)}>ثبت اعتراض</button>
+            <button className="primary-button" style={{width:"100%"}} disabled={!complaintCat||!complaintText.trim()} onClick={async()=>{setComplaintError("");try{const token=localStorage.getItem("anpardaz:accessToken")??"";if(!token||!ANPARDAZ_API_BASE)throw new Error("auth");const r=await fetch(ANPARDAZ_API_BASE+"/api/v1/support/tickets",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({subject:"اعتراض · "+complaintCat,message:complaintText.trim()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(d?.error??"support_failed"));setComplaintTrack(String(d?.ticket?.id??""));setComplaintSent(true);}catch{setComplaintError("ثبت اعتراض انجام نشد. اتصال حساب و سرور را بررسی کنید.");}}}>ثبت اعتراض</button>{complaintError&&<div style={{fontSize:12,color:"#e8354e",marginTop:10}}>{complaintError}</div>}
           </>
         )}
       </div>
