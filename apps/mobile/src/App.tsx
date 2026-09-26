@@ -7764,8 +7764,7 @@ function CameraCardScanModal({onClose,onDetect}:{onClose:()=>void;onDetect:(num:
     ctx.drawImage(v,0,0);
     setCapturedImg(c.toDataURL("image/jpeg",0.8));
     streamRef.current?.getTracks().forEach(t=>t.stop());
-    setPhase("captured");setLoading(true);
-    setTimeout(()=>{setLoading(false);setPhase("result");setDetectedNum("");},1500);
+    setLoading(false);setDetectedNum("");setPhase("result");
   };
 
   useBackHandler(onClose);
@@ -7793,14 +7792,14 @@ function CameraCardScanModal({onClose,onDetect}:{onClose:()=>void;onDetect:(num:
         {loading&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center"}}>
           <div style={{textAlign:"center",color:"#fff"}}>
             <div style={{width:40,height:40,border:"3px solid rgba(0,214,176,0.3)",borderTop:"3px solid #00D6B0",borderRadius:"50%",margin:"0 auto 12px",animation:"spin 1s linear infinite"}}/>
-            <div style={{fontSize:13}}>در حال تحلیل...</div>
+            <div style={{fontSize:13}}>در حال آماده‌سازی تصویر...</div>
           </div>
         </div>}
       </div>
       <canvas ref={canvasRef} style={{display:"none"}}/>
       <div style={{padding:"20px 16px",background:"rgba(0,0,0,0.9)"}}>
         {phase==="camera"&&<>
-          <p style={{color:"rgba(255,255,255,0.6)",fontSize:12,textAlign:"center",marginBottom:16,lineHeight:1.7}}>از شماره کارت عکس بگیرید{"\n"}ما شماره کارت را برایتان وارد می‌کنیم.</p>
+          <p style={{color:"rgba(255,255,255,0.6)",fontSize:12,textAlign:"center",marginBottom:16,lineHeight:1.7}}>از شماره کارت عکس بگیرید؛ تصویر فقط برای بازبینی شما ثبت می‌شود. تشخیص خودکار شماره کارت تا اتصال سرویس OCR واقعی فعال نیست.</p>
           <button onClick={capture} style={{width:"100%",background:"var(--accent)",border:"none",borderRadius:14,padding:"15px",color:"#031522",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn"}}>گرفتن عکس</button>
         </>}
         {phase==="result"&&<>
