@@ -89,7 +89,7 @@ function AboutPage() {
   );
 }
 
-function SupportPage() {
+function SupportPage({ isLoggedIn, onAuthRequired }: { isLoggedIn: boolean; onAuthRequired: () => void }) {
   const [subject, setSubject]   = useState("");
   const [message, setMessage]   = useState("");
   const [sent, setSent]         = useState(false);
@@ -143,9 +143,11 @@ function SupportPage() {
                 <label style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>پیام</label>
                 <textarea value={message} onChange={e=>setMessage(e.target.value)} rows={5} placeholder="مشکل یا سوال خود را شرح دهید..." className="w-input" style={{ resize:"vertical" }}/>
               </div>
-              <button onClick={()=>{if(subject&&message)setSent(true);}} disabled={!subject||!message} className="w-btn w-btn-primary" style={{ padding:"11px", opacity:subject&&message?1:0.5 }}>
-                <WI n="send" s={15}/> ارسال تیکت
+              <button onClick={async()=>{if(!isLoggedIn){onAuthRequired();return;}if(!subject||!message||busy)return;setBusy(true);setError("");try{const token=localStorage.getItem("anpardaz:accessToken")??"";const base=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")??"";const r=await fetch(base+"/api/v1/support/tickets",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${token}`},body:JSON.stringify({subject,message})});if(!r.ok)throw new Error("ارسال تیکت ناموفق بود.");setSent(true);setSubject("");setMessage("");}catch(e){setError(e instanceof Error?e.message:"ارسال تیکت ناموفق بود.")}finally{setBusy(false)}}} disabled={!subject||!message||busy} className="w-btn w-btn-primary" style={{ padding:"11px", opacity:subject&&message&&!busy?1:0.5 }}>
+                <WI n="send" s={15}/> {busy?"در حال ارسال…":"ارسال تیکت"}
               </button>
+              {error && <div style={{fontSize:12,color:"#e8354e"}}>{error}</div>}
+              {!isLoggedIn && <div style={{fontSize:11,color:"var(--w-muted)"}}>برای ثبت تیکت ابتدا وارد حساب کاربری شوید.</div>}
             </div>
           )}
         </div>
@@ -317,7 +319,7 @@ export default function WebPortal() {
           <AboutPage/>
         )}
         {page === "support" && (
-          <SupportPage/>
+          <SupportPage isLoggedIn={isLoggedIn} onAuthRequired={handleAuthRequired}/>
         )}
       </main>
 
