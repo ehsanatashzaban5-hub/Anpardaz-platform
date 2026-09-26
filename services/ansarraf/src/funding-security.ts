@@ -29,7 +29,7 @@ export async function verifyFirstTomanDepositWindow(pool:Pool,customerId:string)
   return {allowed:remaining<=0,firstTomanDepositAt:first,remainingSeconds:Math.ceil(remaining)};
 }
 
-export async function requireTomanWithdrawalSecurity(pool:Pool,request:FastifyRequest,customerId:number,assetId:number,cardId:number){
+export async function requireTomanWithdrawalSecurity(pool:Pool,request:FastifyRequest,customerId:string,assetId:number,cardId:number){
   const auth=(request as AuthRequest).auth;
   const asset=(await pool.query('SELECT id,symbol,asset_type FROM assets WHERE id=$1 AND status=\'active\' LIMIT 1',[assetId])).rows[0];
   if(!asset)throw new Error('asset_not_available');
