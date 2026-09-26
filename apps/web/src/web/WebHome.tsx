@@ -45,7 +45,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
       fetch(API+"/api/v1/news?limit=3&category=education",{cache:"no-store"}).then(r=>r.ok?r.json():{items:[]}),
       fetch(API+"/api/v1/content/videos?limit=4",{cache:"no-store"}).then(r=>r.ok?r.json():{videos:[]}),
       fetch((((import.meta.env as any).VITE_ANSARRAF_API_URL??"") as string).replace(/\/$/,"")+"/api/v1/market-data/quotes",{cache:"no-store"}).then(r=>r.ok?r.json():{quotes:[]})
-    ]).then(([n,e,v,q])=>{if(!active)return;setNews(n.items??[]);setEducation(e.items??[]);setVideos(v.videos??[]);setAssets((q.quotes??q.items??[]).map((x:any)=>({id:String(x.symbol),symbol:String(x.base_asset??x.symbol??"—"),name:String(x.base_asset??x.symbol??"—"),nameFa:String(x.base_asset??x.symbol??"—"),price:Number(x.last_price??0),change24h:Number(x.change24h??0),volume24h:Number(x.volume_24h??0),marketCap:0,logoColor:"#0891b2"})))}).catch(()=>{});
+    ]).then(([n,e,v,q])=>{if(!active)return;setNews(n.items??[]);setEducation(e.items??[]);setVideos(v.videos??[]);setAssets((q.quotes??q.items??[]).map((x:any)=>{const rawSymbol=String(x.symbol??"");const base=String(x.base_asset??rawSymbol.split(/[\/-]/)[0]??"—").toUpperCase();return{id:rawSymbol||base,symbol:base,name:base,nameFa:base,price:Number(x.last_price??x.lastPrice??0),change24h:Number(x.change24h??x.change??0),volume24h:Number(x.volume_24h??x.volume24h??0),marketCap:null,logoColor:"#0891b2"} }))}).catch(()=>{});
     return()=>{active=false};
   },[API]);
   return (
@@ -169,7 +169,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
                     </span>
                   </td>
                   <td style={{ padding:"14px 16px", color:"var(--w-muted)" }}>${fmt(a.volume24h)}</td>
-                  <td style={{ padding:"14px 16px", color:"var(--w-muted)" }}>${fmt(a.marketCap)}</td>
+                  <td style={{ padding:"14px 16px", color:"var(--w-muted)" }}>{a.marketCap!=null&&a.marketCap>0?`${fmt(a.marketCap)}`:"—"}</td>
                   <td style={{ padding:"14px 16px" }}>
                     <button onClick={e => { e.stopPropagation(); onNavigate("sarraf"); }} className="w-btn w-btn-primary" style={{ padding:"6px 14px", fontSize:11, borderRadius:7 }}>معامله</button>
                   </td>
