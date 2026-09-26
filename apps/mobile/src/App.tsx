@@ -3558,8 +3558,7 @@ function ExchangeInstantTrade({initialAsset,user,coins,onBack,onUpdate}:{initial
   const liveUsdtToman=Number(coins.find(c=>c.symbol==="USDT")?.price??0); const priceInQuote=quote==="USDT"?(liveUsdtToman>0?selected.price/liveUsdtToman:0):selected.price;
   const quoteSpent=side==="buy"?rawAmt:rawAmt*priceInQuote;
   const baseUnits=side==="buy"?rawAmt/Math.max(priceInQuote,1e-12):rawAmt;
-  const feeRate=.003;
-  const fee=quoteSpent*feeRate;
+  const fee=0; // The backend/An Sarraf fee engine is authoritative; UI never invents a commission.
   const quoteBalance=quote==="TMN"?Number(liveWallets.TMN??0):Number(liveWallets.USDT??0);
   const baseBalance=Number(liveWallets[String(asset).toUpperCase()]??0);
   const instantTomanNum=side==="buy"&&quote==="TMN"?Math.floor(rawAmt):0;
