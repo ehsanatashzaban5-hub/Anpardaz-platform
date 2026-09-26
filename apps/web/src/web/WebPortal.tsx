@@ -11,6 +11,7 @@ import WebBanner     from "./WebBanner";
 import WebHoosh      from "./WebHooshProduction";
 import WebContent, { type ContentSection } from "./WebContent";
 import WebSettings from "./WebSettings";
+import WebForum from "./WebForum";
 import WebAuthModal, { WebKycModal } from "./WebAuth";
 import type { WebPage, UserRole } from "./types";
 
@@ -319,6 +320,9 @@ export default function WebPortal() {
         )}
         {page === "about" && (
           <AboutPage/>
+        )}
+        {page === "forum" && (
+          <WebForum isLoggedIn={isLoggedIn} onAuthRequired={handleAuthRequired}/>
         )}
         {page === "support" && (
           <SupportPage isLoggedIn={isLoggedIn} onAuthRequired={handleAuthRequired}/>
