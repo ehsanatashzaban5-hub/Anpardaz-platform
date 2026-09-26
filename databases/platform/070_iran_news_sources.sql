@@ -1,5 +1,9 @@
 BEGIN;
 
+UPDATE content_sources SET enabled=FALSE,updated_at=NOW() WHERE category IN ('world-news','forex-news');
+
+UPDATE news_articles SET category_slug='iran-news' WHERE category_slug='world-news';
+
 INSERT INTO content_sources(source_type,name,source_url,category,enabled,fetch_interval_seconds)
 VALUES
 ('rss','ایسنا','https://www.isna.ir/rss','iran-news',TRUE,900),
@@ -9,7 +13,8 @@ VALUES
 ('rss','خبرآنلاین','https://www.khabaronline.ir/rss','iran-news',TRUE,900),
 ('rss','تابناک','https://www.tabnak.ir/fa/rss/allnews','iran-news',TRUE,900),
 ('rss','عصر ایران','https://www.asriran.com/fa/rss/allnews','iran-news',TRUE,900),
-('rss','باشگاه خبرنگاران جوان','https://www.yjc.ir/fa/rss/allnews','iran-news',TRUE,900)
+('rss','باشگاه خبرنگاران جوان','https://www.yjc.ir/fa/rss/allnews','iran-news',TRUE,900),
+('rss','میهن بلاکچین','https://mihanblockchain.com/feed/','crypto-news',TRUE,900)
 ON CONFLICT(source_url) DO UPDATE SET category='iran-news',enabled=TRUE,fetch_interval_seconds=EXCLUDED.fetch_interval_seconds,updated_at=NOW();
 
 INSERT INTO content_publication_policies(category_slug,daily_limit,auto_publish,require_review)
