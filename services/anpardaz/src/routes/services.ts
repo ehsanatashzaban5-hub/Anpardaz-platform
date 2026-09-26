@@ -100,11 +100,17 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
     if(body.payload!==undefined&&(typeof body.payload!=='object'||body.payload===null||Array.isArray(body.payload)))return reply.code(400).send({error:'invalid_service_payload'});
     const op=(await pool.query('SELECT * FROM fintech_service_operations WHERE customer_id=$1 AND operation_id=$2 AND service_code=$3',[customerId,operationId,serviceCode])).rows[0];
     if(!op)return reply.code(404).send({error:'operation_not_found'});
-    if(op.status==='completed'||op.status==='failed')return {operation:op,idempotent:true};
+    if(['completed','failed','manual_review','reversed'].includes(op.status))return {operation:op,idempotent:true};
+    const claim=(await pool.query("UPDATE fintech_service_operations SET status='processing',updated_at=NOW() WHERE customer_id=$1 AND operation_id=$2 AND service_code=$3 AND status='pending' RETURNING *",[customerId,operationId,serviceCode])).rows[0];
+    if(!claim){
+      const current=(await pool.query('SELECT * FROM fintech_service_operations WHERE customer_id=$1 AND operation_id=$2',[customerId,operationId])).rows[0];
+      return {operation:current,idempotent:true};
+    }
+    await pool.query("UPDATE fintech_provider_outbox SET status='processing',attempts=attempts+1,updated_at=NOW() WHERE operation_id=$1 AND event_type='provider.execute' AND status IN ('pending','processing')",[operationId]);
     let payload:Record<string,unknown>={};
     try{payload=(body.payload??op.request_metadata?.payload??{}) as Record<string,unknown>;}catch{}
     const provider=providerOr503(reply);if(!provider)return;
-    await pool.query("UPDATE fintech_service_operations SET status='processing',provider_code='fintech',updated_at=NOW() WHERE operation_id=$1",[operationId]);
+    await pool.query("UPDATE fintech_service_operations SET provider_code='fintech',updated_at=NOW() WHERE operation_id=$1",[operationId]);
     const result=await provider.execute({serviceCode,operationId,payload});
     let status=result.status;
     let accountingStatus='pending';
