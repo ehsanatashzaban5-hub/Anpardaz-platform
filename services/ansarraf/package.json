@@ -11,7 +11,8 @@
   "dependencies": {
     "@fastify/cors": "11.3.0",
     "fastify": "5.12.5",
-    "pg": "8.23.0"
+    "pg": "8.23.0",
+    "@anpardaz/ip-region-policy": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "24.13.5",
