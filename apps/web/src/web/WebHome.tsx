@@ -107,7 +107,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
 
       {/* ── PLATFORMS ──────────────────────────────── */}
       <section style={{ maxWidth:1280, margin:"0 auto", padding:"clamp(40px,6vw,64px) clamp(16px,3vw,24px)" }}>
-        <SectionHeader title="پلتفرم‌های آن پرداز" subtitle="پنج اکوسیستم قدرتمند، یک تجربه یکپارچه" />
+        <SectionHeader title="پلتفرم‌های آن پرداز" subtitle="اکوسیستم‌های آن پرداز، یک تجربه یکپارچه" />
         <div className="w-platforms-grid" style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))", gap:16 }}>
           {PLATFORMS.map(p => (
             <button key={p.id} onClick={() => onNavigate(p.id as WebPage)} className="w-platform-card" style={{ display:"flex", flexDirection:"column", padding:"24px", borderRadius:18, background:p.grad, border:`1px solid ${p.border}`, cursor:"pointer", textAlign:"right", transition:"all 0.18s", position:"relative", overflow:"hidden" }}>
