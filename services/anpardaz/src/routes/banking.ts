@@ -75,6 +75,7 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
       `INSERT INTO banking_provider_outbox(operation_id,operation_type) VALUES($1,'card_balance')`,[operationId]
     );
 
+    await pool.query("UPDATE banking_provider_outbox SET status='processing',updated_at=NOW() WHERE operation_id=$1 AND operation_type='card_balance'",[operationId]);
     const provider=providerOr503(reply);if(!provider)return;
     try{
       const result=await provider.execute({
@@ -107,6 +108,7 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
         `UPDATE card_balance_checks SET status='manual_review',error_code='PROVIDER_UNAVAILABLE',error_message=$1 WHERE operation_id=$2`,
         [e instanceof Error?e.message:'provider_unavailable',operationId]
       );
+      await pool.query("UPDATE banking_provider_outbox SET status='manual_review',last_error=$1,updated_at=NOW() WHERE operation_id=$2 AND operation_type='card_balance'",[e instanceof Error?e.message:'provider_unavailable',operationId]);
       return reply.code(503).send({error:'banking_provider_unavailable',operationId});
     }
   });
