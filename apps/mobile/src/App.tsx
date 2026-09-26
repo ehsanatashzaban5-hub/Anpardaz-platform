@@ -9461,7 +9461,14 @@ export default function App() {
     void userSettingsRequest("/api/v1/user/settings",{method:"PATCH",body:JSON.stringify({theme:v?"light":"dark"})}).catch(()=>{});
   };
   useEffect(()=>{document.body.classList.toggle("light-theme",lightTheme)},[lightTheme]);
-  useEffect(()=>{const p=new URLSearchParams(window.location.search);if(p.get("card_registration")==="verified"){setSystemNotice("کارت بانکی با موفقیت در آن‌پرداز ثبت و تأیید شد.");window.dispatchEvent(new Event("anp-cards-updated"));const clean=window.location.pathname+window.location.hash;window.history.replaceState({},document.title,clean)}},[]);
+  useEffect(()=>{let active=true;
+  const refreshRegisteredCards=async()=>{if(!user||!active)return;try{const cards=await anpardazCards();if(!active)return;const next={...user,cards};DB.saveUser(next);setUser(next);}catch{}};
+  const p=new URLSearchParams(window.location.search);
+  if(p.get("card_registration")==="verified"){setSystemNotice("کارت بانکی با موفقیت در آن‌پرداز ثبت و تأیید شد.");void refreshRegisteredCards();const clean=window.location.pathname+window.location.hash;window.history.replaceState({},document.title,clean)}
+  const onCardsUpdated=()=>{void refreshRegisteredCards()};
+  window.addEventListener("anp-cards-updated",onCardsUpdated);
+  return()=>{active=false;window.removeEventListener("anp-cards-updated",onCardsUpdated)};
+},[user?.uid]);
 
   useEffect(()=>{
     if(!user)return;
