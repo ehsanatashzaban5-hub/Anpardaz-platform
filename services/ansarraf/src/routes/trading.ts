@@ -4,6 +4,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
 import {provisionProviderExecution} from '../provider-execution.js';
 import {ensureKycRequired} from '../kyc.js';
+import {requireTomanWithdrawalSecurity} from '../funding-security.js';
 type R=FastifyRequest&{auth:AuthClaims};const r=(x:FastifyRequest)=>x as R;
 const dec=/^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/;const amount=(v:unknown)=>typeof v==='string'&&dec.test(v)&&v!=='0'&&!/^0\.0+$/.test(v);const id=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;const idem=(v:unknown)=>typeof v==='string'&&v.length>=8&&v.length<=200;const fp=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 
@@ -139,7 +140,11 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
    const kyc=await ensureKycRequired(pool,customer);if(!kyc.allowed)return reply.code(403).send({error:'kyc_required',kycStatus:kyc.status});
    if(!id(b.assetId)||!amount(b.amount)||typeof b.network!=='string'||!b.network.trim()||b.network.length>50||typeof b.destination!=='string'||b.destination.length<10||b.destination.length>500||(b.memo!=null&&(typeof b.memo!=='string'||b.memo.length>200))||!idem(b.idempotencyKey))
      return reply.code(400).send({error:'invalid_withdrawal'});
-   const requestFingerprint=fp({assetId:b.assetId,amount:b.amount,network:b.network.trim(),destination:b.destination.trim(),memo:b.memo??null});
+   const destinationCardId=Number.isSafeInteger(Number(b.destinationCardId))?Number(b.destinationCardId):0;
+   let fundingSecurity:{asset:any;card:any}=null as any;
+   try{fundingSecurity=await requireTomanWithdrawalSecurity(pool,req,customer,Number(b.assetId),destinationCardId);}
+   catch(e){const code=e instanceof Error?e.message:'withdrawal_security_failed';return reply.code(code==='crypto_withdrawal_locked_24h'?423:400).send({error:code});}
+   const requestFingerprint=fp({assetId:b.assetId,amount:b.amount,network:b.network.trim(),destination:b.destination.trim(),memo:b.memo??null,destinationCardId:destinationCardId||null});
    const client=await pool.connect();
    try{
      await client.query('BEGIN');
@@ -158,7 +163,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      const moved=await client.query('UPDATE wallets SET available_balance=available_balance-$1,locked_balance=locked_balance+$1 WHERE id=$2 AND available_balance >= $1 RETURNING id',[b.amount,wallet.rows[0].id]);
      if(!moved.rows[0])throw new Error('insufficient_available_balance');
      const operationId='ANSARRAF-WD-'+randomUUID();
-     const w=await client.query("INSERT INTO withdrawals(customer_id,asset_id,amount,network,destination,destination_memo,idempotency_key,operation_id,approval_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING') RETURNING *",[customer,b.assetId,b.amount,b.network.trim(),b.destination.trim(),b.memo??null,b.idempotencyKey,operationId]);
+     const w=await client.query("INSERT INTO withdrawals(customer_id,asset_id,amount,network,destination,destination_memo,idempotency_key,operation_id,approval_status,destination_card_id,destination_card_last4,admin_review_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',$9,$10,'PENDING') RETURNING *",[customer,b.assetId,b.amount,b.network.trim(),b.destination.trim(),b.memo??null,b.idempotencyKey,operationId,fundingSecurity.card?.id??null,fundingSecurity.card?.last4??null]);
      await client.query('INSERT INTO withdrawal_reservations(withdrawal_id,wallet_id,asset_id,amount) VALUES($1,$2,$3,$4)',[w.rows[0].id,wallet.rows[0].id,b.assetId,b.amount]);
      await client.query('COMMIT');
      return reply.code(201).send({withdrawal:w.rows[0]});
@@ -234,11 +239,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      if(!w)throw new Error('withdrawal_not_found');
      if(w.identity_id===auth.sub)throw new Error('self_approval_forbidden');
      if(w.approval_status!=='PENDING'||w.status!=='pending')throw new Error('withdrawal_not_pending_approval');
-     const threshold=process.env.WITHDRAWAL_DUAL_APPROVAL_THRESHOLD;
-     const requiresDual=threshold===undefined||threshold===''||threshold==='0'
-       ? true
-       : Number(w.amount)>=Number(threshold);
-     const requiredCount=requiresDual?2:1;
+     const requiredCount=1;
      if(Number(w.approval_required_count)!==requiredCount){
        await client.query('UPDATE withdrawals SET approval_required_count=$2 WHERE id=$1',[wid,requiredCount]);
      }
@@ -251,6 +252,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      const count=Number((await client.query(
        "SELECT COUNT(*)::int AS count FROM withdrawal_approvals WHERE withdrawal_id=$1 AND decision='APPROVED'",[wid])).rows[0].count);
      if(count>=requiredCount){
+       await client.query("UPDATE withdrawals SET admin_review_status='APPROVED',reviewed_by=$2,reviewed_at=NOW() WHERE id=$1",[wid,auth.sub]);
        const provider=await client.query("SELECT id FROM liquidity_providers WHERE code=$1 AND status='ACTIVE' FOR UPDATE",[process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX']);
        if(!provider.rows[0])throw new Error('provider_not_active');
        await client.query(
