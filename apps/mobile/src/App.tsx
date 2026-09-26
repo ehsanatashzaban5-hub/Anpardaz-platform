@@ -7136,17 +7136,7 @@ function CashbackScreen({user,transactions,onBack,onUpdate}:{user:UserData;trans
                 </div>
                 <div style={{display:"flex",gap:10}}>
                   <button onClick={()=>setWdStep("select-card")} style={{flex:1,padding:"14px",borderRadius:12,background:"rgba(255,255,255,0.05)",border:"1px solid var(--border-color)",color:"var(--text-muted)",fontFamily:"Vazirmatn",fontSize:14,fontWeight:700,cursor:"pointer"}}>ویرایش</button>
-                  <button onClick={()=>{
-                    setWdStep("processing");
-                    const track=genId().slice(0,10).toUpperCase();
-                    setTimeout(()=>{
-                      setWdTrack(track);
-                      setWdStep("done");
-                      const card=user.cards.find(c=>c.id===wdCard);
-                      const txRecord:TxRecord={id:genId(),userId:user.phone,type:"deposit",fromAsset:"toman",toAsset:"toman",amount:totalCashback,fee:0,status:"done",createdAt:new Date().toISOString(),source:"app",note:`بازگشت هزینه · برداشت · کارت: ${card?.number?.slice(-4)||""} · شناسه: ${track}`,fromCard:wdCard};
-                      onUpdate&&onUpdate({...user,tomanBalance:user.tomanBalance+totalCashback},txRecord);
-                    },2200);
-                  }} style={{flex:2,padding:"14px",borderRadius:12,background:"#f59e0b",border:"none",color:"#1a1200",fontSize:15,fontWeight:800,fontFamily:"Vazirmatn",cursor:"pointer"}}>تأیید و برداشت</button>
+                  <button disabled style={{flex:2,padding:"14px",borderRadius:12,background:"rgba(245,158,11,.25)",border:"none",color:"#8a6a20",fontFamily:"Vazirmatn",fontSize:14,fontWeight:800,cursor:"not-allowed"}}>برداشت تا اتصال سرویس مالی غیرفعال است</button>
                 </div>
               </>);})()}
               {wdStep==="processing"&&<div style={{textAlign:"center",padding:"32px 0"}}>
