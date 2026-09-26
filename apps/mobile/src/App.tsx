@@ -9449,7 +9449,8 @@ export default function App() {
   const [serviceName,setServiceName]=useState("");
   const [lightTheme,setLightThemeState]=useState(()=>localStorage.getItem("anp_theme")==="light");
   const [insuranceTab,setInsuranceTab]=useState<"third-party"|"body"|"motorcycle">("third-party");
-  const [systemNotice,setSystemNotice]=useState("");\n  const [protectedAccessNotice,setProtectedAccessNotice]=useState("");
+  const [systemNotice,setSystemNotice]=useState("");
+  const [protectedAccessNotice,setProtectedAccessNotice]=useState("");
   const [homeSlide,setHomeSlide]=useState(0);
   const [homeSliderPaused,setHomeSliderPaused]=useState(false);
   const internetStateRef=useRef<{phone:string;step:InternetStep}|null>(null);
