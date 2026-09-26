@@ -26,7 +26,7 @@ export function registerProviderFundingRoutes(app:FastifyInstance,pool:Pool){
     const adapter=registry.get(providerCode);if(!adapter)return reply.code(503).send({error:'provider_not_configured'});
     const address=await adapter.getDepositAddress(symbol,network);if(!address.address)return reply.code(503).send({error:'provider_deposit_address_unavailable'});
     const others=(await pool.query("SELECT customer_id FROM provider_deposit_addresses WHERE provider_id=$1 AND asset_id=$2 AND network=$3 AND address=$4 AND status='ACTIVE' AND customer_id<>$5",[provider.id,asset.id,network,address.address,customer])).rows;
-    const safe=others.rows.length===0||Boolean(address.memo);
+    const safe=others.length===0||Boolean(address.memo);
     const row=(await pool.query(`INSERT INTO provider_deposit_addresses(provider_id,customer_id,asset_id,network,address,memo,provider_reference)
       VALUES($1,$2,$3,$4,$5,$6,$7)
       ON CONFLICT(provider_id,customer_id,asset_id,network) DO UPDATE SET address=EXCLUDED.address,memo=EXCLUDED.memo,provider_reference=EXCLUDED.provider_reference,status='ACTIVE'
