@@ -53,10 +53,12 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
     }catch(error){req.log.warn({error,serviceCode,operator},'service catalog unavailable');return reply.code(503).send({error:'service_catalog_unavailable'});}
   });
 
-  app.post('/api/v1/services/bill_payment/inquiry',{preHandler:requireAuth},async(req,reply)=>{
+  app.post('/api/v1/services/:serviceCode/inquiry',{preHandler:requireAuth},async(req,reply)=>{
+    const serviceCode=String((req.params as any)?.serviceCode??'').trim() as FintechServiceCode;
+    if(!allowed.has(serviceCode))return reply.code(400).send({error:'unsupported_service'});
     const body=(req.body??{}) as Record<string,unknown>;
-    if(!body.billType||typeof body.inputValue!=='string'||!body.inputValue.trim())return reply.code(400).send({error:'invalid_bill_inquiry'});
-    try{return {inquiry:await serviceInquiry('bill_payment',body)};}catch(error){req.log.warn({error},'bill inquiry unavailable');return reply.code(503).send({error:'bill_inquiry_unavailable'});}
+    if(!Object.keys(body).length)return reply.code(400).send({error:'invalid_inquiry'});
+    try{return {inquiry:await serviceInquiry(serviceCode,body),source:'provider'};}catch(error){req.log.warn({error,serviceCode},'service inquiry unavailable');return reply.code(503).send({error:'service_inquiry_unavailable'});}
   });
 
   app.get('/api/v1/services/operations',{preHandler:requireAuth},async(req)=>{
