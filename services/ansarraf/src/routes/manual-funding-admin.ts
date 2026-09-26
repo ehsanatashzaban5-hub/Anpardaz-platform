@@ -100,7 +100,7 @@ export function registerManualFundingAdminRoutes(app:FastifyInstance,pool:Pool){
       const wallet=(await client.query(`INSERT INTO wallets(customer_id,asset_id,available_balance,locked_balance) VALUES($1,$2,0,0)
         ON CONFLICT(customer_id,asset_id) DO UPDATE SET available_balance=wallets.available_balance RETURNING id`,[customer.id,asset.id])).rows[0];
       const updated=(await client.query('UPDATE wallets SET available_balance=available_balance+$1 WHERE id=$2 RETURNING available_balance::text AS available_balance',[amount,wallet.id])).rows[0];
-      const d=(await client.query(`UPDATE deposits SET status='confirmed',accounting_operation_id=$1,admin_actor_identity_id=$2 WHERE id=$3 AND status IN ('pending','confirmed') RETURNING id,customer_id,asset_id,amount::text,status,external_reference,source_card_last4,source_card_provider_reference,accounting_operation_id,created_at`,[operationId,actorIdentityId,depositId])).rows[0];
+      const d=(await client.query(`UPDATE deposits SET status='confirmed',admin_review_status='APPROVED',reviewed_by=$2,reviewed_at=NOW(),accounting_operation_id=$1,admin_actor_identity_id=$2 WHERE id=$3 AND status IN ('pending','confirmed') RETURNING id,customer_id,asset_id,amount::text,status,external_reference,source_card_last4,source_card_provider_reference,accounting_operation_id,created_at`,[operationId,actorIdentityId,depositId])).rows[0];
       if(!d)throw new Error('deposit_not_found');
       await client.query('COMMIT');
       return {deposit:d,wallet:{available_balance:updated.available_balance},accounting:ledgerBody};
