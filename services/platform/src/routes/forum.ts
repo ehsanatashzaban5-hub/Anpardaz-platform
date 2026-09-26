@@ -4,7 +4,8 @@ import { ensurePlatformUser, requireAuth } from '../auth.js';
 
 type AuthenticatedRequest = FastifyRequest & { auth: any };
 
-export function registerForumRoutes(app: FastifyInstance, pool: Pool) {\n  app.get('/api/v1/forum/rooms', async () => ({ rooms: (await pool.query("SELECT id,name,slug,description,status,created_at FROM forum_rooms WHERE status='open' ORDER BY id")).rows }));
+export function registerForumRoutes(app: FastifyInstance, pool: Pool) {
+  app.get('/api/v1/forum/rooms', async () => ({ rooms: (await pool.query("SELECT id,name,slug,description,status,created_at FROM forum_rooms WHERE status='open' ORDER BY id")).rows }));
   app.get<{ Params: { roomId: string } }>('/api/v1/forum/rooms/:roomId/messages', async (request, reply) => {
     const roomId=Number(request.params.roomId);if(!Number.isSafeInteger(roomId)||roomId<=0)return reply.code(400).send({error:'invalid_room'});
     return {messages:(await pool.query("SELECT id,room_id,identity_id,body,created_at FROM forum_room_messages WHERE room_id=$1 AND status='visible' ORDER BY id DESC LIMIT 100",[roomId])).rows};
