@@ -2,7 +2,7 @@
 // An Pardaz Web Portal — Homepage
 // ─────────────────────────────────────────────────
 import WI from "./WebIcons";
-import { NEWS_ARTICLES, EDU_ARTICLES, VIDEOS, CRYPTO_ASSETS, MARKET_INDICES } from "./mockData";
+import { NEWS_ARTICLES, EDU_ARTICLES, VIDEOS } from "./mockData";
 import type { WebPage } from "./types";
 
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
@@ -15,19 +15,18 @@ const PLATFORMS = [
   { id:"market",    label:"آن مارکت", desc:"بازار آنلاین محصولات فناوری و دیجیتال با بهترین قیمت و ضمانت اصالت کالا.", icon:"market",   color:"#d97706", grad:"linear-gradient(135deg,rgba(217,119,6,0.12),rgba(245,158,11,0.05))",  border:"rgba(217,119,6,0.22)",  stats:"۵۰۰+ محصول" },
   { id:"banner",    label:"آن بنر",   desc:"سامانه آگهی‌های ایران. ثبت و مشاهده آگهی در تمام شهرهای کشور.", icon:"banner",   color:"#e8354e", grad:"linear-gradient(135deg,rgba(232,53,78,0.12),rgba(244,63,94,0.05))",   border:"rgba(232,53,78,0.22)",  stats:"۱۰۰K+ آگهی" },
   { id:"hoosh",     label:"آن هوش",   desc:"پلتفرم هوش مصنوعی با ۲۲ مدل پیشرفته. ساخت ویدیو، تصویر، کد و محتوا.", icon:"hoosh",    color:"#7c3aed", grad:"linear-gradient(135deg,rgba(124,58,237,0.12),rgba(139,92,246,0.05))",  border:"rgba(124,58,237,0.22)",  stats:"۲۲ مدل AI" },
-  { id:"financial", label:"سبد ارز دیجیتال",desc:"داده‌های مالی، شاخص‌های بازار، ابزارهای تحلیل و آموزش سرمایه‌گذاری.", icon:"financial", color:"#059669", grad:"linear-gradient(135deg,rgba(5,150,105,0.12),rgba(16,185,129,0.05))",  border:"rgba(5,150,105,0.22)",  stats:"بازارهای جهانی" },
-] as const;
 
 // ── Feature categories (homepage discovery) ───────
 const FEATURES = [
-  { title:"اخبار ارزهای دیجیتال",  icon:"sarraf",    color:"#0891b2", cat:"crypto" },
-  { title:"اخبار هوش مصنوعی",       icon:"hoosh",     color:"#7c3aed", cat:"ai"     },
-  { title:"اخبار تکنولوژی",         icon:"cpu",       color:"#6366f1", cat:"tech"   },
-  { title:"اخبار محصولات جدید",     icon:"package",   color:"#d97706", cat:"product"},
-  { title:"آموزش ارزهای دیجیتال",   icon:"graduation",color:"#0891b2", cat:"edu"    },
-  { title:"آموزش هوش مصنوعی",       icon:"sparkle",   color:"#7c3aed", cat:"edu-ai" },
-  { title:"آموزش فارکس",            icon:"chart-line", color:"#059669", cat:"forex"  },
-  { title:"مرکز ویدئو",             icon:"play-circle",color:"#e8354e", cat:"video"  },
+  { title:"اخبار ایران", icon:"newspaper", color:"#0891b2", cat:"iran-news" },
+  { title:"اخبار ارزهای دیجیتال", icon:"sarraf", color:"#0891b2", cat:"crypto" },
+  { title:"اخبار هوش مصنوعی", icon:"hoosh", color:"#7c3aed", cat:"ai" },
+  { title:"اخبار تکنولوژی", icon:"cpu", color:"#6366f1", cat:"tech" },
+  { title:"اخبار محصولات جدید", icon:"package", color:"#d97706", cat:"product" },
+  { title:"آموزش ارزهای دیجیتال", icon:"graduation", color:"#0891b2", cat:"edu" },
+  { title:"آموزش هوش مصنوعی", icon:"sparkle", color:"#7c3aed", cat:"edu-ai" },
+  { title:"آموزش فارکس", icon:"chart-line", color:"#059669", cat:"forex" },
+  { title:"مرکز ویدئو", icon:"play-circle", color:"#e8354e", cat:"video" },
 ] as const;
 
 interface HomeProps { onNavigate: (p: WebPage) => void; }
