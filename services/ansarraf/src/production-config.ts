@@ -25,10 +25,11 @@ export function validateAnSarrafProductionConfig(env: NodeJS.ProcessEnv) {
   const kycProviderUrl=env.KYC_PROVIDER_URL;
   const kycProviderCode=env.KYC_PROVIDER_CODE;
   const kycProviderKey=env.KYC_PROVIDER_API_KEY;
+  const manualKyc=env.KYC_MANUAL_REVIEW_ENABLED==='true';
   const kycKey=env.KYC_ENCRYPTION_KEY_B64;
-  if (placeholder(kycProviderUrl ?? '')) throw new Error('KYC_PROVIDER_URL must be configured in production');
-  if (!kycProviderCode) throw new Error('KYC_PROVIDER_CODE must be configured in production');
-  if (placeholder(kycProviderKey ?? '')) throw new Error('KYC_PROVIDER_API_KEY must be configured in production');
+  if (!manualKyc && placeholder(kycProviderUrl ?? '')) throw new Error('KYC_PROVIDER_URL must be configured in production unless manual KYC review is enabled');
+  if (!manualKyc && !kycProviderCode) throw new Error('KYC_PROVIDER_CODE must be configured in production unless manual KYC review is enabled');
+  if (!manualKyc && placeholder(kycProviderKey ?? '')) throw new Error('KYC_PROVIDER_API_KEY must be configured in production unless manual KYC review is enabled');
   if (!kycKey) throw new Error('KYC_ENCRYPTION_KEY_B64 must be configured in production');
   const decoded=Buffer.from(kycKey,'base64');
   if (decoded.length!==32) throw new Error('KYC_ENCRYPTION_KEY_B64 must decode to exactly 32 bytes');
