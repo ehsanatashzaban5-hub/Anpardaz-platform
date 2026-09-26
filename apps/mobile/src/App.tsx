@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, type ReactNode } from "react";
+import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { createPortal } from "react-dom";
 import { _ANP_BACK, useBackHandler } from "./backHandler";
 import AnBannerScreen from "./AnBanner";
@@ -195,14 +196,37 @@ type SarrafAssetRecord={id:number|string;symbol:string;status?:string};async fun
     const regionRes=await fetch(ANPARDAZ_API_BASE+"/api/v1/access/region",{cache:"no-store",headers:{accept:"application/json"}});
     const region=await regionRes.json().catch(()=>({}));
     if(!regionRes.ok||region?.allowed!==true){setNotice("استفاده از این خدمات فقط با IP ایران مجاز است. لطفاً با یک IP ایران دوباره تلاش کنید.");return false;}
-    const pk=(window as any).PublicKeyCredential;
-    if(!pk?.isUserVerifyingPlatformAuthenticatorAvailable){setNotice("برای استفاده از خدمات، باید حداقل یک قفل امن روی گوشی شما فعال باشد؛ مانند الگو، رمز عبور، PIN یا اثر انگشت. امکان بررسی قفل دستگاه در این محیط وجود ندارد.");return false;}
-    if(!await pk.isUserVerifyingPlatformAuthenticatorAvailable()){setNotice("برای استفاده از خدمات، ابتدا حداقل یک قفل امن روی گوشی خود فعال کنید؛ مانند الگو، رمز عبور، PIN یا اثر انگشت. سپس دوباره تلاش کنید.");return false;}
+    if(!browserSupportsWebAuthn()){setNotice("برای استفاده از خدمات، ابتدا حداقل یک قفل امن روی گوشی خود فعال کنید؛ مانند الگو، رمز عبور، PIN یا اثر انگشت. این دستگاه یا مرورگر امکان بررسی امن قفل صفحه را ندارد.");return false;}
+    const existingToken=sessionStorage.getItem("anpardaz:deviceSecurityToken")??"";
+    if(existingToken)return true;
+    const status=await anpardazRequest("/api/v1/device-security/status");
+    let deviceToken="";
+    if(status?.registered){
+      const options=await anpardazRequest("/api/v1/device-security/authentication/options");
+      const response=await startAuthentication({optionsJSON:options});
+      const verification=await anpardazRequest("/api/v1/device-security/authentication/verify",{method:"POST",body:JSON.stringify(response)});
+      deviceToken=String(verification?.deviceToken??"");
+    }else{
+      const options=await anpardazRequest("/api/v1/device-security/registration/options");
+      const response=await startRegistration({optionsJSON:options});
+      const verification=await anpardazRequest("/api/v1/device-security/registration/verify",{method:"POST",body:JSON.stringify(response)});
+      deviceToken=String(verification?.deviceToken??"");
+    }
+    if(!deviceToken){setNotice("تأیید قفل امن گوشی انجام نشد. لطفاً حداقل یک الگو، PIN، رمز عبور یا اثر انگشت روی گوشی فعال کنید و دوباره تلاش کنید.");return false;}
+    sessionStorage.setItem("anpardaz:deviceSecurityToken",deviceToken);
     return true;
-  }catch{setNotice("به‌دلیل خطای بررسی امنیتی، استفاده از این خدمت در حال حاضر مجاز نیست. لطفاً اتصال اینترنت و قفل امن گوشی را بررسی کنید.");return false;}
+  }catch(error){
+    const name=String((error as any)?.name??"");
+    if(name==="NotAllowedError"||name==="InvalidStateError"||name==="SecurityError"){
+      setNotice("برای استفاده از خدمات، باید حداقل یک قفل امن روی گوشی فعال باشد؛ مانند الگو، PIN، رمز عبور یا اثر انگشت. تأیید قفل دستگاه انجام نشد.");
+    }else{
+      setNotice("به‌دلیل خطای بررسی امنیتی، استفاده از این خدمت در حال حاضر مجاز نیست. لطفاً اتصال اینترنت، IP ایران و قفل امن گوشی را بررسی کنید.");
+    }
+    return false;
+  }
 }
 
-async function anpardazRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const res=await fetch(`${ANPARDAZ_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(data?.error??"anpardaz_request_failed"));return data;}
+async function anpardazRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const deviceToken=sessionStorage.getItem("anpardaz:deviceSecurityToken");if(deviceToken)headers.set("x-anpardaz-device-token",deviceToken);const res=await fetch(`${ANPARDAZ_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(data?.error??"anpardaz_request_failed"));return data;}
 type UserSettings={theme:"dark"|"light";notificationsEnabled:boolean;keySoundEnabled:boolean;fontScale:number;pinEnabled:boolean;updatedAt:string};
 async function userSettingsRequest(path:string,init:RequestInit={}){
   const token=window.localStorage.getItem("anpardaz:accessToken")??"";
