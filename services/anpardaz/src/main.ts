@@ -58,7 +58,7 @@ app.post('/api/v1/device-security/registration/verify',{preHandler:requireAuth},
   if(!pool)return reply.code(503).send({error:'database_unavailable'});
   const auth=(request as typeof request&{auth:any}).auth;
   const customerId=await ensureCustomer(pool,auth);
-  const challenge=(await pool.query("SELECT challenge FROM device_security_challenges WHERE customer_id=$1 AND challenge_type='registration' AND expires_at>NOW()",[customerId])).rows[0]?.challenge;
+  const challenge=(await pool.query("DELETE FROM device_security_challenges WHERE customer_id=$1 AND challenge_type='registration' AND expires_at>NOW() RETURNING challenge",[customerId])).rows[0]?.challenge;
   if(!challenge)return reply.code(400).send({error:'device_security_challenge_expired'});
   try{
     const verification=await verifyRegistrationResponse({
@@ -100,7 +100,7 @@ app.post('/api/v1/device-security/authentication/verify',{preHandler:requireAuth
   if(!pool)return reply.code(503).send({error:'database_unavailable'});
   const auth=(request as typeof request&{auth:any}).auth;
   const customerId=await ensureCustomer(pool,auth);
-  const challenge=(await pool.query("SELECT challenge FROM device_security_challenges WHERE customer_id=$1 AND challenge_type='authentication' AND expires_at>NOW()",[customerId])).rows[0]?.challenge;
+  const challenge=(await pool.query("DELETE FROM device_security_challenges WHERE customer_id=$1 AND challenge_type='authentication' AND expires_at>NOW() RETURNING challenge",[customerId])).rows[0]?.challenge;
   const body=(request.body??{}) as any;
   const stored=(await pool.query('SELECT id,credential_id,public_key,counter,transports FROM device_security_credentials WHERE customer_id=$1 AND credential_id=$2 LIMIT 1',[customerId,String(body.id??'')])).rows[0];
   if(!challenge||!stored)return reply.code(400).send({error:'device_security_authentication_invalid'});
