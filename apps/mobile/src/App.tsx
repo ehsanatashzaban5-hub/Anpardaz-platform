@@ -2762,14 +2762,23 @@ function ViolationsScreen({onBack,onGoToPayment}:{onBack:()=>void;onGoToPayment?
   const [result,setResult]=useState<string|null>(null);
   const [errModal,setErrModal]=useState("");
 
-  const inquire=()=>{
+  const inquire=async()=>{
     if(!part1||!part2||!province){setErrModal("لطفاً پلاک خودرو را کامل وارد کنید.");return}
-    setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);
-      const plateStr=`${toFaDigits(part1)} ${letter} ${toFaDigits(part2)} | ${toFaDigits(province)}`;
-      onGoToPayment?.({plate:plateStr,amount:"۳۶۰٬۰۰۰",ownerName:"محمد رضایی"});
-    },2000);
+    setProcessing(true);setErrModal("");setResult(null);
+    const plateStr=`${toFaDigits(part1)} ${letter} ${toFaDigits(part2)} | ${toFaDigits(province)}`;
+    try{
+      const inquiry=await anpardazServiceInquiry("vehicle_violations",{plate:plateStr});
+      const source=(inquiry?.inquiry??inquiry?.data??inquiry) as any;
+      const amountValue=source?.payableAmount??source?.totalAmount??source?.amount??source?.fineAmount??source?.total;
+      const amountText=typeof amountValue==="number"||typeof amountValue==="string"?String(amountValue).trim():"";
+      if(!amountText||!Number.isFinite(Number(toLatinDigits(amountText).replace(/[^0-9.]/g,"")))||Number(toLatinDigits(amountText).replace(/[^0-9.]/g,""))<=0){
+        throw new Error("vehicle_violations_inquiry_missing_amount");
+      }
+      const ownerName=String(source?.ownerName??source?.owner_name??source?.name??"").trim();
+      onGoToPayment?.({plate:plateStr,amount:amountText,ownerName});
+    }catch(e){
+      setErrModal(e instanceof Error&&e.message==="vehicle_violations_inquiry_missing_amount"?"استعلام واقعی مبلغ قابل پرداخت را از سرویس خلافی برنگرداند؛ از ثبت مبلغ ساختگی جلوگیری شد.":"استعلام خلافی انجام نشد؛ اتصال سرویس را بررسی کنید.");
+    }finally{setProcessing(false)}
   };
 
   return <>
