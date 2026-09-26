@@ -111,21 +111,29 @@ function _genUid(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 const DB = {
+  // Local storage is only a non-financial bootstrap cache. Balances, cards and transaction history
+  // are never persisted here because the backend/database is the operational source of truth.
   getUser:(p:string):UserData|null=>{
     try{
       const raw=JSON.parse(localStorage.getItem(`anp_user_${p}`)??"null");
       if(!raw)return null;
-      const hadLegacyPin=typeof raw.pin==="string"&&/^\d{4}$/.test(raw.pin); const u:UserData={uid:"",cryptoBalances:{},pinEnabled:Boolean(raw.pinEnabled??raw.pin),...raw}; delete (u as any).pin; if(hadLegacyPin){const safe:any={...u};delete safe.pin;localStorage.setItem(`anp_user_${p}`,JSON.stringify(safe));}
-      // Backfill uid for users registered before this field existed
-      if(!u.uid){u.uid="uid_"+p.replace(/[^0-9]/g,"");localStorage.setItem(`anp_user_${p}`,JSON.stringify(u));}
+      const hadLegacyPin=typeof raw.pin==="string"&&/^\d{4}$/.test(raw.pin);
+      const u:UserData={uid:"",cryptoBalances:{},pinEnabled:Boolean(raw.pinEnabled??raw.pin),...raw,tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[]};
+      delete (u as any).pin;
+      if(hadLegacyPin){const safe:any={...u};delete safe.pin;localStorage.setItem(`anp_user_${p}`,JSON.stringify(safe));}
+      if(!u.uid){u.uid="uid_"+p.replace(/[^0-9]/g,"");}
       return u;
     }catch{return null}
   },
-  saveUser:(u:UserData)=>{const safe:any={...u};delete safe.pin;localStorage.setItem(`anp_user_${u.phone}`,JSON.stringify(safe));},
+  saveUser:(u:UserData)=>{
+    const safe:any={...u,tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[]};
+    delete safe.pin;
+    localStorage.setItem(`anp_user_${u.phone}`,JSON.stringify(safe));
+  },
   currentPhone:()=>localStorage.getItem("anp_current")??"",
   setCurrentPhone:(p:string)=>localStorage.setItem("anp_current",p),
-  getTx:(p:string):TxRecord[]=>{try{return JSON.parse(localStorage.getItem(`anp_tx_${p}`)??"[]")}catch{return[]}},
-  saveTx:(p:string,t:TxRecord[])=>localStorage.setItem(`anp_tx_${p}`,JSON.stringify(t)),
+  getTx:(_p:string):TxRecord[]=>[],
+  saveTx:(_p:string,_t:TxRecord[])=>{},
   userExists:(p:string)=>!!localStorage.getItem(`anp_user_${p}`)
 };
 
@@ -232,7 +240,7 @@ async function anpardazAccounts():Promise<any[]>{const d=await anpardazRequest("
 async function anpardazActivity():Promise<any[]>{const d=await anpardazRequest("/api/v1/activity?limit=200");return Array.isArray(d?.activities)?d.activities:[];}
 async function anpardazCards():Promise<BankCard[]>{
   const d=await anpardazRequest("/api/v1/cards");
-  return Array.isArray(d?.cards)?d.cards.map((x:any)=>({id:String(x.id),number:String(x.number??"•••• "+String(x.last4??"")),bank:String(x.bank_name??"بانک"),holderName:String(x.holder_name??""),registrationStatus:String(x.registration_status??"verified")})): [];
+  return Array.isArray(d?.cards)?d.cards.map((x:any)=>({id:String(x.id),number:String(x.number??"•••• "+String(x.last4??"")),bank:String(x.bank_name??"بانک"),holderName:String(x.holder_name??""),registrationStatus:String(x.registration_status??"unknown")})): [];
 }
 async function deleteAnpardazCard(id:string){return anpardazRequest("/api/v1/cards/"+encodeURIComponent(id),{method:"DELETE"});}
 
