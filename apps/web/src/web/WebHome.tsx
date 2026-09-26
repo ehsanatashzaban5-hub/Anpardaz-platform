@@ -116,7 +116,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
                 <div style={{ padding:"10px", borderRadius:12, background:`${p.color}14`, border:`1px solid ${p.color}28`, color:p.color }}>
                   <WI n={p.icon} s={22}/>
                 </div>
-                <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, background:`${p.color}14`, color:p.color, border:`1px solid ${p.color}28` }}>{p.stats}</span>
+                
               </div>
               <div style={{ fontSize:18, fontWeight:900, color:"var(--w-text)", marginBottom:8 }}>{p.label}</div>
               <div style={{ fontSize:13, color:"var(--w-muted)", lineHeight:1.65, flex:1 }}>{p.desc}</div>
