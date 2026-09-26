@@ -1,13 +1,13 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import { ensurePlatformUser, requireAuth, type AuthClaims } from '../auth.js';
+import { hasPermission } from '../permissions.js';
 
 type R = FastifyRequest & { auth: AuthClaims };
 const auth = (req: FastifyRequest) => (req as R).auth;
 
-async function adminOnly(req: FastifyRequest, reply: any) {
-  const role = auth(req).role;
-  if (!['admin', 'super_admin', 'operator'].includes(role)) {
+async function adminOnly(pool: Pool, req: FastifyRequest, reply: any, permission: 'support.read'|'support.write') {
+  if (!(await hasPermission(pool, auth(req), permission))) {
     await reply.code(403).send({ error: 'forbidden' });
     return false;
   }
@@ -110,7 +110,7 @@ export function registerSupportRoutes(app: FastifyInstance, pool: Pool) {
   });
 
   app.get('/api/v1/admin/support/tickets', { preHandler: requireAuth }, async (req, reply) => {
-    if (!(await adminOnly(req, reply))) return;
+    if (!(await adminOnly(pool, req, reply, 'support.read'))) return;
     const result = await pool.query(
       'SELECT t.id,t.subject,t.status,t.priority,t.created_at,t.updated_at,t.closed_at,u.email,u.display_name FROM support_tickets t JOIN platform_users u ON u.id=t.user_id ORDER BY t.updated_at DESC LIMIT 500',
     );
@@ -118,7 +118,7 @@ export function registerSupportRoutes(app: FastifyInstance, pool: Pool) {
   });
 
   app.get('/api/v1/admin/support/tickets/:id', { preHandler: requireAuth }, async (req, reply) => {
-    if (!(await adminOnly(req, reply))) return;
+    if (!(await adminOnly(pool, req, reply, 'support.read'))) return;
     const id = Number((req.params as { id: string }).id);
     if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'invalid_ticket_id' });
     const ticket = (await pool.query(
@@ -134,7 +134,7 @@ export function registerSupportRoutes(app: FastifyInstance, pool: Pool) {
   });
 
   app.post('/api/v1/admin/support/tickets/:id/reply', { preHandler: requireAuth }, async (req, reply) => {
-    if (!(await adminOnly(req, reply))) return;
+    if (!(await adminOnly(pool, req, reply, 'support.write'))) return;
     const id = Number((req.params as { id: string }).id);
     const body = (req.body ?? {}) as { message?: unknown };
     const message = typeof body.message === 'string' ? body.message.trim() : '';
@@ -172,7 +172,7 @@ export function registerSupportRoutes(app: FastifyInstance, pool: Pool) {
   });
 
   app.post('/api/v1/admin/support/tickets/:id/close', { preHandler: requireAuth }, async (req, reply) => {
-    if (!(await adminOnly(req, reply))) return;
+    if (!(await adminOnly(pool, req, reply, 'support.write'))) return;
     const id = Number((req.params as { id: string }).id);
     if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'invalid_ticket_id' });
 
