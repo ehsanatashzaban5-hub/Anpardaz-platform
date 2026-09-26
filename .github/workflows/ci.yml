@@ -9,6 +9,61 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  database-migrations:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: platform
+            path: databases/platform
+            database: platform
+          - name: anpardaz
+            path: databases/anpardaz
+            database: anpardaz
+          - name: accounting
+            path: databases/accounting
+            database: accounting
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Create migration database
+        env:
+          PGPASSWORD: ci-password
+        run: |
+          set -euo pipefail
+          psql -h 127.0.0.1 -p 5432 -U ci -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE ${{ matrix.database }}"
+      - name: Apply migrations
+        env:
+          PGPASSWORD: ci-password
+        working-directory: ${{ matrix.path }}
+        run: |
+          set -euo pipefail
+          for file in $(find . -maxdepth 1 -name '*.sql' -print | sort -V); do
+            echo "Applying $file"
+            psql -h 127.0.0.1 -p 5432 -U ci -d "${{ matrix.database }}" -v ON_ERROR_STOP=1 -f "$file"
+          done
+      - name: Verify migration marker
+        env:
+          PGPASSWORD: ci-password
+        run: |
+          set -euo pipefail
+          test "$(psql -h 127.0.0.1 -p 5432 -U ci -d "${{ matrix.database }}" -Atqc "SELECT COUNT(*) FROM schema_migrations")" -gt 0
+
   build:
     runs-on: ubuntu-latest
     strategy:
