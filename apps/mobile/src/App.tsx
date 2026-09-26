@@ -4632,116 +4632,22 @@ function CircleTimer({secs,total,color}:{secs:number;total:number;color:string})
 
 // ─── Withdraw Confirm Sheet ────────────────────────────────────────────────────
 function WithdrawConfirmSheet({onConfirm,onClose,summary,onHistory}:{onConfirm:()=>void;onClose:()=>void;summary:{amount:string;destination:string};onHistory?:()=>void}){
-  const [stage,setStage]=useState<"confirm"|"success">("confirm");
-  const [verifying,setVerifying]=useState(false);
-  useEffect(()=>{
-    if(stage!=="otp")return;
-    const t=setInterval(()=>setGaSecs(s=>s<=1?60:s-1),1000);
-    return()=>clearInterval(t);
-  },[stage]);
-  useEffect(()=>{
-    if(stage!=="otp")return;
-    const t=setInterval(()=>setSmsSecs(s=>Math.max(0,s-1)),1000);
-    return()=>clearInterval(t);
-  },[stage]);
-  const connectGA=()=>{
-    if(setupOtp.length<6)return;
-    localStorage.setItem("anp_ga_connected","1");
-    setGaConnected(true);
-    setStage("otp");
-  };
-  const verify=()=>{
-    if(gaCode.length<6||smsCode.length<6||verifying)return;
-    setVerifying(true);
-    setTimeout(()=>{setVerifying(false);setStage("success");},1400);
-  };
-  const canSubmit=gaCode.length===6&&smsCode.length===6&&!verifying&&smsSecs>0;
-  const gaProgress=(60-gaSecs)/60;
-  const smsProgress=(120-smsSecs)/120;
-    const shortAddr=withdrawSummary.address.length>16?`${withdrawSummary.address.slice(0,8)}...${withdrawSummary.address.slice(-6)}`:"";
-  return <div className="expage" dir="rtl">
-    <div className="expage-header">
-      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
-      <h2 className="expage-title">{stage==="success"?"تأیید موفق":stage==="setup"?"اتصال Google Authenticator":"تأیید برداشت"}</h2>
-      <div style={{width:36}}/>
-    </div>
-    <div className="expage-body">
-      {stage==="setup"&&<>
-        <div style={{textAlign:"center",padding:"20px 0 16px",borderBottom:"1px solid var(--border-faint)",marginBottom:16}}>
-          <div className="wcs-shield-icon" style={{margin:"0 auto 14px"}}><svg width="28" height="28" viewBox="0 0 32 32" fill="none"><path d="M16 3L5 7v10c0 6.6 4.6 12.8 11 14.4C22.4 29.8 27 23.6 27 17V7L16 3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M11 16l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
-          <p className="wcs-desc">برای امنیت بیشتر، Google Authenticator را متصل کنید.</p>
-        </div>
-        <div className="wcs-steps">
-          {setupSteps.map((s,i)=>(
-            <div key={i} className={`wcs-step${setupStep===i?" wcs-step--active":setupStep>i?" wcs-step--done":""}`}>
-              <div className="wcs-step-num">{setupStep>i?<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>:toFaDigits(String(i+1))}</div>
-              <div className="wcs-step-body">
-                <b>{s.title}</b>
-                {(setupStep===i||setupStep>i)&&<span>{s.desc}</span>}
-                {setupStep===1&&i===1&&<div className="wcs-key-box">{SETUP_KEY}</div>}
-                {setupStep===2&&i===2&&<input className="wcs-otp-input" inputMode="numeric" maxLength={6} placeholder="— — — — — —" value={toFaDigits(setupOtp)} onChange={e=>setSetupOtp(toLatinDigits(e.target.value).replace(/\D/g,""))} style={{marginTop:8}}/>}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="wcs-actions">
-          {setupStep<2?<button className="primary-button" style={{width:"100%"}} onClick={()=>setSetupStep(s=>s+1)}>ادامه</button>:<button className="primary-button" style={{width:"100%",opacity:setupOtp.length>=6?1:0.45}} disabled={setupOtp.length<6} onClick={connectGA}>تأیید و اتصال</button>}
-        </div>
-      </>}
-      {stage==="otp"&&<>
-        <div className="wcs-confirm-card">
-          <div className="wcs-confirm-row">
-            <span className="wcs-confirm-label">مبلغ برداشت</span>
-            <span className="wcs-confirm-amount">{withdrawSummary.amount}</span>
-          </div>
-          {withdrawSummary.network&&<><div className="wcs-confirm-sep"/>
-          <div className="wcs-confirm-row">
-            <span className="wcs-confirm-label">شبکه انتقال</span>
-            <span className="wcs-confirm-badge">{withdrawSummary.network}</span>
-          </div></>}
-          {withdrawSummary.address&&<><div className="wcs-confirm-sep"/>
-          <div className="wcs-confirm-addr-row">
-            <span className="wcs-confirm-label">آدرس مقصد</span>
-            <span className="wcs-confirm-addr" dir="ltr" title={withdrawSummary.address}>{shortAddr||withdrawSummary.address}</span>
-          </div></>}
-        </div>
-        <div className="wcs-otp-block">
-          <div className="wcs-otp-row">
-            <div className="wcs-otp-field">
-              <div className="wcs-otp-label-row">
-                <span className="wcs-otp-label">کد Google Authenticator</span>
-                <span className="wcs-ga-badge">● متصل است</span>
-              </div>
-              <div style={{display:"flex",gap:6,alignItems:"center"}}><input className="wcs-otp-input" style={{flex:1}} type="tel" inputMode="numeric" maxLength={6} placeholder="— — — — — —" autoComplete="one-time-code" value={toFaDigits(gaCode)} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,6);setGaCode(v);}} disabled={verifying}/><button type="button" onClick={()=>{navigator.clipboard?.readText().then(t=>{const v=t.trim().replace(/\D/g,"").slice(0,6);if(v)setGaCode(v);}).catch(()=>{});}} style={{flexShrink:0,padding:"12px 14px",borderRadius:10,background:"var(--card-bg2,rgba(0,214,176,0.1))",border:"1px solid rgba(0,214,176,0.3)",color:"var(--accent)",fontFamily:"Vazirmatn",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",minHeight:48}}>چسباندن</button></div>
-            </div>
-            <CircleTimer secs={gaSecs} total={60} color="var(--accent)"/>
-          </div>
-          <div className="wcs-otp-divider"/>
-          <div className="wcs-otp-row">
-            <div className="wcs-otp-field">
-              <div className="wcs-otp-label-row">
-                <span className="wcs-otp-label">کد پیامک</span>
-                {smsSecs>0?<span className="wcs-sms-timer">{toFaDigits(String(smsSecs))} ث</span>:<button className="wcs-resend-btn" onClick={()=>setSmsSecs(120)}>ارسال مجدد</button>}
-              </div>
-              <div style={{display:"flex",gap:6,alignItems:"center"}}><input className="wcs-otp-input" style={{flex:1}} type="tel" inputMode="numeric" maxLength={6} placeholder="— — — — — —" autoComplete="one-time-code" value={toFaDigits(smsCode)} onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,6);setSmsCode(v);}} disabled={verifying||smsSecs===0}/><button type="button" onClick={()=>{navigator.clipboard?.readText().then(t=>{const v=t.trim().replace(/\D/g,"").slice(0,6);if(v)setSmsCode(v);}).catch(()=>{});}} disabled={verifying||smsSecs===0} style={{flexShrink:0,padding:"12px 14px",borderRadius:10,background:"var(--card-bg2,rgba(0,214,176,0.1))",border:"1px solid rgba(0,214,176,0.3)",color:"var(--accent)",fontFamily:"Vazirmatn",fontSize:13,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",minHeight:48,opacity:smsSecs===0?0.4:1}}>چسباندن</button></div>
-            </div>
-            <CircleTimer secs={smsSecs} total={120} color={smsSecs>30?"var(--accent)":"#e85c5c"}/>
-          </div>
-        </div>
-        <button className="primary-button" style={{width:"100%",opacity:canSubmit?1:0.42}} disabled={!canSubmit} onClick={verify}>{verifying?"در حال تأیید...":"تأیید و انتقال"}</button>
-      </>}
-      {stage==="success"&&<div className="wcs-success">
-        <div className="wcs-success-icon"><svg width="42" height="42" viewBox="0 0 42 42" fill="none"><circle cx="21" cy="21" r="20" stroke="currentColor" strokeWidth="1.5"/><path d="M13 21l6 6 10-10" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
-        <h3 className="wcs-success-title">برداشت با موفقیت ثبت شد</h3>
-        <p className="wcs-success-desc">درخواست شما در صف انجام قرار گرفت و پس از بررسی پردازش خواهد شد.</p>
-        <div className="wcs-success-info"><span>{withdrawSummary.amount}</span><span>{withdrawSummary.network&&`شبکه ${withdrawSummary.network}`}</span></div>
-        <button className="primary-button" style={{width:"100%",marginTop:8}} onClick={()=>{pendingWithdrawCb.current=null;onDone();}}>مشاهده تاریخچه</button>
-        <button className="outline-button" style={{width:"100%",marginTop:8}} onClick={onGoHome}>بازگشت به صرافی</button>
-      </div>}
-    </div>
-  </div>;
+  const [busy,setBusy]=useState(false);
+  const confirm=async()=>{if(busy)return;setBusy(true);try{await Promise.resolve(onConfirm());onHistory?.();}finally{setBusy(false);}};
+  useBackHandler(onClose);
+  return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={onClose}><Icon name="arrow" size={20}/></button><h2 className="expage-title">تأیید برداشت</h2><div style={{width:36}}/></div><div className="expage-body"><div className="wcs-confirm-card"><div className="wcs-confirm-row"><span className="wcs-confirm-label">مبلغ برداشت</span><span className="wcs-confirm-amount">{summary.amount}</span></div><div className="wcs-confirm-sep"/><div className="wcs-confirm-row"><span className="wcs-confirm-label">مقصد</span><span className="wcs-confirm-addr" dir="ltr">{summary.destination}</span></div></div><div className="warning-box" style={{marginTop:14}}>تأیید دومرحله‌ای ساختگی یا کلید ثابت در برنامه استفاده نمی‌شود؛ ثبت نهایی فقط پس از موفقیت Backend واقعی انجام می‌شود.</div><button className="primary-button" style={{width:"100%",marginTop:16}} disabled={busy} onClick={()=>void confirm()}>{busy?"در حال ثبت…":"تأیید و ثبت برداشت"}</button></div></div>;
 }
-
+type WithdrawConfirmPageProps={
+  withdrawSummary:{amount:string;destination:string;network:string;address:string};
+  pendingWithdrawCb:React.MutableRefObject<(()=>void)|null>;
+  onBack:()=>void;onDone:()=>void;onGoHome:()=>void;
+};
+function WithdrawConfirmPage({withdrawSummary,pendingWithdrawCb,onBack,onDone,onGoHome}:WithdrawConfirmPageProps){
+  const [busy,setBusy]=useState(false); const [error,setError]=useState("");
+  const confirm=async()=>{if(busy)return;setBusy(true);setError("");try{const cb=pendingWithdrawCb.current;if(!cb)throw new Error("withdrawal_request_missing");await Promise.resolve(cb());pendingWithdrawCb.current=null;onDone();}catch(e){setError(e instanceof Error?e.message:"ثبت برداشت انجام نشد.");}finally{setBusy(false);}};
+  useBackHandler(onBack);
+  return <div className="expage" dir="rtl"><div className="expage-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="expage-title">تأیید برداشت</h2><div style={{width:36}}/></div><div className="expage-body"><div className="wcs-confirm-card"><div className="wcs-confirm-row"><span className="wcs-confirm-label">مبلغ برداشت</span><span className="wcs-confirm-amount">{withdrawSummary.amount}</span></div><div className="wcs-confirm-sep"/><div className="wcs-confirm-row"><span className="wcs-confirm-label">شبکه</span><span className="wcs-confirm-badge">{withdrawSummary.network}</span></div><div className="wcs-confirm-sep"/><div className="wcs-confirm-addr-row"><span className="wcs-confirm-label">آدرس مقصد</span><span className="wcs-confirm-addr" dir="ltr">{withdrawSummary.address}</span></div></div>{error&&<div className="warning-box" style={{marginTop:14}}>{error}</div>}<div className="warning-box" style={{marginTop:14}}>هیچ کد تأیید، کلید Google Authenticator یا وضعیت موفقیت ساختگی استفاده نمی‌شود.</div><button className="primary-button" style={{width:"100%",marginTop:16}} disabled={busy} onClick={()=>void confirm()}>{busy?"در حال ثبت…":"تأیید و ثبت برداشت"}</button></div></div>;
+}
 // ─── Crypto Withdrawal Form ───────────────────────────────────────────────────
 type WithdrawPageProps={
   asset:string;network:string;available:number;processing:boolean;
@@ -7049,8 +6955,6 @@ function FinancialCenterScreen({transactions,onBack,user}:{transactions:TxRecord
   const expense=classified.filter(x=>x.isExpense).reduce((a,x)=>a+x.irr,0);
   const net=income-expense;
   const hasData=income>0||expense>0;
-
-  const healthGood=income>=expense;
 
   // Spending categories
   const CAT_DEFS=[
