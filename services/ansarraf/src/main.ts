@@ -15,6 +15,7 @@ import { ProviderWithdrawalWorker } from './provider-withdrawal-worker.js';
 import { ProviderReconciliationWorker } from './provider-reconciliation.js';
 import { validateAnSarrafProductionConfig } from './production-config.js';
 import { registerManualFundingAdminRoutes } from './routes/manual-funding-admin.js';
+import { requireIranIpInProduction } from '@anpardaz/ip-region-policy';
 
 const isProduction=process.env.NODE_ENV==='production';
 validateAnSarrafProductionConfig(process.env);
@@ -26,7 +27,8 @@ if(isProduction){
   }
 }
 
-const app=Fastify({logger:true});
+const trustProxy=process.env.TRUST_PROXY==='true';
+const app=Fastify({logger:true,trustProxy});
 app.setErrorHandler((error,_request,reply)=>{
   if(error instanceof Error&&error.message==='customer_inactive')return reply.code(403).send({error:'customer_inactive'});
   app.log.error(error);
@@ -51,6 +53,7 @@ app.addHook('onSend',async(_request,reply)=>{
   reply.header('Cache-Control','no-store');
 });
 app.get('/health',async()=>({service:'ansarraf',status:'ok'}));
+app.addHook('onRequest',async(request,reply)=>{if(request.url.startsWith('/api/v1/'))await requireIranIpInProduction(request,reply);});
 app.get('/health/db',async(_r,reply)=>{
   if(!pool)return reply.code(503).send({service:'ansarraf',database:'not-configured'});
   try{
