@@ -128,32 +128,6 @@ export default function WebHome({ onNavigate }: HomeProps) {
         </div>
       </section>
 
-      {/* ── MARKET INDICES ──────────────────────────── */}
-      <section style={{ background:"var(--w-surface)", padding:"clamp(24px,4vw,40px) 0", borderTop:"1px solid var(--w-border)", borderBottom:"1px solid var(--w-border)" }}>
-        <div style={{ maxWidth:1280, margin:"0 auto", padding:"0 clamp(16px,3vw,24px)" }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:"var(--w-muted)" }}>شاخص‌های جهانی</div>
-            <button onClick={() => onNavigate("sarraf")} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--w-accent)", fontSize:12, fontWeight:700, display:"flex", alignItems:"center", gap:4 }}>
-              سبد ارز دیجیتال <WI n="chevron-left" s={12} w={2}/>
-            </button>
-          </div>
-          <div style={{ display:"flex", gap:16, overflowX:"auto" }} className="w-noscroll">
-            {[] .map((idx: any) => (
-              <div key={idx.name} style={{ flexShrink:0, padding:"16px 20px", background:"var(--w-card2)", border:"1px solid var(--w-border)", borderRadius:12, minWidth:160 }}>
-                <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", marginBottom:6 }}>{idx.nameFa}</div>
-                <div style={{ fontSize:18, fontWeight:900, color:"var(--w-text)", marginBottom:4 }}>
-                  {idx.name === "USD/IRR" ? FA(idx.value.toLocaleString()) : idx.value.toLocaleString()}
-                </div>
-                <div style={{ fontSize:12, fontWeight:700, color: idx.changePercent >= 0 ? "#059669" : "#dc2626", display:"flex", alignItems:"center", gap:3 }}>
-                  <WI n={idx.changePercent >= 0 ? "trending-up" : "trending-down"} s={12}/>
-                  {idx.changePercent >= 0 ? "+" : ""}{idx.changePercent.toFixed(2)}%
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── CRYPTO TOP 10 ────────────────────────────── */}
       <section style={{ maxWidth:1280, margin:"0 auto", padding:"clamp(32px,5vw,64px) clamp(16px,3vw,24px)" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:28 }}>
