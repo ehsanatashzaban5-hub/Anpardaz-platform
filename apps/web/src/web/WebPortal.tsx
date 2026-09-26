@@ -9,7 +9,6 @@ import WebSarraf     from "./WebSarraf";
 import WebMarket     from "./WebMarket";
 import WebBanner     from "./WebBanner";
 import WebHoosh      from "./WebHooshProduction";
-import WebFinancial  from "./WebFinancial";
 import WebContent, { type ContentSection } from "./WebContent";
 import WebSettings from "./WebSettings";
 import WebAuthModal, { WebKycModal } from "./WebAuth";
@@ -306,9 +305,6 @@ export default function WebPortal() {
         )}
         {page === "hoosh" && (
           <WebHoosh onNavigate={handleNavigate}/>
-        )}
-        {page === "financial" && (
-          <WebFinancial onNavigate={handleNavigate}/>
         )}
         {(page === "news" || page === "news-article" || page === "education" ||
           page === "education-article" || page === "video" || page === "video-detail") && (
