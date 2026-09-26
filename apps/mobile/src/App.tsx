@@ -208,6 +208,8 @@ async function anpardazCards():Promise<BankCard[]>{
   const d=await anpardazRequest("/api/v1/cards");
   return Array.isArray(d?.cards)?d.cards.map((x:any)=>({id:String(x.id),number:String(x.number??"•••• "+String(x.last4??"")),bank:String(x.bank_name??"بانک"),holderName:String(x.holder_name??""),registrationStatus:String(x.registration_status??"verified")})): [];
 }
+async function deleteAnpardazCard(id:string){return anpardazRequest("/api/v1/cards/"+encodeURIComponent(id),{method:"DELETE"});}
+
 async function startShaparakCardRegistration():Promise<{sessionId:string;authorizationUrl:string}>{
   return anpardazRequest("/api/v1/cards/registration/start",{method:"POST"});
 }
@@ -1773,7 +1775,8 @@ function TransferScreen({user,onUpdate,transactions,onBack,onDone}:{user:UserDat
       </div>
       <div className="receipt-page-body">
         {user.cards.length===0&&<p className="bs-empty">کارتی ثبت نشده. از پروفایل کارت اضافه کنید.</p>}
-        {user.cards.map(c=>(
+        {cards.map(c=>((c)=>(
+
           <button key={c.id} className={`bs-card-item${srcCardId===c.id?" active":""}`}
             onClick={()=>{setSrcCardId(c.id);setSrcPickerOpen(false);if(c.expM)setExpM(toFaDigits(c.expM));if(c.expY)setExpY(toFaDigits(c.expY))}}>
             <BankLogo bankName={c.bank} size={48} rounded={14}/>
@@ -6098,6 +6101,10 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
   const toggleSmartNotif=(key:keyof typeof smartNotif)=>{const next={...smartNotif,[key]:!smartNotif[key]};setSmartNotif(next);localStorage.setItem("anp_smart_notif_settings",JSON.stringify(next));};
   const [fontScale,setFontScaleState]=useState(()=>Number(localStorage.getItem("anp_font_scale")||"0"));
   const [logoutConfirm,setLogoutConfirm]=useState(false);
+  const deleteRegisteredCard=async(id:string)=>{
+    try{await deleteAnpardazCard(id);const next={...user,cards:user.cards.filter(c=>c.id!==id)};onUpdate(next);DB.saveUser(next);}
+    catch{setPinError("حذف کارت انجام نشد.");}
+  };
   const persistSettings=async(patch:Partial<UserSettings>)=>{
     try{await userSettingsRequest("/api/v1/user/settings",{method:"PATCH",body:JSON.stringify(patch)});}
     catch{setPinError("ذخیره تنظیمات انجام نشد. اتصال سرور را بررسی کنید.");}
@@ -6131,7 +6138,10 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
 
   if(modal==="info")return <div className="anp-full-page" dir="rtl"><div className="anp-page-header"><button className="back-btn" onClick={()=>setModal(null)}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">اطلاعات شخصی</h2><div style={{width:36}}/></div><div className="anp-page-body">{[["نام",user.name||"—"],["نام خانوادگی",user.family||"—"],["کد ملی",user.nationalId?toFaDigits(user.nationalId):"—"],["تاریخ تولد",user.birthDate?toFaDigits(user.birthDate):"—"],["موبایل",toFaDigits(user.phone)],["عضویت",user.registeredAt?new Date(user.registeredAt).toLocaleDateString("fa-IR"):"—"]].map(([k,v])=><div key={k} className="modal-detail"><span>{k}</span><b dir="ltr">{v}</b></div>)}<button className="primary-button" style={{marginTop:20}} onClick={()=>setModal(null)}>بازگشت</button></div></div>;
 
-  if(modal==="addcard")return <div className="anp-full-page" dir="rtl"><div className="anp-page-header"><button className="back-btn" onClick={()=>setModal(null)}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">کارت‌های بانکی</h2><div style={{width:36}}/></div><div className="anp-page-body">{user.cards.length===0&&<p style={{textAlign:"center",color:"var(--text-faint)",padding:"20px 0"}}>کارتی ثبت نشده است.</p>}{user.cards.map(c=>{const binfo=getBankInfo(c.bank);const bgColor=binfo?.color||"#1d3a2e";return <div key={c.id} style={{borderRadius:18,padding:"18px 20px",marginBottom:12,background:`linear-gradient(135deg,${bgColor}ee,${bgColor}aa)`,color:"#fff",direction:"ltr",position:"relative",overflow:"hidden",minHeight:120,display:"flex",flexDirection:"column",justifyContent:"space-between",boxShadow:"0 4px 20px rgba(0,0,0,0.35)"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>{binfo?.logo?<div style={{width:40,height:40,borderRadius:10,background:"rgba(255,255,255,0.18)",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",backdropFilter:"blur(4px)"}}><img src={binfo.logo} alt={c.bank} style={{width:"80%",height:"80%",objectFit:"contain"}}/></div>:<div style={{width:40,height:40,borderRadius:10,background:"rgba(255,255,255,0.18)"}}/>}<div style={{width:32,height:24,borderRadius:4,background:"linear-gradient(135deg,#d4a94b,#f5dd8a)",opacity:0.85}}/></div><div style={{fontFamily:"Vazirmatn,sans-serif",fontSize:16,letterSpacing:2,color:"rgba(255,255,255,0.95)",textShadow:"0 1px 3px rgba(0,0,0,0.4)",marginTop:12,direction:"ltr"}}>{toFaDigits(c.number.replace(/(.{4})/g,"$1 ").trim())}</div><div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginTop:10}}><div style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.9)",fontFamily:"Vazirmatn",direction:"rtl",textShadow:"0 1px 2px rgba(0,0,0,0.3)"}}>{c.holderName}</div><div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>{c.expM&&c.expY&&<div style={{fontSize:10,opacity:0.65,fontFamily:"Vazirmatn,sans-serif",direction:"ltr"}}>{toFaDigits(c.expM)}/{toFaDigits(c.expY)}</div>}<div style={{fontSize:9,fontWeight:700,opacity:0.5,fontFamily:"Vazirmatn",direction:"rtl",textAlign:"right",lineHeight:1.3}}>ثبت شده در شاپرک<br/>آن پرداز</div></div></div></div>;})}<button className="outline-button" style={{width:"100%",marginBottom:10}} onClick={()=>setModal("addcard-shaparak")}>+ افزودن کارت</button><button className="primary-button" onClick={()=>setModal(null)}>بازگشت</button></div></div>;
+  if(modal==="addcard")return <div className="anp-full-page" dir="rtl"><div className="anp-page-header"><button className="back-btn" onClick={()=>setModal(null)}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">کارت‌های بانکی</h2><div style={{width:36}}/></div><div className="anp-page-body">{user.cards.length===0&&<p style={{textAlign:"center",color:"var(--text-faint)",padding:"20px 0"}}>کارتی ثبت نشده است.</p>}{user.cards.map(c=>{const binfo=getBankInfo(c.bank);const bgColor=binfo?.color||"#1d3a2e";return <div key={c.id} style={{borderRadius:18,padding:"18px 20px",marginBottom:12,background:`linear-gradient(135deg,${bgColor}ee,${bgColor}aa)`,color:"#fff",direction:"ltr",position:"relative",overflow:"hidden",minHeight:120,display:"flex",flexDirection:"column",justifyContent:"space-between",boxShadow:"0 4px 20px rgba(0,0,0,0.35)"}}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>{binfo?.logo?<div style={{width:40,height:40,borderRadius:10,background:"rgba(255,255,255,0.18)",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",backdropFilter:"blur(4px)"}}><img src={binfo.logo} alt={c.bank} style={{width:"80%",height:"80%",objectFit:"contain"}}/></div>:<div style={{width:40,height:40,borderRadius:10,background:"rgba(255,255,255,0.18)"}}/>}<div style={{width:32,height:24,borderRadius:4,background:"linear-gradient(135deg,#d4a94b,#f5dd8a)",opacity:0.85}}/></div><div style={{fontFamily:"Vazirmatn,sans-serif",fontSize:16,letterSpacing:2,color:"rgba(255,255,255,0.95)",textShadow:"0 1px 3px rgba(0,0,0,0.4)",marginTop:12,direction:"ltr"}}>{toFaDigits(c.number.replace(/(.{4})/g,"$1 ").trim())}</div><div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginTop:10}}><div style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,0.9)",fontFamily:"Vazirmatn",direction:"rtl",textShadow:"0 1px 2px rgba(0,0,0,0.3)"}}>{c.holderName}</div><div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>{c.expM&&c.expY&&<div style={{fontSize:10,opacity:0.65,fontFamily:"Vazirmatn,sans-serif",direction:"ltr"}}>{toFaDigits(c.expM)}/{toFaDigits(c.expY)}</div>}<div style={{display:"flex",alignItems:"center",gap:7}}>
+  <button onClick={()=>deleteRegisteredCard(c.id)} style={{border:"1px solid rgba(255,255,255,.35)",background:"rgba(0,0,0,.16)",color:"#fff",borderRadius:9,padding:"5px 8px",fontFamily:"Vazirmatn",fontSize:9}}>حذف</button>
+  <div style={{fontSize:9,fontWeight:700,opacity:0.5,fontFamily:"Vazirmatn",direction:"rtl",textAlign:"right",lineHeight:1.3}}>ثبت شده در شاپرک<br/>آن پرداز</div>
+</div></div></div></div>;})}<button className="outline-button" style={{width:"100%",marginBottom:10}} onClick={()=>setModal("addcard-shaparak")}>+ افزودن کارت</button><button className="primary-button" onClick={()=>setModal(null)}>بازگشت</button></div></div>;
 
   if(modal==="addcard-shaparak")return <ShaparkCardModal onClose={()=>setModal("addcard")}/>;
   if(modal==="support")return <SupportModal onClose={()=>setModal(null)}/>;
@@ -6510,6 +6520,7 @@ function FinExpField({label,value,onChange,inputRef,maxLength,onFilled}:{
 }
 
 function CardBalanceScreen({user,onBack,onDone}:{user:UserData;onBack:()=>void;onDone:()=>void}){
+  const [cards,setCards]=useState<BankCard[]>(user.cards);
   const [selectedCardId,setSelectedCardId]=useState("");
   const [cardPickerOpen,setCardPickerOpen]=useState(false);
   const [manualNum,setManualNum]=useState("");
@@ -6526,7 +6537,7 @@ function CardBalanceScreen({user,onBack,onDone}:{user:UserData;onBack:()=>void;o
   const [err,setErr]=useState("");
   const [showShaparak,setShowShaparak]=useState(false);
 
-  const selCard=user.cards.find(c=>c.id===selectedCardId);
+  const selCard=cards.find(c=>c.id===selectedCardId);
   const fmtCardInput=(v:string)=>v.replace(/\D/g,"").slice(0,16).replace(/(.{4})(?=.)/g,"$1 ");
   const activeRaw=selCard?selCard.number:manualNum.replace(/\s/g,"");
   const cardBank=activeRaw.length>=4?detectBank(activeRaw):"";
@@ -6644,7 +6655,7 @@ function CardBalanceScreen({user,onBack,onDone}:{user:UserData;onBack:()=>void;o
               </div>
               {selectedCardId===c.id&&<div className="bs-card-check"><Icon name="check" size={16} stroke={2.5}/></div>}
             </button>
-          ))}
+          )))}
           <div className="bs-divider"/>
           <button className="outline-button" style={{width:"100%",marginTop:4,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
             onClick={()=>{setCardPickerOpen(false);setShowShaparak(true)}}>
