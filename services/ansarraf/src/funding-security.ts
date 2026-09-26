@@ -18,7 +18,7 @@ async function verifyOwnedCard(identityId:string,cardId:number){
   return card;
 }
 
-export async function verifyFirstTomanDepositWindow(pool:Pool,customerId:number){
+export async function verifyFirstTomanDepositWindow(pool:Pool,customerId:string){
   const r=await pool.query(`SELECT MIN(d.created_at) AS first_toman_deposit_at
     FROM deposits d JOIN assets a ON a.id=d.asset_id
     WHERE d.customer_id=$1 AND d.status='confirmed' AND a.asset_type='fiat'`,[customerId]);
