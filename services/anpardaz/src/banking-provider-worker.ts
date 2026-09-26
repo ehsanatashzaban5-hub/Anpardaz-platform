@@ -20,6 +20,19 @@ async function postLedger(referenceType:string,referenceId:string,operationId:st
   const r=await fetch(base+'/internal/v1/ledger/transactions',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({referenceType,referenceId,operationId,idempotencyKey:'anpardaz:'+referenceType+':'+referenceId,description:'An Pardaz banking operation '+referenceId,entries}),signal:AbortSignal.timeout(10000)});
   if(!r.ok)throw new Error('accounting_post_failed');
 }
+function decimal18(v:string){const x=String(v).trim();if(!/^\d+(?:\.\d+)?$/.test(x))throw new Error('invalid_ledger_decimal');const [a,b='']=x.split('.');return BigInt(a)*1000000000000000000n+BigInt((b+'000000000000000000').slice(0,18));}
+async function ledgerCustomerBalance(customerId:number,currency:string){
+  const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;
+  if(!base||!token)throw new Error('accounting_service_not_configured');
+  const code='anpardaz.customer.'+customerId+'.liability.'+currency;
+  const r=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(8000)});
+  if(r.status===404)return '0';
+  if(!r.ok)throw new Error('accounting_balance_lookup_failed');
+  const id=Number((await r.json() as any)?.account?.id);if(!Number.isSafeInteger(id))throw new Error('accounting_account_invalid');
+  const b=await fetch(base+'/internal/v1/ledger/accounts/'+id+'/balance',{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(8000)});
+  if(!b.ok)throw new Error('accounting_balance_lookup_failed');
+  return String((await b.json() as any)?.balance?.balance??'0');
+}
 async function postInternalTransferLedger(referenceId:string,operationId:string,sourceCustomerId:number,destinationCustomerId:number,currency:string,amount:string){
   const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;
   if(!base||!token)throw new Error('accounting_service_not_configured');
@@ -48,6 +61,12 @@ export class BankingProviderWorker{
           const destination=(await this.pool.query('SELECT id,customer_id,currency,status FROM accounts WHERE id=$1',[x.destination_account_id])).rows[0];
           if(!destination||destination.status!=='active'||destination.currency!==x.currency){await this.fail(row.id,'invalid_internal_destination');return true;}
           const providerStatus='completed';
+          const sourceBalance=await ledgerCustomerBalance(Number(x.customer_id),String(x.currency));
+          if(decimal18(sourceBalance)<decimal18(String(x.amount))){
+            await this.pool.query("UPDATE transfer_requests SET status='failed',provider_status='failed',provider_error_code='INSUFFICIENT_FUNDS',provider_error_message='insufficient_ledger_balance',updated_at=NOW() WHERE operation_id=$1",[x.operation_id]);
+            await this.pool.query("UPDATE banking_provider_outbox SET status='failed',last_error='insufficient_ledger_balance',updated_at=NOW() WHERE id=$1",[row.id]);
+            return true;
+          }
           await postInternalTransferLedger(String(x.id),x.operation_id,Number(x.customer_id),Number(destination.customer_id),String(x.currency),String(x.amount));
           await this.pool.query("UPDATE transfer_requests SET status='completed',provider_status=$1,provider_metadata=$2,updated_at=NOW() WHERE operation_id=$3",[providerStatus,JSON.stringify({mode:'internal_ledger',destinationAccountId:destination.id}),x.operation_id]);
           await this.pool.query("UPDATE banking_provider_outbox SET status='completed',last_error=NULL,updated_at=NOW() WHERE id=$1",[row.id]);
