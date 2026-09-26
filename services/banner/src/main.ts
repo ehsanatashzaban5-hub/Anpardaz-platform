@@ -112,7 +112,7 @@ async function registerPublic(app:FastifyInstance){
   });
   app.get('/api/v1/banner/media/:id',async(req,reply)=>{
     const id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
-    const r=await pool.query('SELECT m.mime_type,m.data,m.filename FROM banner_media m JOIN banner_listings l ON l.id=m.listing_id WHERE m.id=$1 AND l.status='published'',[id]);if(!r.rows[0])return reply.code(404).send({error:'media_not_found'});
+    const r=await pool.query("SELECT m.mime_type,m.data,m.filename FROM banner_media m JOIN banner_listings l ON l.id=m.listing_id WHERE m.id=$1 AND l.status='published'",[id]);if(!r.rows[0])return reply.code(404).send({error:'media_not_found'});
     reply.header('Content-Type',r.rows[0].mime_type).header('Content-Disposition','inline').send(r.rows[0].data);
   });
 }
