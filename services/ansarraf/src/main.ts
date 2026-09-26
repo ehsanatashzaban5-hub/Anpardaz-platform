@@ -22,7 +22,7 @@ import { ProviderDepositWorker } from './provider-deposit-worker.js';
 const isProduction=process.env.NODE_ENV==='production';
 validateAnSarrafProductionConfig(process.env);
 const requiredProduction=['DATABASE_URL','CORS_ORIGIN','IDENTITY_SERVICE_URL','IDENTITY_ISSUER','IDENTITY_PUBLIC_KEY_B64','ANSARRAF_INTERNAL_TOKEN','ACCOUNTING_SERVICE_URL','ACCOUNTING_INTERNAL_TOKEN','ANPARDAZ_SERVICE_URL','ANPARDAZ_INTERNAL_TOKEN'];
-if(isProduction){
+if(isProduction&&process.env.TRUST_PROXY!=='true')throw new Error('Production service must trust the configured HTTPS reverse proxy for client IP extraction');if(isProduction&&process.env.IP_POLICY_ALLOW_PRIVATE_NETWORKS==='true')throw new Error('Production IP policy must not allow private-network bypasses');if(isProduction){
   for(const name of requiredProduction){
     const value=process.env[name];
     if(!value||value.includes('CHANGE_ME')||value.includes('your-web-domain.example')||value.includes('your-domain.example')||value.includes('BASE64-DER-ED25519-PUBLIC-KEY'))throw new Error(`Production environment variable ${name} must be configured with a real value`);
