@@ -22,10 +22,13 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
       COALESCE(MIN(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text price_min,
       COALESCE(MAX(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text price_max,
       COUNT(DISTINCT os.id)::int store_count,
-      COUNT(o.id) FILTER(WHERE os.id IS NOT NULL)::int offer_count
+      COUNT(o.id) FILTER(WHERE os.id IS NOT NULL)::int offer_count,
+      COALESCE(ROUND(AVG(rv.rating) FILTER (WHERE rv.status='published'),2),0)::numeric rating,
+      COUNT(rv.id) FILTER (WHERE rv.status='published')::int reviews
       FROM market_products p
       LEFT JOIN market_categories c ON c.id=p.category_id
       LEFT JOIN market_offers o ON o.product_id=p.id LEFT JOIN market_stores os ON os.id=o.store_id AND os.active=true
+      LEFT JOIN market_reviews rv ON rv.product_id=p.id
       WHERE ${where.join(' AND ')}
       GROUP BY p.id,c.id ORDER BY p.updated_at DESC,p.id DESC LIMIT $${lim} OFFSET $${off}`,params);
     const ids=r.rows.map((x:any)=>Number(x.id));
