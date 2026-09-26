@@ -2511,7 +2511,7 @@ function ChargeScreen({type,user,onUpdate,onBack,onGoToPayment}:{type:"charge"|"
   const operator=phone.length>=4?detectOperator(phone):null;
   const chargeAmt=parseInt(toLatinDigits(amount).replace(/\D/g,""))||0;
   const packages=type==="internet"?["۱ گیگ — ۷ روز — ۱۵,۰۰۰ ریال","۲ گیگ — ۱۵ روز — ۲۸,۰۰۰ ریال","۳ گیگ — ۳۰ روز — ۳۸,۰۰۰ ریال","۵ گیگ — ۳۰ روز — ۵۵,۰۰۰ ریال","۸ گیگ — ۳۰ روز — ۸۰,۰۰۰ ریال","۱۲ گیگ — ۳۰ روز — ۱۱۰,۰۰۰ ریال","۲۰ گیگ — ۳۰ روز — ۱۵۰,۰۰۰ ریال","۳۰ گیگ — ۳۰ روز — ۲۱۵,۰۰۰ ریال","۵۰ گیگ — ۳۰ روز — ۳۴۰,۰۰۰ ریال","نامحدود — ۳۰ روز — ۳۵۰,۰۰۰ ریال"]:["۱۰,۰۰۰ ریال","۲۰,۰۰۰ ریال","۵۰,۰۰۰ ریال","۱۰۰,۰۰۰ ریال","۲۰۰,۰۰۰ ریال","۵۰۰,۰۰۰ ریال"];
-  const submit=()=>{
+  const submit=async()=>{
     if(!isIranPhone(phone)){setErrModal("شماره موبایل معتبر وارد کنید.");return}
     if(!amount){setErrModal(type==="internet"?"لطفاً بسته اینترنت مورد نظر را انتخاب کنید.":"لطفاً مبلغ یا شارژ مورد نظر را انتخاب کنید.");return}
     if(onGoToPayment){onGoToPayment({phone,operator,amount,type});return}
@@ -2892,7 +2892,7 @@ function BillsPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{billType:s
   const selCard=user.cards.find(c=>c.id===selectedCard);
   const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
   const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
-  const pay=()=>{
+  const pay=async()=>{
     if(!otp){setErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
@@ -3191,7 +3191,7 @@ function ViolationsPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{plate
   const selCard=user.cards.find(c=>c.id===selectedCard);
   const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
   const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
-  const pay=()=>{
+  const pay=async()=>{
     if(!otp){setErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
@@ -3317,7 +3317,7 @@ function CarServicesScreen({onBack}:{onBack:()=>void}){
 // ─── Sana Registration Screen ─────────────────────────────────────────────────
 function SanaScreen({onBack}:{onBack:()=>void}){
   const [nationalId,setNationalId]=useState("");const [phone,setPhone]=useState("");const [done,setDone]=useState(false);const [processing,setProcessing]=useState(false);const [errModal,setErrModal]=useState("");
-  const submit=()=>{if(!nationalId||!phone){setErrModal("تمام فیلدها الزامی است.");return}setProcessing(true);setTimeout(()=>{setProcessing(false);setDone(true)},3000)};
+  const submit=async()=>{if(!nationalId||!phone){setErrModal("تمام فیلدها الزامی است.");return}setProcessing(true);setTimeout(()=>{setProcessing(false);setDone(true)},3000)};
   return <>
   {processing&&<AnPardazLoadingOverlay text="در حال ثبت اطلاعات..."/>}
   <div className="subscreen" dir="rtl">
@@ -3380,7 +3380,7 @@ function JudiciaryBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUpda
     setTimeout(()=>{setProcessing(false);setInquiryDone(true)},2000);
   };
 
-  const pay=()=>{
+  const pay=async()=>{
     if(!otp){setPayErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setPayErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setPayErr("تاریخ انقضا را وارد کنید.");return}
@@ -3491,7 +3491,7 @@ function PropertyRegBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUp
     setTimeout(()=>{setProcessing(false);setInquiryDone(true)},2000);
   };
 
-  const pay=()=>{
+  const pay=async()=>{
     if(!otp){setPayErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setPayErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setPayErr("تاریخ انقضا را وارد کنید.");return}
@@ -3649,7 +3649,7 @@ function CharityPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{orgId:st
   const selCard=user.cards.find(c=>c.id===selectedCard);
   const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
   const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
-  const pay=()=>{
+  const pay=async()=>{
     if(!otp){setErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
@@ -4866,7 +4866,7 @@ function TomanWithdrawScreen({user,available,onBack,onGoHome,onHistory}:{user:Us
   const twAmtNum=parseInt(toLatinDigits(twAmount).replace(/\D/g,""))||0;
   const withdrawValid=!!selCard&&twAmtNum>0&&twAmtNum<=available;
   const fmtCard=(v:string)=>v.replace(/(.{4})(?=.)/g,"$1 ");
-  const submit=()=>{
+  const submit=async()=>{
     if(!selCard){setErr("کارت مقصد را انتخاب کنید.");return;}
     if(!twAmount||Number(toLatinDigits(twAmount))<=0){setErr("مبلغ برداشت را وارد کنید.");return;}
     setErr("");setShowOtp(true);
@@ -6385,7 +6385,7 @@ function CardBalanceScreen({user,onBack,onDone}:{user:UserData;onBack:()=>void;o
   const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
   const allFilled=activeRaw.length===16&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
 
-  const submit=()=>{
+  const submit=async()=>{
     if(activeRaw.length!==16){setErr("لطفاً کارت بانکی را انتخاب کنید.");return}
     if(!otp){setErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setErr("CVV2 را وارد کنید.");return}
@@ -6522,7 +6522,7 @@ function ChargePaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{phone:str
   const selCard=user.cards.find(c=>c.id===selectedCard);
   const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
   const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
-  const pay=()=>{
+  const pay=async()=>{
     if(!otp){setErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
