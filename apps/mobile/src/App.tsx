@@ -4944,25 +4944,12 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions,onForexB
     go("withdraw-confirm");
   };
   const History=()=>{const [filter,setFilter]=useState<"همه"|"خرید و فروش"|"واریز"|"برداشت">("همه");const tradeTypeLabel:Record<string,string>={instant:"معاملات آنی",spot:"معاملات اسپات",margin:"معاملات تعهدی",conversion:"تبدیل دارایی",withdraw:"برداشت کوین",deposit:"واریز کوین"};const exchangeTx=transactions.filter(tx=>tx.source==="exchange"||(tx.source==null&&(tx.note?.includes("[صرافی]")||tx.type==="deposit"||tx.type==="withdraw"))).filter(tx=>filter==="همه"||(filter==="خرید و فروش"&&tx.type==="swap")||(filter==="واریز"&&tx.type==="deposit")||(filter==="برداشت"&&tx.type==="withdraw"));const status={done:"موفق",pending:"در حال پردازش",failed:"ناموفق"};return <div className="exchange-page exchange-history"><div className="page-title"><h2>تاریخچه</h2><button onClick={()=>setNotice("خروجی اطلاعات تراکنش‌ها آماده دانلود است.")}>خروجی</button></div><div className="segmented small">{(["همه","خرید و فروش","واریز","برداشت"] as const).map(item=><button key={item} className={filter===item?"active":""} onClick={()=>setFilter(item)}>{item}</button>)}</div>{exchangeTx.length?<div className="exchange-history-list">{exchangeTx.map(tx=><button type="button" key={tx.id} className="exchange-history-row" onClick={()=>goDetail(tx,'history')}><span className={`history-status ${tx.status}`}><i/>{status[tx.status]}</span><div><b>{tx.tradeType?tradeTypeLabel[tx.tradeType]||(tx.note?.split(" · ")[0]||tx.type):tx.note?.split(" · ").slice(0,2).join(" · ")||({swap:"خرید و فروش",deposit:"واریز",withdraw:"برداشت",transfer:"انتقال",service:"خدمات"}[tx.type])}</b><small>{new Date(tx.createdAt).toLocaleDateString("fa-IR")} · {new Date(tx.createdAt).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"})}</small></div><strong>{faFixed(tx.amount,tx.fromAsset==="toman"?0:4)} {tx.fromAsset==="toman"?"تومان":tx.fromAsset.toUpperCase()}</strong><em>‹</em></button>)}</div>:<div className="empty-state">هنوز تراکنشی در صرافی ثبت نشده است.</div>}</div>};
-  const Fees=()=><div className="exchange-page">
+  const Fees=()=> <div className="exchange-page" dir="rtl">
     <h2 style={{fontSize:20,fontWeight:900,marginBottom:20}}>کارمزدها</h2>
-    {[
-      {level:"سطح ۱",range:"۰ تا ۱۰۰ میلیون تومان",maker:"۰٫۲۵٪",taker:"۰٫۳٪"},
-      {level:"سطح ۲",range:"۱۰۰ تا ۵۰۰ میلیون تومان",maker:"۰٫۲٪",taker:"۰٫۲۵٪"},
-      {level:"سطح ۳",range:"۵۰۰ میلیون تا ۲ میلیارد تومان",maker:"۰٫۱۵٪",taker:"۰٫۲٪"},
-      {level:"سطح ۴",range:"بیش از ۲ میلیارد تومان",maker:"۰٫۱٪",taker:"۰٫۱۵٪"},
-    ].map(row=><button key={row.level} className="fee-card" onClick={()=>setFeeDetail(row.level)} style={{display:"block",width:"100%",textAlign:"right",marginBottom:12,cursor:"pointer",padding:"18px 20px",borderRadius:16,background:"var(--card-bg)",border:"1px solid var(--border-color)",boxSizing:"border-box"}}>
-      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-        <span style={{fontSize:15,fontWeight:800,color:"var(--text-primary)"}}>{row.level}</span>
-        <span style={{fontSize:12,color:"var(--text-muted)"}}>{row.range}</span>
-      </div>
-      <div style={{display:"flex",gap:20}}>
-        <span style={{fontSize:14,color:"var(--text-muted)"}}>میکر <strong style={{color:"#00D6B0"}}>{row.maker}</strong></span>
-        <span style={{fontSize:14,color:"var(--text-muted)"}}>تیکر <strong style={{color:"#00D6B0"}}>{row.taker}</strong></span>
-      </div>
-    </button>)}
-    <p className="muted-copy" style={{fontSize:13,lineHeight:1.8}}>کارمزد دقیق پیش از ثبت هر سفارش نمایش داده می‌شود. برای اطلاعات بیشتر با پشتیبانی تماس بگیرید.</p>
-    {feeDetail&&<div style={{marginTop:8,marginBottom:16,padding:"18px 20px",borderRadius:14,background:"var(--card-bg)",border:"1px solid rgba(0,214,176,0.25)",boxSizing:"border-box"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><h3 style={{margin:0,fontSize:16,fontWeight:900,color:"var(--text-primary)"}}>{feeDetail} — جزئیات کارمزد</h3><button onClick={()=>setFeeDetail(null)} style={{width:28,height:28,borderRadius:8,background:"rgba(255,255,255,0.06)",border:"1px solid var(--border-color)",color:"var(--text-muted)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>✕</button></div><p style={{fontSize:13,color:"var(--text-muted)",lineHeight:1.9,margin:0}}>کارمزد معاملات بر اساس حجم ۳۰ روز گذشته شما محاسبه می‌شود. پس از رسیدن به سطح بالاتر، کارمزد جدید از تراکنش بعدی اعمال خواهد شد.</p></div>}
+    <div className="warning-box" style={{lineHeight:1.9}}>
+      کارمزد معاملات و هزینه‌های ارائه‌دهنده باید از تنظیمات واقعی Backend محاسبه و پیش از ثبت سفارش اعلام شود.
+      جدول ثابت یا درصد ساختگی در برنامه نمایش داده نمی‌شود.
+    </div>
   </div>;
   const Support=()=>{
     const scIcons:Record<string,ReactNode>={
