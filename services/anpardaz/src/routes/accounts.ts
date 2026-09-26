@@ -30,7 +30,7 @@ export function registerAccountRoutes(app:FastifyInstance,pool:Pool){
    const customerId=await ensureCustomer(pool,auth);
    const r=await pool.query('SELECT id,account_type,currency,status,created_at FROM accounts WHERE customer_id=$1 ORDER BY created_at DESC',[customerId]);
    try{
-     const accounts=await Promise.all(r.rows.map(async account=>({...account,...await ledgerBalance(customerId,String(account.currency))})));
+     const accounts=await Promise.all(r.rows.map(async account=>({...account,...await ledgerBalance(Number(customerId),String(account.currency))})));
      return {accounts};
    }catch(error){
      request.log.error({error,customerId},'accounting balance lookup failed');
