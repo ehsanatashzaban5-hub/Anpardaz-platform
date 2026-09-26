@@ -1747,9 +1747,8 @@ function IrancellPkgView({phone,simType,onBack,onGoToPayment}:{phone:string;simT
   const {items:livePkgs,loading}=useLiveServiceCatalog("irancell",simType);
   const [showSort,setShowSort]=useState(false);
   const [showType,setShowType]=useState(false);
-  useEffect(()=>{const t=setTimeout(()=>setLoading(false),900);return()=>clearTimeout(t);},[]);
   const operator=OPERATORS.irancell;
-  const filtered=_IC_PKGS.filter(p=>{
+  const filtered=livePkgs.filter(p=>{
     if(durFilter==="پیشنهاد ویژه")return p.special===true;
     if(durFilter==="۱۵ روزه")return p.durFilter==="پانزده روزه";
     if(durFilter)return p.durFilter===durFilter;
@@ -2115,13 +2114,12 @@ function RightelPrepaidInternetScreen({phone,onBack,onGoToPayment}:{phone:string
   const [durFilter,setDurFilter]=useState<string|null>(null);
   const [typeFilter,setTypeFilter]=useState<string|null>(null);
   const [sortBy,setSortBy]=useState<string|null>(null);
-  const [loading,setLoading]=useState(true);
+  const {items:livePkgs,loading}=useLiveServiceCatalog("rightel","postpaid");
   const [showSort,setShowSort]=useState(false);
   const [showType,setShowType]=useState(false);
   const [selId,setSelId]=useState<string|null>(null);
-  useEffect(()=>{const t=setTimeout(()=>setLoading(false),900);return()=>clearTimeout(t);},[]);
 
-  const filtered=[..._RT_PKGS].filter(p=>{
+  const filtered=[...livePkgs].filter(p=>{
     if(durFilter&&p.durFilter!==durFilter)return false;
     if(typeFilter&&p.type!==typeFilter)return false;
     return true;
