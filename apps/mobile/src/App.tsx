@@ -6057,7 +6057,6 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
   const [pinCurrent,setPinCurrent]=useState("");
   const [pinError,setPinError]=useState("");
   const [pinEnabled,setPinEnabled]=useState(false);
-  const [pinCurrent,setPinCurrent]=useState("");
   const [verifiedProfile,setVerifiedProfile]=useState<{fullName:string;nationalId:string;mobile:string;birthDate:string|null;verifiedAt:string|null}|null>(null);
   const [deletingCard,setDeletingCard]=useState<string|null>(null);
   const handlePinOpen=(mode:"enable"|"change"|"disable")=>{setPinModal(mode);setPinStep(mode==="enable"?"enter-new":"enter-current");setPinInput("");setPinNew("");setPinCurrent("");setPinError("");};
@@ -6108,19 +6107,23 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
   };
   useEffect(()=>{
     let active=true;
-    void userSettingsRequest("/api/v1/user/settings").then(({settings})=>{
-      if(!active||!settings)return;
-      setNotifications(settings.notificationsEnabled);
-      setKeySoundEnabled(settings.keySoundEnabled);
-      setFontScaleState(settings.fontScale);
-      setPinEnabled(settings.pinEnabled);
-      try{const k=await ansarrafVerifiedProfile();setVerifiedProfile(k?.verified&&k?.profile?k.profile:null);}catch{setVerifiedProfile(null);}
-      localStorage.setItem(`anp_notifications_${user.uid}`,settings.notificationsEnabled?"on":"off");
-      localStorage.setItem("anp_key_sound",settings.keySoundEnabled?"on":"off");
-      localStorage.setItem("anp_font_scale",String(settings.fontScale));
-      const root=document.getElementById("root");
-      if(root)root.style.zoom=settings.fontScale===0?"":String(1+settings.fontScale*0.07);
-    }).catch(()=>{});
+    const load=async()=>{
+      try{
+        const {settings}=await userSettingsRequest("/api/v1/user/settings");
+        if(!active||!settings)return;
+        setNotifications(settings.notificationsEnabled);
+        setKeySoundEnabled(settings.keySoundEnabled);
+        setFontScaleState(settings.fontScale);
+        setPinEnabled(settings.pinEnabled);
+        try{const k=await ansarrafVerifiedProfile();if(active)setVerifiedProfile(k?.verified&&k?.profile?k.profile:null);}catch{if(active)setVerifiedProfile(null);}
+        localStorage.setItem(`anp_notifications_${user.uid}`,settings.notificationsEnabled?"on":"off");
+        localStorage.setItem("anp_key_sound",settings.keySoundEnabled?"on":"off");
+        localStorage.setItem("anp_font_scale",String(settings.fontScale));
+        const root=document.getElementById("root");
+        if(root)root.style.zoom=settings.fontScale===0?"":String(1+settings.fontScale*0.07);
+      }catch{}
+    };
+    void load();
     return()=>{active=false};
   },[user.uid]);
   const toggleNotifications=()=>setNotifications(v=>{const next=!v;localStorage.setItem(`anp_notifications_${user.uid}`,next?"on":"off");if(next)playChime();void persistSettings({notificationsEnabled:next});return next});
