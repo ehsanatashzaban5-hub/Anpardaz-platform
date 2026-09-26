@@ -208,7 +208,9 @@ async function anpardazCards():Promise<BankCard[]>{
   const d=await anpardazRequest("/api/v1/cards");
   return Array.isArray(d?.cards)?d.cards.map((x:any)=>({id:String(x.id),number:String(x.number??"•••• "+String(x.last4??"")),bank:String(x.bank_name??"بانک"),holderName:String(x.holder_name??""),registrationStatus:String(x.registration_status??"verified")})): [];
 }
-async function anpardazDeleteCard(cardId:string){return anpardazRequest("/api/v1/cards/"+encodeURIComponent(cardId),{method:"DELETE"});}\nasync function ansarrafVerifiedProfile(){return sarrafRequest("/api/v1/kyc/profile");}\nasync function startShaparakCardRegistration():Promise<{sessionId:string;authorizationUrl:string}>{
+async function anpardazDeleteCard(cardId:string){return anpardazRequest("/api/v1/cards/"+encodeURIComponent(cardId),{method:"DELETE"});}
+async function ansarrafVerifiedProfile(){return sarrafRequest("/api/v1/kyc/profile");}
+async function startShaparakCardRegistration():Promise<{sessionId:string;authorizationUrl:string}>{
   return anpardazRequest("/api/v1/cards/registration/start",{method:"POST"});
 }
 async function shaparakRegistrationStatus(sessionId:string){
@@ -504,12 +506,14 @@ function TransactionReceipt({data,onClose}:{data:ReceiptData;onClose:()=>void}){
     import("html-to-image").then(({toPng})=>toPng(sheetRef.current!,{pixelRatio:2}).then(url=>{cachedPng.current=url;doSave(url);}).catch(()=>{setToast("ذخیره ناموفق");setTimeout(()=>{setToast("");setCaptured(false);},2000);})).catch(()=>{setToast("ذخیره ناموفق");setTimeout(()=>{setToast("");setCaptured(false);},2000);});
   };
   const handleShare=()=>{
-    const txt=[`آن‌پرداز — ${data.title}`,`وضعیت: ${isFailed?"ناموفق":isPending?"در انتظار":"موفق"}`,data.amount?`مبلغ: ${data.amount}`:"",`تاریخ: ${timeStr}`,`کد پیگیری: ${trackId}`].filter(Boolean).join("\n");
+    const txt=[`آن‌پرداز — ${data.title}`,`وضعیت: ${isFailed?"ناموفق":isPending?"در انتظار":"موفق"}`,data.amount?`مبلغ: ${data.amount}`:"",`تاریخ: ${timeStr}`,`کد پیگیری: ${trackId}`].filter(Boolean).join("
+");
     navigator.share?navigator.share({title:"رسید آن‌پرداز",text:txt}).catch(()=>{}):navigator.clipboard?.writeText(txt).catch(()=>{});
   };
   const handleCopy=()=>{
     const lines=["رسید تراکنش","─────────────────",...(data.title?[`نوع تراکنش: ${data.title}`]:[]),...(data.amount?[`مبلغ: ${toFaDigits(data.amount)}`]:[]),...(data.destination?[`مقصد/مبدا: ${data.destination}`]:[]),`وضعیت: ${isFailed?"ناموفق":isPending?"در انتظار":"موفق"}`,`تاریخ و ساعت: ${timeStr}`,`کد پیگیری: ${trackId}`,...(data.detail?[`توضیحات: ${data.detail}`]:[]),"─────────────────","آن پرداز پیشرو در خدمات بانکی و دارایی های دیجیتال"];
-    navigator.clipboard?.writeText(lines.join("\n")).then(()=>{setCopyDone(true);setToast("رسید کپی شد");setTimeout(()=>{setToast("");setCopyDone(false);},2000);}).catch(()=>{});
+    navigator.clipboard?.writeText(lines.join("
+")).then(()=>{setCopyDone(true);setToast("رسید کپی شد");setTimeout(()=>{setToast("");setCopyDone(false);},2000);}).catch(()=>{});
   };
 
   const heroMod=isFailed?" rds-hero-failed":isPending?" rds-hero-pending":"";
@@ -1123,7 +1127,7 @@ function VerificationAnimation({onSuccess,onFail}:{onSuccess:()=>void;onFail:()=
 
 function PinUnlock({user,onVerified}:{user:UserData;onVerified:()=>void}){
   const [pin,setPin]=useState(""),[error,setError]=useState(""),[support,setSupport]=useState(false);
-  const tap=(digit:string)=>{const next=pin+digit;if(next.length>4)return;setPin(next);setError("");if(next.length===4)setTimeout(()=>{if(next===user.pin)onVerified();else{setPin("");setError("رمز امنیتی صحیح نیست. دوباره تلاش کنید.")}},150)};
+  const tap=(digit:string)=>{const next=pin+digit;if(next.length>4)return;setPin(next);setError("");if(next.length===4)setTimeout(()=>{if(next===pinEnabled)onVerified();else{setPin("");setError("رمز امنیتی صحیح نیست. دوباره تلاش کنید.")}},150)};
   const keys=["1","2","3","4","5","6","7","8","9","","0","del"];
   return <div className="auth-screen" dir="rtl"><div className="auth-card pin-card pin-unlock-card"><img src={anPardazLogo} alt="آن‌پرداز" className="pin-logo"/><div style={{display:"flex",justifyContent:"center",marginBottom:12,color:"#00D6B0"}}><Icon name="lock" size={32}/></div><h2>رمز امنیتی را وارد کنید</h2><p>برای ورود به حساب {toFaDigits(user.phone)}، رمز ۴ رقمی خود را وارد کنید.</p><div style={{display:"flex",justifyContent:"center",gap:16,margin:"20px 0"}}>{[0,1,2,3].map(i=><div key={i} style={{width:16,height:16,borderRadius:"50%",background:pin.length>i?"#00D6B0":"rgba(120,190,210,0.2)",transition:"background 0.2s"}}/>)}</div>{error&&<p className="field-err" style={{textAlign:"center"}}>{error}</p>}<div dir="ltr" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>{keys.map((key,i)=>key===""?<div key={i}/>:key==="del"?<button key={i} onClick={()=>setPin(v=>v.slice(0,-1))} style={{height:68,borderRadius:16,background:"#071D2C",border:"1px solid rgba(120,190,210,0.15)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"#F4FAFC"}}><Icon name="delete" size={22}/></button>:<button key={i} onClick={()=>tap(key)} style={{height:68,borderRadius:16,background:"#071D2C",border:"1px solid rgba(120,190,210,0.15)",fontSize:28,fontWeight:700,fontFamily:"Vazirmatn",color:"#F4FAFC",cursor:"pointer"}}>{toFaDigits(key)}</button>)}</div><button className="forgot-pin" onClick={()=>setSupport(true)}>رمز خود را فراموش کرده‌اید؟</button></div>{support&&<div className="receipt-page" dir="rtl"><div className="receipt-page-header"><button className="back-btn" onClick={()=>setSupport(false)}><Icon name="arrow" size={20}/></button><h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>بازیابی رمز امنیتی</h2><div style={{width:36}}/></div><div className="receipt-page-body" style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 24px"}}><img src={anPardazLogo} alt="آن‌پرداز" style={{width:64,height:64,borderRadius:16,marginBottom:20}}/><h3 style={{marginBottom:12}}>بازیابی رمز امنیتی</h3><p style={{textAlign:"center",lineHeight:1.8,marginBottom:8}}>برای غیرفعال کردن رمز فراموش‌شده، با پشتیبانی آن‌پرداز تماس بگیرید.</p><div style={{fontSize:18,fontWeight:900,color:"#00D6B0",letterSpacing:2,margin:"12px 0",fontFamily:"Vazirmatn",direction:"ltr"}}>۰۹۳۷۵۴۳۷۱۰۶</div><button className="primary-button" style={{marginTop:16,width:"100%"}} onClick={()=>setSupport(false)}>متوجه شدم</button></div></div>}</div>;
 }
@@ -5720,7 +5724,8 @@ const TxDetailPage=()=>{
     noteDisplay?["جزئیات",noteDisplay]:null,
   ] as ([string,string]|null)[]).filter((x):x is [string,string]=>x!==null);
   const handleCopy=()=>{
-    const text=[`آن‌پرداز — ${title}`,`وضعیت: ${statusLabel[tx.status]}`,amountDisplay?`مبلغ: ${amountDisplay}`:"",`زمان: ${timeStr}`,`شناسه: ${tx.id}`,...(tx.toAddress?[`مقصد: ${tx.toAddress}`]:[]),...(noteDisplay?[`جزئیات: ${noteDisplay}`]:[])].filter(Boolean).join("\n");
+    const text=[`آن‌پرداز — ${title}`,`وضعیت: ${statusLabel[tx.status]}`,amountDisplay?`مبلغ: ${amountDisplay}`:"",`زمان: ${timeStr}`,`شناسه: ${tx.id}`,...(tx.toAddress?[`مقصد: ${tx.toAddress}`]:[]),...(noteDisplay?[`جزئیات: ${noteDisplay}`]:[])].filter(Boolean).join("
+");
     navigator.clipboard.writeText(text).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2200);}).catch(()=>{});
   };
   return <div className="expage" dir="rtl">
@@ -5862,13 +5867,15 @@ function TxModal({tx,onClose,isHistory=false}:{tx:TxRecord;onClose:()=>void;isHi
     import("html-to-image").then(({toPng})=>toPng(sheetRef.current!,{pixelRatio:2}).then(url=>{cachedPng.current=url;doSave(url);}).catch(()=>{setToast("ذخیره ناموفق");setTimeout(()=>{setToast("");setCaptured(false);},2000);})).catch(()=>{setToast("ذخیره ناموفق");setTimeout(()=>{setToast("");setCaptured(false);},2000);});
   };
   const handleShare=()=>{
-    const text=[`آن‌پرداز — ${title}`,`وضعیت: ${statusLabel[tx.status]}`,amountDisplay?`مبلغ: ${amountDisplay}`:"",`تاریخ: ${timeStr}`,`شناسه: ${tx.id}`,...(tx.toAddress?[`مقصد: ${tx.toAddress}`]:[])].filter(Boolean).join("\n");
+    const text=[`آن‌پرداز — ${title}`,`وضعیت: ${statusLabel[tx.status]}`,amountDisplay?`مبلغ: ${amountDisplay}`:"",`تاریخ: ${timeStr}`,`شناسه: ${tx.id}`,...(tx.toAddress?[`مقصد: ${tx.toAddress}`]:[])].filter(Boolean).join("
+");
     navigator.share?navigator.share({title:"رسید آن‌پرداز",text}).catch(()=>{}):navigator.clipboard?.writeText(text).catch(()=>{});
   };
   const handleCopy=()=>{
     const rateNote=isExchange&&tx.note?.includes("نرخ")?tx.note.split(" · ").find(p=>p.startsWith("نرخ"))||"":null;
     const lines=["رسید تراکنش","─────────────────",`نوع تراکنش: ${title}`,...(amountDisplay?[`مبلغ: ${toFaDigits(amountDisplay)}`]:[]),...(tx.convertedAmount!=null?[`معادل: ${tx.toAsset==="usdt"?faFixed(tx.convertedAmount,2):fa(Math.round(tx.convertedAmount))} ${tx.toAsset==="toman"?"ریال":"دلار تتر"}`]:[]),...(rateNote?[rateNote]:[]),`وضعیت: ${statusLabel[tx.status]||tx.status}`,`تاریخ و ساعت: ${timeStr}`,`شناسه تراکنش: ${tx.id}`,...(tx.fee>0?[`کارمزد: ${faFixed(tx.fee,2)} دلار تتر`]:[]),...(tx.toAddress?[`مقصد: ${tx.toAddress}`]:[]),...(noteDisplay?[`توضیحات: ${noteDisplay}`]:[]),"─────────────────","آن پرداز پیشرو در خدمات بانکی و دارایی های دیجیتال"];
-    navigator.clipboard?.writeText(lines.join("\n")).then(()=>{setCopyDone(true);setToast("رسید کپی شد");setTimeout(()=>{setToast("");setCopyDone(false);},2000);}).catch(()=>{});
+    navigator.clipboard?.writeText(lines.join("
+")).then(()=>{setCopyDone(true);setToast("رسید کپی شد");setTimeout(()=>{setToast("");setCopyDone(false);},2000);}).catch(()=>{});
   };
 
   const heroMod=isFailed?" rds-hero-failed":isPending?" rds-hero-pending":"";
@@ -6046,9 +6053,14 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
   const [pinModal,setPinModal]=useState<null|"enable"|"change"|"disable">(null);
   const [pinStep,setPinStep]=useState<"enter-current"|"enter-new"|"confirm-new">("enter-current");
   const [pinInput,setPinInput]=useState("");
-  const [pinNew,setPinNew]=useState("");\n  const [pinCurrent,setPinCurrent]=useState("");
-  const [pinError,setPinError]=useState("");\n  const [pinEnabled,setPinEnabled]=useState(false);\n  const [verifiedProfile,setVerifiedProfile]=useState<{fullName:string;nationalId:string;mobile:string;birthDate:string|null;verifiedAt:string|null}|null>(null);\n  const [deletingCard,setDeletingCard]=useState<string|null>(null);
-  const handlePinOpen=(mode:"enable"|"change"|"disable")=>{setPinModal(mode);setPinStep(mode==="enable"?"enter-new":"enter-current");setPinInput("");setPinNew("");setPinError("");};
+  const [pinNew,setPinNew]=useState("");
+  const [pinCurrent,setPinCurrent]=useState("");
+  const [pinError,setPinError]=useState("");
+  const [pinEnabled,setPinEnabled]=useState(false);
+  const [pinCurrent,setPinCurrent]=useState("");
+  const [verifiedProfile,setVerifiedProfile]=useState<{fullName:string;nationalId:string;mobile:string;birthDate:string|null;verifiedAt:string|null}|null>(null);
+  const [deletingCard,setDeletingCard]=useState<string|null>(null);
+  const handlePinOpen=(mode:"enable"|"change"|"disable")=>{setPinModal(mode);setPinStep(mode==="enable"?"enter-new":"enter-current");setPinInput("");setPinNew("");setPinCurrent("");setPinError("");};
   const handlePinDigit=(d:string)=>{if(pinInput.length<4)setPinInput(p=>{const next=p+d;
     if(next.length===4){
       setTimeout(async()=>{
@@ -6056,30 +6068,22 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
           if(pinStep==="enter-new"){setPinNew(next);setPinStep("confirm-new");setPinInput("");}
           else if(pinStep==="confirm-new"){
             if(next===pinNew){
-              try{
-                await userSettingsRequest("/api/v1/user/settings/pin/enable",{method:"POST",body:JSON.stringify({newPin:pinNew})});
-                setPinEnabled(true);setPinModal(null);
-              }catch{setPinError("ذخیره رمز انجام نشد. دوباره تلاش کنید.");setPinInput("");}
+              try{await userSettingsRequest("/api/v1/user/settings/pin/enable",{method:"POST",body:JSON.stringify({newPin:pinNew})});setPinEnabled(true);setPinModal(null);}
+              catch{setPinError("ذخیره رمز انجام نشد. دوباره تلاش کنید.");setPinInput("");}
             }else{setPinError("رمزها یکسان نیستند. دوباره امتحان کن.");setPinStep("enter-new");setPinNew("");setPinInput("");}
           }
-        } else if(pinModal==="change"){
-          if(pinStep==="enter-current"){if(next===user.pin){setPinStep("enter-new");setPinInput("");setPinError("");}else{setPinError("رمز اشتباه است.");setPinInput("");}}
+        }else if(pinModal==="change"){
+          if(pinStep==="enter-current"){setPinCurrent(next);setPinStep("enter-new");setPinInput("");setPinError("");}
           else if(pinStep==="enter-new"){setPinNew(next);setPinStep("confirm-new");setPinInput("");}
           else if(pinStep==="confirm-new"){
             if(next===pinNew){
-              try{
-                await userSettingsRequest("/api/v1/user/settings/pin/change",{method:"POST",body:JSON.stringify({currentPin:pinCurrent,newPin:pinNew})});
-                onUpdate({...user,pin:pinNew});DB.saveUser({...user,pin:pinNew});setPinModal(null);
-              }catch{setPinError("رمز فعلی یا رمز جدید معتبر نیست.");setPinInput("");}
+              try{await userSettingsRequest("/api/v1/user/settings/pin/change",{method:"POST",body:JSON.stringify({currentPin:pinCurrent,newPin:pinNew})});setPinEnabled(true);setPinModal(null);}
+              catch{setPinError("رمز فعلی یا رمز جدید معتبر نیست.");setPinInput("");}
             }else{setPinError("رمزها یکسان نیستند.");setPinStep("enter-new");setPinNew("");setPinInput("");}
           }
-        } else if(pinModal==="disable"){
-          if(next===user.pin){
-            try{
-              await userSettingsRequest("/api/v1/user/settings/pin/disable",{method:"POST",body:JSON.stringify({currentPin:user.pin})});
-              onUpdate({...user,pin:""});DB.saveUser({...user,pin:""});setPinModal(null);
-            }catch{setPinError("غیرفعال‌سازی رمز انجام نشد.");setPinInput("");}
-          }else{setPinError("رمز اشتباه است.");setPinInput("");}
+        }else if(pinModal==="disable"){
+          try{await userSettingsRequest("/api/v1/user/settings/pin/disable",{method:"POST",body:JSON.stringify({currentPin:next})});setPinEnabled(false);setPinModal(null);}
+          catch{setPinError("رمز فعلی نادرست است یا غیرفعال‌سازی انجام نشد.");setPinInput("");}
         }
       },100);
     }
@@ -6108,7 +6112,9 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
       if(!active||!settings)return;
       setNotifications(settings.notificationsEnabled);
       setKeySoundEnabled(settings.keySoundEnabled);
-      setFontScaleState(settings.fontScale);\n      setPinEnabled(settings.pinEnabled);\n      try{const k=await ansarrafVerifiedProfile();setVerifiedProfile(k?.verified&&k?.profile?k.profile:null);}catch{setVerifiedProfile(null);}
+      setFontScaleState(settings.fontScale);
+      setPinEnabled(settings.pinEnabled);
+      try{const k=await ansarrafVerifiedProfile();setVerifiedProfile(k?.verified&&k?.profile?k.profile:null);}catch{setVerifiedProfile(null);}
       localStorage.setItem(`anp_notifications_${user.uid}`,settings.notificationsEnabled?"on":"off");
       localStorage.setItem("anp_key_sound",settings.keySoundEnabled?"on":"off");
       localStorage.setItem("anp_font_scale",String(settings.fontScale));
@@ -9380,7 +9386,8 @@ function CameraCardScanModal({onClose,onDetect}:{onClose:()=>void;onDetect:(num:
       <canvas ref={canvasRef} style={{display:"none"}}/>
       <div style={{padding:"20px 16px",background:"rgba(0,0,0,0.9)"}}>
         {phase==="camera"&&<>
-          <p style={{color:"rgba(255,255,255,0.6)",fontSize:12,textAlign:"center",marginBottom:16,lineHeight:1.7}}>از شماره کارت عکس بگیرید{"\n"}ما شماره کارت را برایتان وارد می‌کنیم.</p>
+          <p style={{color:"rgba(255,255,255,0.6)",fontSize:12,textAlign:"center",marginBottom:16,lineHeight:1.7}}>از شماره کارت عکس بگیرید{"
+"}ما شماره کارت را برایتان وارد می‌کنیم.</p>
           <button onClick={capture} style={{width:"100%",background:"var(--accent)",border:"none",borderRadius:14,padding:"15px",color:"#031522",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn"}}>گرفتن عکس</button>
         </>}
         {phase==="result"&&<>
