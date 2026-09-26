@@ -77,11 +77,13 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
     const customerId=await ensureCustomer(pool,asR(req).auth);
     const serviceCode=String((req.params as {serviceCode:string}).serviceCode) as FintechServiceCode;
     const operationId=String((req.params as {operationId:string}).operationId);
+    const body=(req.body??{}) as {payload?:Record<string,unknown>};
+    if(body.payload!==undefined&&(typeof body.payload!=='object'||body.payload===null||Array.isArray(body.payload)))return reply.code(400).send({error:'invalid_service_payload'});
     const op=(await pool.query('SELECT * FROM fintech_service_operations WHERE customer_id=$1 AND operation_id=$2 AND service_code=$3',[customerId,operationId,serviceCode])).rows[0];
     if(!op)return reply.code(404).send({error:'operation_not_found'});
     if(op.status==='completed'||op.status==='failed')return {operation:op,idempotent:true};
     let payload:Record<string,unknown>={};
-    try{payload=(op.request_metadata?.payload??{}) as Record<string,unknown>;}catch{}
+    try{payload=(body.payload??op.request_metadata?.payload??{}) as Record<string,unknown>;}catch{}
     const provider=providerOr503(reply);if(!provider)return;
     await pool.query("UPDATE fintech_service_operations SET status='processing',provider_code='fintech',updated_at=NOW() WHERE operation_id=$1",[operationId]);
     const result=await provider.execute({serviceCode,operationId,payload});
