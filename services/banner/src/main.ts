@@ -90,7 +90,7 @@ async function registerPublic(app:FastifyInstance){
   });
   app.get('/api/v1/banner/listings/:id',async(req,reply)=>{
     const id=idParam((req.params as any).id); if(!id)return reply.code(400).send({error:'invalid_id'});
-    const r=await pool.query('SELECT l.*,c.name category_name,p.display_name seller_display_name FROM banner_listings l LEFT JOIN banner_categories c ON c.id=l.category_id LEFT JOIN banner_profiles p ON p.identity_id=l.identity_id WHERE l.id=$1 AND l.status=\'published\'',[id]);
+    const r=await pool.query('SELECT l.id,l.category_id,l.title,l.description,l.price,l.currency,l.condition,l.city,l.contact_enabled,l.chat_enabled,l.created_at,l.updated_at,l.views,l.attributes,c.name category_name,p.display_name seller_display_name FROM banner_listings l LEFT JOIN banner_categories c ON c.id=l.category_id LEFT JOIN banner_profiles p ON p.identity_id=l.identity_id WHERE l.id=$1 AND l.status=\'published\'',[id]);
     if(!r.rows[0])return reply.code(404).send({error:'listing_not_found'});
     await pool.query('UPDATE banner_listings SET views=views+1 WHERE id=$1',[id]);
     const media=await pool.query('SELECT id,mime_type,filename,sort_order FROM banner_media WHERE listing_id=$1 ORDER BY sort_order,id',[id]);
