@@ -74,7 +74,9 @@ app.post('/api/v1/device-security/registration/verify',{preHandler:requireAuth},
       VALUES($1,$2,$3,$4,$5,$6,$7,NOW()) ON CONFLICT(credential_id) DO UPDATE SET counter=EXCLUDED.counter,transports=EXCLUDED.transports,device_type=EXCLUDED.device_type,backed_up=EXCLUDED.backed_up,last_verified_at=NOW()`,
       [customerId,cred.id,Buffer.from(cred.publicKey),cred.counter,cred.transports??[],info.credentialDeviceType??null,info.credentialBackedUp??false]);
     await pool.query('DELETE FROM device_security_challenges WHERE customer_id=$1',[customerId]);
-    return {verified:true};
+    const deviceToken=randomBytes(32).toString('base64url');
+    await pool.query('INSERT INTO device_security_sessions(token_hash,customer_id,expires_at) VALUES($1,$2,NOW()+INTERVAL \'15 minutes\')',[deviceToken,customerId]);
+    return {verified:true,deviceToken,expiresInSeconds:900};
   }catch(error){request.log.warn({error},'device security registration verification failed');return reply.code(400).send({error:'device_security_registration_failed'});}
 });
 
