@@ -57,7 +57,7 @@ ALTER TABLE market_sync_runs
 ALTER TABLE market_sync_runs DROP CONSTRAINT IF EXISTS market_sync_runs_status_check;
 ALTER TABLE market_sync_runs
   ADD CONSTRAINT market_sync_runs_status_check
-  CHECK (status IN ('queued','running','succeeded','partial','failed','blocked'));
+  CHECK (status IN ('queued','running','succeeded','partial','failed','blocked','skipped'));
 
 CREATE INDEX IF NOT EXISTS idx_market_store_sources_enabled
   ON market_store_sources(enabled,store_id);
