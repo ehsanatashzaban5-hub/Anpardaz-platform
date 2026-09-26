@@ -56,6 +56,29 @@ CREATE TABLE IF NOT EXISTS market_home_sections (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 032 created this table with slug/query_config/active. Reconcile that schema
+-- before seeding the 042 contract so fresh installs and upgrades converge.
+ALTER TABLE market_home_sections
+  ADD COLUMN IF NOT EXISTS key TEXT,
+  ADD COLUMN IF NOT EXISTS query JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
+
+UPDATE market_home_sections
+SET key=COALESCE(key,slug),
+    query=COALESCE(query,query_config,'{}'::jsonb),
+    enabled=COALESCE(enabled,active,TRUE)
+WHERE key IS NULL OR query IS NULL OR enabled IS NULL;
+
+ALTER TABLE market_home_sections
+  ALTER COLUMN key SET NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_market_home_sections_key ON market_home_sections(key);
+
+ALTER TABLE market_home_sections DROP CONSTRAINT IF EXISTS market_home_sections_section_type_check;
+ALTER TABLE market_home_sections
+  ADD CONSTRAINT market_home_sections_section_type_check
+  CHECK(section_type IN ('hero','category','products','price_drops','offers','stores','custom','campaign'));
+
 INSERT INTO market_home_sections(key,title,subtitle,section_type,query,sort_order)
 VALUES
 ('categories','دسته‌بندی‌ها','دسته‌های فعال آن مارکت','category','{}',10),
