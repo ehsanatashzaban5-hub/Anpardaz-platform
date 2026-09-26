@@ -7504,21 +7504,23 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
                   })}
                 </div>
               </div>
-              <AnSH title="رضایت بر اساس معیارها"/>
-              {([["کیفیت ساخت",Math.min(99,Math.round(p.rating/5*90)+10)],["عملکرد",Math.min(99,Math.round(p.rating/5*85)+15)],["ارزش خرید",Math.min(99,60+(p.storeCount%30))],["طراحی",Math.min(99,Math.round(p.rating/5*80)+18)],["باتری / پایداری",Math.min(99,55+(p.reviews%40))],["خدمات پس از فروش",Math.min(99,48+(p.storeCount*2%40))]] as [string,number][]).map(([label,val])=>(
-                <div key={label} style={{marginBottom:14}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                    <span style={{fontSize:13,color:"var(--am-muted)"}}>{label}</span>
-                    <span style={{fontSize:13,fontWeight:700,color:"var(--am-text)"}}>{toFaDigits(String(val))}٪</span>
+              <AnSH title="نظرات واقعی کاربران"/>
+              {reviewRows.length===0
+                ? <div style={{padding:"18px 4px",color:"var(--am-muted)",fontSize:12,lineHeight:1.9}}>هنوز نظر منتشرشده‌ای برای این محصول ثبت نشده است.</div>
+                : reviewRows.slice(0,20).map((r:any)=>(
+                  <div key={r.id} style={{padding:"14px 0",borderBottom:"1px solid var(--am-border)"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",gap:12,marginBottom:6}}>
+                      <span style={{fontWeight:800,color:"var(--am-text)"}}>{toFaDigits(String(r.rating))} از ۵</span>
+                      <span style={{fontSize:10,color:"var(--am-muted)"}}>{r.verified_purchase?"خرید تأییدشده":""}</span>
+                    </div>
+                    {r.title&&<div style={{fontWeight:700,fontSize:12,marginBottom:5}}>{r.title}</div>}
+                    <div style={{fontSize:12,lineHeight:1.9,color:"var(--am-muted)"}}>{r.body}</div>
                   </div>
-                  <div className="am-progress-track"><div className="am-progress-fill" style={{width:`${val}%`}}/></div>
-                </div>
-              ))}
+                ))}
             </div>
             <div style={{padding:"14px",background:"var(--am-bg)",borderRadius:14,border:"1px solid var(--am-border)"}}>
-              <div style={{fontSize:11,color:"var(--am-muted)",lineHeight:1.9}}>اطلاعات رضایت کاربران بر اساس بازخوردهای {toFaDigits(String(p.reviews))} کاربر جمع‌آوری شده است. این اطلاعات ممکن است کامل یا به‌روز نباشد.</div>
-            </div>
-          </>
+              <div style={{fontSize:11,color:"var(--am-muted)",lineHeight:1.9}}>امتیاز و نظرات این بخش فقط از نظرات منتشرشده واقعی کاربران دریافت می‌شود و هیچ مقدار تخمینی یا ساختگی نمایش داده نمی‌شود.</div>
+            </div>         </>
         )}
 
         {/* ─── Alternatives tab ─── */}
