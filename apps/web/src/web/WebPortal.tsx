@@ -174,11 +174,24 @@ export default function WebPortal() {
   useEffect(() => {
     if (userRole === "guest") return;
     const token = localStorage.getItem("anpardaz:accessToken");
-    if (!token) return;
-    const base = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+    if (!token) { setUserRole("guest"); return; }
+    const base = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
     if (!base) return;
-    void fetch(`${base}/api/v1/user/settings`, { headers: { accept: "application/json", authorization: `Bearer ${token}` }, cache: "no-store" })
-      .then(r => r.ok ? r.json() : null)
+    void fetch(`${base}/api/v1/auth/me`, { headers: { accept: "application/json", authorization: `Bearer ${token}` }, cache: "no-store" })
+      .then(async r => {
+        if (r.status === 401) {
+          localStorage.removeItem("anpardaz:accessToken");
+          localStorage.removeItem("anpardaz:web:role");
+          localStorage.removeItem("anpardaz:web:email");
+          localStorage.removeItem("anpardaz:web:phone");
+          setUserRole("guest");
+          return null;
+        }
+        return r.ok ? r.json() : null;
+      })
+      .then(d => d?.user?.status === "active"
+        ? fetch(`${base}/api/v1/user/settings`, { headers: { accept: "application/json", authorization: `Bearer ${token}` }, cache: "no-store" }).then(r => r.ok ? r.json() : null)
+        : null)
       .then(d => { if (d?.settings?.theme) setDarkMode(d.settings.theme !== "light"); })
       .catch(() => {});
   }, [userRole]);
