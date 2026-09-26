@@ -9826,7 +9826,8 @@ export default function App() {
   const recentTx=transactions.filter(tx=>tx.source!=="exchange"&&!tx.note?.includes("[صرافی]")&&!(tx.note?.includes("ربات فارکس")&&tx.note?.includes("تخصیص"))).slice(0,3);
   const lt=lightTheme?" light-theme":"";
 
-  const handleService=async(action:string,label:string)=>{\n    if(!(await checkProtectedServiceAccess(setProtectedAccessNotice)))return;
+  const handleService=async(action:string,label:string)=>{
+    if(!(await checkProtectedServiceAccess(setProtectedAccessNotice)))return;
     setMenuOpen(false);
     if(action==="transfer"){setTab("home");setSubPage("transfer")}
     else if(action==="exchange"){setTab("home");setSubPage("exchange")}
