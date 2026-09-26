@@ -80,7 +80,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_market_home_sections_key ON market_home_sec
 ALTER TABLE market_home_sections DROP CONSTRAINT IF EXISTS market_home_sections_section_type_check;
 ALTER TABLE market_home_sections
   ADD CONSTRAINT market_home_sections_section_type_check
-  CHECK(section_type IN ('hero','category','products','price_drops','offers','stores','custom','campaign'));
+  CHECK(section_type IN ('hero','latest','category','products','price_drops','price_drop','popular','offers','stores','custom','query','campaign'));
 
 INSERT INTO market_home_sections(key,title,subtitle,section_type,query,sort_order)
 VALUES
