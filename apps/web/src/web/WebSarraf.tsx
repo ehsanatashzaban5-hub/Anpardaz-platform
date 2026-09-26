@@ -7,7 +7,7 @@ import WI from "./WebIcons";
 import type { WebPage, CryptoAsset, KycStatus, OrderBookEntry } from "./types";
 import { useIsMobile } from "./useResponsive";
 
-const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";\nconst PLATFORM_API_BASE = ((import.meta as any).env?.VITE_PLATFORM_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 const getWebToken = () => typeof window !== "undefined" ? window.localStorage.getItem("anpardaz:accessToken") ?? "" : "";
 
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
@@ -779,16 +779,7 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
         </div>
         {/* Chart */}
         <div style={{ height:260, background:"var(--w-card)", borderBottom:"1px solid var(--w-border)", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", overflow:"hidden" }}>
-          <svg viewBox="0 0 600 180" style={{ position:"absolute", bottom:0, left:0, width:"100%", height:"100%" }}>
-            <defs>
-              <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0891b2" stopOpacity="0.2"/>
-                <stop offset="100%" stopColor="#0891b2" stopOpacity="0"/>
-              </linearGradient>
-            </defs>
-            <path d="M0,140 L40,130 L80,135 L120,100 L160,90 L200,70 L240,75 L280,55 L320,50 L360,35 L400,30 L440,20 L480,25 L520,15 L560,10 L600,5 L600,180 L0,180Z" fill="url(#chartFill)"/>
-            <path d="M0,140 L40,130 L80,135 L120,100 L160,90 L200,70 L240,75 L280,55 L320,50 L360,35 L400,30 L440,20 L480,25 L520,15 L560,10 L600,5" fill="none" stroke="#0891b2" strokeWidth="1.5"/>
-          </svg>
+          {recentTrades.length>1&&(()=>{const prices=recentTrades.map(t=>t.price).filter(Number.isFinite);const lo=Math.min(...prices),hi=Math.max(...prices);const span=hi-lo||1;const points=prices.map((p,i)=>`${(i/(prices.length-1))*600},${165-((p-lo)/span)*145}`).join(" ");return <svg viewBox="0 0 600 180" style={{position:"absolute",bottom:0,left:0,width:"100%",height:"100%"}}><polyline points={points} fill="none" stroke="#0891b2" strokeWidth="1.5"/><line x1="0" y1="170" x2="600" y2="170" stroke="rgba(8,145,178,.12)"/></svg>})()}
           <div style={{ position:"absolute", bottom:4, left:8, display:"flex", gap:4 }}>
             {["۱ه","۴ه","۱ر","۱ه","۱هف","۱م"].map(tf=>(
               <button key={tf} style={{ padding:"2px 8px", borderRadius:4, border:"none", background:"rgba(8,145,178,0.1)", color:"#0891b2", fontSize:10, fontWeight:700, cursor:"pointer" }}>{tf}</button>
@@ -1242,8 +1233,8 @@ function TradeSelectTab({ asset, onInstant, onSpot, onMargin, isLoggedIn, onAuth
 }) {
   const cards = [
     { id:"instant", label:"خرید/فروش لحظه‌ای", sublabel:"لحظه‌ای", icon:"swap", color:"#059669", desc:"خرید یا فروش آنی با قیمت بازار. ساده‌ترین روش معامله.", badge:"پیشنهادی", onClick: isLoggedIn ? onInstant : onAuth },
-    { id:"spot", label:"معامله اسپات", sublabel:"اسپات", icon:"bar-chart", color:"#0891b2", desc:"معامله با دفتر سفارشات کامل. بازار، لیمیت و استاپ-لیمیت.", badge:"حرفه‌ای", onClick: onSpot },
-    { id:"margin", label:"معامله تعهدی", sublabel:"مارجین", icon:"trending-up", color:"#7c3aed", desc:"معامله با اهرم تا ×۱۰. امکان Long و Short با استفاده از وام.", badge:"ریسک بالا", onClick: isLoggedIn ? onMargin : onAuth },
+    { id:"spot", label:"معامله اسپات", sublabel:"اسپات", icon:"bar-chart", color:"#0891b2", desc:"معامله اسپات با دفتر سفارشات واقعی. سفارش استاپ‌لیمیت فعلاً فعال نیست.", badge:"اسپات", onClick: onSpot },
+    { id:"margin", label:"معامله تعهدی", sublabel:"غیرفعال", icon:"lock", color:"#6b7280", desc:"زیرساخت مارجین هنوز فعال نشده است و هیچ سفارش مارجینی ارسال نمی‌شود.", badge:"غیرفعال", onClick: ()=>setTab("trade-select") },
   ];
   return (
     <div style={{ padding:"32px 0" }}>
@@ -1313,72 +1304,57 @@ function InstantTradeTab({ asset, onBack, isLoggedIn, onAuth, kycStatus }: { ass
 
 // ── Support Tab ────────────────────────────────────
 function SupportTab({ isLoggedIn, onAuth }: { isLoggedIn:boolean; onAuth:()=>void }) {
-  if(!isLoggedIn) return <div style={{textAlign:"center",padding:"60px 24px"}}><WI n="comment" s={40} style={{opacity:.2,marginBottom:16}}/><div style={{fontSize:16,fontWeight:800,marginBottom:8}}>ورود برای دسترسی به پشتیبانی</div><button onClick={onAuth} className="w-btn w-btn-primary" style={{padding:"10px 24px"}}>ورود / ثبت‌نام</button></div>;
-  return <div style={{padding:"24px 0",maxWidth:620}}><div className="w-card" style={{padding:22}}><div style={{fontSize:15,fontWeight:900,marginBottom:8}}>پشتیبانی آن صراف</div><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>API تیکت و چت پشتیبانی هنوز به سایت متصل نشده است؛ هیچ تیکت، پیام یا پاسخ ساختگی نمایش داده نمی‌شود.</div></div></div>;
+  const [tickets,setTickets]=useState<any[]>([]);
+  const [selected,setSelected]=useState<any|null>(null);
+  const [subject,setSubject]=useState("");
+  const [message,setMessage]=useState("");
+  const [reply,setReply]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const token=getWebToken();
+  const headers={authorization:`Bearer ${token}`,accept:"application/json","content-type":"application/json"};
+  const load=async()=>{if(!PLATFORM_API_BASE||!token)return;try{const r=await fetch(PLATFORM_API_BASE+"/api/v1/support/tickets",{headers,cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"support_unavailable");setTickets(Array.isArray(d.tickets)?d.tickets:[]);}catch(e){setError(e instanceof Error?e.message:"پشتیبانی در دسترس نیست.");}};
+  const open=async(id:number)=>{try{const r=await fetch(PLATFORM_API_BASE+"/api/v1/support/tickets/"+id,{headers,cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"ticket_unavailable");setSelected(d);}catch(e){setError(e instanceof Error?e.message:"تیکت در دسترس نیست.");}};
+  useEffect(()=>{if(isLoggedIn)void load();},[isLoggedIn]);
+  const create=async()=>{if(!subject.trim()||!message.trim()||!PLATFORM_API_BASE)return;setBusy(true);setError("");try{const r=await fetch(PLATFORM_API_BASE+"/api/v1/support/tickets",{method:"POST",headers,body:JSON.stringify({subject:subject.trim(),message:message.trim()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"ticket_create_failed");setSubject("");setMessage("");await load();if(d.ticket?.id)await open(Number(d.ticket.id));}catch(e){setError(e instanceof Error?e.message:"ایجاد تیکت ناموفق بود.");}finally{setBusy(false);}};
+  const sendReply=async()=>{if(!selected?.ticket?.id||!reply.trim())return;setBusy(true);setError("");try{const r=await fetch(PLATFORM_API_BASE+"/api/v1/support/tickets/"+selected.ticket.id+"/messages",{method:"POST",headers,body:JSON.stringify({message:reply.trim()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"support_message_failed");setReply("");await open(Number(selected.ticket.id));await load();}catch(e){setError(e instanceof Error?e.message:"ارسال پیام ناموفق بود.");}finally{setBusy(false);}};
+  if(!isLoggedIn)return <div style={{textAlign:"center",padding:"60px 24px"}}><WI n="comment" s={40} style={{opacity:.2,marginBottom:16}}/><div style={{fontSize:16,fontWeight:800,marginBottom:8}}>ورود برای دسترسی به پشتیبانی</div><button onClick={onAuth} className="w-btn w-btn-primary" style={{padding:"10px 24px"}}>ورود / ثبت‌نام</button></div>;
+  return <div style={{padding:"24px 0",maxWidth:820}}>
+    <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:16}}>
+      <div className="w-card" style={{padding:16}}>
+        <div style={{fontWeight:900,marginBottom:12}}>تیکت‌های من</div>
+        <button className="w-btn w-btn-primary" style={{width:"100%",marginBottom:12}} onClick={()=>setSelected(null)}>تیکت جدید</button>
+        {tickets.length===0?<div style={{fontSize:12,color:"var(--w-muted)",padding:12}}>هنوز تیکتی ثبت نشده است.</div>:tickets.map(t=><button key={t.id} onClick={()=>void open(Number(t.id))} style={{width:"100%",textAlign:"right",background:selected?.ticket?.id===t.id?"rgba(8,145,178,.08)":"transparent",border:"1px solid var(--w-border)",borderRadius:8,padding:"10px",marginBottom:7,cursor:"pointer",fontFamily:"Vazirmatn"}}><div style={{fontSize:12,fontWeight:800}}>{t.subject}</div><div style={{fontSize:10,color:"var(--w-muted)",marginTop:4}}>{t.status}</div></button>)}
+      </div>
+      <div className="w-card" style={{padding:18}}>
+        {selected?.ticket?<><div style={{fontWeight:900,marginBottom:12}}>{selected.ticket.subject}</div><div style={{maxHeight:320,overflowY:"auto",marginBottom:12}}>{(selected.messages??[]).map((m:any)=><div key={m.id} style={{padding:"9px 10px",borderRadius:8,background:m.sender_role==="user"?"rgba(8,145,178,.06)":"var(--w-card2)",marginBottom:8,fontSize:12,lineHeight:1.8}}><div style={{fontSize:10,color:"var(--w-muted)",marginBottom:3}}>{m.sender_role} · {new Date(m.created_at).toLocaleString("fa-IR")}</div>{m.message}</div>)}</div>{selected.ticket.status!=="closed"&&<div style={{display:"flex",gap:8}}><input className="w-input" value={reply} onChange={e=>setReply(e.target.value)} placeholder="پیام جدید..."/><button className="w-btn w-btn-primary" disabled={busy||!reply.trim()} onClick={()=>void sendReply()}>ارسال</button></div>}</>:<><div style={{fontWeight:900,marginBottom:12}}>تیکت جدید</div><input className="w-input" value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع" style={{marginBottom:8}}/><textarea className="w-input" value={message} onChange={e=>setMessage(e.target.value)} placeholder="شرح درخواست" rows={7} style={{resize:"vertical",marginBottom:8}}/><button className="w-btn w-btn-primary" disabled={busy||!subject.trim()||!message.trim()} onClick={()=>void create()}>ثبت تیکت</button></>}
+        {error&&<div style={{marginTop:10,color:"#b91c1c",fontSize:11}}>{error}</div>}
+      </div>
+    </div>
+  </div>;
 }
 // ── Guide Tab ──────────────────────────────────────
 
 // ── Guide Tab ──────────────────────────────────────
 function GuideTab() {
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(35);
-  const VIDEOS = [
-    { title:"آشنایی با آن صراف", duration:"۵:۳۲", done:true },
-    { title:"نحوه واریز و برداشت", duration:"۸:۱۵", done:true },
-    { title:"معامله اسپات برای مبتدیان", duration:"۱۲:۴۰", done:false },
-    { title:"معامله تعهدی (مارجین)", duration:"۱۵:۲۲", done:false },
-    { title:"فارکس بات: تنظیمات", duration:"۹:۵۸", done:false },
-    { title:"امنیت حساب و ۲FA", duration:"۶:۱۰", done:false },
-  ];
-  return (
-    <div style={{ padding:"24px 0", display:"flex", gap:24, alignItems:"flex-start" }}>
-      <div style={{ flex:1 }}>
-        <div className="w-card" style={{ overflow:"hidden", marginBottom:16 }}>
-          <div style={{ height:320, background:"#0a0a12", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", cursor:"pointer" }} onClick={()=>setPlaying(!playing)}>
-            <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,rgba(8,145,178,0.15),rgba(124,58,237,0.1))" }}/>
-            {!playing ? (
-              <div style={{ width:72, height:72, borderRadius:"50%", background:"rgba(255,255,255,0.15)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <WI n="play" s={32} style={{ color:"#fff", marginRight:-4 }}/>
-              </div>
-            ) : (
-              <div style={{ display:"flex", gap:4 }}>
-                {[...Array(3)].map((_,i)=><div key={i} style={{ width:4, height:24+i*8, background:"#0891b2", borderRadius:2, animation:`pulse ${0.8+i*0.2}s ease-in-out infinite alternate` }}/>)}
-              </div>
-            )}
-            <div style={{ position:"absolute", bottom:12, right:16, fontSize:13, color:"rgba(255,255,255,0.8)", fontWeight:700 }}>معامله اسپات برای مبتدیان</div>
-          </div>
-          <div style={{ padding:"14px 16px" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-              <span style={{ fontSize:11, color:"var(--w-muted)" }}>۳:۵۲ / ۱۲:۴۰</span>
-              <div style={{ flex:1, height:4, background:"var(--w-card2)", borderRadius:4, overflow:"hidden", cursor:"pointer" }}
-                onClick={e=>{ const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); setProgress(((e.clientX-r.left)/r.width)*100); }}>
-                <div style={{ height:"100%", width:`${progress}%`, background:"#0891b2", transition:"width 0.1s" }}/>
-              </div>
-              <button onClick={()=>setPlaying(!playing)} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)" }}>
-                <WI n={playing?"pause":"play"} s={16}/>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div style={{ width:280 }}>
-        <div style={{ fontSize:14, fontWeight:800, marginBottom:12 }}>فهرست دروس</div>
-        <div className="w-card" style={{ overflow:"hidden" }}>
-          {VIDEOS.map((v,i)=>(
-            <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom:i<VIDEOS.length-1?"1px solid var(--w-border)":"none", cursor:"pointer", background:i===2?"rgba(8,145,178,0.06)":"transparent" }}>
-              <div style={{ width:28, height:28, borderRadius:8, background:v.done?"rgba(16,185,129,0.12)":i===2?"rgba(8,145,178,0.12)":"var(--w-card2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, color:v.done?"#10b981":i===2?"#0891b2":"var(--w-muted)" }}>
-                {v.done ? <WI n="check" s={13}/> : <WI n="play" s={12}/>}
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:v.done||i===2?700:500, color:i===2?"#0891b2":"var(--w-text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.title}</div>
-                <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:1 }}>{v.duration}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+  const [videos,setVideos]=useState<any[]>([]);
+  const [selected,setSelected]=useState<any|null>(null);
+  const [error,setError]=useState("");
+  useEffect(()=>{let active=true;(async()=>{if(!PLATFORM_API_BASE)return;try{const r=await fetch(PLATFORM_API_BASE+"/api/v1/content/videos?limit=50",{cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"content_unavailable");const rows=Array.isArray(d.videos)?d.videos:[];if(active){setVideos(rows);setSelected(rows[0]??null);}}catch(e){if(active)setError(e instanceof Error?e.message:"راهنما در دسترس نیست.");}})();return()=>{active=false}},[]);
+  return <div style={{padding:"24px 0",display:"flex",gap:24,alignItems:"flex-start"}}>
+    <div style={{flex:1}}>
+      <div className="w-card" style={{overflow:"hidden",marginBottom:16}}>
+        {selected?<video key={selected.id} controls preload="metadata" style={{width:"100%",height:320,background:"#0a0a12",display:"block"}} src={`${PLATFORM_API_BASE}/api/v1/content/videos/${selected.id}`}/>:<div style={{height:320,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--w-muted)"}}>{error||"هنوز ویدئوی منتشرشده‌ای برای راهنما ثبت نشده است."}</div>}
+        {selected&&<div style={{padding:"14px 16px"}}><div style={{fontSize:15,fontWeight:900}}>{selected.title}</div>{selected.description&&<div style={{fontSize:12,color:"var(--w-muted)",marginTop:6,lineHeight:1.8}}>{selected.description}</div>}</div>}
       </div>
     </div>
-  );
+    <div style={{width:280}}>
+      <div style={{fontSize:14,fontWeight:800,marginBottom:12}}>ویدئوهای منتشرشده</div>
+      <div className="w-card" style={{overflow:"hidden"}}>
+        {videos.length===0?<div style={{padding:14,fontSize:12,color:"var(--w-muted)"}}>محتوای واقعی هنوز منتشر نشده است.</div>:videos.map(v=><button key={v.id} onClick={()=>setSelected(v)} style={{width:"100%",textAlign:"right",background:selected?.id===v.id?"rgba(8,145,178,.06)":"transparent",border:"none",borderBottom:"1px solid var(--w-border)",padding:"12px 14px",cursor:"pointer",fontFamily:"Vazirmatn"}}><div style={{fontSize:12,fontWeight:selected?.id===v.id?800:600}}>{v.title}</div><div style={{fontSize:10,color:"var(--w-muted)",marginTop:3}}>{v.category_slug??"ویدئو"}</div></button>)}
+      </div>
+    </div>
+  </div>;
 }
 
 // ── Forex Bot Tab ──────────────────────────────────
