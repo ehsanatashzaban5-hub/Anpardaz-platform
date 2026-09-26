@@ -36,13 +36,15 @@ export default function WebHome({ onNavigate }: HomeProps) {
   const [news,setNews]=useState<any[]>([]);
   const [education,setEducation]=useState<any[]>([]);
   const [videos,setVideos]=useState<any[]>([]);
+  const [assets,setAssets]=useState<any[]>([]);
   useEffect(()=>{
     let active=true;
     Promise.all([
       fetch(API+"/api/v1/news?limit=6",{cache:"no-store"}).then(r=>r.ok?r.json():{items:[]}),
       fetch(API+"/api/v1/news?limit=3&category=education",{cache:"no-store"}).then(r=>r.ok?r.json():{items:[]}),
-      fetch(API+"/api/v1/content/videos?limit=4",{cache:"no-store"}).then(r=>r.ok?r.json():{videos:[]})
-    ]).then(([n,e,v])=>{if(!active)return;setNews(n.items??[]);setEducation(e.items??[]);setVideos(v.videos??[])}).catch(()=>{});
+      fetch(API+"/api/v1/content/videos?limit=4",{cache:"no-store"}).then(r=>r.ok?r.json():{videos:[]}),
+      fetch((((import.meta.env as any).VITE_ANSARRAF_API_URL??"") as string).replace(/\\/$/,"")+"/api/v1/market-data/quotes",{cache:"no-store"}).then(r=>r.ok?r.json():{quotes:[]})
+    ]).then(([n,e,v,q])=>{if(!active)return;setNews(n.items??[]);setEducation(e.items??[]);setVideos(v.videos??[]);setAssets(q.quotes??q.items??[])}).catch(()=>{});
     return()=>{active=false};
   },[API]);
   return (
@@ -89,7 +91,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
 
           {/* Live ticker */}
           <div style={{ background:"var(--w-card)", border:"1px solid var(--w-border)", borderRadius:14, padding:"12px 20px", display:"flex", gap:0, overflowX:"auto" }} className="w-noscroll">
-            {CRYPTO_ASSETS.slice(0,8).map((a, i) => (
+            {assets.slice(0,8).map((a, i) => (
               <div key={a.id} style={{ flexShrink:0, padding:"4px 20px", borderLeft: i < 7 ? "1px solid var(--w-border)" : "none", display:"flex", flexDirection:"column", alignItems:"center", gap:2, minWidth:90 }}>
                 <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)" }}>{a.symbol}</div>
                 <div style={{ fontSize:13, fontWeight:800, color:"var(--w-text)" }}>${fmtPrice(a.price)}</div>
@@ -130,12 +132,12 @@ export default function WebHome({ onNavigate }: HomeProps) {
         <div style={{ maxWidth:1280, margin:"0 auto", padding:"0 clamp(16px,3vw,24px)" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
             <div style={{ fontSize:13, fontWeight:700, color:"var(--w-muted)" }}>شاخص‌های جهانی</div>
-            <button onClick={() => onNavigate("financial")} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--w-accent)", fontSize:12, fontWeight:700, display:"flex", alignItems:"center", gap:4 }}>
+            <button onClick={() => onNavigate("sarraf")} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--w-accent)", fontSize:12, fontWeight:700, display:"flex", alignItems:"center", gap:4 }}>
               سبد ارز دیجیتال <WI n="chevron-left" s={12} w={2}/>
             </button>
           </div>
           <div style={{ display:"flex", gap:16, overflowX:"auto" }} className="w-noscroll">
-            {MARKET_INDICES.map(idx => (
+            {[] .map((idx: any) => (
               <div key={idx.name} style={{ flexShrink:0, padding:"16px 20px", background:"var(--w-card2)", border:"1px solid var(--w-border)", borderRadius:12, minWidth:160 }}>
                 <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", marginBottom:6 }}>{idx.nameFa}</div>
                 <div style={{ fontSize:18, fontWeight:900, color:"var(--w-text)", marginBottom:4 }}>
@@ -170,7 +172,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
               </tr>
             </thead>
             <tbody>
-              {CRYPTO_ASSETS.slice(0,10).map((a, i) => (
+              {assets.slice(0,10).map((a, i) => (
                 <tr key={a.id} onClick={() => onNavigate("sarraf")} style={{ borderBottom:"1px solid var(--w-border)", cursor:"pointer", transition:"background 0.12s" }}
                   onMouseEnter={e => (e.currentTarget.style.background = "var(--w-card2)")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
@@ -203,7 +205,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
         </div>
         {/* Mobile card list */}
         <div className="w-crypto-table-mobile" style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {CRYPTO_ASSETS.slice(0,10).map((a, i) => (
+          {assets.slice(0,10).map((a, i) => (
             <button key={a.id} onClick={() => onNavigate("sarraf")} className="w-card" style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", border:"1px solid var(--w-border)", cursor:"pointer", textAlign:"right", width:"100%" }}>
               <div style={{ fontSize:12, color:"var(--w-muted)", fontWeight:700, width:20, flexShrink:0 }}>{FA(i+1)}</div>
               <div style={{ width:36, height:36, borderRadius:"50%", background:`${a.logoColor}18`, border:`1.5px solid ${a.logoColor}30`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, color:a.logoColor, flexShrink:0 }}>{a.symbol.slice(0,2)}</div>
