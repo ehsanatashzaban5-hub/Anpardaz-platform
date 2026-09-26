@@ -3367,8 +3367,7 @@ function JudiciaryBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUpda
 
   const inquire=()=>{
     if(!billId.trim()){setErrModal("شناسه دریافت وجه را وارد کنید.");return}
-    setProcessing(true);
-    setTimeout(()=>{setProcessing(false);setInquiryDone(true)},2000);
+    setErrModal("استعلام این خدمت تا زمان اتصال سرویس واقعی در دسترس نیست.");
   };
 
   const pay=async()=>{
@@ -3478,8 +3477,7 @@ function PropertyRegBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUp
 
   const inquire=()=>{
     if(!billId.trim()){setErrModal("شناسه دریافت وجه را وارد کنید.");return}
-    setProcessing(true);
-    setTimeout(()=>{setProcessing(false);setInquiryDone(true)},2000);
+    setErrModal("استعلام این خدمت تا زمان اتصال سرویس واقعی در دسترس نیست.");
   };
 
   const pay=async()=>{
