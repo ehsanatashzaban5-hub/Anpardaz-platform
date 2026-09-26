@@ -76,7 +76,7 @@ export function registerManualFundingAdminRoutes(app:FastifyInstance,pool:Pool){
     if(!depositId){
       const q=await pool.query(`INSERT INTO deposits(customer_id,asset_id,amount,network,external_reference,status,funding_source,source_card_last4,source_card_provider_reference,source_card_verified_at,admin_actor_identity_id,accounting_operation_id)
         VALUES($1,$2,$3,'BANK_CARD',$4,'pending','manual',$5,$6,NOW(),$7,$8)
-        ON CONFLICT(external_reference) DO UPDATE SET updated_at=COALESCE(deposits.updated_at,NOW())
+        ON CONFLICT(external_reference) DO NOTHING
         RETURNING id`,[customer.id,asset.id,amount,externalReference,cardNumber.slice(-4),verified.provider_reference??null,actorIdentityId,operationId]);
       depositId=Number(q.rows[0].id);
     }
