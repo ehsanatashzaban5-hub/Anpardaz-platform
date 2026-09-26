@@ -1170,7 +1170,7 @@ function OtpCooldownBtn({onRequest,cardId,noCard}:{onRequest:()=>void;cardId?:st
 }
 
 // ─── Animated Card Input ──────────────────────────────────────────────────────
-const CARD_SAMPLE="۶۱۰۴ ۶۶۴۳ ۷۶۴۴ ۷۸۹۷";
+const CARD_SAMPLE="•••• •••• •••• ••••";
 function AnimatedCardInput({value,onChange,className,style,...rest}:{value:string;onChange:(v:string)=>void;className?:string;style?:React.CSSProperties;[k:string]:unknown}){
   const [tick,setTick]=useState(0);
   const {placeholder:customPlaceholder,...restStripped}=rest as {placeholder?:string;[k:string]:unknown};
@@ -1188,7 +1188,7 @@ function AnimatedCardInput({value,onChange,className,style,...rest}:{value:strin
     style={style}
     value={value}
     onChange={e=>onChange(e.target.value)}
-    placeholder={tick>0?CARD_SAMPLE.slice(0,tick):(customPlaceholder||"شماره کارت")}
+    placeholder={customPlaceholder||"شماره کارت ۱۶ رقمی"}
   />;
 }
 
