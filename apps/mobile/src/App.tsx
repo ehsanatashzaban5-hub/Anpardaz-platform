@@ -7261,7 +7261,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
   const openOffer=async(o:AnOffer)=>{if(!o.offerId)return;try{const token=localStorage.getItem("anpardaz:accessToken")??"";const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/clickout",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({offerId:o.offerId,surface:"mobile"})});const d=await r.json();if(!r.ok)throw new Error();if(d.mode==="iframe")setFrameUrl(d.url);else window.open(d.url,"_blank","noopener,noreferrer")}catch{setFrameUrl("")}};
   const drop=p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p?Math.round((p.ph[0].p-p.ph[p.ph.length-1].p)/p.ph[0].p*100):0;
   const TABS=([["sellers","فروشگاه‌ها"],["specs","مشخصات"],["reviews","نظرات"],["similar","گزینه‌ها"]] as const);
-  // Simulate 4 gallery images using same URL with different crops
+  // Use only media actually returned by the real catalog API.
   const galleryImgs=(p.media&&p.media.length?p.media:[p.img]).filter(Boolean).slice(0,8);
 
   return(
