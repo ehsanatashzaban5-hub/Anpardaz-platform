@@ -101,8 +101,8 @@ function modelFromProvider(provider:any, modelId:string): AIModel {
   };
 }
 
-let DEMO_CONVS: Conversation[] = [];
-let DEMO_PROJECTS: Project[] = [];
+let CONVERSATIONS_CACHE: Conversation[] = [];
+let PROJECTS_CACHE: Project[] = [];
 
 const apiBase = (import.meta.env.VITE_PLATFORM_API_URL || "/api").replace(/\/$/,"");
 const authToken = () => localStorage.getItem("anpardaz:accessToken");
@@ -444,7 +444,7 @@ function HistoryView({ onOpenConv, onNewChat }: { onOpenConv:(c:Conversation)=>v
   const [q, setQ] = useState("");
   const [menuId, setMenuId] = useState<string|null>(null);
   const groups = ["today","yesterday","week","older"] as const;
-  const filtered = DEMO_CONVS.filter(c=>q===""||c.title.includes(q)||c.preview.includes(q));
+  const filtered = CONVERSATIONS_CACHE.filter(c=>q===""||c.title.includes(q)||c.preview.includes(q));
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       {/* Header */}
@@ -524,7 +524,7 @@ function HistoryView({ onOpenConv, onNewChat }: { onOpenConv:(c:Conversation)=>v
 // ══════════════════════════════════════════════════════════════════
 function ProjectsView({ onOpenProject, onNewProject }: { onOpenProject:(p:Project)=>void; onNewProject:()=>void }) {
   const [q, setQ] = useState("");
-  const filtered = DEMO_PROJECTS.filter(p=>q===""||p.title.includes(q)||p.description.includes(q));
+  const filtered = PROJECTS_CACHE.filter(p=>q===""||p.title.includes(q)||p.description.includes(q));
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <div style={{padding:"16px 16px 10px",flexShrink:0}}>
@@ -725,12 +725,12 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
       }
       AI_MODELS=mapped;
       PROVIDERS=[...new Set(mapped.map(m=>m.provider))];
-      DEMO_CONVS=(convs.conversations??[]).map((x:any)=>({
+      CONVERSATIONS_CACHE=(convs.conversations??[]).map((x:any)=>({
         id:String(x.id),title:x.title??"مکالمه جدید",preview:"",messages:[],
         modelId:x.model??mapped[0]?.id??"",modeId:x.mode??"assistant",
         createdAt:x.created_at,updatedAt:x.updated_at,group:"week"
       }));
-      DEMO_PROJECTS=(projects.projects??[]).map((x:any)=>({
+      PROJECTS_CACHE=(projects.projects??[]).map((x:any)=>({
         id:String(x.id),title:x.title,description:x.description??"",modelId:x.model??mapped[0]?.id??"",
         modeId:x.mode??"assistant",conversationIds:[],createdAt:x.created_at,updatedAt:x.updated_at,accentColor:"#8B5CF6"
       }));
@@ -754,7 +754,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
       if(!conversationId){
         const d=await hooshApi("/v1/hoosh/conversations",{method:"POST",body:JSON.stringify({title:"مکالمه جدید",model:modelId,mode:modeId})});
         conversationId=String(d.conversation.id); setActiveConversationId(conversationId);
-        DEMO_CONVS.unshift({id:conversationId,title:"مکالمه جدید",preview:"",messages:[],modelId,modeId,createdAt:d.conversation.created_at,updatedAt:d.conversation.updated_at,group:"today"});
+        CONVERSATIONS_CACHE.unshift({id:conversationId,title:"مکالمه جدید",preview:"",messages:[],modelId,modeId,createdAt:d.conversation.created_at,updatedAt:d.conversation.updated_at,group:"today"});
       }
       const u:Message={id:"u-"+Date.now(),role:"user",text,ts:new Date()};
       const t:Message={id:"t-"+Date.now(),role:"ai",text:isMedia?"در حال تولید…":"",thinking:true,modelId,ts:new Date()};
@@ -779,7 +779,7 @@ export default function AnHooshScreen({ onBack }: { onBack: () => void }) {
         const assistant=(d.messages??[]).filter((m:any)=>m.role==="assistant").at(-1);
         if(assistant){
           setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:String(assistant.id),role:"ai",text:assistant.content,modelId:assistant.metadata?.model??modelId,ts:new Date(assistant.created_at)}]);
-          DEMO_CONVS=DEMO_CONVS.map(c=>c.id===conversationId?{...c,preview:assistant.content,updatedAt:d.conversation.updated_at}:c); setRefresh(v=>v+1); break;
+          CONVERSATIONS_CACHE=CONVERSATIONS_CACHE.map(c=>c.id===conversationId?{...c,preview:assistant.content,updatedAt:d.conversation.updated_at}:c); setRefresh(v=>v+1); break;
         }
       }
     }catch(e:any){ setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:"err-"+Date.now(),role:"ai",text:"خطا در اجرای آن هوش: "+(e?.message??"AI_EXECUTION_FAILED"),modelId,ts:new Date()}]); }
