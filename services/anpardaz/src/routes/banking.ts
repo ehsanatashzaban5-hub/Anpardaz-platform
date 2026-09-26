@@ -60,16 +60,19 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
     if(!/^\d{3,4}$/.test(String(b.cvv2??'')))return reply.code(400).send({error:'invalid_cvv2'});
     if(!/^\d{4,6}$/.test(String(b.otp??'')))return reply.code(400).send({error:'invalid_otp'});
 
-    const operationId=`ANPARDAZ-CB-${randomUUID()}`;
     const requestFingerprint=fp({cardLast4:cardNumber.slice(-4),expiryMonth:month,expiryYear:year});
     const existing=(await pool.query(
-      'SELECT * FROM card_balance_checks WHERE customer_id=$1 AND operation_id=$2',[c,operationId]
+      'SELECT * FROM card_balance_checks WHERE customer_id=$1 AND idempotency_key=$2',[c,b.idempotencyKey]
     )).rows[0];
-    if(existing)return {check:existing,idempotent:true};
-
+    if(existing){
+      const existingFingerprint=fp({cardLast4:existing.card_last4,expiryMonth:existing.request_metadata?.expiryMonth??'',expiryYear:existing.request_metadata?.expiryYear??''});
+      if(existingFingerprint!==requestFingerprint)return reply.code(409).send({error:'idempotency_key_reused'});
+      return {check:existing,idempotent:true};
+    }
+    const operationId=`ANPARDAZ-CB-${randomUUID()}`;
     await pool.query(
-      `INSERT INTO card_balance_checks(customer_id,operation_id,card_last4,provider_code,status)
-       VALUES($1,$2,$3,'FINNOTECH','pending')`,[c,operationId,cardNumber.slice(-4)]
+      `INSERT INTO card_balance_checks(customer_id,operation_id,idempotency_key,card_last4,provider_code,status,request_metadata)
+       VALUES($1,$2,$3,$4,'FINNOTECH','pending',$5)`,[c,operationId,b.idempotencyKey,cardNumber.slice(-4),JSON.stringify({expiryMonth:month,expiryYear:year})]
     );
     await pool.query(
       `INSERT INTO banking_provider_outbox(operation_id,operation_type) VALUES($1,'card_balance')`,[operationId]
@@ -170,8 +173,8 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
     )).rows[0];
     await pool.query(`INSERT INTO banking_provider_outbox(operation_id,operation_type) VALUES($1,'transfer')`,[operationId]);
 
-    await pool.query("UPDATE transfer_requests SET status='processing',updated_at=NOW() WHERE operation_id=$1 AND status='pending'",[operationId]);
-    const provider=providerOr503(reply);if(!provider)return;
+    return reply.code(202).send({transfer:x,operationId,queued:true});
+    /* provider execution is intentionally owned by BankingProviderWorker; never execute inline after enqueue. */
     try{
       const result=await provider.execute({
         serviceCode:'transfer',operationId,
