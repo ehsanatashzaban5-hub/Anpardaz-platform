@@ -44,12 +44,13 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
     const serviceCode=String((req.query as any)?.serviceCode??'').trim();
     const operator=String((req.query as any)?.operator??'').trim().toLowerCase();
     const simType=String((req.query as any)?.simType??'').trim().toLowerCase();
-    if(!['mobile_charge','internet_package'].includes(serviceCode)||!operator)return reply.code(400).send({error:'invalid_catalog_request'});
+    if(!['mobile_charge','internet_package','charity'].includes(serviceCode)||!operator)return reply.code(400).send({error:'invalid_catalog_request'});
     if(serviceCode==='internet_package'&&!['mci','irancell','rightel'].includes(operator))return reply.code(400).send({error:'unsupported_operator'});
+    if(serviceCode==='charity'&&operator!=='charity')return reply.code(400).send({error:'unsupported_operator'});
     try{
       const raw=await fetchServiceCatalog(serviceCode,{operator,simType});
       const items=Array.isArray(raw?.items)?raw.items:Array.isArray(raw?.packages)?raw.packages:Array.isArray(raw?.data?.items)?raw.data.items:Array.isArray(raw?.data?.packages)?raw.data.packages:[];
-      return {serviceCode,operator,simType,items,source:'provider'};
+      return {serviceCode,operator,simType,items,presets:Array.isArray(raw?.presetAmounts)?raw.presetAmounts:Array.isArray(raw?.amounts)?raw.amounts:[],source:'provider'};
     }catch(error){req.log.warn({error,serviceCode,operator},'service catalog unavailable');return reply.code(503).send({error:'service_catalog_unavailable'});}
   });
 
