@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS market_home_sections (
 -- 032 created this table with slug/query_config/active. Reconcile that schema
 -- before seeding the 042 contract so fresh installs and upgrades converge.
 ALTER TABLE market_home_sections
+  ADD COLUMN IF NOT EXISTS slug TEXT,
+  ADD COLUMN IF NOT EXISTS query_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS key TEXT,
   ADD COLUMN IF NOT EXISTS query JSONB NOT NULL DEFAULT '{}'::jsonb,
   ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
