@@ -1775,7 +1775,7 @@ function TransferScreen({user,onUpdate,transactions,onBack,onDone}:{user:UserDat
       </div>
       <div className="receipt-page-body">
         {user.cards.length===0&&<p className="bs-empty">کارتی ثبت نشده. از پروفایل کارت اضافه کنید.</p>}
-        {cards.map(c=>((c)=>(
+        {cards.map(c=>(
 
           <button key={c.id} className={`bs-card-item${srcCardId===c.id?" active":""}`}
             onClick={()=>{setSrcCardId(c.id);setSrcPickerOpen(false);if(c.expM)setExpM(toFaDigits(c.expM));if(c.expY)setExpY(toFaDigits(c.expY))}}>
