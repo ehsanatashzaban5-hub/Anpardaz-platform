@@ -3265,7 +3265,7 @@ function PropertyRegBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUp
   const inquire=async()=>{
     if(!billId.trim()){setErrModal("شناسه دریافت وجه را وارد کنید.");return}
     setProcessing(true);setErrModal("");
-    try{const q=await anpardazServiceInquiry("judiciary_bill",{billId});const amount=String(q?.amount??q?.payableAmount??q?.billAmount??"");if(!amount||Number(amount)<=0)throw new Error("bill_amount_unavailable");setInquiryAmount(amount);setInquiryDone(true);}catch(e){setErrModal(e instanceof Error?e.message:"استعلام واقعی قبض در دسترس نیست.");}finally{setProcessing(false)}
+    try{const q=await anpardazServiceInquiry("property_registration",{billId});const amount=String(q?.amount??q?.payableAmount??q?.billAmount??"");if(!amount||Number(amount)<=0)throw new Error("bill_amount_unavailable");setInquiryAmount(amount);setInquiryDone(true);}catch(e){setErrModal(e instanceof Error?e.message:"استعلام واقعی قبض در دسترس نیست.");}finally{setProcessing(false)}
   };
 
   const pay=async()=>{
