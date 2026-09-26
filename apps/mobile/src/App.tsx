@@ -51,7 +51,7 @@ import logoMellat from "@/imports/bank-mellat.png";
 const liveRate = 0;
 const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
 const ANPARDAZ_API_BASE = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
-const KAVENEGAR_KEY = "";
+
 const ANMARKET_PLATFORM_API_BASE=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")??"";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -262,11 +262,6 @@ async function anpardazTransfer(destinationExternal:string,amount:number,currenc
 async function sarrafRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANSARRAF_API_BASE)throw new Error("ansarraf_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const r=await fetch(`${ANSARRAF_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data?.error??"ansarraf_request_failed"));return data;}async function sarrafAssets():Promise<SarrafAssetRecord[]>{const d=await sarrafRequest("/api/v1/assets");return Array.isArray(d?.assets)?d.assets:[]}function sarrafAssetId(assets:SarrafAssetRecord[],symbol:string){const aliases=symbol==="TMN"?["TMN","TOMAN","IRT","IRR"]:symbol==="USDT"?["USDT"]:[symbol];const a=assets.find(x=>aliases.includes(String(x.symbol).toUpperCase())&&x.status!=="disabled");if(!a)throw new Error(`asset_not_available:${symbol}`);return a.id;}async function sarrafPlaceOrder(baseSymbol:string,quoteSymbol:string,side:"buy"|"sell",orderType:"market"|"limit",quantity:number,price?:number,quoteAmount?:number){const assets=await sarrafAssets();const body:any={baseAssetId:sarrafAssetId(assets,baseSymbol),quoteAssetId:sarrafAssetId(assets,quoteSymbol),side,orderType,quantity:String(quantity),idempotencyKey:crypto.randomUUID()};if(orderType==="limit")body.price=String(price);else if(side==="buy")body.quoteAmount=String(quoteAmount??0);return sarrafRequest("/api/v1/orders",{method:"POST",body:JSON.stringify(body)});}async function sarrafWalletMap():Promise<Record<string,number>>{const d=await sarrafRequest("/api/v1/wallets");const out:Record<string,number>={};for(const w of d?.wallets??[])out[String(w.symbol).toUpperCase()]=Number(w.available_balance??0);return out;}async function sarrafOrders():Promise<any[]>{const d=await sarrafRequest("/api/v1/orders");return Array.isArray(d?.orders)?d.orders:[]}
 async function sarrafOrderBook(symbol:string){const d=await sarrafRequest(`/api/v1/orderbook?symbol=${encodeURIComponent(symbol)}&limit=20`);return {bids:Array.isArray(d?.bids)?d.bids:[],asks:Array.isArray(d?.asks)?d.asks:[]};}
 async function sarrafSubmitKyc(payload:{fullName:string;nationalId:string;mobile:string;birthDate:string}){return sarrafRequest("/api/v1/kyc",{method:"POST",body:JSON.stringify(payload)});}
-
-async function sendOTP(phone:string,code:string):Promise<{ok:boolean;devCode?:string}>{
-  if(!KAVENEGAR_KEY)return{ok:false,devCode:code};
-  try{const url=`https://api.kavenegar.com/v1/${KAVENEGAR_KEY}/sms/send.json`;const body=new URLSearchParams({receptor:phone,message:`کد تأیید آن‌پرداز: ${code}`,sender:"10004346"});const r=await fetch(url,{method:"POST",body});const d=await r.json();return{ok:d.return?.status===200}}catch{return{ok:false,devCode:code}}
-}
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 const toFaDigits=(value:string)=>value.replace(/[0-9]/g,d=>"۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
