@@ -93,6 +93,8 @@ function SupportPage({ isLoggedIn, onAuthRequired }: { isLoggedIn: boolean; onAu
   const [subject, setSubject]   = useState("");
   const [message, setMessage]   = useState("");
   const [sent, setSent]         = useState(false);
+  const [busy, setBusy]         = useState(false);
+  const [error, setError]       = useState("");
 
   const FAQS = [
     { q:"چطور حساب کاربری ایجاد کنم؟", a:"از طریق دکمه «ورود / ثبت‌نام» در بالای صفحه اقدام کنید. کافی است شماره موبایل خود را وارد کنید." },
