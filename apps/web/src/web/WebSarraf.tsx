@@ -4,7 +4,6 @@
 // ─────────────────────────────────────────────────
 import { useState, useMemo, useCallback, useEffect } from "react";
 import WI from "./WebIcons";
-import { CRYPTO_ASSETS } from "./mockData";
 import type { WebPage, CryptoAsset, KycStatus, OrderBookEntry } from "./types";
 import { useIsMobile } from "./useResponsive";
 
@@ -62,12 +61,12 @@ const TAB_GROUPS = [
 
 export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onAuthRequired, isLoggedIn }: SarrafProps) {
   const [tab, setTab]               = useState<SarrafTab>("markets");
-  const [liveAssets, setLiveAssets] = useState<CryptoAsset[]>(() => CRYPTO_ASSETS.map(a => ({ ...a, price: 0, priceIrt: 0 })));
-  const [selectedAsset, setAsset]   = useState<CryptoAsset>(() => ({ ...CRYPTO_ASSETS[0], price: 0, priceIrt: 0 }));
+  const [liveAssets, setLiveAssets] = useState<CryptoAsset[]>([]);
+  const [selectedAsset, setAsset]   = useState<CryptoAsset>({ id:"", symbol:"", name:"", nameFa:"", logoColor:"#0891b2", price:0, priceIrt:0, change24h:0, volume24h:0, marketCap:0, high24h:0, low24h:0, rank:0 });
   const [search, setSearch]         = useState("");
   const [sortBy, setSortBy]         = useState<"rank"|"price"|"change"|"volume">("rank");
   const [filterFav, setFilterFav]   = useState(false);
-  const [favorites, setFavorites]   = useState<Set<string>>(new Set(["btc","eth","sol","bnb","usdt"]));
+  const [favorites, setFavorites]   = useState<Set<string>>(new Set());
   const [tradeType, setTradeType]   = useState<"buy"|"sell">("buy");
   const [tradeMode, setTradeMode]   = useState<"market"|"limit"|"stop-limit">("market");
   const [price, setPrice]           = useState("");
@@ -118,6 +117,33 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   }, [isLoggedIn]);
 
   const effectiveKycStatus = backendKycStatus ?? initialKycStatus;
+
+  useEffect(() => {
+    let active = true;
+    const loadAssets = async () => {
+      try {
+        const r = await fetch(ANSARRAF_API_BASE + "/api/v1/assets", { cache: "no-store" });
+        if (!r.ok) throw new Error("assets_unavailable");
+        const rows = (await r.json()).assets ?? [];
+        const mapped: CryptoAsset[] = rows
+          .filter((x:any) => String(x.assetType ?? x.asset_type ?? "crypto").toLowerCase() === "crypto")
+          .map((x:any, i:number) => ({
+            id:String(x.id), symbol:String(x.symbol).toUpperCase(), name:String(x.name ?? x.symbol),
+            nameFa:String(x.nameFa ?? x.name ?? x.symbol), logoUrl:x.logoUrl ?? undefined,
+            logoColor:String(x.logoColor ?? "#0891b2"), price:0, priceIrt:0,
+            change24h:0, volume24h:0, marketCap:0, high24h:0, low24h:0, rank:Number(x.rank ?? i+1)
+          }));
+        if (!active) return;
+        setLiveAssets(mapped);
+        setAsset(prev => prev.symbol ? (mapped.find(a=>a.symbol===prev.symbol) ?? prev) : (mapped[0] ?? prev));
+      } catch {
+        if (active) setLiveAssets([]);
+      }
+    };
+    void loadAssets();
+    const id = window.setInterval(() => void loadAssets(), 30000);
+    return () => { active = false; window.clearInterval(id); };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -404,7 +430,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
             <WithdrawTomanTab kycStatus={effectiveKycStatus}/>
           )}
           {tab === "withdraw-coin" && isLoggedIn && (
-            <WithdrawCoinTab assets={CRYPTO_ASSETS} kycStatus={kycStatus}/>
+            <WithdrawCoinTab assets={liveAssets} kycStatus={effectiveKycStatus}/>
           )}
           {tab === "orders" && isLoggedIn && (
             <OrdersTab orders={orders}/>
