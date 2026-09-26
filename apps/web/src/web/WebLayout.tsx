@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import WI from "./WebIcons";
 import anPardazLogo from "@/imports/ChatGPT_Image_Aug_10__2026__06_38_53_PM__3_.png";
 import type { WebPage, UserRole } from "./types";
-import { FOOTER_CONFIG } from "./mockData";
+import { FOOTER_CONFIG } from "./footerConfig";
 
 // ── Design tokens ────────────────────────────────
 export const CSS_VARS = `
