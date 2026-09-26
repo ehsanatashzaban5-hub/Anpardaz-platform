@@ -7246,7 +7246,8 @@ function AnPriceSparkline({ph}:{ph:{d:string;p:number}[]}){
 function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(pid:string)=>void;onSearch:(q:string)=>void;onBack:()=>void}){
   const p=MARKET_PRODUCTS.find(x=>x.id===pid);
   const [remoteOffers,setRemoteOffers]=useState<AnOffer[]>([]);
-  useEffect(()=>{(async()=>{try{const base=ANMARKET_PLATFORM_API_BASE;const r=await fetch(base+"/api/v1/market/products/"+encodeURIComponent(pid));if(!r.ok)return;const d=await r.json();setRemoteOffers((d.offers??[]).map((o:any)=>({sid:String(o.store_id??o.id),offerId:Number(o.id),storeName:o.store_name??o.seller_name??"فروشگاه",price:Number(o.price??0),ship:o.shipping_cost?String(o.shipping_cost):"",warranty:"",inStock:o.availability!=="out_of_stock",upd:o.updated_at??"",productUrl:o.product_url??o.seller_url??"",iframeMode:o.iframe_mode??"unknown"})));}catch{}})()},[pid]);
+  const [reviewRows,setReviewRows]=useState<any[]>([]);
+  useEffect(()=>{(async()=>{try{const base=ANMARKET_PLATFORM_API_BASE;const [productRes,reviewsRes]=await Promise.all([fetch(base+"/api/v1/market/products/"+encodeURIComponent(pid),{cache:"no-store"}),fetch(base+"/api/v1/market/products/"+encodeURIComponent(pid)+"/reviews",{cache:"no-store"})]);if(productRes.ok){const d=await productRes.json();setRemoteOffers((d.offers??[]).map((o:any)=>({sid:String(o.store_id??o.id),offerId:Number(o.id),storeName:o.store_name??o.seller_name??"",price:Number(o.price??0),ship:o.shipping_cost?String(o.shipping_cost):"",warranty:"",inStock:o.availability!=="out_of_stock",upd:o.updated_at??"",productUrl:o.product_url??o.seller_url??"",iframeMode:o.iframe_mode??"unknown"})));}if(reviewsRes.ok){const d=await reviewsRes.json();setReviewRows(Array.isArray(d.reviews)?d.reviews:[]);}}catch{setReviewRows([])}})()},[pid]);
   const [tab,setTab]=useState<"sellers"|"specs"|"reviews"|"similar">("sellers");
   const [alert,setAlert]=useState(false);
   const [fav,setFav]=useState(false);
@@ -7489,7 +7490,7 @@ function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(
                 </div>
                 <div style={{flex:1}}>
                   {([5,4,3,2,1]).map(star=>{
-                    const pct=Math.max(5,Math.round((p.rating/5)*(star/5)*100*(1+Math.random()*0.3)));
+                    const pct=p.reviews>0?Math.round(((reviewRows.filter((r:any)=>Number(r.rating)===star).length)/p.reviews)*100):0;
                     return(
                       <div key={star} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
                         <span style={{fontSize:11,color:"var(--am-muted)",width:12,textAlign:"center"}}>{star}</span>
@@ -8330,7 +8331,7 @@ function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;
     const pages=await Promise.all([1,2,3,4,5].map(page=>fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/catalog?limit=100&page="+page,{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(new Error("catalog_failed")))));
     const rows=pages.flatMap((d:any)=>Array.isArray(d?.products)?d.products:[]);
     const catMap:Record<string,string>={"mobile-digital":"mobile","laptop-computer":"laptop","home-appliance":"appliance","supermarket":"hypermarket","beauty-health":"beauty","audio-video":"av","automotive":"car","baby-kids":"kids","books-culture":"culture","tools-industrial":"industrial","travel-camping":"travel","pet":"pet","office":"office","jewelry-gold":"gold","other":"other"};
-    MARKET_PRODUCTS=rows.map((p:any)=>{const media=(p.media??[]).map((m:any)=>m.url).filter(Boolean);const imgs=media.concat((p.offers??[]).map((o:any)=>o.image_url).filter(Boolean));return{id:String(p.id),title:p.title??"",brand:p.brand??"",catId:catMap[p.category_slug]??"other",subId:p.category_slug??"other",img:imgs[0]??"",specs:p.specs??{},priceMin:Number(p.priceMin??0),priceMax:Number(p.priceMax??0),storeCount:Number(p.storeCount??0),desc:p.description??"",tags:[],rating:0,reviews:0,ph:[],media:imgs.slice(0,8)} as AnProduct;});
+    MARKET_PRODUCTS=rows.map((p:any)=>{const media=(p.media??[]).map((m:any)=>m.url).filter(Boolean);const imgs=media.concat((p.offers??[]).map((o:any)=>o.image_url).filter(Boolean));return{id:String(p.id),title:p.title??"",brand:p.brand??"",catId:catMap[p.category_slug]??"other",subId:p.category_slug??"other",img:imgs[0]??"",specs:p.specs??{},priceMin:Number(p.priceMin??0),priceMax:Number(p.priceMax??0),storeCount:Number(p.storeCount??0),desc:p.description??"",tags:[],rating:Number(p.rating??0),reviews:Number(p.reviews??0),ph:[],media:imgs.slice(0,8)} as AnProduct;});
     if(active){setError("");setLoading(false);}
   }catch{if(active){MARKET_PRODUCTS=[];setError("اطلاعات واقعی آن مارکت در دسترس نیست.");setLoading(false);}}})();return()=>{active=false}},[]);
   const handleCompareToggle=(pid:string)=>{if(pid==="__mode__"){setCompare(p=>({...p,active:!p.active,selectedIds:p.active?[]:p.selectedIds}));return;}setCompare(p=>p.selectedIds.includes(pid)?({...p,selectedIds:p.selectedIds.filter(x=>x!==pid)}):p.selectedIds.length<6?({...p,selectedIds:[...p.selectedIds,pid]}):p);};
