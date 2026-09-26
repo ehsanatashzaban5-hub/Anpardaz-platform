@@ -16,6 +16,8 @@ import { ProviderReconciliationWorker } from './provider-reconciliation.js';
 import { validateAnSarrafProductionConfig } from './production-config.js';
 import { registerManualFundingAdminRoutes } from './routes/manual-funding-admin.js';
 import { requireIranIpInProduction } from '@anpardaz/ip-region-policy';
+import { registerProviderFundingRoutes } from './routes/provider-funding.js';
+import { ProviderDepositWorker } from './provider-deposit-worker.js';
 
 const isProduction=process.env.NODE_ENV==='production';
 validateAnSarrafProductionConfig(process.env);
@@ -42,6 +44,7 @@ const accountingOutbox=pool?new AccountingOutboxWorker(pool,app.log):null;
 const providerExecution=pool?new ProviderExecutionWorker(pool,app.log):null;
 const providerWithdrawal=pool?new ProviderWithdrawalWorker(pool,app.log):null;
 const providerReconciliation=pool?new ProviderReconciliationWorker(pool,app.log):null;
+const providerDeposit=pool?new ProviderDepositWorker(pool,app.log):null;
 if(!pool)app.log.warn('DATABASE_URL is not configured; database endpoints will be unavailable');
 const corsOrigins=process.env.CORS_ORIGIN?.split(',').map(v=>v.trim()).filter(Boolean)??['http://localhost:5173'];
 if(isProduction&&corsOrigins.some(v=>v==='*'||v.startsWith('http://localhost')||v.startsWith('http://127.0.0.1')))throw new Error('Production CORS_ORIGIN must not allow localhost or wildcard origins');
@@ -75,6 +78,7 @@ if(pool){
   registerMatchingRoutes(app,pool);
   registerInternalAdminRoutes(app,pool);
   registerManualFundingAdminRoutes(app,pool);
+  registerProviderFundingRoutes(app,pool);
   registerKycRoutes(app,pool);
   app.get('/api/v1/auth/me',{preHandler:requireAuth},async(request)=>{
     const auth=(request as typeof request&{auth:any}).auth;
@@ -87,6 +91,7 @@ if(pool){
   if(providerExecution)providerExecution.start();
   if(providerWithdrawal)providerWithdrawal.start();
   if(providerReconciliation)providerReconciliation.start();
+  if(providerDeposit)providerDeposit.start();
 }
 const shutdown=async()=>{
   marketData?.stop();
@@ -94,6 +99,7 @@ const shutdown=async()=>{
   providerExecution?.stop();
   providerWithdrawal?.stop();
   providerReconciliation?.stop();
+  providerDeposit?.stop();
   await app.close();
   await pool?.end();
 };
