@@ -189,8 +189,7 @@ function BankLogo({bankName,size=42,rounded=12}:{bankName:string;size?:number;ro
 async function fetchUSDTRate():Promise<number|null>{
   try{const r=await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes?symbol=USDT/TOMAN`,{signal:AbortSignal.timeout(7000),cache:"no-store"});if(!r.ok)throw new Error("market_data_unavailable");const d=await r.json();const live=d?.quotes?.filter((q:any)=>!q.stale&&Number(q.lastPrice)>0);const preferred=live?.find((q:any)=>q.provider==="wallex")??live?.[0];return preferred?Number(preferred.lastPrice):null;}catch{return null}
 }
-type SarrafAssetRecord={id:number|string;symbol:string;status?:string};type ProtectedAccessReason = "iran" | "device-lock" | "security-unavailable";
-async function checkProtectedServiceAccess(setNotice:(message:string)=>void):Promise<boolean>{
+type SarrafAssetRecord={id:number|string;symbol:string;status?:string};async function checkProtectedServiceAccess(setNotice:(message:string)=>void):Promise<boolean>{
   try{
     if(!ANPARDAZ_API_BASE){setNotice("برای استفاده از خدمات، اتصال امن آن‌پرداز در دسترس نیست. لطفاً اتصال اینترنت و تنظیمات برنامه را بررسی کنید.");return false;}
     const regionRes=await fetch(ANPARDAZ_API_BASE+"/api/v1/access/region",{cache:"no-store",headers:{accept:"application/json"}});
