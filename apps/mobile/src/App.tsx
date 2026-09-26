@@ -48,7 +48,6 @@ import logoPostBank from "@/imports/postbank.png";
 import logoMellat from "@/imports/bank-mellat.png";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const liveRate = 0;
 const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
 const ANPARDAZ_API_BASE = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
 const AUTH_API_BASE = ((import.meta as any).env?.VITE_PLATFORM_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
@@ -79,48 +78,7 @@ interface TxRecord {
   toAddress?: string; fromCard?: string; note?: string;
   source?: "app" | "exchange"; tradeType?: string;
 }
-interface ExOrder {
-  id: string; pair: string; side: "buy" | "sell";
-  price: number; amount: number; total: number;
-  status: "open" | "filled" | "cancelled"; createdAt: string;
-  mode?: "spot" | "margin";
-}
-interface ExPosition {
-  id: string; asset: string; side: "long" | "short";
-  entry: number; qty: number; leverage: number; margin: number; fee: number; openedAt: string;
-}
-type ExAsset = "toman" | "USDT" | "BTC" | "ETH" | "BNB" | "SOL" | "DOGE" | "ADA";
-type ExWallet = Record<ExAsset, number>;
-
 // ─── Exchange Constants ────────────────────────────────────────────────────────
-const EX_PAIRS = [
-  "BTC/USDT","ETH/USDT","BNB/USDT","XRP/USDT","ADA/USDT","SOL/USDT",
-  "AVAX/USDT","DOT/USDT","MATIC/USDT","LINK/USDT","UNI/USDT","ATOM/USDT",
-  "LTC/USDT","ETC/USDT","DOGE/USDT","TRX/USDT","NEAR/USDT","ALGO/USDT",
-  "VET/USDT","SHIB/USDT","APE/USDT","OP/USDT","ARB/USDT","INJ/USDT",
-  "SUI/USDT","PEPE/USDT","WIF/USDT","JUP/USDT",
-  "BTC/TOMAN","ETH/TOMAN","USDT/TOMAN","BNB/TOMAN","SOL/TOMAN","DOGE/TOMAN",
-];
-const INITIAL_PRICES: Record<string, number> = {};
-const TV_SYMBOLS: Record<string,string> = {
-  "BTC/USDT":"BINANCE:BTCUSDT","ETH/USDT":"BINANCE:ETHUSDT",
-  "BNB/USDT":"BINANCE:BNBUSDT","XRP/USDT":"BINANCE:XRPUSDT",
-  "ADA/USDT":"BINANCE:ADAUSDT","SOL/USDT":"BINANCE:SOLUSDT",
-  "AVAX/USDT":"BINANCE:AVAXUSDT","DOT/USDT":"BINANCE:DOTUSDT",
-  "MATIC/USDT":"BINANCE:MATICUSDT","LINK/USDT":"BINANCE:LINKUSDT",
-  "UNI/USDT":"BINANCE:UNIUSDT","ATOM/USDT":"BINANCE:ATOMUSDT",
-  "LTC/USDT":"BINANCE:LTCUSDT","ETC/USDT":"BINANCE:ETCUSDT",
-  "DOGE/USDT":"BINANCE:DOGEUSDT","TRX/USDT":"BINANCE:TRXUSDT",
-  "NEAR/USDT":"BINANCE:NEARUSDT","ALGO/USDT":"BINANCE:ALGOUSDT",
-  "VET/USDT":"BINANCE:VETUSDT","SHIB/USDT":"BINANCE:SHIBUSDT",
-  "APE/USDT":"BINANCE:APEUSDT","OP/USDT":"BINANCE:OPUSDT",
-  "ARB/USDT":"BINANCE:ARBUSDT","INJ/USDT":"BINANCE:INJUSDT",
-  "SUI/USDT":"BINANCE:SUIUSDT","PEPE/USDT":"BINANCE:PEPEUSDT",
-  "WIF/USDT":"BINANCE:WIFUSDT","JUP/USDT":"BINANCE:JUPUSDT",
-  "USDT/TOMAN":"NOBITEX:USDTIRT","BTC/TOMAN":"NOBITEX:BTCIRT",
-  "ETH/TOMAN":"NOBITEX:ETHIRT","BNB/TOMAN":"NOBITEX:BNBIRT",
-  "SOL/TOMAN":"NOBITEX:SOLIRT","DOGE/TOMAN":"NOBITEX:DOGEIRT",
-};
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 function _genUid(): string {
@@ -142,9 +100,7 @@ const DB = {
   setCurrentPhone:(p:string)=>localStorage.setItem("anp_current",p),
   getTx:(p:string):TxRecord[]=>{try{return JSON.parse(localStorage.getItem(`anp_tx_${p}`)??"[]")}catch{return[]}},
   saveTx:(p:string,t:TxRecord[])=>localStorage.setItem(`anp_tx_${p}`,JSON.stringify(t)),
-  userExists:(p:string)=>!!localStorage.getItem(`anp_user_${p}`),
-  // Exchange data — ALL keyed by uid so different users never share wallet/orders/positions
-  getExWallet:(_uid:string):ExWallet=>({toman:0,USDT:0,BTC:0,ETH:0,BNB:0,SOL:0,DOGE:0,ADA:0}),saveExWallet:(_uid:string,_w:ExWallet)=>undefined,getExOrders:(_uid:string):ExOrder[]=>[],saveExOrders:(_uid:string,_o:ExOrder[])=>undefined,getExPositions:(_uid:string):ExPosition[]=>[],saveExPositions:(_uid:string,_p:ExPosition[])=>undefined,
+  userExists:(p:string)=>!!localStorage.getItem(`anp_user_${p}`)
 };
 
 // ─── Operator Detection ───────────────────────────────────────────────────────
