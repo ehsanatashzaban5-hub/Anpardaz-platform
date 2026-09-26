@@ -45,6 +45,8 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
 
   app.get('/api/v1/market/categories',async()=>({categories:(await pool.query(`SELECT id,parent_id,slug,name,name_fa,icon,sort_order FROM market_categories WHERE active=true ORDER BY sort_order,id`)).rows}));
 
+  app.get('/api/v1/market/trending',async(req)=>{const q=req.query as any;const limit=Math.min(20,Math.max(1,Number(q.limit)||15));const rows=await pool.query(`SELECT TRIM(query) query,COUNT(*)::int searches,MAX(created_at) last_searched FROM market_user_searches WHERE created_at>NOW()-INTERVAL '30 days' AND TRIM(query)<>'' GROUP BY TRIM(query) ORDER BY COUNT(*) DESC,MAX(created_at) DESC LIMIT $1`,[limit]);return{items:rows.rows};});
+
   app.get('/api/v1/market/stores',async()=>({stores:(await pool.query(`SELECT id,name,slug,domain,homepage_url,category_hint,iframe_mode,active FROM market_stores WHERE active=true ORDER BY name`)).rows}));
 
   app.get('/api/v1/market/stores/:id/frame',async(req,reply)=>{
