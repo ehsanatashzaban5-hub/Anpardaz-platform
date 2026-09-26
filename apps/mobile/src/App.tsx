@@ -9464,6 +9464,7 @@ export default function App() {
   useEffect(()=>{let active=true;
   const refreshRegisteredCards=async()=>{if(!user||!active)return;try{const cards=await anpardazCards();if(!active)return;const next={...user,cards};DB.saveUser(next);setUser(next);}catch{}};
   const p=new URLSearchParams(window.location.search);
+  void refreshRegisteredCards();
   if(p.get("card_registration")==="verified"){setSystemNotice("کارت بانکی با موفقیت در آن‌پرداز ثبت و تأیید شد.");void refreshRegisteredCards();const clean=window.location.pathname+window.location.hash;window.history.replaceState({},document.title,clean)}
   const onCardsUpdated=()=>{void refreshRegisteredCards()};
   window.addEventListener("anp-cards-updated",onCardsUpdated);
