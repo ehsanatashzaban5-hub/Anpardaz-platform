@@ -19,7 +19,7 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
       );
       if (!customer.rows[0]) return reply.code(404).send({ error: 'customer_not_found' });
       const customerId = customer.rows[0].id;
-      const [wallets, orders, withdrawals, kyc, reconciliation, reconciliationDetails, customerReconciliation] = await Promise.all([
+      const [wallets, orders, withdrawals, deposits, kyc, reconciliation, reconciliationDetails, customerReconciliation] = await Promise.all([
         pool.query(
           `SELECT w.id,a.symbol,a.asset_type,w.available_balance::text,w.locked_balance::text,
                   (w.available_balance+w.locked_balance)::text AS total_balance
@@ -37,6 +37,14 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
           `SELECT id,operation_id,asset_id,amount::text,network,destination,
                   status,approval_status,provider_withdrawal_id,created_at,completed_at
            FROM withdrawals WHERE customer_id=$1 ORDER BY created_at DESC LIMIT 100`,
+          [customerId],
+        ),
+        pool.query(
+          `SELECT d.id,d.amount::text,d.status,d.external_reference,d.funding_source,
+                  d.source_card_last4,d.source_card_provider_reference,d.admin_actor_identity_id,
+                  d.accounting_operation_id,d.created_at,a.symbol AS asset_symbol
+           FROM deposits d JOIN assets a ON a.id=d.asset_id
+           WHERE d.customer_id=$1 ORDER BY d.created_at DESC LIMIT 100`,
           [customerId],
         ),
         pool.query(
@@ -68,6 +76,7 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
         wallets: wallets.rows,
         orders: orders.rows,
         withdrawals: withdrawals.rows,
+        deposits: deposits.rows,
         kyc: kyc.rows[0] ?? null,
         reconciliation: reconciliation.rows,
         reconciliationDetails: reconciliationDetails.rows,

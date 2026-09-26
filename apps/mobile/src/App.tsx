@@ -6389,7 +6389,7 @@ function ShaparkCardModal({onClose,onRegistered}:{onClose:()=>void;onRegistered?
         const d=await shaparakRegistrationStatus(id);const st=String(d?.registration?.status??"pending");
         if(st==="verified"||st==="rejected"||st==="expired"||st==="cancelled"||st==="error"){
           if(timer.current)clearInterval(timer.current);
-          if(st==="verified"){setStatus("verified");setMessage("کارت با تأیید شاپرک به‌صورت خودکار در آن‌پرداز ثبت شد.");window.dispatchEvent(new Event("anp-cards-updated"));onRegistered?.();}
+          if(st==="verified"){setStatus("verified");setMessage("کارت با تأیید شاپرک به‌صورت خودکار در آن‌پرداز ثبت شد.");localStorage.removeItem("anp:shaparak:registrationSession");window.dispatchEvent(new Event("anp-cards-updated"));onRegistered?.();}
           else {setStatus(st==="rejected"?"rejected":"error");setMessage(st==="rejected"?"ثبت کارت توسط سرویس تأیید نشد.":"فرایند ثبت کارت کامل نشد.");}
         }
       }catch{}
@@ -6398,7 +6398,7 @@ function ShaparkCardModal({onClose,onRegistered}:{onClose:()=>void;onRegistered?
   const start=async()=>{
     setBusy(true);setMessage("");
     try{
-      const r=await startShaparakCardRegistration();setSessionId(r.sessionId);setStatus("pending");poll(r.sessionId);
+      const r=await startShaparakCardRegistration();setSessionId(r.sessionId);localStorage.setItem("anp:shaparak:registrationSession",r.sessionId);setStatus("pending");poll(r.sessionId);
       window.location.href=r.authorizationUrl;
     }catch(e){setStatus("error");setMessage(e instanceof Error?e.message:"اتصال به فرایند ثبت کارت برقرار نشد.");}
     finally{setBusy(false)}
@@ -9449,6 +9449,8 @@ export default function App() {
     void userSettingsRequest("/api/v1/user/settings",{method:"PATCH",body:JSON.stringify({theme:v?"light":"dark"})}).catch(()=>{});
   };
   useEffect(()=>{document.body.classList.toggle("light-theme",lightTheme)},[lightTheme]);
+  useEffect(()=>{const p=new URLSearchParams(window.location.search);if(p.get("card_registration")==="verified"){setSystemNotice("کارت بانکی با موفقیت در آن‌پرداز ثبت و تأیید شد.");window.dispatchEvent(new Event("anp-cards-updated"));const clean=window.location.pathname+window.location.hash;window.history.replaceState({},document.title,clean)}},[]);
+
   useEffect(()=>{
     if(!user)return;
     let active=true;
