@@ -6026,7 +6026,7 @@ function UserDrawerModal({user,onClose,onLogout}:{user:UserData;onClose:()=>void
         <div style={{flex:1}}>
           <div style={{fontSize:17,fontWeight:900,color:"var(--text-primary)"}}>{(user.name+" "+user.family).trim()||"کاربر"}</div>
           <div style={{fontSize:12,color:"var(--text-muted)",marginTop:4}}>{toFaDigits(user.phone)}</div>
-          <div style={{display:"flex",alignItems:"center",gap:4,marginTop:6,color:"#00D6B0",fontSize:11,fontWeight:700}}><Icon name="check" size={12}/>احراز هویت شده</div>
+          <div style={{display:"flex",alignItems:"center",gap:4,marginTop:6,color:user.kycDone?"#00D6B0":"var(--text-muted)",fontSize:11,fontWeight:700}}><Icon name={user.kycDone?"check":"clock"} size={12}/>{user.kycDone?"احراز هویت شده":"احراز هویت نشده"}</div>
         </div>
       </div>
       <div className="user-drawer-info-grid" style={{marginBottom:20}}>{user.nationalId&&<div className="user-info-chip"><span>کد ملی</span><b>{toFaDigits(user.nationalId)}</b></div>}{user.birthDate&&<div className="user-info-chip"><span>تاریخ تولد</span><b>{toFaDigits(user.birthDate)}</b></div>}</div>
