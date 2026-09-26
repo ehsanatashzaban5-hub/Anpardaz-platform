@@ -89,7 +89,7 @@ const DB = {
     try{
       const raw=JSON.parse(localStorage.getItem(`anp_user_${p}`)??"null");
       if(!raw)return null;
-      const u:UserData={uid:"",cryptoBalances:{},pinEnabled:Boolean(raw.pinEnabled??raw.pin),...raw}; delete (u as any).pin;
+      const hadLegacyPin=typeof raw.pin==="string"&&/^\d{4}$/.test(raw.pin); const u:UserData={uid:"",cryptoBalances:{},pinEnabled:Boolean(raw.pinEnabled??raw.pin),...raw}; delete (u as any).pin; if(hadLegacyPin){const safe:any={...u};delete safe.pin;localStorage.setItem(`anp_user_${p}`,JSON.stringify(safe));}
       // Backfill uid for users registered before this field existed
       if(!u.uid){u.uid="uid_"+p.replace(/[^0-9]/g,"");localStorage.setItem(`anp_user_${p}`,JSON.stringify(u));}
       return u;
