@@ -1,4 +1,5 @@
-import type {FastifyInstance,FastifyRequest} from 'fastify';
+imp
+app.post('/api/v1/admin/support/tickets/:id/close',{preHandler:requireAuth},async(req,reply)=>{if(!await adminOnly(req,reply))return;const id=Number((req.params as any).id);if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_ticket_id'});const sender=await ensurePlatformUser(pool,(req as R).auth);const client=await pool.connect();try{await client.query('BEGIN');const t=(await client.query("SELECT id,status FROM support_tickets WHERE id=$1 FOR UPDATE",[id])).rows[0];if(!t){await client.query('ROLLBACK');return reply.code(404).send({error:'ticket_not_found'});}if(t.status!=='closed'){await client.query("INSERT INTO support_ticket_messages(ticket_id,sender_user_id,sender_role,message) VALUES($1,$2,$3,$4)",[id,sender,(req as R).auth.role==='operator'?'operator':'admin','تیکت توسط پشتیبانی بسته شد.']);await client.query("UPDATE support_tickets SET status='closed',closed_at=NOW(),updated_at=NOW() WHERE id=$1",[id]);}await client.query('COMMIT');return{ok:true,status:'closed'};}catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}});ort type {FastifyInstance,FastifyRequest} from 'fastify';
 import type {Pool} from 'pg';
 import {ensurePlatformUser,requireAuth,type AuthClaims} from '../auth.js';
 type R=FastifyRequest&{auth:AuthClaims};
