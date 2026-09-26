@@ -2285,8 +2285,9 @@ function InternetPackageScreen({user,onUpdate,onBack,onGoToPayment,initialState,
 function ChargeScreen({type,user,onUpdate,onBack,onGoToPayment}:{type:"charge"|"internet";user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onGoToPayment?:(d:{phone:string;operator:Operator|null;amount:string;type:"charge"|"internet"})=>void}){
   const [phone,setPhone]=useState("");const [amount,setAmount]=useState("");const [errModal,setErrModal]=useState("");const [processing,setProcessing]=useState(false);const [receipt,setReceipt]=useState<ReceiptData|null>(null);
   const operator=phone.length>=4?detectOperator(phone):null;
+  const [livePackages,setLivePackages]=useState<string[]>([]);const [catalogLoading,setCatalogLoading]=useState(false);
   const chargeAmt=parseInt(toLatinDigits(amount).replace(/\D/g,""))||0;
-  const packages=type==="internet"?["۱ گیگ — ۷ روز — ۱۵,۰۰۰ ریال","۲ گیگ — ۱۵ روز — ۲۸,۰۰۰ ریال","۳ گیگ — ۳۰ روز — ۳۸,۰۰۰ ریال","۵ گیگ — ۳۰ روز — ۵۵,۰۰۰ ریال","۸ گیگ — ۳۰ روز — ۸۰,۰۰۰ ریال","۱۲ گیگ — ۳۰ روز — ۱۱۰,۰۰۰ ریال","۲۰ گیگ — ۳۰ روز — ۱۵۰,۰۰۰ ریال","۳۰ گیگ — ۳۰ روز — ۲۱۵,۰۰۰ ریال","۵۰ گیگ — ۳۰ روز — ۳۴۰,۰۰۰ ریال","نامحدود — ۳۰ روز — ۳۵۰,۰۰۰ ریال"]:["۱۰,۰۰۰ ریال","۲۰,۰۰۰ ریال","۵۰,۰۰۰ ریال","۱۰۰,۰۰۰ ریال","۲۰۰,۰۰۰ ریال","۵۰۰,۰۰۰ ریال"];
+  useEffect(()=>{let active=true;setLivePackages([]);if(!operator)return;setCatalogLoading(true);fetchLiveServiceCatalog(type==="charge"?"mobile_charge":"internet_package",operator.id,"prepaid").then(items=>{if(active)setLivePackages(items.map((x:any)=>`${x.name} — ${x.price} ریال`))}).catch(()=>{if(active)setLivePackages([])}).finally(()=>{if(active)setCatalogLoading(false)});return()=>{active=false}},[operator?.id,type]);
   const submit=async()=>{
     if(!isIranPhone(phone)){setErrModal("شماره موبایل معتبر وارد کنید.");return}
     if(!amount){setErrModal(type==="internet"?"لطفاً بسته اینترنت مورد نظر را انتخاب کنید.":"لطفاً مبلغ یا شارژ مورد نظر را انتخاب کنید.");return}
@@ -2311,7 +2312,7 @@ function ChargeScreen({type,user,onUpdate,onBack,onGoToPayment}:{type:"charge"|"
       </div>
       <label className="field-label">انتخاب {type==="charge"?"مبلغ":"بسته"}</label>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
-        {packages.map(p=><button key={p} className={`pkg-btn ${amount===p?"active":""}`} onClick={()=>setAmount(p)}>{p}</button>)}
+        {catalogLoading?[1,2,3,4].map(i=><div key={i} style={{height:42,borderRadius:10,background:"rgba(255,255,255,0.05)"}}/>):livePackages.map(p=><button key={p} className={`pkg-btn ${amount===p?"active":""}`} onClick={()=>setAmount(p)}>{p}</button>)}
       </div>
       {type==="charge"&&<div style={{marginBottom:chargeAmt>0?6:16}}>
         <FloatInput label="مبلغ دلخواه" value={chargeAmt?fa(chargeAmt):""} onChange={v=>setAmount(toLatinDigits(v).replace(/[^0-9]/g,""))} inputMode="numeric" dir="ltr" suffix="ریال"/>
