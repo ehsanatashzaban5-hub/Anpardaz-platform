@@ -1228,22 +1228,11 @@ function StickyActionBtn({label,onClick,disabled,loading,loadingText}:{
 
 // ─── Destination Card Picker Screen ──────────────────────────────────────────
 interface DestCard {id:string;number:string;bank:string;holderName:string}
-function getDestCards(phone:string):DestCard[]{
-  try{
-    const stored=JSON.parse(localStorage.getItem(`anp_dest_cards_${phone}`)??"null");
-    if(Array.isArray(stored)&&stored.length>0)return stored;
-    // seed sample cards
-    const seed:DestCard[]=[
-      {id:"dc1",number:"6037997599887766",bank:"بانک ملی",holderName:"علی احمدی"},
-      {id:"dc2",number:"6104338700112233",bank:"بانک ملت",holderName:"مریم رضایی"},
-      {id:"dc3",number:"5892101234567890",bank:"بانک سپه",holderName:"حسین کریمی"},
-      {id:"dc4",number:"6274129876543210",bank:"بانک اقتصاد نوین",holderName:"زهرا محمدی"},
-    ];
-    localStorage.setItem(`anp_dest_cards_${phone}`,JSON.stringify(seed));
-    return seed;
-  }catch{return[]}
-}
-function saveDestCards(phone:string,cards:DestCard[]){try{localStorage.setItem(`anp_dest_cards_${phone}`,JSON.stringify(cards))}catch{}}
+// Destination cards are never seeded or fabricated. Until a server-side
+// recipient-card registry is available, users can enter a destination card manually
+// or use verified destinations from transaction history.
+function getDestCards(_phone:string):DestCard[]{return[]}
+function saveDestCards(_phone:string,_cards:DestCard[]){/* no local source of truth */}
 
 function CardPickerScreen({phone,onSelect,onBack}:{phone:string;onSelect:(card:DestCard)=>void;onBack:()=>void}){
   const [cards,setCards]=useState<DestCard[]>(()=>getDestCards(phone));
