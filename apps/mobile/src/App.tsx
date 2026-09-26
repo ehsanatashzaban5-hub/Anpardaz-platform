@@ -5374,7 +5374,6 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
               onUpdate({...user,pinEnabled:false});DB.saveUser({...user,pinEnabled:false});setPinModal(null);
             }catch{setPinError("غیرفعال‌سازی رمز انجام نشد.");setPinInput("");}
           }
-        }
       },100);
     }
     return next;
