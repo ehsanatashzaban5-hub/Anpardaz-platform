@@ -18,7 +18,7 @@ app.addHook('onRequest',async(request,reply)=>{
   const customer=pool?await pool.query('SELECT id FROM customers WHERE identity_id=$1 AND status=\'active\' LIMIT 1',[claims.sub]):{rows:[]};
   const customerId=customer.rows[0]?.id;
   if(!customerId){await reply.code(403).send({error:'device_security_required'});return reply;}
-  const session=await pool!.query('SELECT 1 FROM device_security_sessions WHERE token_hash=$1 AND customer_id=$2 AND expires_at>NOW() LIMIT 1',[deviceTokenHash(deviceToken),customerId]);
+  const session=await pool!.query('SELECT 1 FROM device_security_sessions WHERE token_hash=$1 AND customer_id=$2 AND expires_at>NOW() AND revoked_at IS NULL LIMIT 1',[deviceTokenHash(deviceToken),customerId]);
   if(!session.rows[0]){await reply.code(403).send({error:'device_security_required',message:'برای ادامه، قفل امن گوشی را تأیید کنید.'});return reply;}
 });
 app.get('/api/v1/access/region',async(request)=>{const d=await iranIpDecision(request);return{allowed:d.allowed,countryCode:d.countryCode,source:d.source};});
@@ -76,7 +76,7 @@ app.post('/api/v1/device-security/registration/verify',{preHandler:requireAuth},
       [customerId,cred.id,Buffer.from(cred.publicKey),cred.counter,cred.transports??[],info.credentialDeviceType??null,info.credentialBackedUp??false]);
     await pool.query('DELETE FROM device_security_challenges WHERE customer_id=$1',[customerId]);
     const deviceToken=randomBytes(32).toString('base64url');
-    await pool.query('INSERT INTO device_security_sessions(token_hash,customer_id,expires_at) VALUES($1,$2,NOW()+INTERVAL \'15 minutes\')',[deviceToken,customerId]);
+    await pool.query('INSERT INTO device_security_sessions(token_hash,customer_id,expires_at) VALUES($1,$2,NOW()+INTERVAL \'15 minutes\')',[deviceTokenHash(deviceToken),customerId]);
     return {verified:true,deviceToken,expiresInSeconds:900};
   }catch(error){request.log.warn({error},'device security registration verification failed');return reply.code(400).send({error:'device_security_registration_failed'});}
 });
@@ -117,7 +117,7 @@ app.post('/api/v1/device-security/authentication/verify',{preHandler:requireAuth
     await pool.query('UPDATE device_security_credentials SET counter=$1,last_verified_at=NOW() WHERE id=$2',[verification.authenticationInfo.newCounter,stored.id]);
     await pool.query('DELETE FROM device_security_challenges WHERE customer_id=$1',[customerId]);
     const deviceToken=randomBytes(32).toString('base64url');
-    await pool.query('INSERT INTO device_security_sessions(token_hash,customer_id,expires_at) VALUES($1,$2,NOW()+INTERVAL \'15 minutes\')',[deviceToken,customerId]);
+    await pool.query('INSERT INTO device_security_sessions(token_hash,customer_id,expires_at) VALUES($1,$2,NOW()+INTERVAL \'15 minutes\')',[deviceTokenHash(deviceToken),customerId]);
     return {verified:true,deviceToken,expiresInSeconds:900};
   }catch(error){request.log.warn({error},'device security authentication verification failed');return reply.code(401).send({error:'device_security_authentication_failed'});}
 });
