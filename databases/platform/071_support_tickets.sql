@@ -1,0 +1,7 @@
+BEGIN;
+CREATE TABLE IF NOT EXISTS support_tickets (id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,subject TEXT NOT NULL CHECK(length(subject) BETWEEN 3 AND 200),status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','pending','answered','closed')),priority TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('low','normal','high','urgent')),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),closed_at TIMESTAMPTZ);
+CREATE TABLE IF NOT EXISTS support_ticket_messages (id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,ticket_id BIGINT NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,sender_user_id BIGINT REFERENCES platform_users(id) ON DELETE SET NULL,sender_role TEXT NOT NULL CHECK(sender_role IN ('user','admin','operator')),message TEXT NOT NULL CHECK(length(message) BETWEEN 1 AND 10000),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE INDEX IF NOT EXISTS idx_support_tickets_user_status ON support_tickets(user_id,status,updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_messages_ticket_created ON support_ticket_messages(ticket_id,created_at);
+INSERT INTO schema_migrations(version) VALUES ('071_support_tickets') ON CONFLICT(version) DO NOTHING;
+COMMIT;
