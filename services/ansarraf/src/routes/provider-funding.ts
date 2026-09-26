@@ -25,7 +25,7 @@ export function registerProviderFundingRoutes(app:FastifyInstance,pool:Pool){
     const providerCode=(process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX').toUpperCase(),provider=(await pool.query("SELECT id FROM liquidity_providers WHERE code=$1 AND status='ACTIVE'",[providerCode])).rows[0];if(!provider)return reply.code(503).send({error:'provider_not_active'});
     const adapter=registry.get(providerCode);if(!adapter)return reply.code(503).send({error:'provider_not_configured'});
     const address=await adapter.getDepositAddress(symbol,network);if(!address.address)return reply.code(503).send({error:'provider_deposit_address_unavailable'});
-    const others=(await pool.query("SELECT customer_id FROM provider_deposit_addresses WHERE provider_id=$1 AND asset_id=$2 AND network=$3 AND address=$4 AND status='ACTIVE' AND customer_id<>$5",[provider.id,asset.id,network,address.address,customer])).rows;
+    const others=(await pool.query("SELECT customer_id,memo FROM provider_deposit_addresses WHERE provider_id=$1 AND asset_id=$2 AND network=$3 AND address=$4 AND status='ACTIVE' AND customer_id<>$5",[provider.id,asset.id,network,address.address,customer])).rows;
     const memoIsUnique=Boolean(address.memo)&&others.every((x:any)=>String(x.memo??'')!==String(address.memo));
     const safe=others.length===0||memoIsUnique;
     const row=(await pool.query(`INSERT INTO provider_deposit_addresses(provider_id,customer_id,asset_id,network,address,memo,provider_reference)
