@@ -36,6 +36,29 @@ CREATE TABLE IF NOT EXISTS market_sync_runs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 032 created market_sync_runs with a different operational schema. Reconcile it
+-- explicitly instead of relying on CREATE TABLE IF NOT EXISTS, which does not alter
+-- an existing table.
+ALTER TABLE market_sync_runs
+  ADD COLUMN IF NOT EXISTS source_id BIGINT REFERENCES market_store_sources(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS discovered_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS upserted_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS deactivated_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS error_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+ALTER TABLE market_sync_runs ALTER COLUMN store_id DROP NOT NULL;
+ALTER TABLE market_sync_runs DROP CONSTRAINT IF EXISTS market_sync_runs_store_id_fkey;
+ALTER TABLE market_sync_runs
+  ADD CONSTRAINT market_sync_runs_store_id_fkey
+  FOREIGN KEY (store_id) REFERENCES market_stores(id) ON DELETE SET NULL;
+
+ALTER TABLE market_sync_runs DROP CONSTRAINT IF EXISTS market_sync_runs_status_check;
+ALTER TABLE market_sync_runs
+  ADD CONSTRAINT market_sync_runs_status_check
+  CHECK (status IN ('queued','running','succeeded','partial','failed','blocked'));
+
 CREATE INDEX IF NOT EXISTS idx_market_store_sources_enabled
   ON market_store_sources(enabled,store_id);
 CREATE INDEX IF NOT EXISTS idx_market_sync_runs_store_time
