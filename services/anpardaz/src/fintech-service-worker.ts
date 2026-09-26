@@ -30,7 +30,7 @@ export class FintechServiceWorker{
     const client=await this.pool.connect();let row:any;
     try{
       await client.query('BEGIN');
-      row=(await client.query("SELECT id,operation_id,attempts FROM fintech_provider_outbox WHERE (status='pending' OR (status='processing' AND updated_at < NOW()-INTERVAL '30 seconds')) AND next_attempt_at<=NOW() AND attempts<20 ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1")).rows[0];
+      row=(await client.query("SELECT id,operation_id,attempts FROM fintech_provider_outbox WHERE (status='pending' OR (status='processing' AND updated_at < NOW()-INTERVAL '120 seconds')) AND next_attempt_at<=NOW() AND attempts<20 ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1")).rows[0];
       if(!row){await client.query('ROLLBACK');return false;}
       const op=(await client.query('SELECT status FROM fintech_service_operations WHERE operation_id=$1 FOR UPDATE',[row.operation_id])).rows[0];
       if(!op){await client.query("UPDATE fintech_provider_outbox SET status='manual_review',last_error='operation_not_found',updated_at=NOW() WHERE id=$1",[row.id]);await client.query('COMMIT');return true;}
