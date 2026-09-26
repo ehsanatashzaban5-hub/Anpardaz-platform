@@ -141,7 +141,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
 
   app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/kyc/:id/decision', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
-    if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
+    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(sarrafBase() + '/api/v1/admin/kyc/' + encodeURIComponent(request.params.id) + '/decision', {
       method: 'POST',
       headers: forwardUser(request),
