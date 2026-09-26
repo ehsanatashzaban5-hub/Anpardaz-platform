@@ -146,7 +146,6 @@ const PLATFORM_NAV: NavItem[] = [
   { id:"market",    label:"آن مارکت", icon:"market",   color:"#d97706" },
   { id:"banner",    label:"آن بنر",   icon:"banner",   color:"#e8354e" },
   { id:"hoosh",     label:"آن هوش",   icon:"hoosh",    color:"#7c3aed" },
-  { id:"financial", label:"سبد ارز دیجیتال",icon:"financial", color:"#059669" },
 ];
 
 const CONTENT_NAV: NavItem[] = [
@@ -325,7 +324,6 @@ export function WebFooter({ onNavigate }: FooterProps) {
       { label:"آن مارکت", page:"market"    as WebPage },
       { label:"آن بنر",   page:"banner"    as WebPage },
       { label:"آن هوش",   page:"hoosh"     as WebPage },
-      { label:"سبد ارز دیجیتال",page:"financial" as WebPage },
     ]},
     { label:"محتوا", items:[
       { label:"اخبار",      page:"news"      as WebPage },
