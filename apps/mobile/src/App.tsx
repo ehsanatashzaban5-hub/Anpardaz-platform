@@ -275,7 +275,6 @@ function normalizeIranianPhone(tel:string):string{
 }
 const fa=(v:number|string)=>new Intl.NumberFormat("fa-IR").format(Number(v));
 const faFixed=(v:number,d=4)=>new Intl.NumberFormat("fa-IR",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
-function genOTP(){return String(Math.floor(100000+Math.random()*900000))}
 function genId(){return"TX"+Date.now().toString(36).toUpperCase()}
 
 // ─── Mobile Back-Button Stack ──────────────────────────────────────────────────
