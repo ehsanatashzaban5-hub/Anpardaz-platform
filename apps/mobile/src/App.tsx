@@ -891,183 +891,20 @@ function PrivacyPage({onClose}:{onClose:()=>void}){
 }
 
 // ─── Phone Login ──────────────────────────────────────────────────────────────
-function PhoneLogin({onSend}:{onSend:(p:string,c:string,d?:string)=>void}){
+function PhoneLogin({onSend}:{onSend:(p:string)=>void}){
   const [phone,setPhone]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");const [showPrivacy,setShowPrivacy]=useState(false);
-  const submit=async()=>{const p=phone.trim();if(!isIranPhone(p)){setErr("شماره موبایل معتبر نیست.");return;}setErr("");setLoading(true);const code=genOTP();const res=await sendOTP(p,code);setLoading(false);onSend(p,code,res.devCode)};
+  const submit=async()=>{const p=normalizeIranianPhone(phone.trim());if(!isIranPhone(p)){setErr("شماره موبایل معتبر نیست.");return;}if(!ANPARDAZ_API_BASE){setErr("اتصال احراز هویت در دسترس نیست.");return;}setErr("");setLoading(true);try{const r=await fetch(ANPARDAZ_API_BASE+"/api/v1/auth/phone/request-otp",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({phone:p}),cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(d?.error??"otp_request_failed"));onSend(p);}catch(e){setErr(e instanceof Error&&e.message==="phone_otp_disabled"?"ورود پیامکی هنوز برای این محیط فعال نشده است.":"ارسال کد تأیید انجام نشد.");}finally{setLoading(false);}};
   if(showPrivacy)return <PrivacyPage onClose={()=>setShowPrivacy(false)}/>;
-  return <div className="auth-screen" dir="rtl">
-    <div className="auth-logo-area">
-      <img className="auth-logo-image" src={anPardazLogo} alt="لوگوی آن‌پرداز" decoding="sync" fetchPriority="high"/>
-      <div style={{marginTop:12,textAlign:"center"}}><div style={{fontSize:20,fontWeight:900,color:"#F4FAFC"}}>آن‌پرداز</div><div style={{fontSize:11,color:"#00D6B0",marginTop:4,lineHeight:1.5}}>نقل و انتقال آنی پول و دارایی های دیجیتال</div></div>
-    </div>
-    <div className="auth-card">
-      <h2 style={{fontSize:18,fontWeight:800,color:"#F4FAFC",marginBottom:8}}>ورود به حساب</h2>
-      <p style={{fontSize:13,color:"#888",marginBottom:20}}>شماره موبایل خود را وارد کنید. کد تأیید برایتان پیامک می‌شود.</p>
-      <label style={{fontSize:13,color:"#aaa",display:"block",marginBottom:6}}>شماره موبایل</label>
-      <div className={`auth-input-wrap ${err?"error":""}`}>
-        <input className="auth-input ltr" value={toFaDigits(phone)} onChange={e=>setPhone(toLatinDigits(e.target.value))} placeholder="شماره موبایل" inputMode="tel" maxLength={11} dir="ltr" onKeyDown={e=>e.key==="Enter"&&submit()}/>
-      </div>
-      {err&&<p className="field-err">{err}</p>}
-      <button className="primary-button" style={{marginTop:20}} onClick={submit} disabled={loading}>{loading?"در حال ارسال...":"دریافت کد تأیید"}</button>
-      <button className="privacy-link-btn" onClick={()=>setShowPrivacy(true)}>پذیرش قوانین فعالیت و ضوابط حریم خصوصی</button>
-    </div>
-  </div>;
+  return <div className="auth-screen" dir="rtl"><div className="auth-logo-area"><img className="auth-logo-image" src={anPardazLogo} alt="لوگوی آن‌پرداز" decoding="sync" fetchPriority="high"/><div style={{marginTop:12,textAlign:"center"}}><div style={{fontSize:20,fontWeight:900,color:"#F4FAFC"}}>آن‌پرداز</div><div style={{fontSize:11,color:"#00D6B0",marginTop:4,lineHeight:1.5}}>نقل و انتقال آنی پول و دارایی های دیجیتال</div></div></div><div className="auth-card"><h2 style={{fontSize:18,fontWeight:800,color:"#F4FAFC",marginBottom:8}}>ورود به حساب</h2><p style={{fontSize:13,color:"#888",marginBottom:20}}>شماره موبایل خود را وارد کنید. کد تأیید برایتان پیامک می‌شود.</p><label style={{fontSize:13,color:"#aaa",display:"block",marginBottom:6}}>شماره موبایل</label><div className={"auth-input-wrap "+(err?"error":"")}><input className="auth-input ltr" value={toFaDigits(phone)} onChange={e=>setPhone(toLatinDigits(e.target.value))} placeholder="شماره موبایل" inputMode="tel" maxLength={11} dir="ltr" onKeyDown={e=>e.key==="Enter"&&void submit()}/></div>{err&&<p className="field-err">{err}</p>}<button className="primary-button" style={{marginTop:20}} onClick={()=>void submit()} disabled={loading}>{loading?"در حال ارسال...":"دریافت کد تأیید"}</button><button className="privacy-link-btn" onClick={()=>setShowPrivacy(true)}>پذیرش قوانین فعالیت و ضوابط حریم خصوصی</button></div></div>;
 }
-
-// ─── OTP Verify ───────────────────────────────────────────────────────────────
-function OTPVerify({phone,correctCode,devCode,onVerified,onBack}:{phone:string;correctCode:string;devCode?:string;onVerified:(p:string)=>void;onBack?:()=>void}){
-  const [digits,setDigits]=useState<string[]>(Array(6).fill(""));
-  const [err,setErr]=useState("");
-  const [resendLeft,setResendLeft]=useState(120);
-  const refs=useRef<(HTMLInputElement|null)[]>([]);
+function OTPVerify({phone,onVerified,onBack}:{phone:string;onVerified:(phone:string,accessToken:string,email:string)=>void;onBack?:()=>void}){
+  const [digits,setDigits]=useState<string[]>(Array(6).fill(""));const [err,setErr]=useState("");const [loading,setLoading]=useState(false);const [resendLeft,setResendLeft]=useState(120);const refs=useRef<(HTMLInputElement|null)[]>([]);
   useEffect(()=>{if(resendLeft<=0)return;const t=setTimeout(()=>setResendLeft(v=>v-1),1000);return()=>clearTimeout(t)},[resendLeft]);
-  const code=digits.join("");
-  const doVerify=(d:string[])=>{
-    const c=d.join("");
-    if(c===correctCode){onVerified(phone);}
-    else if(c.length===6){setErr("کد واردشده صحیح نیست؛ دوباره تلاش کنید.");}
-  };
-  const write=(i:number,v:string)=>{
-    const d=toLatinDigits(v).replace(/\D/g,"");
-    if(!d)return;
-    const n=[...digits];
-    d.slice(0,6-i).split("").forEach((x,j)=>{n[i+j]=x});
-    setDigits(n);
-    setErr("");
-    const nextIdx=Math.min(5,i+d.length);
-    refs.current[nextIdx]?.focus();
-    doVerify(n);
-  };
-  const handleKeyDown=(i:number,e:React.KeyboardEvent<HTMLInputElement>)=>{
-    if(e.key==="Backspace"){
-      e.preventDefault();
-      if(digits[i]){
-        const n=[...digits];n[i]="";setDigits(n);setErr("");
-      } else if(i>0){
-        const n=[...digits];n[i-1]="";setDigits(n);setErr("");
-        refs.current[i-1]?.focus();
-      }
-    } else if(e.key==="Enter"){
-      doVerify(digits);
-    }
-  };
-  return <div className="auth-screen" dir="rtl"><div className="auth-logo-area"><img className="auth-logo-image" src={anPardazLogo} alt="لوگوی آن‌پرداز"/></div><div className="auth-card">
-    {onBack&&<button className="auth-back-btn" onClick={onBack}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>بازگشت</button>}
-    <div className="auth-kicker">ورود امن</div><h2>کد تأیید</h2><p>کد شش‌رقمی ارسال‌شده به <b>{phone.replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[+d])}</b> را وارد کنید.</p>
-    {devCode&&<div className="dev-code">حالت آزمایشی · کد ورود: <b>{devCode.replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[+d])}</b></div>}
-    <div className="otp-boxes" dir="ltr">{digits.map((d,i)=><input key={i} ref={el=>{refs.current[i]=el}} value={d?"۰۱۲۳۴۵۶۷۸۹"[+d]:""} inputMode="numeric" aria-label={`رقم ${fa(i+1)} کد تأیید`} onChange={e=>write(i,e.target.value)} onKeyDown={e=>handleKeyDown(i,e)}/>)}</div>
-    {err&&<p className="field-err">{err}</p>}<button className="primary-button" disabled={code.length!==6} onClick={()=>doVerify(digits)}>تأیید و ادامه</button><p className="auth-resend">{resendLeft>0?`ارسال دوباره کد تا ${fa(Math.ceil(resendLeft/60))} دقیقه دیگر`:<button onClick={()=>setResendLeft(120)}>ارسال دوباره کد</button>}</p>
-  </div></div>;
+  const verify=async(d:string[])=>{const code=d.join("");if(code.length!==6||loading)return;if(!ANPARDAZ_API_BASE){setErr("اتصال احراز هویت در دسترس نیست.");return;}setLoading(true);setErr("");try{const r=await fetch(ANPARDAZ_API_BASE+"/api/v1/auth/phone/verify-otp",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({phone,code}),cache:"no-store"});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data?.error??"invalid_otp"));const token=String(data?.accessToken??"");if(!token)throw new Error("token_missing");onVerified(phone,token,String(data?.phone??phone)+"@users.anpardaz.ir");}catch{setErr("کد واردشده صحیح نیست یا منقضی شده است.");}finally{setLoading(false);}};
+  const write=(i:number,v:string)=>{const d=toLatinDigits(v).replace(/\D/g,"");if(!d)return;const n=[...digits];d.slice(0,6-i).split("").forEach((x,j)=>{n[i+j]=x});setDigits(n);setErr("");const nextIdx=Math.min(5,i+d.length);refs.current[nextIdx]?.focus();if(n.every(Boolean))void verify(n);};
+  const handleKeyDown=(i:number,e:React.KeyboardEvent<HTMLInputElement>)=>{if(e.key==="Backspace"){e.preventDefault();if(digits[i]){const n=[...digits];n[i]="";setDigits(n);setErr("");}else if(i>0){const n=[...digits];n[i-1]="";setDigits(n);setErr("");refs.current[i-1]?.focus();}}else if(e.key==="Enter"){void verify(digits);}};
+  return <div className="auth-screen" dir="rtl"><div className="auth-logo-area"><img className="auth-logo-image" src={anPardazLogo} alt="لوگوی آن‌پرداز" decoding="sync" fetchPriority="high"/></div><div className="auth-card"><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}><button onClick={onBack} style={{background:"none",border:"none",color:"#aaa"}}><Icon name="arrow" size={18}/></button><h2 style={{fontSize:18,fontWeight:800,color:"#F4FAFC",margin:0}}>کد تأیید</h2></div><p style={{fontSize:13,color:"#888",marginBottom:20}}>کد ۶ رقمی ارسال‌شده به <b dir="ltr">{phone}</b> را وارد کنید.</p><div style={{display:"flex",gap:8,justifyContent:"center",direction:"ltr",marginBottom:20}}>{digits.map((d,i)=><input key={i} ref={el=>{refs.current[i]=el}} value={d} onChange={e=>write(i,e.target.value)} onKeyDown={e=>handleKeyDown(i,e)} inputMode="numeric" maxLength={1} style={{width:42,height:52,textAlign:"center",fontSize:22,fontWeight:800,background:"var(--card-bg2)",border:"1.5px solid "+(d?"#00D6B0":"var(--border-faint)"),borderRadius:11,color:"var(--text-primary)",outline:"none"}}/> )}</div>{err&&<p className="field-err" style={{textAlign:"center"}}>{err}</p>}<button className="primary-button" disabled={loading||digits.join("").length<6} onClick={()=>void verify(digits)}>{loading?"در حال بررسی...":"تأیید و ورود"}</button><div style={{textAlign:"center",marginTop:14,fontSize:12,color:"#888"}}>{resendLeft>0?"ارسال مجدد کد تا "+Math.floor(resendLeft/60)+":"+String(resendLeft%60).padStart(2,"0"):<button onClick={()=>setResendLeft(120)} style={{background:"none",border:0,color:"#00D6B0",fontFamily:"Vazirmatn"}}>ارسال مجدد</button>}</div></div></div>;
 }
-
-function OnboardPhoto({onDone,onBack,initialAccepted}:{onDone:(p:string)=>void;onBack?:()=>void;initialAccepted?:boolean}){
-  const [legal,setLegal]=useState(!initialAccepted),[scrolled,setScrolled]=useState(false),[accepted,setAccepted]=useState(initialAccepted||false),[recording,setRecording]=useState(false),[videoReady,setVideoReady]=useState(false),[cardReady,setCardReady]=useState(false),[preview,setPreview]=useState(""),[err,setErr]=useState("");
-  const live=useRef<HTMLVideoElement>(null), recorder=useRef<MediaRecorder|null>(null), streamRef=useRef<MediaStream|null>(null), chunks=useRef<Blob[]>([]), videoFile=useRef<HTMLInputElement>(null), cardFile=useRef<HTMLInputElement>(null);
-  useEffect(()=>()=>streamRef.current?.getTracks().forEach(track=>track.stop()),[]);
-  const start=async()=>{try{setErr("");const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"user"},width:{ideal:720},height:{ideal:960}},audio:true});streamRef.current=stream;chunks.current=[];setRecording(true);requestAnimationFrame(async()=>{if(live.current){live.current.srcObject=stream;await live.current.play().catch(()=>setErr("نمایش دوربین آغاز نشد؛ مجوز دوربین را بررسی کنید."))}const r=new MediaRecorder(stream);recorder.current=r;r.ondataavailable=e=>{if(e.data.size)chunks.current.push(e.data)};r.onstop=()=>{setVideoReady(chunks.current.length>0);stream.getTracks().forEach(t=>t.stop());streamRef.current=null};r.start(300)})}catch{setErr("دسترسی دوربین یا میکروفن فعال نیست. لطفاً مجوزها را تأیید کنید یا ویدیو را بارگذاری کنید.")}};
-  const stop=()=>{if(live.current&&live.current.videoWidth){const c=document.createElement("canvas");c.width=live.current.videoWidth;c.height=live.current.videoHeight;c.getContext("2d")?.drawImage(live.current,0,0);setPreview(c.toDataURL("image/jpeg",.75))}recorder.current?.stop();setRecording(false)};
-  const content=<><h2 style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",margin:"0 0 12px"}}>قوانین و شرایط استفاده از آن‌پرداز</h2><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",marginBottom:14}}>آن‌پرداز یک ابزار مدیریت مالی و دارایی دیجیتال است. افتتاح حساب و استفاده از خدمات، به معنی پذیرش این شرایط است.</p><h3 style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",margin:"18px 0 8px"}}>احراز هویت و مسئولیت کاربر</h3><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",margin:"0 0 10px"}}>کاربر متعهد است اطلاعات هویتی، شماره همراه، کارت بانکی و مدارک خود را صحیح، متعلق به خود و به‌روز وارد کند. استفاده از حساب شخص دیگر، ارائه مدرک جعلی یا هرگونه تلاش برای دورزدن احراز هویت ممنوع است.</p><h3 style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",margin:"18px 0 8px"}}>امنیت حساب</h3><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",margin:"0 0 10px"}}>حفظ رمز، کد تأیید و دسترسی دستگاه بر عهده کاربر است. آن‌پرداز هرگز رمز یا کد یک‌بارمصرف را از طریق تماس یا پیام درخواست نمی‌کند. در صورت مشاهده فعالیت مشکوک، خدمات می‌تواند موقتاً محدود شود.</p><h3 style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",margin:"18px 0 8px"}}>تراکنش‌ها و دارایی دیجیتال</h3><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",margin:"0 0 10px"}}>کاربر پیش از تأیید هر انتقال باید مقصد، شبکه، مبلغ و کارمزد را بررسی کند. تراکنش‌های ثبت‌شده در شبکه بلاک‌چین پس از تأیید قابل بازگشت نیستند.</p><h3 style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",margin:"18px 0 8px"}}>حریم خصوصی و مقررات</h3><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",margin:"0 0 10px"}}>اطلاعات فقط برای ارائه خدمات، کنترل تقلب و اجرای تکالیف قانونی پردازش می‌شود. آن‌پرداز در چارچوب قوانین جمهوری اسلامی ایران و الزامات مبارزه با پول‌شویی عمل می‌کند.</p><h3 style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",margin:"18px 0 8px"}}>محدودیت‌ها</h3><p style={{fontSize:15,lineHeight:1.9,color:"var(--text-secondary)",margin:"0 0 10px"}}>استفاده از خدمات برای فعالیت غیرقانونی، پول‌شویی، تأمین مالی اقدامات ممنوع یا ایجاد اختلال در سامانه ممنوع است.</p><p style={{fontSize:14,lineHeight:1.9,color:"var(--text-muted)",marginTop:14}}>با ادامه این مسیر، اعلام می‌کنید که متن را به‌طور کامل مطالعه کرده و آن را می‌پذیرید.</p></>;
-  return <><div className="auth-screen" dir="rtl"><div className="auth-card verification-card">
-    {onBack&&<button className="auth-back-btn" onClick={onBack}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>بازگشت</button>}
-    <div className="auth-kicker">مرحله ۱ از ۳ · احراز هویت</div>
-    <h2 style={{fontSize:22,fontWeight:900,color:"var(--text-primary)",margin:"0 0 10px"}}>تأیید هویت تصویری</h2>
-    <p style={{fontSize:15,color:"var(--text-muted)",lineHeight:1.8,marginBottom:16}}>متن تعهد را با صدای واضح بخوانید و در حین ضبط به دوربین نگاه کنید.</p>
-    <div className="camera-stage">{recording?<><video ref={live} muted playsInline className="video-preview"/><div className="recording-badge"><i/> در حال ضبط</div></>:preview?<img src={preview} alt="پیش‌نمایش ویدیو"/>:<div className="camera-placeholder"><Icon name="camera" size={35}/><span style={{fontSize:13}}>پس از شروع ضبط، تصویر دوربین اینجا دیده می‌شود.</span></div>}<div className="pledge-overlay" style={{fontSize:13,lineHeight:2}}>«من … نام و نام خانوادگی … با اطلاع کامل از قوانین نرم‌افزار آن‌پرداز، حساب کاربری خود را افتتاح می‌کنم.»</div></div>
-    <div className="verify-row" style={{paddingTop:16}}>
-      <div><b style={{fontSize:15}}>ویدیوی تعهد</b><span style={{fontSize:13}}>{videoReady?"✓ ویدیو دریافت شد":"ضبط یا بارگذاری الزامی"}</span></div>
-      {!videoReady?<button className="outline-button" style={{fontSize:14,padding:"10px 16px"}} onClick={recording?stop:start}>{recording?"پایان و ثبت ویدیو":"شروع ضبط ویدیو"}</button>:<span className="verify-ok">✓</span>}
-    </div>
-    <input ref={videoFile} type="file" accept="video/*" hidden onChange={e=>{if(e.target.files?.[0]){setVideoReady(true);setPreview("")}}}/>
-    {!videoReady&&!recording&&<button className="outline-button" style={{width:"100%",marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:14,padding:"12px"}} onClick={()=>videoFile.current?.click()}><Icon name="upload" size={16}/> آپلود ویدئو</button>}
-    <div className="verify-row">
-      <div><b style={{fontSize:15}}>تصویر کارت ملی</b><span style={{fontSize:13}}>{cardReady?"✓ مدرک دریافت شد":"بارگذاری تصویر الزامی"}</span></div>
-      <button className="outline-button" style={{fontSize:14,padding:"10px 16px"}} onClick={()=>cardFile.current?.click()}>{cardReady?"تغییر":"انتخاب فایل"}</button>
-    </div>
-    <input ref={cardFile} type="file" accept="image/*" hidden onChange={e=>{if(e.target.files?.[0])setCardReady(true)}}/>
-    {err&&<p className="field-err" style={{fontSize:14}}>{err}</p>}
-    <button className="primary-button" style={{marginTop:16,fontSize:15,padding:"15px"}} disabled={!accepted||!videoReady||!cardReady} onClick={()=>onDone(preview||"")}>ادامه</button>
-  </div></div>
-  {legal&&<div className="receipt-page" dir="rtl">
-    <div className="receipt-page-header">
-      <button className="back-btn" onClick={()=>setLegal(false)}><Icon name="arrow" size={20}/></button>
-      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>پیش از ادامه، قوانین را بخوانید</h2>
-      <div style={{width:36}}/>
-    </div>
-    <div className="receipt-page-body">
-      <div className="legal-modal">
-        <div className="modal-head"><span style={{fontSize:12}}>مطالعه تا انتها الزامی است</span></div>
-        <div className="legal-copy" style={{fontSize:15,lineHeight:1.9}} onScroll={e=>{const el=e.currentTarget;if(el.scrollTop+el.clientHeight>=el.scrollHeight-8)setScrolled(true)}}>{content}</div>
-        <label className="legal-check" style={{fontSize:14}}><input type="checkbox" disabled={!scrolled} checked={accepted} onChange={e=>setAccepted(e.target.checked)}/><span>قوانین و شرایط را خواندم و می‌پذیرم.</span></label>
-        <button className="primary-button" style={{margin:"0 16px 16px",fontSize:15,padding:"14px"}} disabled={!accepted} onClick={()=>setLegal(false)}>پذیرش و ادامه</button>
-      </div>
-    </div>
-  </div>}
-  </>;
-}
-
-function OnboardProfile({onDone,onBack,initialData}:{onDone:(d:{name:string;family:string;nationalId:string;birthDate:string})=>void;onBack?:()=>void;initialData?:{name:string;family:string;nationalId:string;birthDate:string}}){
-  const parseDate=(bd:string)=>{if(!bd)return{y:"۱۳۷۰",m:"۰۱",day:"۰۱"};const parts=bd.split("/");return{y:parts[0]||"۱۳۷۰",m:parts[1]||"۰۱",day:parts[2]||"۰۱"}};
-  const [d,setD]=useState({name:initialData?.name||"",family:initialData?.family||"",nationalId:initialData?.nationalId||"",birthDate:initialData?.birthDate||""});
-  const [err,setErr]=useState("");
-  const initParsed=parseDate(initialData?.birthDate||"");
-  const [date,setDate]=useState(initParsed);
-  const [picker,setPicker]=useState<"y"|"m"|"day"|null>(null);
-  const years=Array.from({length:90},(_,i)=>toFaDigits(String(1320+i)));
-  const two=(n:number)=>toFaDigits(String(n).padStart(2,"0"));
-  const title=picker==="y"?"انتخاب سال":picker==="m"?"انتخاب ماه":"انتخاب روز";
-  const options=picker==="y"?years:picker==="m"?Array.from({length:12},(_,i)=>two(i+1)):Array.from({length:31},(_,i)=>two(i+1));
-  const confirm=()=>{if(!d.name||!d.family||d.nationalId.length!==10){setErr("نام، نام خانوادگی و کد ملی ده‌رقمی الزامی است.");return}onDone({...d,birthDate:`${date.y}/${date.m}/${date.day}`})};
-  return <><div className="auth-screen" dir="rtl" style={{justifyContent:"center",minHeight:"100dvh"}}>
-    <div className="auth-card" style={{margin:"16px",padding:"24px 20px"}}>
-      {onBack&&<button className="auth-back-btn" onClick={onBack}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>بازگشت</button>}
-      <div className="auth-kicker" style={{fontSize:13,marginBottom:10}}>مرحله ۲ از ۳</div>
-      <h2 style={{fontSize:22,fontWeight:900,color:"var(--text-primary)",margin:"0 0 20px"}}>اطلاعات شخصی</h2>
-      <div className="form-stack" style={{gap:16}}>
-        <label style={{fontSize:14,color:"var(--text-secondary)",display:"block",fontWeight:600}}>نام
-          <input style={{marginTop:8,fontSize:16,padding:"13px 14px",borderRadius:14,width:"100%",boxSizing:"border-box",border:"1.5px solid var(--border-color)",background:"var(--input-bg)",color:"var(--text-primary)",outline:"none",fontFamily:"Vazirmatn"}} value={d.name} onChange={e=>setD(p=>({...p,name:e.target.value}))}/>
-        </label>
-        <label style={{fontSize:14,color:"var(--text-secondary)",display:"block",fontWeight:600}}>نام خانوادگی
-          <input style={{marginTop:8,fontSize:16,padding:"13px 14px",borderRadius:14,width:"100%",boxSizing:"border-box",border:"1.5px solid var(--border-color)",background:"var(--input-bg)",color:"var(--text-primary)",outline:"none",fontFamily:"Vazirmatn"}} value={d.family} onChange={e=>setD(p=>({...p,family:e.target.value}))}/>
-        </label>
-        <label style={{fontSize:14,color:"var(--text-secondary)",display:"block",fontWeight:600}}>کد ملی
-          <input
-            style={{marginTop:8,fontSize:20,padding:"13px 14px",borderRadius:14,width:"100%",boxSizing:"border-box",border:"1.5px solid var(--border-color)",background:"var(--input-bg)",color:"var(--text-primary)",outline:"none",fontFamily:"Vazirmatn",letterSpacing:4,direction:"ltr",textAlign:"center"}}
-            value={toFaDigits(d.nationalId)}
-            inputMode="numeric"
-            maxLength={10}
-            dir="ltr"
-            onKeyDown={e=>{const ok=["Backspace","Delete","Tab","ArrowLeft","ArrowRight","Home","End"];if(ok.includes(e.key)||e.ctrlKey||e.metaKey)return;if(!/^[0-9۰-۹]$/.test(e.key)){e.preventDefault();return}if(d.nationalId.length>=10)e.preventDefault();}}
-            onChange={e=>{const v=toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,10);setD(p=>({...p,nationalId:v}))}}
-          />
-        </label>
-      </div>
-      <label style={{marginTop:22,display:"block",marginBottom:0,fontSize:14,color:"var(--text-secondary)",fontWeight:600}}>تاریخ تولد
-        <div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr 1fr",gap:10,marginTop:10}}>
-          <button type="button" style={{border:"1.5px solid var(--border-color)",background:"var(--input-bg)",borderRadius:14,color:"var(--text-primary)",padding:"13px 8px",fontFamily:"Vazirmatn",fontSize:18,fontWeight:700,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}} onClick={()=>setPicker("y")}>{date.y}<small style={{fontSize:11,color:"var(--text-muted)",fontWeight:400}}>سال</small></button>
-          <button type="button" style={{border:"1.5px solid var(--border-color)",background:"var(--input-bg)",borderRadius:14,color:"var(--text-primary)",padding:"13px 8px",fontFamily:"Vazirmatn",fontSize:18,fontWeight:700,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}} onClick={()=>setPicker("m")}>{date.m}<small style={{fontSize:11,color:"var(--text-muted)",fontWeight:400}}>ماه</small></button>
-          <button type="button" style={{border:"1.5px solid var(--border-color)",background:"var(--input-bg)",borderRadius:14,color:"var(--text-primary)",padding:"13px 8px",fontFamily:"Vazirmatn",fontSize:18,fontWeight:700,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}} onClick={()=>setPicker("day")}>{date.day}<small style={{fontSize:11,color:"var(--text-muted)",fontWeight:400}}>روز</small></button>
-        </div>
-      </label>
-      {err&&<p className="field-err" style={{fontSize:14,marginTop:12}}>{err}</p>}
-      <button className="primary-button" style={{marginTop:28,fontSize:15,padding:"15px"}} onClick={confirm}>ادامه</button>
-    </div>
-  </div>
-  {picker&&<div className="receipt-page" dir="rtl">
-    <div className="receipt-page-header">
-      <button className="back-btn" onClick={()=>setPicker(null)}><Icon name="arrow" size={20}/></button>
-      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>{title}</h2>
-      <div style={{width:36}}/>
-    </div>
-    <div className="receipt-page-body">
-      <div className="date-option-grid" style={{paddingTop:16,paddingBottom:20}}>
-        {options.map(v=><button key={v} style={{fontSize:15,padding:"12px 4px",borderRadius:12,fontWeight:600,fontFamily:"Vazirmatn",border:"1px solid var(--border-color)",background:date[picker!]===v?"var(--accent)":"var(--card-bg2)",color:date[picker!]===v?"#000":"var(--text-primary)",cursor:"pointer"}} className={date[picker!]===v?"active":""} onClick={()=>{setDate(p=>({...p,[picker!]:v}));setPicker(null)}}>{v}</button>)}
-      </div>
-    </div>
-  </div>}
-  </>;
-}
-
-
 // ─── Onboard PIN ──────────────────────────────────────────────────────────────
 function OnboardPin({onDone,onSkip,onBack}:{onDone:(pin:string)=>void;onSkip?:()=>void;onBack?:()=>void}){
   const [step,setStep]=useState<"enter"|"confirm">("enter");const [first,setFirst]=useState("");const [cur,setCur]=useState("");const [err,setErr]=useState("");
@@ -9452,7 +9289,7 @@ function CameraCardScanModal({onClose,onDetect}:{onClose:()=>void;onDetect:(num:
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [appState,setAppState]=useState<AppState>("splash");
-  const [pendingPhone,setPendingPhone]=useState("");const [pendingCode,setPendingCode]=useState("");const [pendingDevCode,setPendingDevCode]=useState<string|undefined>();
+  const [pendingPhone,setPendingPhone]=useState("");
   const [user,setUser]=useState<UserData|null>(null);
   const [tab,setTab]=useState<MainTab>("home");
   const [subPage,setSubPage]=useState<SubPage>(null);
@@ -9833,7 +9670,7 @@ export default function App() {
   const updateUser=useCallback((u:UserData)=>{DB.saveUser(u);setUser(u)},[]);
   const updateWithTx=useCallback((u:UserData,tx:TxRecord)=>{const txs=[tx,...transactions];DB.saveUser(u);DB.saveTx(u.phone,txs);setUser(u);setTransactions(txs);if(localStorage.getItem(`anp_notifications_${u.uid}`)!=="off")playChime()},[transactions]);
 
-  const handleVerified=(phone:string)=>{DB.setCurrentPhone(phone);const existing=DB.getUser(phone);if(existing){setUser(existing);setTransactions(DB.getTx(phone));const hs=localStorage.getItem(`anp_home_services_${existing.uid}`);if(hs){try{const p=JSON.parse(hs);if(Array.isArray(p))setHomeServices(p);}catch{}}const hp=localStorage.getItem(`anp_home_platforms_${existing.uid}`);if(hp){try{const p=JSON.parse(hp);if(Array.isArray(p))setHomePlatforms(p);}catch{}}setShowCashback(localStorage.getItem(`anp_show_cashback_${existing.uid}`)!=="false");setAppState(existing.pin?"unlock-pin":"ready")}else{const uid=_genUid();const newUser:UserData={uid,name:"",family:"",nationalId:"",birthDate:"",phone,photo:"",pin:"",tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(newUser);DB.setCurrentPhone(phone);setUser(newUser);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setPendingTour(true);setAppState("ready")}};
+  const handleVerified=(phone:string,accessToken:string,email:string)=>{localStorage.setItem("anpardaz:accessToken",accessToken);localStorage.setItem("anpardaz:web:email",email);DB.setCurrentPhone(phone);const existing=DB.getUser(phone);if(existing){setUser(existing);setTransactions(DB.getTx(phone));const hs=localStorage.getItem(`anp_home_services_${existing.uid}`);if(hs){try{const p=JSON.parse(hs);if(Array.isArray(p))setHomeServices(p);}catch{}}const hp=localStorage.getItem(`anp_home_platforms_${existing.uid}`);if(hp){try{const p=JSON.parse(hp);if(Array.isArray(p))setHomePlatforms(p);}catch{}}setShowCashback(localStorage.getItem(`anp_show_cashback_${existing.uid}`)!=="false");setAppState(existing.pin?"unlock-pin":"ready")}else{const uid=_genUid();const newUser:UserData={uid,name:"",family:"",nationalId:"",birthDate:"",phone,photo:"",pin:"",tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(newUser);DB.setCurrentPhone(phone);setUser(newUser);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setPendingTour(true);setAppState("ready")}};
   const handleLogout=()=>{DB.setCurrentPhone("");setUser(null);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setHomePlatforms(DEFAULT_HOME_PLATFORMS);setShowCashback(true);setTab("home");setSubPage(null);setAppState("login")};
 
   const [obPhoto,setObPhoto]=useState("");
