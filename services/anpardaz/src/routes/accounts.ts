@@ -44,6 +44,27 @@ export function registerAccountRoutes(app:FastifyInstance,pool:Pool){
    try{const r=await pool.query('INSERT INTO accounts(customer_id,account_type,currency) VALUES($1,$2,$3) RETURNING id,account_type,currency,status,created_at',[customerId,type,currency]);return reply.code(201).send({account:r.rows[0]});}
    catch(e:any){if(e?.code==='23505')return reply.code(409).send({error:'account_already_exists'});throw e;}
  });
+ app.get('/api/v1/activity',{preHandler:requireAuth},async(request)=>{
+   const auth=(request as FastifyRequest&{auth:any}).auth;const customerId=await ensureCustomer(pool,auth);
+   const limit=Math.min(Math.max(Number((request.query as any)?.limit??100)||100,1),200);
+   const result=await pool.query(`
+     SELECT id::text AS id,transaction_type AS type,amount::text AS amount,currency,status,COALESCE(reference,id::text) AS reference,description,created_at
+       FROM transactions WHERE account_id IN (SELECT id FROM accounts WHERE customer_id=$1)
+     UNION ALL
+     SELECT id::text,'transfer',amount::text,currency,status,operation_id,description,created_at
+       FROM transfer_requests WHERE customer_id=$1
+     UNION ALL
+     SELECT id::text,'deposit',amount::text,currency,status,operation_id,provider,created_at
+       FROM topup_requests WHERE customer_id=$1
+     UNION ALL
+     SELECT id::text,'service',
+       COALESCE((response_metadata->>'amount'),(request_metadata->'payload'->>'amount'),'0')::text,
+       'IRR',status,operation_id,service_code,created_at
+       FROM fintech_service_operations WHERE customer_id=$1
+     ORDER BY created_at DESC LIMIT $2`,[customerId,limit]);
+   return {activities:result.rows};
+ });
+
  app.get<{Params:Params}>('/api/v1/accounts/:id/transactions',{preHandler:requireAuth},async(request,reply)=>{
    const auth=(request as FastifyRequest&{auth:any}).auth;const id=Number(request.params.id);
    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_account_id'});
