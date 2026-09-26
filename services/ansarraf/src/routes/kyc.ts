@@ -14,7 +14,7 @@ export function registerKycRoutes(app: FastifyInstance, pool: Pool) {
     return { kyc: await getKyc(pool, customer, false) };
   });
 
-  app.post('/api/v1/kyc/submit', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/api/v1/kyc/profile', { preHandler: requireAuth }, async (request, reply) => { const customer = await ensureCustomer(pool, ar(request).auth); const kyc = await getKyc(pool, customer, true) as any; if (!kyc || kyc.status !== 'VERIFIED' || !kyc.submittedData) return { verified: false, profile: null }; const d = kyc.submittedData as any; return { verified: true, profile: { fullName: d.fullName, nationalId: d.nationalId, mobile: d.mobile, birthDate: d.birthDate ?? null, verifiedAt: kyc.approved_at ?? null } }; });\n\n  app.post('/api/v1/kyc/submit', { preHandler: requireAuth }, async (request, reply) => {
     const customer = await ensureCustomer(pool, ar(request).auth);
     try {
       const kyc = await submitKyc(pool, customer, request.body, ar(request).auth.sub);
