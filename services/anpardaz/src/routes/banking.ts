@@ -174,39 +174,6 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
     await pool.query(`INSERT INTO banking_provider_outbox(operation_id,operation_type) VALUES($1,'transfer')`,[operationId]);
 
     return reply.code(202).send({transfer:x,operationId,queued:true});
-    /* provider execution is intentionally owned by BankingProviderWorker; never execute inline after enqueue. */
-    try{
-      const result=await provider.execute({
-        serviceCode:'transfer',operationId,
-        payload:{
-          amount:String(b.amount),currency:b.currency,
-          destinationAccountId:hasInternal?String(b.destinationAccountId):undefined,
-          destinationExternal:hasExternal?b.destinationExternal.trim():undefined,
-          description:b.description?.trim()??undefined,
-          sourceAccountId:String(sourceAccountId),
-          ...(b.clientId?{clientId:String(b.clientId)}:{}),
-          ...(b.nid?{nid:String(b.nid)}:{})
-        }
-      });
-      const updated=(await pool.query(
-        `UPDATE transfer_requests
-         SET status=$1,provider_operation_id=$2,provider_reference=$3,provider_status=$4,
-             provider_error_code=$5,provider_error_message=$6,provider_metadata=$7,updated_at=NOW()
-         WHERE operation_id=$8 RETURNING *`,
-        [providerStatusToTransferStatus(result.status),result.providerOperationId??null,result.externalReference??null,result.status,result.errorCode??null,result.errorMessage??null,JSON.stringify(result.data??{}),operationId]
-      )).rows[0];
-      await pool.query(
-        `UPDATE banking_provider_outbox SET status=$1,updated_at=NOW(),attempts=attempts+1,last_error=$2 WHERE operation_id=$3 AND operation_type='transfer'`,
-        [result.status==='completed'?'completed':result.status==='failed'?'failed':result.status==='manual_review'?'manual_review':'processing',result.errorMessage??null,operationId]
-      );
-      return reply.code(result.status==='failed'?502:202).send({transfer:updated,operationId});
-    }catch(e){
-      await pool.query(
-        `UPDATE transfer_requests SET status='processing',provider_status='manual_review',provider_error_code='PROVIDER_UNAVAILABLE',provider_error_message=$1,updated_at=NOW() WHERE operation_id=$2`,
-        [e instanceof Error?e.message:'provider_unavailable',operationId]
-      );
-      return reply.code(503).send({error:'banking_provider_unavailable',operationId});
-    }
   });
 
   app.post('/api/v1/transfers/:id/cancel',{preHandler:requireAuth},async(req,reply)=>{
@@ -226,7 +193,7 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
     const c=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;
     if(!sid(b.accountId)||!valid(b.amount)||typeof b.currency!=='string'||!/^[A-Z]{3}$/.test(b.currency)||!idem(b.idempotencyKey))
       return reply.code(400).send({error:'invalid_topup'});
-    const own=await pool.query('SELECT id,currency FROM accounts WHERE id=$1 AND customer_id=$2',[b.accountId,c]);
+    const own=await pool.query("SELECT id,currency FROM accounts WHERE id=$1 AND customer_id=$2 AND status='active'",[b.accountId,c]);
     if(!own.rows[0]||own.rows[0].currency!==b.currency)return reply.code(400).send({error:'invalid_account'});
     const operationId=randomUUID();
     try{
@@ -234,7 +201,8 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
         'INSERT INTO topup_requests(customer_id,account_id,amount,currency,provider,idempotency_key,operation_id) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',
         [c,b.accountId,b.amount,b.currency,b.provider??'FINNOTECH',b.idempotencyKey,operationId]
       );
-      return reply.code(202).send({topup:x.rows[0],operationId});
+      await pool.query("INSERT INTO banking_provider_outbox(operation_id,operation_type) VALUES($1,'topup')",[operationId]);
+      return reply.code(202).send({topup:x.rows[0],operationId,queued:true});
     }catch(e:any){
       if(e?.code==='23505'){
         const x=await pool.query('SELECT * FROM topup_requests WHERE customer_id=$1 AND idempotency_key=$2',[c,b.idempotencyKey]);
