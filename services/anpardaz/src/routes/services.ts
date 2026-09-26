@@ -112,7 +112,7 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
       const rawAmount=(result.data as any)?.amount??(result.data as any)?.amountPaid??payload.amount;
       const amount=typeof rawAmount==='number'?String(rawAmount):typeof rawAmount==='string'&&/^(?:0|[1-9]\d{0,15})(?:\.\d{1,8})?$/.test(rawAmount)?rawAmount:null;
       if(!amount||amount==='0'){status='manual_review';accountingStatus='failed';}
-      else{try{await postServiceAccounting(customerId,operationId,amount,'IRR');accountingStatus='posted';}catch(e){status='manual_review';accountingStatus='failed';}}
+      else{try{await postServiceAccounting(Number(customerId),operationId,amount,'IRR');accountingStatus='posted';}catch(e){status='manual_review';accountingStatus='failed';}}
     }else if(status==='failed'||status==='manual_review')accountingStatus='failed';
     else accountingStatus='pending';
     const updated=(await pool.query(
