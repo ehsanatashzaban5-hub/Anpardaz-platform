@@ -150,6 +150,7 @@ const PLATFORM_NAV: NavItem[] = [
 
 const CONTENT_NAV: NavItem[] = [
   { id:"news",      label:"اخبار",     icon:"newspaper" },
+  { id:"forum",     label:"انجمن",     icon:"message-circle" },
   { id:"education", label:"آموزش",     icon:"graduation" },
   { id:"video",     label:"مرکز ویدئو",icon:"video" },
 ];
@@ -334,6 +335,7 @@ export function WebFooter({ onNavigate }: FooterProps) {
       { label:"درباره آن پرداز", page:"about"    as WebPage },
       { label:"تنظیمات",         page:"settings" as WebPage },
       { label:"پشتیبانی",        page:"support"  as WebPage },
+      { label:"انجمن",           page:"forum"    as WebPage },
       { label:"دانلود اپلیکیشن", page:"download" as WebPage },
     ]},
   ];
