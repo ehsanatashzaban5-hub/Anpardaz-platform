@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────
 // An Pardaz Web Portal — Homepage
 // ─────────────────────────────────────────────────
+import { useEffect, useState } from "react";
 import WI from "./WebIcons";
-import { NEWS_ARTICLES, EDU_ARTICLES, VIDEOS } from "./mockData";
 import type { WebPage } from "./types";
 
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
@@ -32,6 +32,19 @@ const FEATURES = [
 interface HomeProps { onNavigate: (p: WebPage) => void; }
 
 export default function WebHome({ onNavigate }: HomeProps) {
+  const API=(import.meta.env.VITE_PLATFORM_API_URL??"").replace(/\/$/,"");
+  const [news,setNews]=useState<any[]>([]);
+  const [education,setEducation]=useState<any[]>([]);
+  const [videos,setVideos]=useState<any[]>([]);
+  useEffect(()=>{
+    let active=true;
+    Promise.all([
+      fetch(API+"/api/v1/news?limit=6",{cache:"no-store"}).then(r=>r.ok?r.json():{items:[]}),
+      fetch(API+"/api/v1/news?limit=3&category=education",{cache:"no-store"}).then(r=>r.ok?r.json():{items:[]}),
+      fetch(API+"/api/v1/content/videos?limit=4",{cache:"no-store"}).then(r=>r.ok?r.json():{videos:[]})
+    ]).then(([n,e,v])=>{if(!active)return;setNews(n.items??[]);setEducation(e.items??[]);setVideos(v.videos??[])}).catch(()=>{});
+    return()=>{active=false};
+  },[API]);
   return (
     <div className="w-fade" style={{ direction:"rtl" }}>
 
@@ -236,7 +249,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
           </button>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))", gap:20 }}>
-          {NEWS_ARTICLES.slice(0,6).map(a => (
+          {news.map((a:any) => (
             <ArticleCard key={a.id} article={a} onNavigate={onNavigate}/>
           ))}
         </div>
@@ -252,7 +265,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
             </button>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))", gap:20 }}>
-            {EDU_ARTICLES.slice(0,3).map(a => (
+            {education.map((a:any) => (
               <ArticleCard key={a.id} article={a} onNavigate={onNavigate}/>
             ))}
           </div>
@@ -268,7 +281,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
           </button>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:20 }}>
-          {VIDEOS.slice(0,4).map(v => (
+          {videos.map((v:any) => (
             <VideoCard key={v.id} video={v} onNavigate={onNavigate}/>
           ))}
         </div>
