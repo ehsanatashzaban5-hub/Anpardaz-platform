@@ -243,7 +243,8 @@ async function shaparakRegistrationStatus(sessionId:string){
   return anpardazRequest("/api/v1/cards/registration/"+encodeURIComponent(sessionId));
 }
 async function anpardazCardBalance(cardNumber:string,otp:string,cvv2:string,expiryMonth:string,expiryYear:string){return anpardazRequest("/api/v1/cards/balance",{method:"POST",body:JSON.stringify({cardNumber,otp,cvv2,expiryMonth,expiryYear,idempotencyKey:crypto.randomUUID()})});}
-async function anpardazTransfer(destinationExternal:string,amount:number,currency:string,description:string){return anpardazRequest("/api/v1/transfers",{method:"POST",body:JSON.stringify({destinationExternal,amount:String(amount),currency,description,idempotencyKey:crypto.randomUUID()})});} async function anpardazServiceExecute(serviceCode:string,payload:Record<string,unknown>){const key=crypto.randomUUID();const created=await anpardazRequest("/api/v1/services/"+encodeURIComponent(serviceCode),{method:"POST",body:JSON.stringify({idempotencyKey:key,payload})});const operationId=String(created?.operationId??created?.operation?.operation_id??"");if(!operationId)throw new Error("service_operation_missing");let latest=created?.operation??created;for(let attempt=0;attempt<60;attempt++){const status=String(latest?.status??"pending");if(["completed","failed","manual_review","reversed"].includes(status))return {operation:latest,operationId};await new Promise(r=>setTimeout(r,1000));const d=await anpardazRequest("/api/v1/services/operations/"+encodeURIComponent(operationId));latest=d?.operation??d;}return {operation:latest,operationId,timeout:true};}
+async function anpardazTransfer(destinationExternal:string,amount:number,currency:string,description:string){return anpardazRequest("/api/v1/transfers",{method:"POST",body:JSON.stringify({destinationExternal,amount:String(amount),currency,description,idempotencyKey:crypto.randomUUID()})});} async function anpardazServiceInquiry(serviceCode:string,payload:Record<string,unknown>){const d=await anpardazRequest("/api/v1/services/"+encodeURIComponent(serviceCode)+"/inquiry",{method:"POST",body:JSON.stringify(payload)});return d?.inquiry??d;}
+async function anpardazServiceExecute(serviceCode:string,payload:Record<string,unknown>){const key=crypto.randomUUID();const created=await anpardazRequest("/api/v1/services/"+encodeURIComponent(serviceCode),{method:"POST",body:JSON.stringify({idempotencyKey:key,payload})});const operationId=String(created?.operationId??created?.operation?.operation_id??"");if(!operationId)throw new Error("service_operation_missing");let latest=created?.operation??created;for(let attempt=0;attempt<60;attempt++){const status=String(latest?.status??"pending");if(["completed","failed","manual_review","reversed"].includes(status))return {operation:latest,operationId};await new Promise(r=>setTimeout(r,1000));const d=await anpardazRequest("/api/v1/services/operations/"+encodeURIComponent(operationId));latest=d?.operation??d;}return {operation:latest,operationId,timeout:true};}
 async function sarrafRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANSARRAF_API_BASE)throw new Error("ansarraf_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const r=await fetch(`${ANSARRAF_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data?.error??"ansarraf_request_failed"));return data;}async function sarrafAssets():Promise<SarrafAssetRecord[]>{const d=await sarrafRequest("/api/v1/assets");return Array.isArray(d?.assets)?d.assets:[]}function sarrafAssetId(assets:SarrafAssetRecord[],symbol:string){const aliases=symbol==="TMN"?["TMN","TOMAN","IRT","IRR"]:symbol==="USDT"?["USDT"]:[symbol];const a=assets.find(x=>aliases.includes(String(x.symbol).toUpperCase())&&x.status!=="disabled");if(!a)throw new Error(`asset_not_available:${symbol}`);return a.id;}async function sarrafPlaceOrder(baseSymbol:string,quoteSymbol:string,side:"buy"|"sell",orderType:"market"|"limit",quantity:number,price?:number,quoteAmount?:number){const assets=await sarrafAssets();const body:any={baseAssetId:sarrafAssetId(assets,baseSymbol),quoteAssetId:sarrafAssetId(assets,quoteSymbol),side,orderType,quantity:String(quantity),idempotencyKey:crypto.randomUUID()};if(orderType==="limit")body.price=String(price);else if(side==="buy")body.quoteAmount=String(quoteAmount??0);return sarrafRequest("/api/v1/orders",{method:"POST",body:JSON.stringify(body)});}async function sarrafWalletMap():Promise<Record<string,number>>{const d=await sarrafRequest("/api/v1/wallets");const out:Record<string,number>={};for(const w of d?.wallets??[])out[String(w.symbol).toUpperCase()]=Number(w.available_balance??0);return out;}async function sarrafOrders():Promise<any[]>{const d=await sarrafRequest("/api/v1/orders");return Array.isArray(d?.orders)?d.orders:[]}
 async function sarrafOrderBook(symbol:string){const d=await sarrafRequest(`/api/v1/orderbook?symbol=${encodeURIComponent(symbol)}&limit=20`);return {bids:Array.isArray(d?.bids)?d.bids:[],asks:Array.isArray(d?.asks)?d.asks:[]};}
 async function sarrafSubmitKyc(payload:{fullName:string;nationalId:string;mobile:string;birthDate:string}){return sarrafRequest("/api/v1/kyc",{method:"POST",body:JSON.stringify(payload)});}
@@ -3093,7 +3094,7 @@ function CarServicesScreen({onBack}:{onBack:()=>void}){
 // ─── Sana Registration Screen ─────────────────────────────────────────────────
 function SanaScreen({onBack}:{onBack:()=>void}){
   const [nationalId,setNationalId]=useState("");const [phone,setPhone]=useState("");const [done,setDone]=useState(false);const [processing,setProcessing]=useState(false);const [errModal,setErrModal]=useState("");
-  const submit=()=>{if(!nationalId||!phone){setErrModal("تمام فیلدها الزامی است.");return}setErrModal("ثبت ثنا تا زمان اتصال سرویس واقعی دفاتر خدمات قضایی در دسترس نیست.");};
+  const submit=async()=>{if(!nationalId||!phone){setErrModal("تمام فیلدها الزامی است.");return}setProcessing(true);try{const result=await anpardazServiceExecute("sana",{nationalId,phone});const status=String(result?.operation?.status??"pending");setDone(status==="completed");if(status!=="completed")setErrModal("درخواست ثبت ثنا ثبت شد و تا پاسخ سرویس مربوطه در وضعیت پیگیری قرار دارد.");}catch(e){setErrModal(e instanceof Error?e.message:"ثبت ثنا انجام نشد.");}finally{setProcessing(false)}};
   return <>
   {processing&&<AnPardazLoadingOverlay text="در حال ثبت اطلاعات..."/>}
   <div className="subscreen" dir="rtl">
@@ -3135,7 +3136,7 @@ function SanaScreen({onBack}:{onBack:()=>void}){
 function JudiciaryBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onDone:()=>void}){
   const [billId,setBillId]=useState("");
   const [inquiryDone,setInquiryDone]=useState(false);
-  const [inquiryAmount]=useState("۴۵۰٬۰۰۰");
+  const [inquiryAmount,setInquiryAmount]=useState("");
   const [processing,setProcessing]=useState(false);
   const [errModal,setErrModal]=useState("");
   // payment fields
@@ -3150,9 +3151,10 @@ function JudiciaryBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUpda
   const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
   const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
 
-  const inquire=()=>{
+  const inquire=async()=>{
     if(!billId.trim()){setErrModal("شناسه دریافت وجه را وارد کنید.");return}
-    setErrModal("استعلام این خدمت تا زمان اتصال سرویس واقعی در دسترس نیست.");
+    setProcessing(true);setErrModal("");
+    try{const q=await anpardazServiceInquiry("judiciary_bill",{billId});const amount=String(q?.amount??q?.payableAmount??q?.billAmount??"");if(!amount||Number(amount)<=0)throw new Error("bill_amount_unavailable");setInquiryAmount(amount);setInquiryDone(true);}catch(e){setErrModal(e instanceof Error?e.message:"استعلام واقعی قبض در دسترس نیست.");}finally{setProcessing(false)}
   };
 
   const pay=async()=>{
@@ -3246,7 +3248,7 @@ function JudiciaryBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUpda
 function PropertyRegBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void;onDone:()=>void}){
   const [billId,setBillId]=useState("");
   const [inquiryDone,setInquiryDone]=useState(false);
-  const [inquiryAmount]=useState("۳۸۰٬۰۰۰");
+  const [inquiryAmount,setInquiryAmount]=useState("");
   const [processing,setProcessing]=useState(false);
   const [errModal,setErrModal]=useState("");
   const [selectedCard,setSelectedCard]=useState(user.cards[0]?.id??"");
@@ -3260,9 +3262,10 @@ function PropertyRegBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUp
   const payValid=!!selCard&&toLatinDigits(otp).length===5&&toLatinDigits(cvv2).length===3&&toLatinDigits(expM).length===2&&toLatinDigits(expY).length===2;
   const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
 
-  const inquire=()=>{
+  const inquire=async()=>{
     if(!billId.trim()){setErrModal("شناسه دریافت وجه را وارد کنید.");return}
-    setErrModal("استعلام این خدمت تا زمان اتصال سرویس واقعی در دسترس نیست.");
+    setProcessing(true);setErrModal("");
+    try{const q=await anpardazServiceInquiry("judiciary_bill",{billId});const amount=String(q?.amount??q?.payableAmount??q?.billAmount??"");if(!amount||Number(amount)<=0)throw new Error("bill_amount_unavailable");setInquiryAmount(amount);setInquiryDone(true);}catch(e){setErrModal(e instanceof Error?e.message:"استعلام واقعی قبض در دسترس نیست.");}finally{setProcessing(false)}
   };
 
   const pay=async()=>{
