@@ -56,7 +56,7 @@ export default function WebAuthModal({ onClose, onSuccess }: Props) {
       const r=await fetch(API+"/api/v1/auth/phone/verify-otp",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({phone,code}),cache:"no-store"});
       const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(String(d?.error||"otp_verify_failed"));
       const token=String(d?.accessToken||""); if(!token)throw new Error("token_missing");
-      setStep("done"); setTimeout(()=>onSuccess(token,String(d?.phone||phone)+"@users.anpardaz.ir"),500);
+      localStorage.setItem("anpardaz:web:phone",phone); setStep("done"); setTimeout(()=>onSuccess(token,String(d?.phone||phone)+"@users.anpardaz.ir"),500);
     } catch { setOtpErr("کد تأیید صحیح نیست یا منقضی شده است."); }
     finally { setLoading(false); }
   };
@@ -219,6 +219,7 @@ export default function WebAuthModal({ onClose, onSuccess }: Props) {
 // ── KYC modal (used by exchange / financial actions) ──
 export function WebKycModal({ onClose, currentStatus }: { onClose: () => void; currentStatus: string }) {
   const [step, setStep] = useState<"info"|"national"|"photo"|"done">("info");
+  const [fullName, setFullName] = useState("");
   const [nationalId, setNationalId] = useState("");
   const [birthDate, setBirthDate]   = useState("");
 
@@ -275,19 +276,22 @@ export function WebKycModal({ onClose, currentStatus }: { onClose: () => void; c
 
           {step === "national" && (
             <>
-              <p style={{ fontSize:13, color:"var(--w-muted)", marginBottom:20 }}>اطلاعات شناسنامه‌ای خود را وارد کنید.</p>
+              <p style={{ fontSize:13, color:"var(--w-muted)", marginBottom:20 }}>اطلاعات هویتی خود را وارد کنید.</p>
+              <div style={{ marginBottom:14 }}>
+                <label style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:6 }}>نام و نام خانوادگی</label>
+                <input value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="نام کامل" className="w-input"/>
+              </div>
               <div style={{ marginBottom:14 }}>
                 <label style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:6 }}>کد ملی</label>
                 <input value={nationalId} onChange={e=>setNationalId(e.target.value.replace(/\D/g,""))} maxLength={10}
                   placeholder="۱۰ رقم" inputMode="numeric" dir="ltr" className="w-input" style={{ textAlign:"left" }}/>
               </div>
               <div style={{ marginBottom:20 }}>
-                <label style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:6 }}>تاریخ تولد</label>
-                <input value={birthDate} onChange={e=>setBirthDate(e.target.value)} placeholder="مثال: ۱۳۷۰/۰۱/۱۵"
-                  className="w-input"/>
+                <label style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:6 }}>تاریخ تولد (میلادی)</label>
+                <input value={birthDate} onChange={e=>setBirthDate(e.target.value)} placeholder="مثال: 1990-01-15" className="w-input" dir="ltr"/>
               </div>
-              <button onClick={()=>setStep("photo")} disabled={nationalId.length<10||!birthDate}
-                className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, opacity:nationalId.length<10||!birthDate?0.5:1 }}>
+              <button onClick={()=>setStep("photo")} disabled={fullName.trim().length<3||nationalId.length<10||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(birthDate)}
+                className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, opacity:fullName.trim().length<3||nationalId.length<10||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(birthDate)?0.5:1 }}>
                 مرحله بعد
               </button>
             </>
@@ -295,17 +299,20 @@ export function WebKycModal({ onClose, currentStatus }: { onClose: () => void; c
 
           {step === "photo" && (
             <>
-              <p style={{ fontSize:13, color:"var(--w-muted)", marginBottom:20 }}>تصویر واضح کارت ملی (رو و پشت) بارگذاری کنید.</p>
-              {["تصویر روی کارت ملی","تصویر پشت کارت ملی","سلفی با کارت ملی"].map(l => (
-                <div key={l} style={{ display:"flex", alignItems:"center", gap:10, padding:"14px", background:"var(--w-card2)",
-                  border:"1.5px dashed var(--w-border2)", borderRadius:12, cursor:"pointer", marginBottom:10,
-                  color:"var(--w-muted)", fontSize:13 }}>
-                  <WI n="upload" s={18}/>
-                  {l}
-                </div>
-              ))}
-              <button onClick={()=>setStep("done")} className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, marginTop:8 }}>
-                ارسال برای بررسی
+              <p style={{ fontSize:13, color:"var(--w-muted)", marginBottom:20, lineHeight:1.8 }}>اطلاعات شما برای بررسی دستی ارسال می‌شود. این نسخه از سامانه هنوز دریافت و نگهداری تصویر مدرک را فعال نکرده است؛ بنابراین هیچ بارگذاری ساختگی انجام نمی‌شود.</p>
+              <button onClick={async()=>{
+                const token=localStorage.getItem("anpardaz:accessToken")||"";
+                const phone=localStorage.getItem("anpardaz:web:phone")||"";
+                if(!token||!/^09\d{9}$/.test(phone)){return;}
+                try{
+                  const base=((import.meta as any).env?.VITE_ANSARRAF_API_URL as string|undefined)?.replace(/\/$/,"")||"";
+                  if(!base)throw new Error("api_unconfigured");
+                  const res=await fetch(base+"/api/v1/kyc/submit",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({fullName:fullName.trim(),nationalId,mobile:phone,birthDate})});
+                  if(!res.ok)throw new Error("kyc_submit_failed");
+                  setStep("done");
+                }catch{}
+              }} className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px", fontSize:14, marginTop:8 }}>
+                ارسال اطلاعات برای بررسی
               </button>
             </>
           )}
