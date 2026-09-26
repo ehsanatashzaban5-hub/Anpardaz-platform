@@ -3064,11 +3064,10 @@ function CarServicesScreen({onBack}:{onBack:()=>void}){
   if(inner==="violations")return <ViolationsScreen onBack={()=>setInner(null)}/>;
   if(inner==="freeway")return <FreewayScreen onBack={()=>setInner(null)}/>;
   if(inner==="traffic")return <TrafficScreen onBack={()=>setInner(null)}/>;
-  const plate="۲۴ | ۶۱۵ م ۱۹";
   const services=[
-    {label:"عوارض آزادراهی",sub:"",status:"بدون بدهی",statusColor:"#00D6B0",icon:"🛣️",action:"freeway" as const},
-    {label:"خلافی خودرو",sub:"",status:"استعلام",statusColor:"#f5c23d",icon:"🚦",action:"violations" as const},
-    {label:"طرح ترافیک تهران",sub:"ویژه تهران",status:"بدون بدهی",statusColor:"#00D6B0",icon:"📷",action:"traffic" as const},
+    {label:"عوارض آزادراهی",sub:"نیازمند استعلام واقعی",status:"استعلام",statusColor:"#f5c23d",icon:"🛣️",action:"freeway" as const},
+    {label:"خلافی خودرو",sub:"نیازمند استعلام واقعی",status:"استعلام",statusColor:"#f5c23d",icon:"🚦",action:"violations" as const},
+    {label:"طرح ترافیک تهران",sub:"نیازمند اتصال سرویس",status:"در دسترس نیست",statusColor:"#94a3b8",icon:"📷",action:"traffic" as const},
   ];
   return <div className="subscreen" dir="rtl">
     <div className="subscreen-header">
@@ -3081,14 +3080,9 @@ function CarServicesScreen({onBack}:{onBack:()=>void}){
         <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>وسیله‌های نقلیه</div>
         <button style={{background:"none",border:"none",color:"#00D6B0",fontSize:13,cursor:"pointer",fontFamily:"Vazirmatn",display:"flex",alignItems:"center",gap:4}}><Icon name="plus" size={14}/> افزودن</button>
       </div>
-      <div style={{background:"var(--card-bg)",borderRadius:14,padding:"14px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:12,border:"1px solid var(--border-color)"}}>
-        <div style={{background:"#1a4fa0",borderRadius:8,padding:"8px 12px",display:"flex",flexDirection:"column",alignItems:"center",color:"#fff",fontSize:10,fontWeight:700,flexShrink:0}}>
-          <div>🇮🇷</div><div>ایران</div>
-        </div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",direction:"ltr"}}>{plate}</div>
-          <div style={{fontSize:12,color:"var(--text-muted)",marginTop:2}}>خودرو سواری</div>
-        </div>
+      <div style={{background:"var(--card-bg)",borderRadius:14,padding:"16px",marginBottom:16,border:"1px solid var(--border-color)",textAlign:"center"}}>
+        <div style={{fontSize:13,fontWeight:800,color:"var(--text-primary)",marginBottom:6}}>وسیله نقلیه‌ای ثبت نشده است</div>
+        <div style={{fontSize:11,color:"var(--text-muted)",lineHeight:1.8}}>شماره پلاک یا وضعیت بدهی به‌صورت ساختگی نمایش داده نمی‌شود. پس از اتصال سرویس ثبت وسیله و استعلام رسمی، اطلاعات واقعی اینجا نمایش داده خواهد شد.</div>
       </div>
       <div style={{fontSize:12,color:"var(--text-muted)",textAlign:"center",padding:"8px 0",marginBottom:12,borderTop:"1px solid var(--border-lighter)",borderBottom:"1px solid var(--border-lighter)"}}>خدمات پرطرفدار</div>
       {services.map(s=><button key={s.label} onClick={()=>setInner(s.action)} style={{display:"flex",alignItems:"center",width:"100%",background:"var(--card-bg)",border:"1px solid var(--border-light)",borderRadius:14,padding:"14px 16px",marginBottom:10,cursor:"pointer",color:"var(--text-primary)",textAlign:"right",transition:"background 0.15s"}}>
