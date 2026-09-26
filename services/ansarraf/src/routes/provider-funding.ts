@@ -5,6 +5,15 @@ import {createProviderRegistry} from '../providers/index.js';
 import {randomUUID} from 'node:crypto';
 
 type R=FastifyRequest&{auth:AuthClaims};
+async function ledgerAccount(base:string,token:string,code:string,name:string,type:string,currency:string){
+ let r=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers:{authorization:'Bearer '+token}});
+ if(r.ok)return Number((await r.json() as any).account.id);
+ if(r.status!==404)throw new Error('account_lookup_failed');
+ r=await fetch(base+'/internal/v1/ledger/accounts',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({accountCode:code,accountName:name,accountType:type,currency})});
+ if(r.ok)return Number((await r.json() as any).account.id);
+ if(r.status===409){r=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers:{authorization:'Bearer '+token}});if(r.ok)return Number((await r.json() as any).account.id);}
+ throw new Error('account_create_failed');
+}
 const admin=async(req:FastifyRequest,reply:any)=>{const a=(req as R).auth;if(!['admin','super_admin','operator'].includes(a.role))return reply.code(403).send({error:'forbidden'});return a;};
 
 export function registerProviderFundingRoutes(app:FastifyInstance,pool:Pool){
@@ -41,7 +50,9 @@ export function registerProviderFundingRoutes(app:FastifyInstance,pool:Pool){
       const op='ANSARRAF-CRYPTO-DEP-'+randomUUID();
       const wallet=(await client.query(`INSERT INTO wallets(customer_id,asset_id,available_balance,locked_balance) VALUES($1,$2,0,0) ON CONFLICT(customer_id,asset_id) DO UPDATE SET available_balance=wallets.available_balance RETURNING id`,[customerId,e.asset_id])).rows[0];
       const accountingUrl=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const accountingToken=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!accountingUrl||!accountingToken)throw new Error('accounting_service_not_configured');
-      const ledger=await fetch(accountingUrl+'/internal/v1/ledger/transactions',{method:'POST',headers:{authorization:'Bearer '+accountingToken,'content-type':'application/json'},body:JSON.stringify({referenceType:'ansarraf_provider_crypto_deposit',referenceId:String(id),operationId:op,idempotencyKey:'ansarraf:crypto-deposit:'+id,description:'Wallex provider crypto deposit approved by admin',entries:[{accountCode:'ansarraf.provider.'+(process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX')+'.asset.'+e.symbol,direction:'debit',amount:String(e.amount),currency:e.symbol},{accountCode:'ansarraf.customer.'+customerId+'.asset.'+e.symbol,direction:'credit',amount:String(e.amount),currency:e.symbol}]}) ,signal:AbortSignal.timeout(10000)});
+      const providerAccount=await ledgerAccount(accountingUrl,accountingToken,'ansarraf.provider.'+(process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX')+'.asset.'+e.symbol,'An Sarraf provider '+e.symbol,'asset',e.symbol);
+      const customerAccount=await ledgerAccount(accountingUrl,accountingToken,'ansarraf.customer.'+customerId+'.asset.'+e.symbol,'An Sarraf customer '+customerId+' '+e.symbol,'liability',e.symbol);
+      const ledger=await fetch(accountingUrl+'/internal/v1/ledger/transactions',{method:'POST',headers:{authorization:'Bearer '+accountingToken,'content-type':'application/json'},body:JSON.stringify({referenceType:'ansarraf_provider_crypto_deposit',referenceId:String(id),operationId:op,idempotencyKey:'ansarraf:crypto-deposit:'+id,description:'Wallex provider crypto deposit approved by admin',entries:[{accountId:providerAccount,direction:'debit',amount:String(e.amount),currency:e.symbol},{accountId:customerAccount,direction:'credit',amount:String(e.amount),currency:e.symbol}]}) ,signal:AbortSignal.timeout(10000)});
       if(!ledger.ok)throw new Error('accounting_post_failed');
       await client.query('UPDATE wallets SET available_balance=available_balance+$1 WHERE id=$2',[e.amount,wallet.id]);
       await client.query(`UPDATE provider_deposit_events SET customer_id=$2,status='credited',credited_at=NOW(),confirmed_at=COALESCE(confirmed_at,NOW()) WHERE id=$1`,[id,customerId]);
