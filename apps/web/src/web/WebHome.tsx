@@ -273,7 +273,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
           <div style={{ flex:1, minWidth:280 }}>
             <div style={{ fontSize:"clamp(20px,3vw,32px)", fontWeight:900, color:"var(--w-text)", marginBottom:12 }}>آن هوش — پلتفرم هوش مصنوعی</div>
             <div style={{ fontSize:"clamp(13px,2vw,16px)", color:"var(--w-muted)", lineHeight:1.8, maxWidth:600 }}>
-              با ۲۲ مدل پیشرفته از OpenAI، Anthropic، Google، Meta، Mistral و Qwen — بسازید، بنویسید، طراحی کنید.
+              با مدل‌ها و سرویس‌های هوش مصنوعی متصل به زیرساخت آن‌پرداز — بسازید، بنویسید، طراحی کنید.
             </div>
           </div>
           <button onClick={() => onNavigate("hoosh")} className="w-btn w-btn-primary" style={{ padding:"14px 32px", fontSize:15, borderRadius:12, flexShrink:0 }}>
