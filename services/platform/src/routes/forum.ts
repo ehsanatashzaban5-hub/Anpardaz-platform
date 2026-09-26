@@ -4,7 +4,19 @@ import { ensurePlatformUser, requireAuth } from '../auth.js';
 
 type AuthenticatedRequest = FastifyRequest & { auth: any };
 
-export function registerForumRoutes(app: FastifyInstance, pool: Pool) {
+export function registerForumRoutes(app: FastifyInstance, pool: Pool) {\n  app.get('/api/v1/forum/rooms', async () => ({ rooms: (await pool.query("SELECT id,name,slug,description,status,created_at FROM forum_rooms WHERE status='open' ORDER BY id")).rows }));
+  app.get<{ Params: { roomId: string } }>('/api/v1/forum/rooms/:roomId/messages', async (request, reply) => {
+    const roomId=Number(request.params.roomId);if(!Number.isSafeInteger(roomId)||roomId<=0)return reply.code(400).send({error:'invalid_room'});
+    return {messages:(await pool.query("SELECT id,room_id,identity_id,body,created_at FROM forum_room_messages WHERE room_id=$1 AND status='visible' ORDER BY id DESC LIMIT 100",[roomId])).rows};
+  });
+  app.post<{ Params: { roomId: string }; Body: { body?: string } }>('/api/v1/forum/rooms/:roomId/messages',{preHandler:requireAuth},async(request,reply)=>{
+    const roomId=Number(request.params.roomId);const body=String(request.body?.body??'').trim();if(!Number.isSafeInteger(roomId)||roomId<=0||!body||body.length>10000)return reply.code(400).send({error:'invalid_message'});
+    const auth=(request as AuthenticatedRequest).auth;const room=(await pool.query("SELECT id FROM forum_rooms WHERE id=$1 AND status='open'",[roomId])).rows[0];if(!room)return reply.code(404).send({error:'room_not_found'});
+    await pool.query("INSERT INTO forum_room_members(room_id,identity_id) VALUES($1,$2) ON CONFLICT DO NOTHING",[roomId,auth.sub]);
+    const r=await pool.query("INSERT INTO forum_room_messages(room_id,identity_id,body) VALUES($1,$2,$3) RETURNING id,room_id,identity_id,body,created_at",[roomId,auth.sub,body]);return reply.code(201).send({message:r.rows[0]});
+  });
+
+
   app.get('/api/v1/forum/threads', async (request) => {
     const q = request.query as { page?: string; limit?: string };
     const page = Math.max(1, Number(q.page) || 1);
