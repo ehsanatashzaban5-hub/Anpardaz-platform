@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────
 // An Pardaz Web Portal — News + Education + Video
 // ─────────────────────────────────────────────────
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import WI from "./WebIcons";
-import { NEWS_ARTICLES, EDU_ARTICLES, VIDEOS } from "./mockData";
+
 import type { WebPage, Article, Video } from "./types";
 
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
@@ -47,22 +47,30 @@ export type ContentSection = "news" | "education" | "video";
 interface Props { section: ContentSection; onNavigate: (p: WebPage) => void; }
 
 export default function WebContent({ section, onNavigate }: Props) {
+  const API=(import.meta.env.VITE_PLATFORM_API_URL??"").replace(/\\/$/,"");
+  const [liveNews,setLiveNews]=useState<any[]>([]);
+  const [liveVideos,setLiveVideos]=useState<any[]>([]);
+  const [loadingLive,setLoadingLive]=useState(true);
   const [newsCat,  setNewsCat]  = useState("all");
   const [eduCat,   setEduCat]   = useState("all");
   const [videoCat, setVideoCat] = useState("all");
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [selectedVideo,   setSelectedVideo]   = useState<Video | null>(null);
   const [search, setSearch] = useState("");
+  useEffect(()=>{let cancelled=false;setLoadingLive(true);Promise.all([
+    fetch(API+"/api/v1/news?limit=50",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(new Error("news_http"))),
+    fetch(API+"/api/v1/content/videos?limit=50",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(new Error("video_http")))
+  ]).then(([n,v])=>{if(cancelled)return;setLiveNews((n.items??[]).map((a:any)=>({id:String(a.id),type:"news",title:a.title,summary:a.summary??"",body:undefined,category:a.category_slug??"crypto-news",author:{id:"platform",name:a.source_name??"آن پرداز"},publishedAt:a.published_at??"",readingTime:1,views:0,likes:0,comments:0,shares:0,tags:a.keywords??[],hashtags:a.hashtags??[],seo:{title:a.meta_title??a.title,description:a.meta_description??a.summary??"",keywords:a.keywords??[],slug:a.slug,canonicalUrl:a.canonical_url},status:"published"})));setLiveVideos((v.videos??[]).map((x:any)=>({id:String(x.id),title:x.title,description:x.description??"",duration:Number(x.duration_seconds??0),category:x.category_slug??"video-news",author:{id:String(x.created_by??"admin"),name:"آن پرداز"},publishedAt:x.published_at??"",views:0,likes:0,comments:0,shares:0,tags:[],keywords:[],hashtags:x.hashtags??[],seo:{title:x.title,description:x.description??"",keywords:[],slug:String(x.id)},status:"published",videoUrl:API+"/api/v1/content/videos/"+x.id})));}).catch(()=>{if(!cancelled){setLiveNews([]);setLiveVideos([])}}).finally(()=>{if(!cancelled)setLoadingLive(false)});return()=>{cancelled=true}},[API]);
 
-  const filteredNews = NEWS_ARTICLES.filter(a =>
+  const filteredNews = liveNews.filter(a =>
     (newsCat === "all" || a.category === newsCat) &&
     (search === "" || a.title.includes(search))
   );
-  const filteredEdu = EDU_ARTICLES.filter(a =>
+  const filteredEdu = liveNews.filter(a =>
     (eduCat === "all" || a.category === eduCat) &&
     (search === "" || a.title.includes(search))
   );
-  const filteredVideo = VIDEOS.filter(v =>
+  const filteredVideo = liveVideos.filter(v =>
     (videoCat === "all" || v.category === videoCat) &&
     (search === "" || v.title.includes(search))
   );
@@ -271,7 +279,7 @@ function ArticleDetail({ article: a, onBack }: { article: Article; onBack: ()=>v
       </div>
       <div style={{ fontSize:15, lineHeight:2, color:"var(--w-text)" }}>
         <p style={{ marginBottom:16 }}>{a.summary}</p>
-        <p style={{ marginBottom:16 }}>محتوای کامل این مطلب پس از اتصال به سرویس اخبار نمایش داده خواهد شد. این متن نمایانگر ساختار صفحه مقاله است و داده‌های واقعی از API بارگذاری می‌شود.</p>
+        <div style={{ marginBottom:16, whiteSpace:"pre-wrap" }}>{a.body || "متن کامل این مطلب در حال بارگذاری است."}</div>
         <p style={{ marginBottom:16 }}>آن پرداز با ارائه محتوای تخصصی در حوزه ارزهای دیجیتال، هوش مصنوعی و فناوری مالی، به کاربران خود کمک می‌کند تا تصمیمات آگاهانه‌تری بگیرند.</p>
       </div>
       <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:20 }}>
@@ -291,7 +299,7 @@ function VideoDetail({ video: v, onBack }: { video: Video; onBack: ()=>void }) {
       <div style={{ display:"grid", gridTemplateColumns:"1fr 320px", gap:24, alignItems:"start" }}>
         <div>
           {/* Video player placeholder */}
-          <div style={{ aspectRatio:"16/9", background:"#09090f", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:16, position:"relative", overflow:"hidden" }}>
+          <div style={{ aspectRatio:"16/9", background:"#09090f", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:16, position:"relative", overflow:"hidden" }}>{v.videoUrl ? <video controls playsInline src={v.videoUrl} style={{width:"100%",height:"100%",objectFit:"contain"}} /> : null}
             <div style={{ width:64, height:64, borderRadius:"50%", background:"rgba(232,53,78,0.85)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
               <WI n="play" s={28} style={{ color:"#fff", marginRight:-4 }}/>
             </div>
