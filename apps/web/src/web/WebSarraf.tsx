@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────
 // An Pardaz Web Portal — An Sarraf (Desktop Exchange)
-// Full professional exchange: 293 assets, all tabs
+// Live exchange UI; asset catalog and market state come from backend
 // ─────────────────────────────────────────────────
 import { useState, useMemo, useCallback, useEffect } from "react";
 import WI from "./WebIcons";
@@ -874,8 +874,8 @@ function TradeView({ asset, asks, bids, recentTrades, tradeType, onTradeType, tr
               <span style={{ fontWeight:700 }}>{estimatedTotal>0?`$${estimatedTotal.toFixed(2)}`:"—"}</span>
             </div>
             <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginTop:4 }}>
-              <span style={{ color:"var(--w-muted)" }}>کارمزد (۰.۱%)</span>
-              <span style={{ color:"var(--w-muted)" }}>{estimatedTotal>0?`$${(estimatedTotal*0.001).toFixed(4)}`:"—"}</span>
+              <span style={{ color:"var(--w-muted)" }}>کارمزد نهایی</span>
+              <span style={{ color:"var(--w-muted)" }}>طبق محاسبه backend</span>
             </div>
           </div>
           {/* CTA */}
