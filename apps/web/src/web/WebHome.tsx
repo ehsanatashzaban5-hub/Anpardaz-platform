@@ -44,7 +44,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
       fetch(API+"/api/v1/news?limit=6",{cache:"no-store"}).then(r=>r.ok?r.json():{items:[]}),
       fetch(API+"/api/v1/news?limit=3&category=education",{cache:"no-store"}).then(r=>r.ok?r.json():{items:[]}),
       fetch(API+"/api/v1/content/videos?limit=4",{cache:"no-store"}).then(r=>r.ok?r.json():{videos:[]}),
-      fetch((((import.meta.env as any).VITE_ANSARRAF_API_URL??"") as string).replace(/\\/$/,"")+"/api/v1/market-data/quotes",{cache:"no-store"}).then(r=>r.ok?r.json():{quotes:[]})
+      fetch((((import.meta.env as any).VITE_ANSARRAF_API_URL??"") as string).replace(/\/$/,"")+"/api/v1/market-data/quotes",{cache:"no-store"}).then(r=>r.ok?r.json():{quotes:[]})
     ]).then(([n,e,v,q])=>{if(!active)return;setNews(n.items??[]);setEducation(e.items??[]);setVideos(v.videos??[]);setAssets(q.quotes??q.items??[])}).catch(()=>{});
     return()=>{active=false};
   },[API]);
