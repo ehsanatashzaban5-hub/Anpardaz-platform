@@ -299,7 +299,7 @@ export function WebKycModal({ onClose, currentStatus }: { onClose: () => void; c
 
           {step === "photo" && (
             <>
-              <p style={{ fontSize:13, color:"var(--w-muted)", marginBottom:20, lineHeight:1.8 }}>اطلاعات شما برای بررسی دستی ارسال می‌شود. این نسخه از سامانه هنوز دریافت و نگهداری تصویر مدرک را فعال نکرده است؛ بنابراین هیچ بارگذاری ساختگی انجام نمی‌شود.</p>
+              <p style={{ fontSize:13, color:"var(--w-muted)", marginBottom:20, lineHeight:1.8 }}>اطلاعات هویتی شما برای بررسی دستی ارسال می‌شود. بارگذاری تصویر مدرک در این نسخه فعال نیست و هیچ بارگذاری ساختگی انجام نمی‌شود.</p>
               <button onClick={async()=>{
                 const token=localStorage.getItem("anpardaz:accessToken")||"";
                 const phone=localStorage.getItem("anpardaz:web:phone")||"";
@@ -326,7 +326,7 @@ export function WebKycModal({ onClose, currentStatus }: { onClose: () => void; c
               </div>
               <div style={{ fontSize:18, fontWeight:900, marginBottom:8 }}>در انتظار بررسی</div>
               <div style={{ fontSize:13, color:"var(--w-muted)", lineHeight:1.7, marginBottom:20 }}>
-                مدارک شما دریافت شد و ظرف ۱ تا ۳ روز کاری بررسی خواهد شد.
+                اطلاعات هویتی شما دریافت شد و برای بررسی دستی ارسال شد.
               </div>
               <button onClick={onClose} className="w-btn w-btn-ghost" style={{ padding:"10px 24px" }}>بستن</button>
             </div>
