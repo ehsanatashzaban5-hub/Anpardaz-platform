@@ -29,6 +29,21 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
     )).rows};
   });
 
+  app.delete('/api/v1/cards/:id',{preHandler:requireAuth},async(req,reply)=>{
+    const c=await ensureCustomer(pool,r(req).auth),id=Number((req.params as any).id);
+    if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_card_id'});
+    const client=await pool.connect();
+    try{
+      await client.query('BEGIN');
+      const card=(await client.query(`SELECT id,last4,bank_name,provider,provider_reference,status,registration_status FROM cards WHERE id=$1 AND customer_id=$2 FOR UPDATE`,[id,c])).rows[0];
+      if(!card){await client.query('ROLLBACK');return reply.code(404).send({error:'card_not_found'});}
+      await client.query(`INSERT INTO card_lifecycle_audit(customer_id,card_id,action,provider,provider_reference,last4,bank_name,actor_type,reason,metadata) VALUES($1,$2,'deleted',$3,$4,$5,$6,'customer','user_requested_card_deletion',$7)`,[c,card.id,card.provider,card.provider_reference,card.last4,card.bank_name,JSON.stringify({registrationStatus:card.registration_status})]);
+      await client.query('DELETE FROM cards WHERE id=$1 AND customer_id=$2',[id,c]);
+      await client.query('COMMIT');
+      return {ok:true,deletedCardId:id};
+    }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
+  });
+
   app.post('/api/v1/cards',{preHandler:requireAuth},async(_req,reply)=>{
     return reply.code(409).send({error:'card_registration_required',message:'کارت بانکی فقط پس از تأیید فرایند ثبت کارت و مالکیت آن قابل اضافه‌شدن است.'});
   });
