@@ -6644,7 +6644,7 @@ function CardBalanceScreen({user,onBack,onDone}:{user:UserData;onBack:()=>void;o
           <button className="bs-close" onClick={()=>setCardPickerOpen(false)}><Icon name="x" size={16}/></button>
         </div>
         <div className="bs-body">
-          {user.cards.map(c=>(
+          {cards.map(c=>(
             <button key={c.id} className={`bs-card-item${selectedCardId===c.id?" active":""}`}
               onClick={()=>{setSelectedCardId(c.id);setCardPickerOpen(false);if(c.expM)setExpM(toFaDigits(c.expM));if(c.expY)setExpY(toFaDigits(c.expY))}}>
               <BankLogo bankName={c.bank} size={48} rounded={14}/>
@@ -6654,8 +6654,9 @@ function CardBalanceScreen({user,onBack,onDone}:{user:UserData;onBack:()=>void;o
                 <span className="bs-card-num" dir="ltr">{toFaDigits(fmtCard(c.number))}</span>
               </div>
               {selectedCardId===c.id&&<div className="bs-card-check"><Icon name="check" size={16} stroke={2.5}/></div>}
+              <span onClick={e=>{e.stopPropagation();deleteAnpardazCard(c.id).then(()=>{setCards(x=>x.filter(v=>v.id!==c.id));if(selectedCardId===c.id)setSelectedCardId("");}).catch(()=>setErr("حذف کارت انجام نشد."));}} style={{marginRight:"auto",color:"#f87171",fontSize:10,fontWeight:800}}>حذف</span>
             </button>
-          )))}
+          ))}
           <div className="bs-divider"/>
           <button className="outline-button" style={{width:"100%",marginTop:4,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
             onClick={()=>{setCardPickerOpen(false);setShowShaparak(true)}}>
