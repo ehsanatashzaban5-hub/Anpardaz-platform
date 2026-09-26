@@ -321,7 +321,7 @@ function VideoDetail({ video: v, onBack }: { video: Video; onBack: ()=>void }) {
         <div>
           <div style={{ fontSize:13, fontWeight:800, marginBottom:12 }}>ویدیوهای مرتبط</div>
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {VIDEOS.filter(x=>x.id!==v.id).slice(0,5).map(rv => (
+            {[].map(rv => (
               <div key={rv.id} style={{ display:"flex", gap:10, cursor:"pointer", padding:"8px", borderRadius:10, border:"1px solid transparent" }}
                 onMouseEnter={e=>{(e.currentTarget as HTMLDivElement).style.background="var(--w-hover)";}}
                 onMouseLeave={e=>{(e.currentTarget as HTMLDivElement).style.background="transparent";}}
