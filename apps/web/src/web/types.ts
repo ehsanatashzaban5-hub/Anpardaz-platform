@@ -33,6 +33,7 @@ export type WebPage =
   | "download"
   | "settings"
   | "support"
+  | "forum"
   | "about";
 
 // ── Content / SEO ─────────────────────────────────
