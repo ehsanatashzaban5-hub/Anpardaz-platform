@@ -133,7 +133,36 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
  app.get('/api/v1/orders/:id/trades',{preHandler:requireAuth},async(req)=>{const customer=await ensureCustomer(pool,r(req).auth),orderId=Number((req.params as any).id);return{trades:(await pool.query('SELECT t.* FROM trades t JOIN orders o ON o.id=t.order_id WHERE t.order_id=$1 AND o.customer_id=$2 ORDER BY t.created_at DESC',[orderId,customer])).rows};});
  app.get('/api/v1/trades',{preHandler:requireAuth},async(req)=>{const customer=await ensureCustomer(pool,r(req).auth);return{trades:(await pool.query('SELECT t.*,o.base_asset_id,o.quote_asset_id,o.side FROM trades t JOIN orders o ON o.id=t.order_id WHERE o.customer_id=$1 ORDER BY t.created_at DESC LIMIT 200',[customer])).rows};});
  app.get('/api/v1/deposits',{preHandler:requireAuth},async(req)=>{const customer=await ensureCustomer(pool,r(req).auth);return{deposits:(await pool.query('SELECT d.*,a.symbol,a.name FROM deposits d JOIN assets a ON a.id=d.asset_id WHERE d.customer_id=$1 ORDER BY d.created_at DESC LIMIT 200',[customer])).rows};});
- app.post('/api/v1/deposits',{preHandler:requireAuth},async(req,reply)=>{const customer=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;if(!id(b.assetId)||!amount(b.amount)||typeof b.network!=='string'||!b.network.trim()||b.network.length>50||!idem(b.idempotencyKey))return reply.code(400).send({error:'invalid_deposit'});const kyc=await ensureKycRequired(pool,customer);if(!kyc.allowed)return reply.code(403).send({error:'kyc_required',kycStatus:kyc.status});const requestFingerprint=fp({assetId:b.assetId,amount:b.amount,network:b.network.trim(),externalReference:b.externalReference??null});try{const x=await pool.query('INSERT INTO deposits(customer_id,asset_id,amount,network,external_reference,idempotency_key) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',[customer,b.assetId,b.amount,b.network.trim(),b.externalReference??null,b.idempotencyKey]);return reply.code(201).send({deposit:x.rows[0]});}catch(e:any){if(e?.code==='23505'){const x=await pool.query('SELECT * FROM deposits WHERE customer_id=$1 AND idempotency_key=$2',[customer,b.idempotencyKey]);const existing=x.rows[0];if(existing){const existingFingerprint=fp({assetId:existing.asset_id,amount:existing.amount,network:existing.network,externalReference:existing.external_reference??null});if(existingFingerprint!==requestFingerprint)return reply.code(409).send({error:'idempotency_key_reused'});return{deposit:existing,idempotent:true};}}throw e;}});
+ app.post('/api/v1/deposits',{preHandler:requireAuth},async(req,reply)=>{
+   const customer=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;
+   if(!id(b.assetId)||!amount(b.amount)||typeof b.network!=='string'||!b.network.trim()||b.network.length>50||!idem(b.idempotencyKey))
+     return reply.code(400).send({error:'invalid_deposit'});
+   const kyc=await ensureKycRequired(pool,customer);if(!kyc.allowed)return reply.code(403).send({error:'kyc_required',kycStatus:kyc.status});
+   const asset=(await pool.query("SELECT id,symbol,asset_type FROM assets WHERE id=$1 AND status='active'",[b.assetId])).rows[0];
+   if(!asset)return reply.code(400).send({error:'asset_not_available'});
+   let sourceCardId:number|null=null;
+   if(asset.asset_type==='fiat'){
+     sourceCardId=Number.isSafeInteger(Number(b.sourceCardId))?Number(b.sourceCardId):0;
+     if(!sourceCardId)return reply.code(400).send({error:'registered_source_card_required'});
+     const base=(process.env.ANPARDAZ_SERVICE_URL??'').replace(/\\/$/,'');const token=process.env.ANPARDAZ_INTERNAL_TOKEN;
+     if(!base||!token)return reply.code(503).send({error:'anpardaz_card_verification_not_configured'});
+     const cr=await fetch(base+'/internal/v1/admin/cards/lookup?identityId='+encodeURIComponent(r(req).auth.sub),{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(5000)});
+     const cb=await cr.json().catch(()=>({})) as any;
+     const card=(Array.isArray(cb.cards)?cb.cards:[]).find((x:any)=>Number(x.id)===sourceCardId&&x.registration_status==='verified'&&x.status==='active'&&x.holder_identity_match===true);
+     if(!cr.ok||!card)return reply.code(409).send({error:'owned_verified_anpardaz_card_required'});
+   }
+   const requestFingerprint=fp({assetId:b.assetId,amount:b.amount,network:b.network.trim(),externalReference:b.externalReference??null,sourceCardId});
+   try{
+     const x=await pool.query('INSERT INTO deposits(customer_id,asset_id,amount,network,external_reference,idempotency_key,source_card_id,admin_review_status) VALUES($1,$2,$3,$4,$5,$6,$7,\'PENDING\') RETURNING *',[customer,b.assetId,b.amount,b.network.trim(),b.externalReference??null,b.idempotencyKey,sourceCardId]);
+     return reply.code(201).send({deposit:x.rows[0],message:asset.asset_type==='fiat'?'واریز تومان پس از بررسی مدیر و حسابداری به موجودی شما افزوده می‌شود.':'واریز رمزارز پس از تأیید شبکه و تطبیق با والکس ثبت می‌شود.'});
+   }catch(e:any){
+     if(e?.code==='23505'){
+       const x=await pool.query('SELECT * FROM deposits WHERE customer_id=$1 AND idempotency_key=$2',[customer,b.idempotencyKey]);const existing=x.rows[0];
+       if(existing){const existingFingerprint=fp({assetId:existing.asset_id,amount:existing.amount,network:existing.network,externalReference:existing.external_reference??null,sourceCardId:existing.source_card_id??null});if(existingFingerprint!==requestFingerprint)return reply.code(409).send({error:'idempotency_key_reused'});return{deposit:existing,idempotent:true};}
+     }
+     throw e;
+   }
+ });
  app.get('/api/v1/withdrawals',{preHandler:requireAuth},async(req)=>{const customer=await ensureCustomer(pool,r(req).auth);return{withdrawals:(await pool.query('SELECT w.*,a.symbol,a.name FROM withdrawals w JOIN assets a ON a.id=w.asset_id WHERE w.customer_id=$1 ORDER BY w.created_at DESC LIMIT 200',[customer])).rows};});
  app.post('/api/v1/withdrawals',{preHandler:requireAuth},async(req,reply)=>{
    const customer=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;
