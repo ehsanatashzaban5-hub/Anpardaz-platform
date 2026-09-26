@@ -2516,14 +2516,7 @@ function ChargeScreen({type,user,onUpdate,onBack,onGoToPayment}:{type:"charge"|"
     if(!isIranPhone(phone)){setErrModal("شماره موبایل معتبر وارد کنید.");return}
     if(!amount){setErrModal(type==="internet"?"لطفاً بسته اینترنت مورد نظر را انتخاب کنید.":"لطفاً مبلغ یا شارژ مورد نظر را انتخاب کنید.");return}
     if(onGoToPayment){onGoToPayment({phone,operator,amount,type});return}
-    setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);
-      const label=type==="charge"?"شارژ مستقیم":"بسته اینترنت";
-      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`${label} · ${operator?.name??""} · ${phone} · ${amount}`,source:"app"});
-      setReceipt({title:type==="charge"?"شارژ سیم کارت موفق بود":"خرید بسته اینترنت موفق بود",amount,destination:`${operator?.name??""}  ${toFaDigits(phone)}`,detail:`${label} با موفقیت ارسال شد.`});
-      setPhone("");setAmount("");
-    },2500);
+    setProcessing(true);setError("");try{const serviceCode=type==="charge"?"mobile_charge":"internet_package";const result=await anpardazServiceExecute(serviceCode,{phone,operator:operator?.id??operator?.name??"",amount});setProcessing(false);const label=type==="charge"?"شارژ مستقیم":"بسته اینترنت";const op=String(result?.operation?.operation_id??result?.operationId??"—");onUpdate(user,{id:op,userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:String(result?.operation?.status??"processing")==="completed"?"done":"pending",createdAt:new Date().toISOString(),note:`${label} · ${operator?.name??""} · ${phone} · ${amount}`,source:"app"});setReceipt({title:String(result?.operation?.status??"")=="completed"?label+" با موفقیت انجام شد":"درخواست "+label+" ثبت شد",amount,destination:`${operator?.name??""}  ${toFaDigits(phone)}`,detail:"شناسه عملیات: "+op});setPhone("");setAmount("");}catch(e){setProcessing(false);setErr(e instanceof Error?e.message:"عملیات سرویس انجام نشد.");}
   };
   const overlayText=type==="charge"?`در حال شارژ سیم کارت شماره ${toFaDigits(phone)} ...`:`در حال خرید بسته اینترنت برای شماره ${toFaDigits(phone)} ...`;
   return <>
@@ -2904,12 +2897,7 @@ function BillsPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{billType:s
     if(!otp){setErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
-    setErr("");setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);resetSensitive();
-      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`قبض ${data.billName} · ${data.inputVal}`,source:"app"});
-      setReceipt({title:"پرداخت قبض با موفقیت انجام شد",amount:`${data.amount} ریال`,destination:data.billName,status:"success",detail:`مشترک: ${data.ownerName}`});
-    },2500);
+    setErr("");setProcessing(true);try{const result=await anpardazServiceExecute("bill_payment",{billType:data.billName,input:data.inputVal,amount:data.amount});setProcessing(false);resetSensitive();const op=String(result?.operation?.operation_id??result?.operationId??"—");const done=String(result?.operation?.status??"")==="completed";onUpdate(user,{id:op,userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:done?"done":"pending",createdAt:new Date().toISOString(),note:`قبض ${data.billName} · ${data.inputVal}`,source:"app"});setReceipt({title:done?"پرداخت قبض با موفقیت انجام شد":"درخواست پرداخت قبض ثبت شد",amount:`${data.amount} ریال`,destination:data.billName,status:done?"success":"pending",detail:"شناسه عملیات: "+op});}catch(e){setProcessing(false);setErr(e instanceof Error?e.message:"پرداخت قبض انجام نشد.");}
   };
   return <>
   {processing&&<AnPardazLoadingOverlay text="در حال پردازش پرداخت..."/>}
@@ -3208,12 +3196,7 @@ function ViolationsPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{plate
     if(!otp){setErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
-    setErr("");setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);resetSensitive();
-      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`خلافی خودرو · ${data.plate}`,source:"app"});
-      setReceipt({title:"پرداخت خلافی با موفقیت انجام شد",amount:`${data.amount} ریال`,destination:`پلاک ${data.plate}`,status:"success",detail:`مالک: ${data.ownerName}`});
-    },2500);
+    setErr("");setProcessing(true);try{const result=await anpardazServiceExecute("vehicle_violations",{plate:data.plate,amount:data.amount});setProcessing(false);resetSensitive();const op=String(result?.operation?.operation_id??result?.operationId??"—");const done=String(result?.operation?.status??"")==="completed";onUpdate(user,{id:op,userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:done?"done":"pending",createdAt:new Date().toISOString(),note:`خلافی خودرو · ${data.plate}`,source:"app"});setReceipt({title:done?"پرداخت خلافی با موفقیت انجام شد":"درخواست پرداخت خلافی ثبت شد",amount:`${data.amount} ریال`,destination:`پلاک ${data.plate}`,status:done?"success":"pending",detail:"شناسه عملیات: "+op});}catch(e){setProcessing(false);setErr(e instanceof Error?e.message:"پرداخت خلافی انجام نشد.");}
   };
   return <>
   {processing&&<AnPardazLoadingOverlay text="در حال پردازش پرداخت..."/>}
@@ -3402,12 +3385,7 @@ function JudiciaryBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUpda
     if(!otp){setPayErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setPayErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setPayErr("تاریخ انقضا را وارد کنید.");return}
-    setPayErr("");setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);resetSensitive();
-      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`قبض قضائیه · ${billId}`,source:"app"});
-      setReceipt({title:"پرداخت قبض با موفقیت انجام شد",amount:`${inquiryAmount} ریال`,destination:"قوه قضائیه",status:"success"});
-    },2500);
+    setPayErr("");setProcessing(true);try{const result=await anpardazServiceExecute("judiciary_bill",{billId,amount:inquiryAmount});setProcessing(false);resetSensitive();const op=String(result?.operation?.operation_id??result?.operationId??"—");const done=String(result?.operation?.status??"")==="completed";onUpdate(user,{id:op,userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:done?"done":"pending",createdAt:new Date().toISOString(),note:`قبض قضائیه · ${billId}`,source:"app"});setReceipt({title:done?"پرداخت قبض با موفقیت انجام شد":"درخواست پرداخت قبض ثبت شد",amount:`${inquiryAmount} ریال`,destination:"قوه قضائیه",status:done?"success":"pending"});}catch(e){setProcessing(false);setPayErr(e instanceof Error?e.message:"پرداخت قبض انجام نشد.");}
   };
 
   return <>
@@ -3518,12 +3496,7 @@ function PropertyRegBillScreen({user,onUpdate,onBack,onDone}:{user:UserData;onUp
     if(!otp){setPayErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setPayErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setPayErr("تاریخ انقضا را وارد کنید.");return}
-    setPayErr("");setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);resetSensitive();
-      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`قبض ثبت اسناد · ${billId}`,source:"app"});
-      setReceipt({title:"پرداخت قبض با موفقیت انجام شد",amount:`${inquiryAmount} ریال`,destination:"ثبت اسناد و املاک",status:"success"});
-    },2500);
+    setPayErr("");setProcessing(true);try{const result=await anpardazServiceExecute("property_registration",{billId,amount:inquiryAmount});setProcessing(false);resetSensitive();const op=String(result?.operation?.operation_id??result?.operationId??"—");const done=String(result?.operation?.status??"")==="completed";onUpdate(user,{id:op,userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:done?"done":"pending",createdAt:new Date().toISOString(),note:`قبض ثبت اسناد · ${billId}`,source:"app"});setReceipt({title:done?"پرداخت قبض با موفقیت انجام شد":"درخواست پرداخت قبض ثبت شد",amount:`${inquiryAmount} ریال`,destination:"ثبت اسناد و املاک",status:done?"success":"pending"});}catch(e){setProcessing(false);setPayErr(e instanceof Error?e.message:"پرداخت قبض انجام نشد.");}
   };
 
   return <>
@@ -3681,13 +3654,7 @@ function CharityPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{orgId:st
     if(!otp){setErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
-    setErr("");setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);
-      resetSensitive();
-      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`نیکوکاری · ${data.orgName} · ${data.amount}`,source:"app"});
-      setReceipt({title:"کمک شما با موفقیت ثبت شد",amount:data.amount,destination:data.orgName,status:"success",detail:"با سپاس از نیکوکاری شما. کمک شما به دست نیازمندان می‌رسد."});
-    },2500);
+    setErr("");setProcessing(true);try{const result=await anpardazServiceExecute("charity",{organization:data.orgId??data.orgName,amount:data.amount});setProcessing(false);resetSensitive();const op=String(result?.operation?.operation_id??result?.operationId??"—");const done=String(result?.operation?.status??"")==="completed";onUpdate(user,{id:op,userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:done?"done":"pending",createdAt:new Date().toISOString(),note:`نیکوکاری · ${data.orgName} · ${data.amount}`,source:"app"});setReceipt({title:done?"کمک شما با موفقیت ثبت شد":"درخواست کمک ثبت شد",amount:data.amount,destination:data.orgName,status:done?"success":"pending",detail:"شناسه عملیات: "+op});}catch(e){setProcessing(false);setErr(e instanceof Error?e.message:"پرداخت نیکوکاری انجام نشد.");}
   };
   return <>
   <div className="subscreen" dir="rtl">
@@ -6560,14 +6527,7 @@ function ChargePaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{phone:str
     if(!otp){setErr("رمز پویا را وارد کنید.");return}
     if(!cvv2){setErr("CVV2 را وارد کنید.");return}
     if(!expM||!expY){setErr("تاریخ انقضا را وارد کنید.");return}
-    setErr("");setProcessing(true);
-    setTimeout(()=>{
-      setProcessing(false);
-      const label=data.type==="charge"?"شارژ مستقیم":"بسته اینترنت";
-      onUpdate(user,{id:genId(),userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:"done",createdAt:new Date().toISOString(),note:`${label} · ${data.operator?.name??""} · ${data.phone} · ${data.amount}`,source:"app"});
-      resetSensitive();
-      setReceipt({title:data.type==="charge"?"شارژ سیم کارت موفق بود":"خرید بسته اینترنت موفق بود",amount:data.amount,destination:`${data.operator?.name??""}  ${toFaDigits(data.phone)}`,status:"success",detail:"تراکنش با موفقیت پردازش شد."});
-    },2500);
+    setErr("");setProcessing(true);try{const serviceCode=data.type==="charge"?"mobile_charge":"internet_package";const result=await anpardazServiceExecute(serviceCode,{phone:data.phone,operator:data.operator?.id??data.operator?.name??"",amount:data.amount});setProcessing(false);resetSensitive();const op=String(result?.operation?.operation_id??result?.operationId??"—");const done=String(result?.operation?.status??"")==="completed";const label=data.type==="charge"?"شارژ مستقیم":"بسته اینترنت";onUpdate(user,{id:op,userId:user.phone,type:"service",fromAsset:"toman",toAsset:"toman",amount:0,fee:0,status:done?"done":"pending",createdAt:new Date().toISOString(),note:`${label} · ${data.operator?.name??""} · ${data.phone} · ${data.amount}`,source:"app"});setReceipt({title:done?label+" با موفقیت انجام شد":"درخواست "+label+" ثبت شد",amount:data.amount,destination:`${data.operator?.name??""}  ${toFaDigits(data.phone)}`,status:done?"success":"pending",detail:"شناسه عملیات: "+op});}catch(e){setProcessing(false);setErr(e instanceof Error?e.message:"پرداخت انجام نشد.");}
   };
   return <>
   <div className="subscreen" dir="rtl">
