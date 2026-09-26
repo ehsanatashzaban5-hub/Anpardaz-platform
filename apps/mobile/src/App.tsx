@@ -189,7 +189,21 @@ function BankLogo({bankName,size=42,rounded=12}:{bankName:string;size?:number;ro
 async function fetchUSDTRate():Promise<number|null>{
   try{const r=await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes?symbol=USDT/TOMAN`,{signal:AbortSignal.timeout(7000),cache:"no-store"});if(!r.ok)throw new Error("market_data_unavailable");const d=await r.json();const live=d?.quotes?.filter((q:any)=>!q.stale&&Number(q.lastPrice)>0);const preferred=live?.find((q:any)=>q.provider==="wallex")??live?.[0];return preferred?Number(preferred.lastPrice):null;}catch{return null}
 }
-type SarrafAssetRecord={id:number|string;symbol:string;status?:string};async function anpardazRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const res=await fetch(`${ANPARDAZ_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(data?.error??"anpardaz_request_failed"));return data;}
+type SarrafAssetRecord={id:number|string;symbol:string;status?:string};type ProtectedAccessReason = "iran" | "device-lock" | "security-unavailable";
+async function checkProtectedServiceAccess(setNotice:(message:string)=>void):Promise<boolean>{
+  try{
+    if(!ANPARDAZ_API_BASE){setNotice("برای استفاده از خدمات، اتصال امن آن‌پرداز در دسترس نیست. لطفاً اتصال اینترنت و تنظیمات برنامه را بررسی کنید.");return false;}
+    const regionRes=await fetch(ANPARDAZ_API_BASE+"/api/v1/access/region",{cache:"no-store",headers:{accept:"application/json"}});
+    const region=await regionRes.json().catch(()=>({}));
+    if(!regionRes.ok||region?.allowed!==true){setNotice("استفاده از این خدمات فقط با IP ایران مجاز است. لطفاً با یک IP ایران دوباره تلاش کنید.");return false;}
+    const pk=(window as any).PublicKeyCredential;
+    if(!pk?.isUserVerifyingPlatformAuthenticatorAvailable){setNotice("برای استفاده از خدمات، باید حداقل یک قفل امن روی گوشی شما فعال باشد؛ مانند الگو، رمز عبور، PIN یا اثر انگشت. امکان بررسی قفل دستگاه در این محیط وجود ندارد.");return false;}
+    if(!await pk.isUserVerifyingPlatformAuthenticatorAvailable()){setNotice("برای استفاده از خدمات، ابتدا حداقل یک قفل امن روی گوشی خود فعال کنید؛ مانند الگو، رمز عبور، PIN یا اثر انگشت. سپس دوباره تلاش کنید.");return false;}
+    return true;
+  }catch{setNotice("به‌دلیل خطای بررسی امنیتی، استفاده از این خدمت در حال حاضر مجاز نیست. لطفاً اتصال اینترنت و قفل امن گوشی را بررسی کنید.");return false;}
+}
+
+async function anpardazRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const res=await fetch(`${ANPARDAZ_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(data?.error??"anpardaz_request_failed"));return data;}
 type UserSettings={theme:"dark"|"light";notificationsEnabled:boolean;keySoundEnabled:boolean;fontScale:number;pinEnabled:boolean;updatedAt:string};
 async function userSettingsRequest(path:string,init:RequestInit={}){
   const token=window.localStorage.getItem("anpardaz:accessToken")??"";
@@ -9436,7 +9450,7 @@ export default function App() {
   const [serviceName,setServiceName]=useState("");
   const [lightTheme,setLightThemeState]=useState(()=>localStorage.getItem("anp_theme")==="light");
   const [insuranceTab,setInsuranceTab]=useState<"third-party"|"body"|"motorcycle">("third-party");
-  const [systemNotice,setSystemNotice]=useState("");
+  const [systemNotice,setSystemNotice]=useState("");\n  const [protectedAccessNotice,setProtectedAccessNotice]=useState("");
   const [homeSlide,setHomeSlide]=useState(0);
   const [homeSliderPaused,setHomeSliderPaused]=useState(false);
   const internetStateRef=useRef<{phone:string;step:InternetStep}|null>(null);
@@ -9813,7 +9827,7 @@ export default function App() {
   const recentTx=transactions.filter(tx=>tx.source!=="exchange"&&!tx.note?.includes("[صرافی]")&&!(tx.note?.includes("ربات فارکس")&&tx.note?.includes("تخصیص"))).slice(0,3);
   const lt=lightTheme?" light-theme":"";
 
-  const handleService=(action:string,label:string)=>{
+  const handleService=async(action:string,label:string)=>{\n    if(!(await checkProtectedServiceAccess(setProtectedAccessNotice)))return;
     setMenuOpen(false);
     if(action==="transfer"){setTab("home");setSubPage("transfer")}
     else if(action==="exchange"){setTab("home");setSubPage("exchange")}
@@ -9963,7 +9977,7 @@ function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;
       <AnHooshScreen onBack={goBack}/>
     </div>
   );
-  if(subPage==="all-services")return <div key="all-services" className={`app${lt} app-slide`} dir="rtl"><AllServicesScreen onBack={goBack} onServiceTap={(action,label)=>{setSubPage(null);handleService(action,label)}} homeServices={homeServices} setHomeServices={v=>{setHomeServices(v);if(user)localStorage.setItem(`anp_home_services_${user.uid}`,JSON.stringify(v));}} homePlatforms={homePlatforms} setHomePlatforms={v=>{setHomePlatforms(v);if(user)localStorage.setItem(`anp_home_platforms_${user.uid}`,JSON.stringify(v));}} showCashback={showCashback} setShowCashback={v=>{setShowCashback(v);if(user)localStorage.setItem(`anp_show_cashback_${user.uid}`,String(v));}}/><SNAV/></div>;
+  if(subPage==="all-services")return <div key="all-services" className={`app${lt} app-slide`} dir="rtl"><AllServicesScreen onBack={goBack} onServiceTap={(action,label)=>{void handleService(action,label)}} homeServices={homeServices} setHomeServices={v=>{setHomeServices(v);if(user)localStorage.setItem(`anp_home_services_${user.uid}`,JSON.stringify(v));}} homePlatforms={homePlatforms} setHomePlatforms={v=>{setHomePlatforms(v);if(user)localStorage.setItem(`anp_home_platforms_${user.uid}`,JSON.stringify(v));}} showCashback={showCashback} setShowCashback={v=>{setShowCashback(v);if(user)localStorage.setItem(`anp_show_cashback_${user.uid}`,String(v));}}/><SNAV/></div>;
 
   return <div className={`app${lightTheme?" light-theme":""}`} dir="rtl">
     <header className="app-header">
@@ -10137,7 +10151,7 @@ function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;
               );
             })}
             {/* همه خدمات — always last, not draggable */}
-            <button className="home-service-btn all-svcs-btn" data-help-id="all-services-btn" style={{zIndex:homeEditMode?7:undefined}} onClick={()=>{setHomeEditMode(false);setSubPage("all-services");}}>
+            <button className="home-service-btn all-svcs-btn" data-help-id="all-services-btn" style={{zIndex:homeEditMode?7:undefined}} onClick={()=>{setHomeEditMode(false);void handleService("all-services","همه خدمات");}}>
               <span className="svc-icon-wrap">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="5" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="19" cy="5" r="1.5"/><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="5" cy="19" r="1.5"/><circle cx="12" cy="19" r="1.5"/><circle cx="19" cy="19" r="1.5"/></svg>
               </span>
@@ -10236,6 +10250,7 @@ function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;
 
     {assetModal&&<AssetModal user={user} rate={rate} onClose={()=>setAssetModal(false)}/>}
     {selectedTx&&<TxModal tx={selectedTx} onClose={()=>setSelectedTx(null)} isHistory={true}/>}
+    {protectedAccessNotice&&<div onClick={()=>setProtectedAccessNotice("")} style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,.68)",display:"flex",alignItems:"center",justifyContent:"center",padding:18,backdropFilter:"blur(6px)"}} dir="rtl"><div onClick={e=>e.stopPropagation()} style={{width:"min(420px,100%)",borderRadius:24,background:"var(--card-bg,#102535)",border:"1px solid rgba(0,214,176,.22)",boxShadow:"0 24px 80px rgba(0,0,0,.45)",padding:"26px 22px",textAlign:"center"}}><div style={{width:68,height:68,borderRadius:20,margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,214,176,.10)",border:"1px solid rgba(0,214,176,.22)",color:"#00D6B0"}}><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1"/></svg></div><h2 style={{margin:"0 0 10px",fontSize:18,fontWeight:900,color:"var(--text-primary)"}}>دسترسی به خدمات</h2><p style={{margin:"0 0 22px",fontSize:13.5,lineHeight:2,color:"var(--text-muted)"}}>{protectedAccessNotice}</p><button className="primary-button" onClick={()=>setProtectedAccessNotice("")} style={{width:"100%"}}>متوجه شدم</button></div></div>}
     {systemNotice&&<div className="receipt-page" dir="rtl"><div className="receipt-page-header"><button className="back-btn" onClick={()=>setSystemNotice("")}><Icon name="arrow" size={20}/></button><h2 style={{flex:1,textAlign:"center",margin:0,fontSize:16,fontWeight:800,color:"var(--text-primary)"}}>اطلاعیه</h2><img src={anPardazLogo} alt="آن‌پرداز" style={{height:22,objectFit:"contain"}}/></div><div className="receipt-page-body"><div style={{padding:"24px 20px",borderRadius:18,background:"var(--card-bg)",border:"1px solid var(--border-faint)",textAlign:"center",marginTop:20}}><div style={{width:64,height:64,borderRadius:"50%",background:"rgba(245,166,35,0.12)",border:"2px solid rgba(245,166,35,0.3)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f5a623" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><p style={{fontSize:14,color:"var(--text-muted)",lineHeight:1.8,margin:"0 0 20px"}}>{systemNotice}</p><button className="primary-button" onClick={()=>setSystemNotice("")}>متوجه شدم</button></div></div></div>}
   </div>;
 }
