@@ -3,6 +3,7 @@ import type {Pool} from 'pg';
 import {randomUUID} from 'node:crypto';
 import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
 import {FintechProvider,type FintechServiceCode,requestFingerprint} from '../fintech-provider.js';
+import {fetchServiceCatalog,serviceInquiry} from '../service-catalog-provider.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
 const asR=(r:FastifyRequest)=>r as R;
@@ -39,6 +40,25 @@ function providerOr503(reply:FastifyReply) {
 }
 
 export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
+  app.get('/api/v1/services/catalog',{preHandler:requireAuth},async(req,reply)=>{
+    const serviceCode=String((req.query as any)?.serviceCode??'').trim();
+    const operator=String((req.query as any)?.operator??'').trim().toLowerCase();
+    const simType=String((req.query as any)?.simType??'').trim().toLowerCase();
+    if(!['mobile_charge','internet_package'].includes(serviceCode)||!operator)return reply.code(400).send({error:'invalid_catalog_request'});
+    if(serviceCode==='internet_package'&&!['mci','irancell','rightel'].includes(operator))return reply.code(400).send({error:'unsupported_operator'});
+    try{
+      const raw=await fetchServiceCatalog(serviceCode,{operator,simType});
+      const items=Array.isArray(raw?.items)?raw.items:Array.isArray(raw?.packages)?raw.packages:Array.isArray(raw?.data?.items)?raw.data.items:Array.isArray(raw?.data?.packages)?raw.data.packages:[];
+      return {serviceCode,operator,simType,items,source:'provider'};
+    }catch(error){req.log.warn({error,serviceCode,operator},'service catalog unavailable');return reply.code(503).send({error:'service_catalog_unavailable'});}
+  });
+
+  app.post('/api/v1/services/bill_payment/inquiry',{preHandler:requireAuth},async(req,reply)=>{
+    const body=(req.body??{}) as Record<string,unknown>;
+    if(!body.billType||typeof body.inputValue!=='string'||!body.inputValue.trim())return reply.code(400).send({error:'invalid_bill_inquiry'});
+    try{return {inquiry:await serviceInquiry('bill_payment',body)};}catch(error){req.log.warn({error},'bill inquiry unavailable');return reply.code(503).send({error:'bill_inquiry_unavailable'});}
+  });
+
   app.get('/api/v1/services/operations',{preHandler:requireAuth},async(req)=>{
     const customerId=await ensureCustomer(pool,asR(req).auth);
     const rows=await pool.query(
@@ -92,46 +112,7 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
     }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   });
 
-  app.post('/api/v1/services/:serviceCode/execute/:operationId',{preHandler:requireAuth},async(req,reply)=>{
-    const customerId=await ensureCustomer(pool,asR(req).auth);
-    const serviceCode=String((req.params as {serviceCode:string}).serviceCode) as FintechServiceCode;
-    const operationId=String((req.params as {operationId:string}).operationId);
-    const body=(req.body??{}) as {payload?:Record<string,unknown>};
-    if(body.payload!==undefined&&(typeof body.payload!=='object'||body.payload===null||Array.isArray(body.payload)))return reply.code(400).send({error:'invalid_service_payload'});
-    const op=(await pool.query('SELECT * FROM fintech_service_operations WHERE customer_id=$1 AND operation_id=$2 AND service_code=$3',[customerId,operationId,serviceCode])).rows[0];
-    if(!op)return reply.code(404).send({error:'operation_not_found'});
-    if(['completed','failed','manual_review','reversed'].includes(op.status))return {operation:op,idempotent:true};
-    const claim=(await pool.query("UPDATE fintech_service_operations SET status='processing',updated_at=NOW() WHERE customer_id=$1 AND operation_id=$2 AND service_code=$3 AND status='pending' RETURNING *",[customerId,operationId,serviceCode])).rows[0];
-    if(!claim){
-      const current=(await pool.query('SELECT * FROM fintech_service_operations WHERE customer_id=$1 AND operation_id=$2',[customerId,operationId])).rows[0];
-      return {operation:current,idempotent:true};
-    }
-    await pool.query("UPDATE fintech_provider_outbox SET status='processing',attempts=attempts+1,updated_at=NOW() WHERE operation_id=$1 AND event_type='provider.execute' AND status IN ('pending','processing')",[operationId]);
-    let payload:Record<string,unknown>={};
-    try{payload=(body.payload??op.request_metadata?.payload??{}) as Record<string,unknown>;}catch{}
-    const provider=providerOr503(reply);if(!provider)return;
-    await pool.query("UPDATE fintech_service_operations SET provider_code='fintech',updated_at=NOW() WHERE operation_id=$1",[operationId]);
-    const result=await provider.execute({serviceCode,operationId,payload});
-    let status=result.status;
-    let accountingStatus='pending';
-    if(status==='completed'){
-      const rawAmount=(result.data as any)?.amount??(result.data as any)?.amountPaid??payload.amount;
-      const amount=typeof rawAmount==='number'?String(rawAmount):typeof rawAmount==='string'&&/^(?:0|[1-9]\d{0,15})(?:\.\d{1,8})?$/.test(rawAmount)?rawAmount:null;
-      if(!amount||amount==='0'){status='manual_review';accountingStatus='failed';}
-      else{try{await postServiceAccounting(Number(customerId),operationId,amount,'IRR');accountingStatus='posted';}catch(e){status='manual_review';accountingStatus='failed';}}
-    }else if(status==='failed'||status==='manual_review')accountingStatus='failed';
-    else accountingStatus='pending';
-    const updated=(await pool.query(
-      `UPDATE fintech_service_operations
-       SET status=$1,provider_operation_id=COALESCE($2,provider_operation_id),
-           external_reference=COALESCE($3,external_reference),
-           failure_code=$4,failure_message=$5,response_metadata=$6,accounting_status=$7,updated_at=NOW(),
-           completed_at=CASE WHEN $1='completed' THEN NOW() ELSE completed_at END
-       WHERE operation_id=$8 RETURNING *`,
-      [status,result.providerOperationId??null,result.externalReference??null,result.errorCode??null,status==='manual_review'&&accountingStatus==='failed'?'ACCOUNTING_REQUIRED':result.errorMessage??null,JSON.stringify(result.data??{}),accountingStatus,operationId],
-    )).rows[0];
-    return {operation:updated};
-  });
+
 }
 
 function redactedPayload(payload:Record<string,unknown>){
