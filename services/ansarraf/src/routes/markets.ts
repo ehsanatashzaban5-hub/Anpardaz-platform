@@ -117,10 +117,4 @@ export function registerMarketRoutes(app: FastifyInstance, pool: Pool, marketDat
 
     return { symbol: symbol || undefined, bids: bids.rows, asks: asks.rows, fetchedAt: new Date().toISOString() };
   });
-  app.get('/api/v1/wallets', { preHandler: requireAuth }, async (request) => {
-    const auth = (request as AuthenticatedRequest).auth;
-    const customerId = await ensureCustomer(pool, auth);
-    const r = await pool.query(`SELECT w.id,w.asset_id,w.available_balance,w.locked_balance,w.created_at,a.symbol,a.name FROM wallets w JOIN assets a ON a.id=w.asset_id WHERE w.customer_id=$1 ORDER BY a.symbol`, [customerId]);
-    return { wallets: r.rows };
-  });
 }
