@@ -186,14 +186,14 @@ export class MarketDataService {
             await client.query(`INSERT INTO assets(symbol,name,asset_type,decimals,status) VALUES($1,$1,$2,18,'active') ON CONFLICT(symbol) DO UPDATE SET status='active'`, [normalizedQuote, quoteType]);
           }
         }
-        await client.query(`INSERT INTO market_quotes(provider,symbol,last_price,bid_price,ask_price,fetched_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(provider,symbol) DO UPDATE SET last_price=EXCLUDED.last_price,bid_price=EXCLUDED.bid_price,ask_price=EXCLUDED.ask_price,fetched_at=EXCLUDED.fetched_at`, [quote.provider, quote.symbol, quote.lastPrice, quote.bidPrice, quote.askPrice, fetchedAt]);
+        await client.query(`INSERT INTO market_quotes(provider,symbol,last_price,bid_price,ask_price,change_24h,volume_24h,high_24h,low_24h,fetched_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(provider,symbol) DO UPDATE SET last_price=EXCLUDED.last_price,bid_price=EXCLUDED.bid_price,ask_price=EXCLUDED.ask_price,change_24h=EXCLUDED.change_24h,volume_24h=EXCLUDED.volume_24h,high_24h=EXCLUDED.high_24h,low_24h=EXCLUDED.low_24h,fetched_at=EXCLUDED.fetched_at`, [quote.provider, quote.symbol, quote.lastPrice, quote.bidPrice, quote.askPrice, quote.change24h, quote.volume24h, quote.high24h, quote.low24h, fetchedAt]);
       }
       await client.query('COMMIT');
     } catch { await client.query('ROLLBACK'); } finally { client.release(); }
   }
 
   async getQuotes(symbol?: string) {
-    const rows = await this.pool.query(`SELECT provider,symbol,last_price,bid_price,ask_price,fetched_at,(EXTRACT(EPOCH FROM (NOW()-fetched_at))*1000 > $1) AS stale FROM market_quotes WHERE ($2::text IS NULL OR symbol=$2) ORDER BY symbol,provider`, [STALE_AFTER_MS, symbol ?? null]);
+    const rows = await this.pool.query(`SELECT provider,symbol,last_price,bid_price,ask_price,change_24h,volume_24h,high_24h,low_24h,fetched_at,(EXTRACT(EPOCH FROM (NOW()-fetched_at))*1000 > $1) AS stale FROM market_quotes WHERE ($2::text IS NULL OR symbol=$2) ORDER BY symbol,provider`, [STALE_AFTER_MS, symbol ?? null]);
     const dbRows = new Map<string, any>();
     for (const row of rows.rows) dbRows.set(`${row.provider}:${row.symbol}`, row);
     const keys = new Set<string>(dbRows.keys());
@@ -215,10 +215,10 @@ export class MarketDataService {
         askPrice: row.ask_price == null ? null : String(row.ask_price),
         fetchedAt: new Date(row.fetched_at).toISOString(),
         stale: Boolean(row.stale),
-        change24h: null,
-        volume24h: null,
-        high24h: null,
-        low24h: null,
+        change24h: row.change_24h == null ? null : Number(row.change_24h),
+        volume24h: row.volume_24h == null ? null : String(row.volume_24h),
+        high24h: row.high_24h == null ? null : String(row.high_24h),
+        low24h: row.low_24h == null ? null : String(row.low_24h),
       };
     });
   }
