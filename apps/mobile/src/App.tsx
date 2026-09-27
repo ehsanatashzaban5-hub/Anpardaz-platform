@@ -3446,7 +3446,7 @@ function ExchangeFeesPage({onBack}:{onBack:()=>void}){
   const generic=active.find((r:any)=>!r.market_symbol&&!r.asset_symbol)??active[0];
   const rate=generic?Number(generic.percentage||0):0,fixed=generic?Number(generic.fixed_amount||0):0;
   const calc=()=>{const n=Number(toLatinDigits(amount))||0;if(!generic){setCalculated(null);return}const min=generic.min_amount==null?0:Number(generic.min_amount),max=generic.max_amount==null?Infinity:Number(generic.max_amount);setCalculated(Math.min(Math.max(n*rate+fixed,min),max));};
-  const labels:{[k:string]:string}={trade:"معاملات",deposit:"واریز",withdrawal:"برداشت",transfer:"انتقال"};
+  const labels:{[k:string]:string}={trade:"معاملات",deposit:"واریز",withdrawal:"برداشت",transfer:"انتقال"};\n  const FeeTable=({headers,rows}:{headers:string[];rows:string[][]})=><div className="fee-table"><div className="fee-tr">{headers.map(h=><b key={h}>{h}</b>)}</div>{rows.map((row,i)=><div className="fee-tr" key={i}>{row.map((cell,j)=><span key={j}>{cell}</span>)}</div>)}</div>;
   return <div className="exchange-content-page">
     <header className="exchange-content-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><h1>کارمزدها</h1><p>این اطلاعات مستقیماً از تنظیمات فعال Backend آن صراف خوانده می‌شود.</p></div><img src={anPardazLogo} alt="صرافی آن‌پرداز"/></header>
     {error&&<div className="warning-box">{error}</div>}
