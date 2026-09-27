@@ -6500,11 +6500,6 @@ function AnAssistantChat({onProduct,compareMode,compareSelected,onCompareToggle,
     setCopied(id);setTimeout(()=>setCopied(null),1500);
   };
 
-  const AI_REPLIES=[
-    (q:string,n:number)=>`${toFaDigits(String(n))} محصول پیدا کردم که به درخواست شما نزدیک هستن. برای مقایسه یا دیدن جزئیات، دکمه «نمایش نتایج» رو بزن.`,
-    (q:string,n:number)=>`برای «${q}» تعداد ${toFaDigits(String(n))} گزینه پیدا کردم. می‌تونم بر اساس بودجه یا ویژگی خاصی فیلتر کنم؟`,
-    (_q:string,n:number)=>`نتایج آماده‌ست! ${toFaDigits(String(n))} محصول از فروشگاه‌های معتبر پیدا شد. اطلاعات بر اساس داده‌های موجود در آن مارکت است و ممکن است کامل یا به‌روز نباشد.`,
-  ];
 
   const sendMsg=async()=>{
     const txt=input.trim();if(!txt||thinking)return;
