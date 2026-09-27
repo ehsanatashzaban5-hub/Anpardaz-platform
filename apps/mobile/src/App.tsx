@@ -5626,9 +5626,9 @@ const SERVICES=[
   {id:"internet",label:"بسته اینترنت",icon:"wifi",color:"#38bdf8",bg:"rgba(56,189,248,0.15)",action:"internet"},
   {id:"bills",label:"قبض",icon:"receipt",color:"#fb923c",bg:"rgba(251,146,60,0.15)",action:"bills"},
   {id:"charity",label:"نیکوکاری",icon:"heart",color:"#f472b6",bg:"rgba(244,114,182,0.15)",action:"charity"},
-
-
-
+  {id:"third-party-ins",label:"بیمه ثالث",icon:"shield",color:"#3b82f6",bg:"rgba(59,130,246,0.15)",action:"insurance"},
+  {id:"body-ins",label:"بیمه بدنه",icon:"car",color:"#6366f1",bg:"rgba(99,102,241,0.15)",action:"insurance-body"},
+  {id:"moto-ins",label:"بیمه موتور",icon:"moto",color:"#4a9eff",bg:"rgba(74,158,255,0.12)",action:"insurance-moto"},
   {id:"violations",label:"خلافی خودرو",icon:"info",color:"#a855f7",bg:"rgba(168,85,247,0.12)",action:"violations"},
   {id:"freeway",label:"عوارض آزادراه",icon:"building",color:"#a855f7",bg:"rgba(168,85,247,0.1)",action:"freeway"},
   {id:"tehran-traffic",label:"طرح ترافیک",icon:"camera",color:"#9333ea",bg:"rgba(147,51,234,0.15)",action:"tehran-traffic"},
@@ -5641,7 +5641,7 @@ const SERVICES=[
 ];
 
 // Services shown on Home by default (excludes extra/new services)
-const DEFAULT_HOME_SERVICES=["card-balance","transfer","charge","internet","bills","charity","violations","freeway","tehran-traffic","sana","judiciary-bill","property-reg","cashback"];
+const DEFAULT_HOME_SERVICES=["card-balance","transfer","charge","internet","bills","charity","third-party-ins","body-ins","moto-ins","violations","freeway","tehran-traffic","sana","judiciary-bill","property-reg","cashback"];
 
 const PLATFORMS=[
   {id:"an-banner",label:"آن بنر",desc:"بازار آگهی‌های ایران",color:"#E8354E",bg:"linear-gradient(135deg,rgba(232,53,78,0.12),rgba(232,53,78,0.05))",border:"rgba(232,53,78,0.22)",action:"an-banner"},
