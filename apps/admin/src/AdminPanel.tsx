@@ -41,7 +41,7 @@ export default function AdminPanel(){
       setOverview(o);setHealth(h);
     }catch(e){setError(e instanceof Error?e.message:"خطا");logout()}finally{setBusy(false)}
   };
-  useEffect(()=>{if(token)void load(token)},[token]);
+  useEffect(()=>{if(token)void load(token)},[token]);\n  useEffect(()=>{if(token&&tab==="ansarraf-fees")void loadAnsarrafFees()},[token,tab]);
 
   const login=async()=>{
     setBusy(true);setLoginError("");
