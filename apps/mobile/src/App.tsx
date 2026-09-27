@@ -3737,6 +3737,7 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
     try{
       await sarrafRequest("/api/v1/forex-bot/requests",{method:"POST",body:JSON.stringify({action:"activate",amount:String(n),idempotencyKey:crypto.randomUUID()})});
       setAmountErr("درخواست فعال‌سازی ثبت شد و در انتظار تأیید مدیریت است.");
+      setShowCandlePopup(true);
       await loadBot();
     }catch(e){setAmountErr(e instanceof Error?e.message:"ثبت درخواست فعال‌سازی ناموفق بود.");}
   };
@@ -3746,6 +3747,8 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
     try{
       await sarrafRequest("/api/v1/forex-bot/requests",{method:"POST",body:JSON.stringify({action:"deactivate",idempotencyKey:crypto.randomUUID()})});
       setAmountErr("درخواست غیرفعال‌سازی ثبت شد و در انتظار تأیید مدیریت است.");
+      setShowCandlePopup(true);
+      setShowDeactivateConfirm(false);
       await loadBot();
     }catch(e){setAmountErr(e instanceof Error?e.message:"ثبت درخواست غیرفعال‌سازی ناموفق بود.");}
   };
@@ -4021,10 +4024,10 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
           شروع به معامله در بازار فارکس می‌کند
         </div>
         <div style={{fontSize:15,fontWeight:900,color:bs.status==="active"?"#00D6B0":"#f5c23d",animation:"pulse 1.5s infinite"}}>
-          {bs.status==="active"?"ربات متصل و فعال و در حال ترید است":"در حال تایید اولیه"}
+          {bs.status==="active"?"ربات فعال و مورد تأیید مدیریت است":"در حال تایید اولیه"}
         </div>
         <div style={{fontSize:11,color:"var(--text-muted)",marginTop:8}}>
-          سود و زیان ربات هر ۲۴ ساعت یکبار و یا هر ۴۸ ساعت یکبار آپدیت می‌شود
+          سود و زیان فقط پس از ثبت گزارش معتبر و تأیید مدیریت در این صفحه به‌روزرسانی می‌شود
         </div>
       </div>
       <button className="outline-button" style={{width:"100%",marginBottom:8}} onClick={()=>setShowCandlePopup(false)}>بستن</button>
