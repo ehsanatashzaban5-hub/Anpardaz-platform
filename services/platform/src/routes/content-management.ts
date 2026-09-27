@@ -10,9 +10,13 @@ const admin=async(pool:Pool,req:FastifyRequest,reply:any,p:string)=>{const a=(re
 export async function registerContentManagementRoutes(app:FastifyInstance,pool:Pool){
   await app.register(multipart,{limits:{fileSize:Number(process.env.CONTENT_VIDEO_MAX_BYTES??268435456),files:1}});
   app.get('/api/v1/content/videos',async(req,reply)=>{
-    const q=req.query as any;const limit=Math.min(50,Math.max(1,Number(q.limit)||20));
+    const q=req.query as {limit?:string;category?:string};
+    const limit=Math.min(50,Math.max(1,Number(q.limit)||20));
+    const category=String(q.category??'').trim()||null;
     const rows=await pool.query(`SELECT id,title,description,mime_type,file_name,byte_size,duration_seconds,category_slug,hashtags,published_at,created_at
-      FROM content_videos WHERE status='published' ORDER BY published_at DESC NULLS LAST LIMIT $1`,[limit]);
+      FROM content_videos
+      WHERE status='published' AND ($2::text IS NULL OR category_slug=$2)
+      ORDER BY published_at DESC NULLS LAST LIMIT $1`,[limit,category]);
     return {videos:rows.rows};
   });
   app.get('/api/v1/content/videos/:id',async(req,reply)=>{
