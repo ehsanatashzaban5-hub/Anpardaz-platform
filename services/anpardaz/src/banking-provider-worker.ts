@@ -80,6 +80,12 @@ export class BankingProviderWorker{
           await this.pool.query("UPDATE banking_provider_outbox SET status='completed',last_error=NULL,updated_at=NOW() WHERE id=$1",[row.id]);
           return true;
         }
+        const externalBalance=await ledgerCustomerBalance(Number(x.customer_id),String(x.currency));
+        if(decimal18(externalBalance)<decimal18(String(x.amount))){
+          await this.pool.query("UPDATE transfer_requests SET status='failed',provider_status='failed',provider_error_code='INSUFFICIENT_FUNDS',provider_error_message='insufficient_ledger_balance',updated_at=NOW() WHERE operation_id=$1",[x.operation_id]);
+          await this.pool.query("UPDATE banking_provider_outbox SET status='failed',last_error='insufficient_ledger_balance',updated_at=NOW() WHERE id=$1",[row.id]);
+          return true;
+        }
         const result=await provider.execute({serviceCode:'transfer',operationId:x.operation_id,payload:{amount:String(x.amount),currency:x.currency,destinationExternal:x.destination_external??undefined,description:x.description??undefined,sourceAccountId:String(x.source_account_id)}});
         const status=result.status==='completed'?'completed':result.status==='failed'?'failed':result.status==='manual_review'?'manual_review':'processing';
         await this.pool.query("UPDATE transfer_requests SET status=$1,provider_operation_id=COALESCE($2,provider_operation_id),provider_reference=COALESCE($3,provider_reference),provider_status=$4,provider_error_code=$5,provider_error_message=$6,provider_metadata=$7,updated_at=NOW() WHERE operation_id=$8",[status==='completed'?'processing':status,result.providerOperationId??null,result.externalReference??null,result.status,result.errorCode??null,result.errorMessage??null,JSON.stringify(result.data??{}),x.operation_id]);
