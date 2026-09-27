@@ -77,8 +77,8 @@ export const CSS_VARS = `
   /* ── Desktop-only layout (no mobile overrides) ─── */
   /* The site always renders as a full desktop interface on every device. */
   /* On small screens, the browser will add horizontal scroll. */
-  body{min-width:1280px;}
-  .w-main{overflow-x:auto;}
+  body{min-width:0;}
+  .w-main{overflow-x:hidden;}
   .w-container{max-width:1480px;margin:0 auto;padding:0 20px;}
 
   /* Platform page headers */
@@ -305,6 +305,9 @@ export function WebHeader({ currentPage, onNavigate, userRole, onAuthClick, dark
 
       <style>{`
         @media (max-width:900px){
+          body{min-width:0!important;overflow-x:hidden;}
+          .w-main{overflow-x:hidden!important;}
+          .w-container{max-width:100%;padding-left:12px;padding-right:12px;}
           .w-desktop-nav{display:none!important;}
           .w-mobile-menu-btn{display:flex!important;}
         }
