@@ -111,30 +111,15 @@ function _genUid(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 }
 const DB = {
-  // Local storage is only a non-financial bootstrap cache. Balances, cards and transaction history
-  // are never persisted here because the backend/database is the operational source of truth.
-  getUser:(p:string):UserData|null=>{
-    try{
-      const raw=JSON.parse(localStorage.getItem(`anp_user_${p}`)??"null");
-      if(!raw)return null;
-      const hadLegacyPin=typeof raw.pin==="string"&&/^\d{4}$/.test(raw.pin);
-      const u:UserData={uid:"",cryptoBalances:{},pinEnabled:Boolean(raw.pinEnabled??raw.pin),...raw,tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[]};
-      delete (u as any).pin;
-      if(hadLegacyPin){const safe:any={...u};delete safe.pin;localStorage.setItem(`anp_user_${p}`,JSON.stringify(safe));}
-      if(!u.uid){u.uid="uid_"+p.replace(/[^0-9]/g,"");}
-      return u;
-    }catch{return null}
-  },
-  saveUser:(u:UserData)=>{
-    const safe:any={...u,tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[]};
-    delete safe.pin;
-    localStorage.setItem(`anp_user_${u.phone}`,JSON.stringify(safe));
-  },
-  currentPhone:()=>localStorage.getItem("anp_current")??"",
-  setCurrentPhone:(p:string)=>localStorage.setItem("anp_current",p),
+  // Financial data, cards, transactions and personal profile data are server-owned.
+  // The mobile app deliberately keeps no local source of truth for those records.
+  getUser:(_p:string):UserData|null=>null,
+  saveUser:(_u:UserData)=>{},
+  currentPhone:()=>"",
+  setCurrentPhone:(_p:string)=>{},
   getTx:(_p:string):TxRecord[]=>[],
   saveTx:(_p:string,_t:TxRecord[])=>{},
-  userExists:(p:string)=>!!localStorage.getItem(`anp_user_${p}`)
+  userExists:(_p:string)=>false
 };
 
 // ─── Operator Detection ───────────────────────────────────────────────────────
