@@ -13,6 +13,7 @@ const authorized=(request:{headers:{authorization?:string}})=>request.headers.au
 const DECIMAL=/^(?:0|[1-9]\d{0,19})(?:\.\d{1,18})?$/;
 const validAmount=(v:unknown)=>typeof v==='string'&&DECIMAL.test(v)&&v!=='0'&&!/^0(?:\.0{1,18})?$/.test(v);
 const validCurrency=(v:unknown)=>typeof v==='string'&&/^[A-Z0-9_]{2,16}$/.test(v);
+const decimal18=(v:unknown)=>{const s=String(v??'').trim();if(!/^-?(?:0|[1-9]\d*)(?:\.\d{1,18})?$/.test(s))throw new Error('invalid_ledger_decimal');const neg=s.startsWith('-'),x=neg?s.slice(1):s,[a,b='']=x.split('.');const scaled=BigInt(a)*1000000000000000000n+BigInt((b+'000000000000000000').slice(0,18));return neg?-scaled:scaled;};
 const validId=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;
 
 app.get('/health',async()=>({service:'accounting',status:'ok'}));
