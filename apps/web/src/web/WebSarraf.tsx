@@ -462,9 +462,6 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
           {tab === "guide" && (
             <GuideTab/>
           )}
-          {tab === "forexbot" && isLoggedIn && (
-            <ForexBotTab asset={selectedAsset}/>
-          )}
         </div>
       </div>
 
