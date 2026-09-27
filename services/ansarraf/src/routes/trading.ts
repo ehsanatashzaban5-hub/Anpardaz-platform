@@ -197,7 +197,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      if(!moved.rows[0])throw new Error('insufficient_available_balance');
      const operationId='ANSARRAF-WD-'+randomUUID();
      const w=await client.query("INSERT INTO withdrawals(customer_id,asset_id,amount,fee_amount,fee_asset_id,net_amount,network,destination,destination_memo,idempotency_key,operation_id,approval_status,destination_card_id,destination_card_last4,admin_review_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'PENDING',$12,$13,'PENDING') RETURNING *",[customer,b.assetId,b.amount,fee.amount,fee.feeAssetId,fee.netAmount,b.network.trim(),b.destination.trim(),b.memo??null,b.idempotencyKey,operationId,fundingSecurity.card?.id??null,fundingSecurity.card?.last4??null]);
-     await client.query('INSERT INTO withdrawal_reservations(withdrawal_id,wallet_id,asset_id,amount) VALUES($1,$2,$3,$4)',[w.rows[0].id,wallet.rows[0].id,b.assetId,b.amount]);
+     await client.query('INSERT INTO withdrawal_reservations(withdrawal_id,wallet_id,asset_id,amount) VALUES($1,$2,$3,$4)',[w.rows[0].id,wallet.rows[0].id,b.assetId,debitAmount.rows[0].amount]);
      await client.query('COMMIT');
      return reply.code(201).send({withdrawal:w.rows[0]});
    }catch(e:any){
