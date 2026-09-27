@@ -109,7 +109,7 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
       const operationId = request.params.operationId?.trim();
       if (!operationId || operationId.length > 200) return reply.code(400).send({ error: 'invalid_operation_id' });
 
-      const [orders, withdrawals, trades, providerOrders, settlements, provenance, reconciliationRuns, auditEvents] = await Promise.all([
+      const [orders, withdrawals, trades, providerOrders, settlements, provenance, reconciliationRuns, auditEvents, forexRequests, forexPnl, forexAudit] = await Promise.all([
         pool.query(
           `SELECT o.*,ba.symbol AS base_symbol,qa.symbol AS quote_symbol
            FROM orders o
@@ -166,6 +166,21 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
            ORDER BY id`,
           [operationId],
         ),
+        pool.query(
+          `SELECT r.*,a.customer_id,a.status AS bot_status,a.investment_amount::text,a.total_pnl::text
+           FROM forex_bot_requests r JOIN forex_bot_accounts a ON a.id=r.account_id
+           WHERE r.operation_id=$1 ORDER BY r.id`, [operationId],
+        ),
+        pool.query(
+          `SELECT p.*,a.customer_id,a.status AS bot_status
+           FROM forex_bot_pnl_events p JOIN forex_bot_accounts a ON a.id=p.account_id
+           WHERE p.operation_id=$1 ORDER BY p.id`, [operationId],
+        ),
+        pool.query(
+          `SELECT e.* FROM forex_bot_audit_events e
+           JOIN forex_bot_requests r ON r.id=e.request_id
+           WHERE r.operation_id=$1 ORDER BY e.id`, [operationId],
+        ),
       ]);
 
       const orderIds = orders.rows.map((r) => Number(r.id));
@@ -217,6 +232,8 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
       for (const row of orders.rows) customerIds.add(Number(row.customer_id));
       for (const row of withdrawals.rows) customerIds.add(Number(row.customer_id));
       for (const row of settlements.rows) customerIds.add(Number(row.customer_id ?? 0));
+      for (const row of forexRequests.rows) customerIds.add(Number(row.customer_id ?? 0));
+      for (const row of forexPnl.rows) customerIds.add(Number(row.customer_id ?? 0));
       customerIds.delete(0);
 
       return {
@@ -233,6 +250,7 @@ export function registerInternalAdminRoutes(app: FastifyInstance, pool: Pool) {
           settlements: settlements.rows,
         },
         withdrawals: withdrawals.rows,
+        forexBot: { requests: forexRequests.rows, pnl: forexPnl.rows, audit: forexAudit.rows },
         provenance: provenance.rows,
         accounting,
         audit: {
