@@ -12,13 +12,13 @@ const PLATFORM_API_BASE = ((import.meta as any).env?.VITE_PLATFORM_API_URL as st
 const getWebToken = () => typeof window !== "undefined" ? window.localStorage.getItem("anpardaz:accessToken") ?? "" : "";
 
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
-const fmtP = (n: number) => n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits:2 }) : n.toPrecision(4);
+const fmtP = (n: number) => !Number.isFinite(n) || n <= 0 ? "—" : n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits:2 }) : n.toPrecision(4);
 const fmtIrt = (n: number) => {
   if (n >= 1_000_000_000) return `${(n/1_000_000_000).toFixed(2)} میلیارد تومان`;
   if (n >= 1_000_000)     return `${(n/1_000_000).toFixed(0)} میلیون تومان`;
   return `${n.toLocaleString("fa-IR")} تومان`;
 };
-const fmtVol = (n: number) => {
+const fmtVol = (n: number) => {\n  if (!Number.isFinite(n) || n <= 0) return "—";
   if (n >= 1e12) return `$${(n/1e12).toFixed(2)}T`;
   if (n >= 1e9)  return `$${(n/1e9).toFixed(2)}B`;
   if (n >= 1e6)  return `$${(n/1e6).toFixed(2)}M`;
@@ -163,7 +163,10 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
         const tomanRate = Number(bySymbol.get("USDT/TOMAN")?.lastPrice || 0);
         if (!active) return;
         setLiveAssets(previous => previous.map(a => {
-          if (a.symbol === "USDT") return { ...a, price: tomanRate, priceIrt: tomanRate };
+          if (a.symbol === "USDT") {
+             const q=bySymbol.get("USDT/TOMAN");
+             return { ...a, price: tomanRate, priceIrt: tomanRate, change24h:Number(q?.change24h??q?.change_percent??q?.change??0)||0, volume24h:Number(q?.volume24h??q?.volume_24h??q?.volume??0)||0, high24h:Number(q?.high24h??q?.high_24h??q?.high??0)||0, low24h:Number(q?.low24h??q?.low_24h??q?.low??0)||0 };
+           }
           const usdt = bySymbol.get(`${a.symbol}/USDT`);
           const toman = bySymbol.get(`${a.symbol}/TOMAN`);
           const price = usdt ? Number(usdt.lastPrice) : 0;
