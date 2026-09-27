@@ -248,7 +248,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   });
   app.post('/api/v1/admin/ecosystem/ansarraf/fees', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
-    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
+    if (!(await hasPermission(pool, req.auth, 'ansarraf_fees.write'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(sarrafBase() + '/api/v1/admin/fees', {
       method: 'POST', headers: { ...forwardUser(request), 'content-type': 'application/json' }, body: JSON.stringify(request.body ?? {}),
     });
@@ -256,7 +256,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   });
   app.post('/api/v1/admin/ecosystem/ansarraf/fees/:id/close', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
-    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
+    if (!(await hasPermission(pool, req.auth, 'ansarraf_fees.write'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(sarrafBase() + '/api/v1/admin/fees/' + encodeURIComponent((request.params as any).id) + '/close', {
       method: 'POST', headers: forwardUser(request),
     });
