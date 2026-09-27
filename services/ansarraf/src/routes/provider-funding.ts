@@ -18,6 +18,19 @@ const admin=async(req:FastifyRequest,reply:any)=>{const a=(req as R).auth;if(!['
 
 export function registerProviderFundingRoutes(app:FastifyInstance,pool:Pool){
   const registry=createProviderRegistry();
+  app.get('/api/v1/funding/cards',{preHandler:requireAuth},async(req,reply)=>{
+    const identityId=String((req as R).auth.sub);
+    const base=(process.env.ANPARDAZ_SERVICE_URL??'').replace(/\\/$/,'');
+    const token=process.env.ANPARDAZ_INTERNAL_TOKEN;
+    if(!base||!token)return reply.code(503).send({error:'anpardaz_card_verification_not_configured'});
+    const response=await fetch(base+'/internal/v1/admin/cards/lookup?identityId='+encodeURIComponent(identityId),{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(Number(process.env.ANPARDAZ_HTTP_TIMEOUT_MS??5000))});
+    const body=await response.json().catch(()=>({})) as any;
+    if(!response.ok)return reply.code(503).send({error:'anpardaz_card_lookup_failed'});
+    const cards=(Array.isArray(body.cards)?body.cards:[]).filter((card:any)=>card.registration_status==='verified'&&card.status==='active'&&card.holder_identity_match===true)
+      .map((card:any)=>({id:Number(card.id),last4:String(card.last4),bankName:card.bank_name??null,provider:card.provider??null}));
+    return {cards};
+  });
+
   app.get('/api/v1/crypto/deposit-networks',{preHandler:requireAuth},async(req,reply)=>{
     const symbol=String((req.query as any)?.asset??'').trim().toUpperCase();
     if(!/^[A-Z0-9]{2,20}$/.test(symbol))return reply.code(400).send({error:'crypto_asset_required'});
