@@ -1438,7 +1438,7 @@ function ForexBotTab({ asset }: { asset:CryptoAsset }) {
       {events.length>0&&<div style={{marginTop:18}}>
         <div style={{fontWeight:800,fontSize:13,marginBottom:8}}>نمودار سود/زیان ثبت‌شده</div>
         <div style={{height:170,border:"1px solid var(--w-border)",borderRadius:10,padding:12,display:"flex",alignItems:"flex-end",gap:5}}>
-          {events.slice(-24).map((x:any,i:number)=>{const v=Number(x.amount)||0;return <div key={x.id??i} title={`${v} USDT · ${x.reason??""}`} style={{flex:1,maxWidth:22,height:${Math.max(4,Math.min(100,Math.abs(v)/max*100))}%,alignSelf:v>=0?"flex-end":"flex-end",background:v>=0?"#10b981":"#f43f5e",borderRadius:4}}/>})}
+          {events.slice(-24).map((x:any,i:number)=>{const v=Number(x.amount)||0;return <div key={x.id??i} title={`${v} USDT · ${x.reason??""}`} style={{flex:1,maxWidth:22,height:Math.max(4,Math.min(100,Math.abs(v)/max*100))+"%",alignSelf:v>=0?"flex-end":"flex-end",background:v>=0?"#10b981":"#f43f5e",borderRadius:4}}/>})}
         </div>
       </div>}
       <div style={{marginTop:12,padding:"10px 12px",background:"var(--w-card2)",borderRadius:9,fontSize:11}}>بازار مرجع: {asset.symbol ? asset.symbol+"/USDT" : "USDT"} · داده‌های سود و وضعیت فقط از Backend خوانده می‌شوند.</div>
