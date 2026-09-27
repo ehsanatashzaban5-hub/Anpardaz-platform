@@ -26,6 +26,26 @@ export function registerMarketRoutes(app: FastifyInstance, pool: Pool, marketDat
     if (symbol && !/^[A-Z0-9]+\/[A-Z0-9]+$/.test(symbol)) return reply.code(400).send({ error: 'invalid_symbol' });
     return { quotes: await marketData.getQuotes(symbol) };
   });
+  app.get('/api/v1/market-data/candles', async (request, reply) => {
+    if (!marketData) return reply.code(503).send({ error: 'market_data_unavailable' });
+    const q = request.query as { symbol?: string; resolution?: string; from?: string; to?: string };
+    const symbol = q.symbol?.trim().toUpperCase() || '';
+    if (!/^[A-Z0-9]+\/(?:[A-Z0-9]+)$/.test(symbol)) return reply.code(400).send({ error: 'invalid_symbol' });
+    const resolution = q.resolution?.trim() || '60';
+    if (!/^(1|5|15|30|60|120|240|360|720|D|1D|W|1W)$/.test(resolution)) return reply.code(400).send({ error: 'invalid_resolution' });
+    const now = Math.floor(Date.now() / 1000);
+    const to = Math.min(now, Number.parseInt(q.to ?? String(now), 10) || now);
+    const defaultFrom = to - 7 * 24 * 60 * 60;
+    const from = Math.max(0, Number.parseInt(q.from ?? String(defaultFrom), 10) || defaultFrom);
+    if (from >= to || to - from > 31 * 24 * 60 * 60) return reply.code(400).send({ error: 'invalid_time_range' });
+    try {
+      return await marketData.getCandles(symbol, resolution, from, to);
+    } catch (error) {
+      request.log.warn({ error, symbol, resolution }, 'wallex candles unavailable');
+      return reply.code(503).send({ error: 'market_candles_unavailable' });
+    }
+  });
+
   app.get('/api/v1/market-data/trades', async (request, reply) => {
     const q = request.query as { symbol?: string; limit?: string };
     const symbol = q.symbol?.trim().toUpperCase() || '';
