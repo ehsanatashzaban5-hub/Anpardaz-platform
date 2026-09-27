@@ -11,6 +11,9 @@ type SettingsBody = {
   notificationsEnabled?: boolean;
   keySoundEnabled?: boolean;
   fontScale?: number;
+  homeServices?: string[];
+  homePlatforms?: string[];
+  showCashback?: boolean;
 };
 
 type PinBody = { currentPin?: string; newPin?: string };
@@ -56,6 +59,7 @@ export function registerUserSettingsRoutes(app: FastifyInstance, pool: Pool) {
     const result = await pool.query(
       `SELECT theme, notifications_enabled AS "notificationsEnabled",
               key_sound_enabled AS "keySoundEnabled", font_scale AS "fontScale",
+              home_services AS "homeServices", home_platforms AS "homePlatforms", show_cashback AS "showCashback",
               pin_enabled AS "pinEnabled", updated_at AS "updatedAt"
        FROM platform_user_settings WHERE identity_id=$1`,
       [auth.sub],
@@ -74,6 +78,12 @@ export function registerUserSettingsRoutes(app: FastifyInstance, pool: Pool) {
       return reply.code(400).send({ error: 'invalid_key_sound_enabled' });
     if (body.fontScale !== undefined && (!Number.isInteger(body.fontScale) || body.fontScale < 0 || body.fontScale > 10))
       return reply.code(400).send({ error: 'invalid_font_scale' });
+    if (body.homeServices !== undefined && (!Array.isArray(body.homeServices) || body.homeServices.some(x => typeof x !== 'string' || x.length > 100) || body.homeServices.length > 100))
+      return reply.code(400).send({ error: 'invalid_home_services' });
+    if (body.homePlatforms !== undefined && (!Array.isArray(body.homePlatforms) || body.homePlatforms.some(x => typeof x !== 'string' || x.length > 100) || body.homePlatforms.length > 100))
+      return reply.code(400).send({ error: 'invalid_home_platforms' });
+    if (body.showCashback !== undefined && typeof body.showCashback !== 'boolean')
+      return reply.code(400).send({ error: 'invalid_show_cashback' });
 
     await ensurePlatformUser(pool, auth);
     await ensureSettings(pool, auth.sub);
@@ -83,12 +93,16 @@ export function registerUserSettingsRoutes(app: FastifyInstance, pool: Pool) {
            notifications_enabled=COALESCE($3,notifications_enabled),
            key_sound_enabled=COALESCE($4,key_sound_enabled),
            font_scale=COALESCE($5,font_scale),
+           home_services=COALESCE($6::jsonb,home_services),
+           home_platforms=COALESCE($7::jsonb,home_platforms),
+           show_cashback=COALESCE($8,show_cashback),
            updated_at=NOW()
        WHERE identity_id=$1
        RETURNING theme, notifications_enabled AS "notificationsEnabled",
                  key_sound_enabled AS "keySoundEnabled", font_scale AS "fontScale",
+                 home_services AS "homeServices", home_platforms AS "homePlatforms", show_cashback AS "showCashback",
                  pin_enabled AS "pinEnabled", updated_at AS "updatedAt"`,
-      [auth.sub, body.theme ?? null, body.notificationsEnabled ?? null, body.keySoundEnabled ?? null, body.fontScale ?? null],
+      [auth.sub, body.theme ?? null, body.notificationsEnabled ?? null, body.keySoundEnabled ?? null, body.fontScale ?? null, body.homeServices === undefined ? null : JSON.stringify(body.homeServices), body.homePlatforms === undefined ? null : JSON.stringify(body.homePlatforms), body.showCashback ?? null],
     );
     return { settings: result.rows[0] };
   });
