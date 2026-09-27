@@ -46,6 +46,7 @@ export function registerFeeRoutes(app: FastifyInstance, pool: Pool) {
     const minAmount=b.minAmount==null||b.minAmount===''?null:String(b.minAmount);
     const maxAmount=b.maxAmount==null||b.maxAmount===''?null:String(b.maxAmount);
     if(!['trade','deposit','withdrawal','transfer'].includes(operationType))return reply.code(400).send({error:'invalid_operation_type'});
+    if(assetSymbol&&feeAssetSymbol&&assetSymbol!==feeAssetSymbol)return reply.code(400).send({error:'fee_asset_must_match_operation_asset'});
     const decimal=/^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/;
     if(!decimal.test(percentage)||!decimal.test(fixedAmount)|| (minAmount!==null&&!decimal.test(minAmount)) || (maxAmount!==null&&!decimal.test(maxAmount)))return reply.code(400).send({error:'invalid_fee_value'});
     const actorId=auth.sub;
