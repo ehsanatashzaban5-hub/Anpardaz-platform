@@ -3712,9 +3712,43 @@ function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserDa
   const maxAlloc=Math.max(0,displayUsdt-3);
   const allocNum=Number(toLatinDigits(amount))||0;
 
-  const handleActivate=()=>{setAmountErr("اجرای واقعی فارکس‌بات هنوز به Backend متصل نشده است؛ هیچ مبلغی از موجودی کسر نمی‌شود.");};
+  const loadBot=async()=>{
+    try{
+      const d=await sarrafRequest("/api/v1/forex-bot");
+      const a=d?.account;
+      const events=Array.isArray(d?.pnlEvents)?d.pnlEvents:[];
+      const status:BotStatus=a?.status==="active"?"active":a?.status==="activation_pending"||a?.status==="deactivation_pending"?"pending":"inactive";
+      setBs({
+        status,
+        amount:Number(a?.investment_amount??0),
+        activatedAt:a?.activated_at??undefined,
+        lastDeactivatedAt:a?.deactivated_at??undefined,
+        sessions:events.map((e:any)=>({id:String(e.id),amount:Number(a?.investment_amount??0),activatedAt:String(e.created_at),pnl:Number(e.amount??0),deactivatedAt:undefined}))
+      });
+      if(a?.investment_amount) setAmount(String(a.investment_amount));
+    }catch(e){setAmountErr(e instanceof Error?e.message:"دریافت وضعیت ربات ناموفق بود.");}
+  };
+  useEffect(()=>{void loadBot();const id=window.setInterval(()=>void loadBot(),5000);return()=>window.clearInterval(id)},[user.uid]);
 
-  const handleDeactivate=()=>{setAmountErr("اجرای واقعی فارکس‌بات هنوز به Backend متصل نشده است؛ هیچ سود یا زیان ساختگی ثبت نمی‌شود.");};
+  const handleActivate=async()=>{
+    setAmountErr("");
+    const n=Number(toLatinDigits(amount))||0;
+    if(n<=0||n>30){setAmountErr("سرمایه‌گذاری باید بیشتر از صفر و حداکثر ۳۰ دلار باشد.");return;}
+    try{
+      await sarrafRequest("/api/v1/forex-bot/requests",{method:"POST",body:JSON.stringify({action:"activate",amount:String(n),idempotencyKey:crypto.randomUUID()})});
+      setAmountErr("درخواست فعال‌سازی ثبت شد و در انتظار تأیید مدیریت است.");
+      await loadBot();
+    }catch(e){setAmountErr(e instanceof Error?e.message:"ثبت درخواست فعال‌سازی ناموفق بود.");}
+  };
+
+  const handleDeactivate=async()=>{
+    setAmountErr("");
+    try{
+      await sarrafRequest("/api/v1/forex-bot/requests",{method:"POST",body:JSON.stringify({action:"deactivate",idempotencyKey:crypto.randomUUID()})});
+      setAmountErr("درخواست غیرفعال‌سازی ثبت شد و در انتظار تأیید مدیریت است.");
+      await loadBot();
+    }catch(e){setAmountErr(e instanceof Error?e.message:"ثبت درخواست غیرفعال‌سازی ناموفق بود.");}
+  };
 
   const totalPnl=bs.sessions.reduce((a,s)=>a+(s.pnl||0),0);
   const cooldownRemaining=bs.lastDeactivatedAt?Math.max(0,24*60*60*1000-(Date.now()-new Date(bs.lastDeactivatedAt).getTime())):0;
