@@ -8,12 +8,15 @@ DECLARE
   transaction_delta NUMERIC(38,18);
 BEGIN
   FOR account_row IN
-    SELECT DISTINCT a.id
+    SELECT a.id
     FROM ledger_accounts a
-    JOIN journal_entries e ON e.ledger_account_id=a.id
-    WHERE e.journal_transaction_id=p_transaction_id
-      AND a.account_type='liability'
-    FOR UPDATE OF a
+    WHERE a.account_type='liability'
+      AND a.id IN (
+        SELECT DISTINCT e.ledger_account_id
+        FROM journal_entries e
+        WHERE e.journal_transaction_id=p_transaction_id
+      )
+    FOR UPDATE
   LOOP
     SELECT COALESCE(SUM(
       CASE WHEN t.status='posted'
