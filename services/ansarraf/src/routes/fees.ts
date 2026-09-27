@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 import { ensureCustomer, requireAuth, type AuthClaims } from '../auth.js';
 
-const adminRoles=new Set(['admin','super_admin','operator']);
+const adminRoles=new Set(['admin','super_admin']);
 const actor=(request:any)=>request.auth as AuthClaims;
 
 export function registerFeeRoutes(app: FastifyInstance, pool: Pool) {
