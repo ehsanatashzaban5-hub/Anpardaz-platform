@@ -518,12 +518,14 @@ function TransactionReceipt({data,onClose}:{data:ReceiptData;onClose:()=>void}){
     import("html-to-image").then(({toPng})=>toPng(sheetRef.current!,{pixelRatio:2}).then(url=>{cachedPng.current=url;doSave(url);}).catch(()=>{setToast("ذخیره ناموفق");setTimeout(()=>{setToast("");setCaptured(false);},2000);})).catch(()=>{setToast("ذخیره ناموفق");setTimeout(()=>{setToast("");setCaptured(false);},2000);});
   };
   const handleShare=()=>{
-    const txt=[`آن‌پرداز — ${data.title}`,`وضعیت: ${isFailed?"ناموفق":isPending?"در انتظار":"موفق"}`,data.amount?`مبلغ: ${data.amount}`:"",`تاریخ: ${timeStr}`,`کد پیگیری: ${trackId}`].filter(Boolean).join("\n");
+    const txt=[`آن‌پرداز — ${data.title}`,`وضعیت: ${isFailed?"ناموفق":isPending?"در انتظار":"موفق"}`,data.amount?`مبلغ: ${data.amount}`:"",`تاریخ: ${timeStr}`,`کد پیگیری: ${trackId}`].filter(Boolean).join("
+");
     navigator.share?navigator.share({title:"رسید آن‌پرداز",text:txt}).catch(()=>{}):navigator.clipboard?.writeText(txt).catch(()=>{});
   };
   const handleCopy=()=>{
     const lines=["رسید تراکنش","─────────────────",...(data.title?[`نوع تراکنش: ${data.title}`]:[]),...(data.amount?[`مبلغ: ${toFaDigits(data.amount)}`]:[]),...(data.destination?[`مقصد/مبدا: ${data.destination}`]:[]),`وضعیت: ${isFailed?"ناموفق":isPending?"در انتظار":"موفق"}`,`تاریخ و ساعت: ${timeStr}`,`کد پیگیری: ${trackId}`,...(data.detail?[`توضیحات: ${data.detail}`]:[]),"─────────────────","آن پرداز پیشرو در خدمات بانکی و دارایی های دیجیتال"];
-    navigator.clipboard?.writeText(lines.join("\n")).then(()=>{setCopyDone(true);setToast("رسید کپی شد");setTimeout(()=>{setToast("");setCopyDone(false);},2000);}).catch(()=>{});
+    navigator.clipboard?.writeText(lines.join("
+")).then(()=>{setCopyDone(true);setToast("رسید کپی شد");setTimeout(()=>{setToast("");setCopyDone(false);},2000);}).catch(()=>{});
   };
 
   const heroMod=isFailed?" rds-hero-failed":isPending?" rds-hero-pending":"";
@@ -3446,7 +3448,8 @@ function ExchangeFeesPage({onBack}:{onBack:()=>void}){
   const generic=active.find((r:any)=>!r.market_symbol&&!r.asset_symbol)??active[0];
   const rate=generic?Number(generic.percentage||0):0,fixed=generic?Number(generic.fixed_amount||0):0;
   const calc=()=>{const n=Number(toLatinDigits(amount))||0;if(!generic){setCalculated(null);return}const min=generic.min_amount==null?0:Number(generic.min_amount),max=generic.max_amount==null?Infinity:Number(generic.max_amount);setCalculated(Math.min(Math.max(n*rate+fixed,min),max));};
-  const labels:{[k:string]:string}={trade:"معاملات",deposit:"واریز",withdrawal:"برداشت",transfer:"انتقال"};\n  const FeeTable=({headers,rows}:{headers:string[];rows:string[][]})=><div className="fee-table"><div className="fee-tr">{headers.map(h=><b key={h}>{h}</b>)}</div>{rows.map((row,i)=><div className="fee-tr" key={i}>{row.map((cell,j)=><span key={j}>{cell}</span>)}</div>)}</div>;
+  const labels:{[k:string]:string}={trade:"معاملات",deposit:"واریز",withdrawal:"برداشت",transfer:"انتقال"};
+  const FeeTable=({headers,rows}:{headers:string[];rows:string[][]})=><div className="fee-table"><div className="fee-tr">{headers.map(h=><b key={h}>{h}</b>)}</div>{rows.map((row,i)=><div className="fee-tr" key={i}>{row.map((cell,j)=><span key={j}>{cell}</span>)}</div>)}</div>;
   return <div className="exchange-content-page">
     <header className="exchange-content-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><h1>کارمزدها</h1><p>این اطلاعات مستقیماً از تنظیمات فعال Backend آن صراف خوانده می‌شود.</p></div><img src={anPardazLogo} alt="صرافی آن‌پرداز"/></header>
     {error&&<div className="warning-box">{error}</div>}
@@ -4045,7 +4048,8 @@ const TxDetailPage=()=>{
     noteDisplay?["جزئیات",noteDisplay]:null,
   ] as ([string,string]|null)[]).filter((x):x is [string,string]=>x!==null);
   const handleCopy=()=>{
-    const text=[`آن‌پرداز — ${title}`,`وضعیت: ${statusLabel[tx.status]}`,amountDisplay?`مبلغ: ${amountDisplay}`:"",`زمان: ${timeStr}`,`شناسه: ${tx.id}`,...(tx.toAddress?[`مقصد: ${tx.toAddress}`]:[]),...(noteDisplay?[`جزئیات: ${noteDisplay}`]:[])].filter(Boolean).join("\n");
+    const text=[`آن‌پرداز — ${title}`,`وضعیت: ${statusLabel[tx.status]}`,amountDisplay?`مبلغ: ${amountDisplay}`:"",`زمان: ${timeStr}`,`شناسه: ${tx.id}`,...(tx.toAddress?[`مقصد: ${tx.toAddress}`]:[]),...(noteDisplay?[`جزئیات: ${noteDisplay}`]:[])].filter(Boolean).join("
+");
     navigator.clipboard.writeText(text).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2200);}).catch(()=>{});
   };
   return <div className="expage" dir="rtl">
@@ -4284,13 +4288,15 @@ function TxModal({tx,onClose,isHistory=false}:{tx:TxRecord;onClose:()=>void;isHi
     import("html-to-image").then(({toPng})=>toPng(sheetRef.current!,{pixelRatio:2}).then(url=>{cachedPng.current=url;doSave(url);}).catch(()=>{setToast("ذخیره ناموفق");setTimeout(()=>{setToast("");setCaptured(false);},2000);})).catch(()=>{setToast("ذخیره ناموفق");setTimeout(()=>{setToast("");setCaptured(false);},2000);});
   };
   const handleShare=()=>{
-    const text=[`آن‌پرداز — ${title}`,`وضعیت: ${statusLabel[tx.status]}`,amountDisplay?`مبلغ: ${amountDisplay}`:"",`تاریخ: ${timeStr}`,`شناسه: ${tx.id}`,...(tx.toAddress?[`مقصد: ${tx.toAddress}`]:[])].filter(Boolean).join("\n");
+    const text=[`آن‌پرداز — ${title}`,`وضعیت: ${statusLabel[tx.status]}`,amountDisplay?`مبلغ: ${amountDisplay}`:"",`تاریخ: ${timeStr}`,`شناسه: ${tx.id}`,...(tx.toAddress?[`مقصد: ${tx.toAddress}`]:[])].filter(Boolean).join("
+");
     navigator.share?navigator.share({title:"رسید آن‌پرداز",text}).catch(()=>{}):navigator.clipboard?.writeText(text).catch(()=>{});
   };
   const handleCopy=()=>{
     const rateNote=isExchange&&tx.note?.includes("نرخ")?tx.note.split(" · ").find(p=>p.startsWith("نرخ"))||"":null;
     const lines=["رسید تراکنش","─────────────────",`نوع تراکنش: ${title}`,...(amountDisplay?[`مبلغ: ${toFaDigits(amountDisplay)}`]:[]),...(tx.convertedAmount!=null?[`معادل: ${tx.toAsset==="usdt"?faFixed(tx.convertedAmount,2):fa(Math.round(tx.convertedAmount))} ${tx.toAsset==="toman"?"ریال":"دلار تتر"}`]:[]),...(rateNote?[rateNote]:[]),`وضعیت: ${statusLabel[tx.status]||tx.status}`,`تاریخ و ساعت: ${timeStr}`,`شناسه تراکنش: ${tx.id}`,...(tx.fee>0?[`کارمزد: ${faFixed(tx.fee,2)} دلار تتر`]:[]),...(tx.toAddress?[`مقصد: ${tx.toAddress}`]:[]),...(noteDisplay?[`توضیحات: ${noteDisplay}`]:[]),"─────────────────","آن پرداز پیشرو در خدمات بانکی و دارایی های دیجیتال"];
-    navigator.clipboard?.writeText(lines.join("\n")).then(()=>{setCopyDone(true);setToast("رسید کپی شد");setTimeout(()=>{setToast("");setCopyDone(false);},2000);}).catch(()=>{});
+    navigator.clipboard?.writeText(lines.join("
+")).then(()=>{setCopyDone(true);setToast("رسید کپی شد");setTimeout(()=>{setToast("");setCopyDone(false);},2000);}).catch(()=>{});
   };
 
   const heroMod=isFailed?" rds-hero-failed":isPending?" rds-hero-pending":"";
