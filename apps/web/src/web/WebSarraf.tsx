@@ -1062,8 +1062,20 @@ function DepositCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus
 }
 // ── Withdraw Toman Tab ─────────────────────────────
 function WithdrawTomanTab({ kycStatus }: { kycStatus:KycStatus }) {
+  const [cards,setCards]=useState<any[]>([]),[assetId,setAssetId]=useState<number|null>(null),[amount,setAmount]=useState(""),[selectedCard,setSelectedCard]=useState<number|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
+  const token=getWebToken();
+  useEffect(()=>{let active=true;if(!token)return;Promise.all([
+    fetch(PLATFORM_API_BASE+"/api/v1/cards",{headers:{authorization:"Bearer "+token},cache:"no-store"}).then(async r=>r.ok?(await r.json()).cards??[]:[]),
+    fetch(ANSARRAF_API_BASE+"/api/v1/assets",{cache:"no-store"}).then(async r=>r.ok?(await r.json()).assets??[]:[])
+  ]).then(([cs,as])=>{if(!active)return;setCards(cs);const fiat=as.find((a:any)=>String(a.asset_type??a.assetType).toLowerCase()==="fiat"&&["IRR","TOMAN","TMN"].includes(String(a.symbol).toUpperCase()));setAssetId(fiat?Number(fiat.id):null);if(cs[0])setSelectedCard(Number(cs[0].id))}).catch(()=>{if(active)setMessage("اطلاعات کارت یا دارایی تومان در دسترس نیست.")});return()=>{active=false}},[token]);
   if(kycStatus!=="verified") return <KycGate kycStatus={kycStatus}/>;
-  return <div style={{maxWidth:620,padding:"24px 0"}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:16}}>برداشت تومان</h2><div className="w-card" style={{padding:24}}><div style={{fontSize:14,fontWeight:800,marginBottom:8}}>سرویس برداشت بانکی</div><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>API برداشت تومان/کارت در سرویس آن صراف فعلاً در backend تعریف نشده است؛ هیچ موجودی، کارمزد یا شماره کارت ساختگی نمایش داده نمی‌شود.</div></div></div>;
+  const submit=async()=>{const n=Number(amount);if(!assetId||!selectedCard||!Number.isFinite(n)||n<=0){setMessage("کارت مقصد و مبلغ معتبر را انتخاب کنید.");return}setBusy(true);setMessage("");try{const r=await fetch(ANSARRAF_API_BASE+"/api/v1/withdrawals",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token},body:JSON.stringify({assetId,amount:amount.trim(),network:"CARD",destination:"bank_card:"+selectedCard,destinationCardId:selectedCard,idempotencyKey:crypto.randomUUID()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(d?.error??"withdrawal_creation_failed"));setMessage("درخواست برداشت ثبت شد و پس از تأیید مدیر پرداخت می‌شود.");setAmount("")}catch(e){setMessage(e instanceof Error?e.message:"ثبت درخواست برداشت ناموفق بود.")}finally{setBusy(false)}};
+  return <div style={{maxWidth:620,padding:"24px 0"}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:16}}>برداشت تومان</h2><div className="w-card" style={{padding:24}}>
+    <div style={{fontSize:14,fontWeight:800,marginBottom:8}}>کارت مقصد ثبت‌شده در آن پرداز</div>
+    {!cards.length?<div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>ابتدا یک کارت بانکی تأییدشده در آن پرداز ثبت کنید.</div>:<><select className="w-input" value={selectedCard??""} onChange={e=>setSelectedCard(Number(e.target.value))}><option value="">انتخاب کارت</option>{cards.map(c=><option key={c.id} value={c.id}>{c.bank_name??"بانک"} · •••• {c.last4}</option>)}</select><input className="w-input" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="مبلغ تومان" inputMode="decimal" dir="ltr" style={{marginTop:10}}/><button className="w-btn w-btn-primary" onClick={()=>void submit()} disabled={busy||!assetId||!selectedCard||!amount.trim()} style={{marginTop:10,width:"100%"}}>{busy?"در حال ثبت…":"ثبت درخواست برداشت"}</button></>}
+    {message&&<div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9,marginTop:12}}>{message}</div>}
+    <div style={{fontSize:11,color:"var(--w-muted)",lineHeight:1.8,marginTop:14}}>برداشت تومان به کارت متعلق به خود کاربر انجام می‌شود و پس از تأیید مدیر، پرداخت دستی و ثبت حسابداری خواهد شد.</div>
+  </div></div>;
 }
 // ── Withdraw Coin Tab ──────────────────────────────
 function WithdrawCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) {
