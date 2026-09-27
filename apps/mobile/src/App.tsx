@@ -3450,7 +3450,7 @@ function ExchangeInstantTrade({initialAsset,user,coins,onBack,onUpdate}:{initial
   const [pickerSearch,setPickerSearch]=useState("");
   const [processing,setProcessing]=useState(false);
   const [result,setResult]=useState<ReceiptData|null>(null);
-  const [error,setError]=useState(""); const [feeRule,setFeeRule]=useState<any>(null); const [liveWallets,setLiveWallets]=useState<Record<string,number>>({}); useEffect(()=>{let active=true;const load=async()=>{try{const w=await sarrafWalletMap();if(active)setLiveWallets(w);}catch{}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;clearInterval(id)}},[]);
+  const [error,setError]=useState(""); const [liveWallets,setLiveWallets]=useState<Record<string,number>>({}); useEffect(()=>{let active=true;const load=async()=>{try{const w=await sarrafWalletMap();if(active)setLiveWallets(w);}catch{}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;clearInterval(id)}},[]);
 
   const selected=coins.find(c=>c.symbol===asset)??coins[0];
   // In buy mode: amount = quote currency (TMN or USDT). In sell mode: amount = base coin.
