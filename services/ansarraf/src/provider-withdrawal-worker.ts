@@ -74,7 +74,7 @@ export class ProviderWithdrawalWorker{
           result=await adapter.submitWithdrawal({
             asset:String(w.symbol),
             network:String(w.network),
-            amount:String(w.amount),
+            amount:String(w.net_amount??w.amount),
             destination:String(w.destination),
             memo:w.destination_memo?String(w.destination_memo):null,
             clientWithdrawalId:String(w.operation_id)
@@ -83,7 +83,7 @@ export class ProviderWithdrawalWorker{
           const message=error instanceof Error?error.message:'provider_withdrawal_submission_failed';
           if(/^wallex_http_(400|401|403|422):/.test(message)){
             await this.persistAndSettle(Number(w.id),{
-              providerWithdrawalId:null,status:'FAILED',amount:String(w.amount),feeAmount:'0',txHash:null,
+              providerWithdrawalId:null,status:'FAILED',amount:String(w.net_amount??w.amount),feeAmount:'0',txHash:null,
               raw:{error:message}
             });
             return;
@@ -154,7 +154,7 @@ export class ProviderWithdrawalWorker{
            ON CONFLICT(idempotency_key) DO NOTHING`,
           [withdrawalId,'ansarraf:withdrawal-settlement:'+withdrawalId,{
             withdrawalId,customerId:w.customer_id,assetId:w.asset_id,assetSymbol:w.symbol,
-            amount:w.amount,providerCode:w.provider_code??null,providerWithdrawalId:result.providerWithdrawalId,
+            amount:w.amount,netAmount:w.net_amount??w.amount,customerFeeAmount:w.fee_amount??'0',providerCode:w.provider_code??null,providerWithdrawalId:result.providerWithdrawalId,
             providerFeeAmount:result.feeAmount,txHash:result.txHash,status:result.status,operationId:w.operation_id
           }]);
       }
