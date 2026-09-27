@@ -3085,48 +3085,26 @@ function ViolationsPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{plate
 }
 
 // ─── Car Services Hub ─────────────────────────────────────────────────────────
-function CarServicesScreen({onBack}:{onBack:()=>void}){
-  const [inner,setInner]=useState<null|"violations"|"freeway"|"traffic">(null);
-  if(inner==="violations")return <ViolationsScreen onBack={()=>setInner(null)}/>;
-  if(inner==="freeway")return <FreewayScreen onBack={()=>setInner(null)}/>;
-  if(inner==="traffic")return <TrafficScreen onBack={()=>setInner(null)}/>;
-  const services=[
-    {label:"عوارض آزادراهی",sub:"نیازمند استعلام واقعی",status:"استعلام",statusColor:"#f5c23d",icon:"🛣️",action:"freeway" as const},
-    {label:"خلافی خودرو",sub:"نیازمند استعلام واقعی",status:"استعلام",statusColor:"#f5c23d",icon:"🚦",action:"violations" as const},
-    {label:"طرح ترافیک تهران",sub:"نیازمند اتصال سرویس",status:"در دسترس نیست",statusColor:"#94a3b8",icon:"📷",action:"traffic" as const},
-  ];
-  return <div className="subscreen" dir="rtl">
-    <div className="subscreen-header">
-      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
-      <h2 className="subscreen-title">خدمات خودرویی</h2>
-      <div style={{width:36}}/>
-    </div>
-    <div className="subscreen-body">
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-        <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>وسیله‌های نقلیه</div>
-        <button style={{background:"none",border:"none",color:"#00D6B0",fontSize:13,cursor:"pointer",fontFamily:"Vazirmatn",display:"flex",alignItems:"center",gap:4}}><Icon name="plus" size={14}/> افزودن</button>
-      </div>
-      <div style={{background:"var(--card-bg)",borderRadius:14,padding:"16px",marginBottom:16,border:"1px solid var(--border-color)",textAlign:"center"}}>
-        <div style={{fontSize:13,fontWeight:800,color:"var(--text-primary)",marginBottom:6}}>وسیله نقلیه‌ای ثبت نشده است</div>
-        <div style={{fontSize:11,color:"var(--text-muted)",lineHeight:1.8}}>شماره پلاک یا وضعیت بدهی به‌صورت ساختگی نمایش داده نمی‌شود. پس از اتصال سرویس ثبت وسیله و استعلام رسمی، اطلاعات واقعی اینجا نمایش داده خواهد شد.</div>
-      </div>
-      <div style={{fontSize:12,color:"var(--text-muted)",textAlign:"center",padding:"8px 0",marginBottom:12,borderTop:"1px solid var(--border-lighter)",borderBottom:"1px solid var(--border-lighter)"}}>خدمات پرطرفدار</div>
-      {services.map(s=><button key={s.label} onClick={()=>setInner(s.action)} style={{display:"flex",alignItems:"center",width:"100%",background:"var(--card-bg)",border:"1px solid var(--border-light)",borderRadius:14,padding:"14px 16px",marginBottom:10,cursor:"pointer",color:"var(--text-primary)",textAlign:"right",transition:"background 0.15s"}}>
-        <div style={{fontSize:24,width:44,height:44,borderRadius:12,background:"rgba(167,85,247,0.15)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginLeft:12}}>{s.icon}</div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>{s.label}</div>
-          {s.sub&&<div style={{fontSize:11,color:"var(--text-muted)",marginTop:2}}>{s.sub}</div>}
-        </div>
-        <div style={{background:`${s.statusColor}25`,borderRadius:8,padding:"4px 10px",fontSize:11,color:s.statusColor,marginLeft:8,flexShrink:0}}>{s.status}</div>
-        <Icon name="arrow" size={16}/>
-      </button>)}
-      {!loading&&orgs.length===0&&<div style={{padding:16,textAlign:"center",color:"var(--text-muted)"}}>فهرست سازمان‌های خیریه از سرویس مربوطه در دسترس نیست.</div>}
-      <div style={{marginTop:8}}>
-        <div style={{textAlign:"center"}}><button style={{background:"none",border:"none",color:"#00D6B0",fontSize:12,cursor:"pointer",fontFamily:"Vazirmatn"}}>مدیریت پلاک‌ها ←</button></div>
-      </div>
-    </div>
-  </div>;
+function VehicleServiceScreen({serviceCode,title,icon,onBack}:{serviceCode:"freeway_toll"|"tehran_traffic";title:string;icon:string;onBack:()=>void}){
+  const [plate,setPlate]=useState("");const [busy,setBusy]=useState(false);const [error,setError]=useState("");const [result,setResult]=useState<any>(null);
+  const inquire=async()=>{const normalized=toLatinDigits(plate).trim();if(!normalized){setError("شماره پلاک را وارد کنید.");return}setBusy(true);setError("");setResult(null);try{const data=await anpardazServiceInquiry(serviceCode,{plate:normalized});setResult(data?.inquiry??data);}catch(e){setError(e instanceof Error?e.message:"استعلام سرویس انجام نشد.");}finally{setBusy(false)}};
+  return <><div className="subscreen" dir="rtl"><div className="subscreen-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">{title}</h2><div style={{width:36}}/></div><div className="subscreen-body">
+    <div style={{textAlign:"center",marginBottom:18}}><div style={{fontSize:42,marginBottom:8}}>{icon}</div><div style={{fontSize:16,fontWeight:900}}>استعلام واقعی {title}</div><div style={{fontSize:11,color:"var(--text-muted)",marginTop:5}}>اطلاعات خودرو و مبلغ فقط از سرویس ارائه‌دهنده دریافت می‌شود.</div></div>
+    <FloatInput label="شماره پلاک" value={toFaDigits(plate)} onChange={v=>setPlate(toLatinDigits(v).slice(0,12))} dir="rtl" style={{marginBottom:14}}/>
+    {error&&<div className="field-err" style={{marginBottom:12}}>{error}</div>}
+    <StickyActionBtn label="استعلام واقعی" onClick={inquire} disabled={busy||!plate.trim()} loading={busy} loadingText="در حال استعلام..."/>
+    {result&&<div className="anp-card" style={{padding:16,marginTop:16}}><div style={{fontWeight:900,marginBottom:8}}>نتیجه سرویس</div><pre style={{whiteSpace:"pre-wrap",overflow:"auto",fontSize:11,lineHeight:1.7}}>{JSON.stringify(result,null,2)}</pre></div>}
+  </div></div></>;
 }
+function CarServicesScreen({onBack}:{onBack:()=>void}){
+  const services=[{label:"عوارض آزادراهی",code:"freeway_toll" as const,icon:"🛣️"},{label:"خلافی خودرو",code:"vehicle_violations" as const,icon:"🚦"},{label:"طرح ترافیک تهران",code:"tehran_traffic" as const,icon:"📷"}];
+  return <div className="subscreen" dir="rtl"><div className="subscreen-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">خدمات خودرویی</h2><div style={{width:36}}/></div><div className="subscreen-body">
+    <div className="anp-card" style={{padding:16,marginBottom:14,textAlign:"center"}}><div style={{fontSize:13,fontWeight:800}}>اطلاعات خودرو از Backend دریافت می‌شود</div><div style={{fontSize:11,color:"var(--text-muted)",marginTop:5,lineHeight:1.8}}>هیچ پلاک، بدهی یا وضعیت پرداخت نمونه‌ای در برنامه نگهداری نمی‌شود. برای استعلام، خدمت موردنظر را انتخاب کنید و پلاک واقعی را وارد کنید.</div></div>
+    {services.map(v=><button key={v.code} onClick={()=>v.code==="freeway_toll"?window.dispatchEvent(new CustomEvent("anp-open-freeway")):v.code==="tehran_traffic"?window.dispatchEvent(new CustomEvent("anp-open-traffic")):window.dispatchEvent(new CustomEvent("anp-open-violations"))} style={{display:"flex",alignItems:"center",width:"100%",background:"var(--card-bg)",border:"1px solid var(--border-color)",borderRadius:14,padding:14,marginBottom:10,cursor:"pointer",color:"var(--text-primary)",fontFamily:"Vazirmatn",textAlign:"right"}}><span style={{fontSize:25,width:42}}>{v.icon}</span><span style={{flex:1,fontWeight:800}}>{v.label}</span><Icon name="arrow" size={16}/></button>)}
+  </div></div>;
+}
+function FreewayScreen({onBack}:{onBack:()=>void}){return <VehicleServiceScreen serviceCode="freeway_toll" title="عوارض آزادراهی" icon="🛣️" onBack={onBack}/>}
+function TrafficScreen({onBack}:{onBack:()=>void}){return <VehicleServiceScreen serviceCode="tehran_traffic" title="طرح ترافیک تهران" icon="📷" onBack={onBack}/>}
 
 // ─── Sana Registration Screen ─────────────────────────────────────────────────
 function SanaScreen({onBack}:{onBack:()=>void}){
