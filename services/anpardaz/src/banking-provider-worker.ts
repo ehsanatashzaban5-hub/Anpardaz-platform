@@ -72,6 +72,14 @@ export class BankingProviderWorker{
           await this.pool.query("UPDATE banking_provider_outbox SET status='completed',last_error=NULL,updated_at=NOW() WHERE id=$1",[row.id]);
           return true;
         }
+        // Provider completion is a terminal external side effect. If Accounting failed after the provider
+        // already completed, retries must reconcile the ledger only and MUST NOT execute the provider again.
+        if(String(x.provider_status).toLowerCase()==='completed'){
+          await postLedger('anpardaz_transfer',String(x.id),x.operation_id,Number(x.customer_id),String(x.provider_code??'FINTECH'),String(x.currency),String(x.amount),'debit');
+          await this.pool.query("UPDATE transfer_requests SET status='completed',updated_at=NOW() WHERE operation_id=$1",[x.operation_id]);
+          await this.pool.query("UPDATE banking_provider_outbox SET status='completed',last_error=NULL,updated_at=NOW() WHERE id=$1",[row.id]);
+          return true;
+        }
         const result=await provider.execute({serviceCode:'transfer',operationId:x.operation_id,payload:{amount:String(x.amount),currency:x.currency,destinationExternal:x.destination_external??undefined,description:x.description??undefined,sourceAccountId:String(x.source_account_id)}});
         const status=result.status==='completed'?'completed':result.status==='failed'?'failed':result.status==='manual_review'?'manual_review':'processing';
         await this.pool.query("UPDATE transfer_requests SET status=$1,provider_operation_id=COALESCE($2,provider_operation_id),provider_reference=COALESCE($3,provider_reference),provider_status=$4,provider_error_code=$5,provider_error_message=$6,provider_metadata=$7,updated_at=NOW() WHERE operation_id=$8",[status==='completed'?'processing':status,result.providerOperationId??null,result.externalReference??null,result.status,result.errorCode??null,result.errorMessage??null,JSON.stringify(result.data??{}),x.operation_id]);
@@ -85,6 +93,14 @@ export class BankingProviderWorker{
       }
       if(row.operation_type==='topup'){
         const x=(await this.pool.query('SELECT * FROM topup_requests WHERE operation_id=$1',[row.operation_id])).rows[0];if(!x){await this.fail(row.id,'topup_not_found');return true;}
+        // Same rule for topups: a completed provider side effect must only be reconciled,
+        // never executed again because Accounting or the local finalization may have failed.
+        if(String(x.provider_status).toLowerCase()==='completed'){
+          await postLedger('anpardaz_topup',String(x.id),x.operation_id,Number(x.customer_id),String(x.provider??'FINTECH'),String(x.currency),String(x.amount),'credit');
+          await this.pool.query("UPDATE topup_requests SET status='completed',updated_at=NOW() WHERE operation_id=$1",[x.operation_id]);
+          await this.pool.query("UPDATE banking_provider_outbox SET status='completed',updated_at=NOW() WHERE id=$1",[row.id]);
+          return true;
+        }
         const result=await provider.execute({serviceCode:'transfer',operationId:x.operation_id,payload:{amount:String(x.amount),currency:x.currency,sourceAccountId:String(x.account_id),description:'An Pardaz topup'}});
         const status=result.status==='completed'?'completed':result.status==='failed'?'failed':result.status==='manual_review'?'manual_review':'processing';
         await this.pool.query("UPDATE topup_requests SET provider_operation_id=COALESCE($1,provider_operation_id),provider_reference=COALESCE($2,provider_reference),provider_status=$3,provider_error_code=$4,provider_error_message=$5,provider_metadata=$6,status=$7 WHERE operation_id=$8",[result.providerOperationId??null,result.externalReference??null,result.status,result.errorCode??null,result.errorMessage??null,JSON.stringify(result.data??{}),status==='completed'?'processing':status,x.operation_id]);
