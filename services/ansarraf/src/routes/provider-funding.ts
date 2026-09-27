@@ -18,6 +18,18 @@ const admin=async(req:FastifyRequest,reply:any)=>{const a=(req as R).auth;if(!['
 
 export function registerProviderFundingRoutes(app:FastifyInstance,pool:Pool){
   const registry=createProviderRegistry();
+  app.get('/api/v1/crypto/deposit-networks',{preHandler:requireAuth},async(req,reply)=>{
+    const symbol=String((req.query as any)?.asset??'').trim().toUpperCase();
+    if(!/^[A-Z0-9]{2,20}$/.test(symbol))return reply.code(400).send({error:'crypto_asset_required'});
+    const asset=(await pool.query("SELECT id,symbol FROM assets WHERE symbol=$1 AND asset_type='crypto' AND status='active'",[symbol])).rows[0];
+    if(!asset)return reply.code(404).send({error:'crypto_asset_not_available'});
+    const providerCode=(process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX').toUpperCase();
+    const provider=(await pool.query("SELECT id FROM liquidity_providers WHERE code=$1 AND status='ACTIVE'",[providerCode])).rows[0];
+    if(!provider)return reply.code(503).send({error:'provider_not_active'});
+    const adapter=registry.get(providerCode);if(!adapter)return reply.code(503).send({error:'provider_not_configured'});
+    const networks=await adapter.listDepositNetworks(symbol);
+    return {provider:providerCode,asset:symbol,networks};
+  });
   app.get('/api/v1/crypto/deposit-address',{preHandler:requireAuth},async(req,reply)=>{
     const customer=await ensureCustomer(pool,(req as R).auth);const q=req.query as any;const symbol=String(q.asset??'').trim().toUpperCase();const network=String(q.network??'').trim();
     if(!/^[A-Z0-9]{2,20}$/.test(symbol)||!network)return reply.code(400).send({error:'asset_and_network_required'});
