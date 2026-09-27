@@ -5638,9 +5638,6 @@ const SERVICES=[
   {id:"cashback",label:"بازگشت هزینه",icon:"refresh",color:"#00D6B0",bg:"rgba(0,214,176,0.12)",action:"cashback"},
   // Extra services — shown in AllServices, can be added to Home
   {id:"cheque-seyadi",label:"چک صیادی",icon:"file-text",color:"#0891B2",bg:"rgba(8,145,178,0.12)",action:"sayad"},
-  {id:"social-ins",label:"تامین اجتماعی",icon:"shield",color:"#059669",bg:"rgba(5,150,105,0.12)",action:"soon"},
-  {id:"payam-noor",label:"پیام نور",icon:"phone",color:"#D97706",bg:"rgba(217,119,6,0.12)",action:"soon"},
-  {id:"credit-score",label:"رتبه اعتباری",icon:"trending-up",color:"#7C3AED",bg:"rgba(124,58,237,0.12)",action:"soon"},
 ];
 
 // Services shown on Home by default (excludes extra/new services)
