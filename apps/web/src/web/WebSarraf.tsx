@@ -344,246 +344,51 @@ function KycGate({ kycStatus }: { kycStatus:KycStatus }) {
 
 // ── Deposit Toman Tab ──────────────────────────────
 function DepositTomanTab({ kycStatus }: { kycStatus:KycStatus }) {
-  const [method, setMethod] = useState<"card"|"bank">("card");
-  if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>;
-  return (
-    <div style={{ maxWidth:560, padding:"24px 0" }}>
-      <h2 style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>واریز تومان</h2>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:20 }}>
-        {[{ id:"card", label:"کارت بانکی (شاپرک)", icon:"credit-card", desc:"واریز آنی تا ۵۰ میلیون تومان" },
-          { id:"bank", label:"انتقال بانکی (پایا/ساتنا)", icon:"deposit", desc:"واریز تا ۵۰۰ میلیون تومان" }
-        ].map(m => (
-          <button key={m.id} onClick={()=>setMethod(m.id as any)} className="w-card" style={{ padding:"18px", textAlign:"right", border:`2px solid ${method===m.id?"rgba(8,145,178,0.5)":"var(--w-border)"}`, background:method===m.id?"rgba(8,145,178,0.05)":"var(--w-card)", cursor:"pointer" }}>
-            <div style={{ fontSize:24, marginBottom:8 }}><WI n={m.icon} s={24} style={{ color:"#0891b2" }}/></div>
-            <div style={{ fontSize:13, fontWeight:800, marginBottom:4 }}>{m.label}</div>
-            <div style={{ fontSize:11, color:"var(--w-muted)" }}>{m.desc}</div>
-          </button>
-        ))}
-      </div>
-      {method === "card" && (
-        <div className="w-card" style={{ padding:"22px" }}>
-          <div style={{ fontSize:13, fontWeight:700, marginBottom:14 }}>واریز با کارت بانکی</div>
-          <div style={{ marginBottom:12 }}>
-            <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>مبلغ (تومان)</label>
-            <input className="w-input" placeholder="مثال: ۵,۰۰۰,۰۰۰" inputMode="numeric"/>
-          </div>
-          <div style={{ padding:"10px 12px", background:"var(--w-card2)", borderRadius:8, fontSize:12, color:"var(--w-muted)", marginBottom:14 }}>
-            کارت‌های عضو شبکه شتاب قابل استفاده هستند. سقف تراکنش روزانه: ۵۰ میلیون تومان
-          </div>
-          <button className="w-btn w-btn-primary" style={{ width:"100%", padding:"12px" }}>انتقال به درگاه پرداخت</button>
-        </div>
-      )}
-      {method === "bank" && (
-        <div className="w-card" style={{ padding:"22px" }}>
-          <div style={{ fontSize:13, fontWeight:700, marginBottom:14 }}>اطلاعات حساب بانکی</div>
-          {[["شماره حساب","6219861034567890"],["شماره شبا","IR120570028080010840901200"]].map(([l,v])=>(
-            <div key={l} style={{ marginBottom:12 }}>
-              <div style={{ fontSize:11, color:"var(--w-muted)", marginBottom:4 }}>{l}</div>
-              <div style={{ display:"flex", alignItems:"center", gap:8, background:"var(--w-card2)", border:"1px solid var(--w-border)", borderRadius:8, padding:"10px 14px" }}>
-                <span style={{ flex:1, fontFamily:"monospace", fontSize:13, letterSpacing:1 }}>{v}</span>
-                <button style={{ background:"none", border:"none", cursor:"pointer", color:"#0891b2", fontSize:11, fontWeight:700 }}><WI n="copy" s={12}/> کپی</button>
-              </div>
-            </div>
-          ))}
-          <div style={{ padding:"10px 12px", background:"rgba(8,145,178,0.07)", borderRadius:8, fontSize:12, color:"#0891b2", marginTop:8 }}>
-            در توضیحات انتقال، شناسه کاربری خود را ذکر کنید. واریز پایا ۲-۳ ساعت کاری اعمال می‌شود.
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const [amount,setAmount]=useState(""),[cards,setCards]=useState<any[]>([]),[cardId,setCardId]=useState(""),[assetId,setAssetId]=useState(""),[reference,setReference]=useState(""),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");
+  useEffect(()=>{const token=getWebToken();if(!token)return;Promise.all([
+    fetch(ANSARRAF_API_BASE+"/api/v1/funding/cards",{headers:{authorization:"Bearer "+token}}).then(r=>r.json()),
+    fetch(ANSARRAF_API_BASE+"/api/v1/assets").then(r=>r.json())
+  ]).then(([cardsBody,assetsBody])=>{setCards(Array.isArray(cardsBody.cards)?cardsBody.cards:[]);const a=(assetsBody.assets??[]).find((x:any)=>x.asset_type==="fiat"&&["TMN","TOMAN","IRR"].includes(String(x.symbol).toUpperCase()));if(a)setAssetId(String(a.id));}).catch(()=>setMsg("اطلاعات حساب برای واریز در دسترس نیست."));},[]);
+  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus}/>;
+  const submit=async()=>{const token=getWebToken();if(!token)return;setBusy(true);setMsg("");try{const r=await fetch(ANSARRAF_API_BASE+"/api/v1/deposits",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({assetId:Number(assetId),amount:amount.replace(/,/g,""),network:"BANK_CARD",sourceCardId:Number(cardId),externalReference:reference.trim()||undefined,idempotencyKey:crypto.randomUUID()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"deposit_failed");setMsg("درخواست واریز ثبت شد و پس از بررسی مدیریت و حسابداری به موجودی اضافه می‌شود.");setAmount("");setReference("");}catch(e){setMsg(e instanceof Error?e.message:"deposit_failed");}finally{setBusy(false);}};
+  return <div style={{maxWidth:560,padding:"24px 0"}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:20}}>واریز تومان</h2><div className="w-card" style={{padding:22}}><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9,marginBottom:14}}>واریز تومان در آن صراف به‌صورت ثبت درخواست انجام می‌شود؛ منبع باید کارت بانکی تأییدشده خود کاربر باشد و اعتباردهی نهایی با بررسی مدیریت و حسابداری انجام می‌شود.</div><label style={{fontSize:11,fontWeight:700}}>کارت مبدأ</label><select className="w-input" value={cardId} onChange={e=>setCardId(e.target.value)} style={{marginTop:6}}><option value="">انتخاب کارت تأییدشده</option>{cards.map((card:any)=><option key={card.id} value={card.id}>{card.bankName??"بانک"} · ****{card.last4}</option>)}</select><label style={{fontSize:11,fontWeight:700,display:"block",marginTop:12}}>مبلغ (تومان)</label><input className="w-input" value={amount} onChange={e=>setAmount(e.target.value.replace(/[^0-9]/g,""))} inputMode="numeric" placeholder="مبلغ واقعی واریز"/><label style={{fontSize:11,fontWeight:700,display:"block",marginTop:12}}>شناسه/مرجع بانکی (اختیاری)</label><input className="w-input" value={reference} onChange={e=>setReference(e.target.value)} placeholder="شماره پیگیری یا مرجع انتقال"/>{msg&&<div style={{marginTop:12,color:"#b45309",fontSize:12,lineHeight:1.8}}>{msg}</div>}<button disabled={busy||!cardId||!assetId||!amount} onClick={()=>void submit()} className="w-btn w-btn-primary" style={{width:"100%",marginTop:14}}>{busy?"در حال ثبت…":"ثبت درخواست واریز"}</button>{cards.length===0&&<div style={{marginTop:10,fontSize:11,color:"var(--w-muted)"}}>ابتدا کارت بانکی خود را از فرایند رسمی ثبت و تأیید کارت اضافه کنید.</div>}</div></div>;
 }
 
-// ── Deposit Coin Tab ───────────────────────────────
+// ── Deposit Coin Tab// ── Deposit Coin Tab ───────────────────────────────
 function DepositCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) {
-  const [selAsset, setSelAsset] = useState(assets[0]);
-  const [network, setNetwork] = useState<"TRC20"|"ERC20"|"BEP20"|"BTC"|"SOL">("TRC20");
-  const [searchCoin, setSearchCoin] = useState("");
-  if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>;
-  const ADDR: Record<string,string> = { TRC20:"TXqz8fR2mQAYn12r4Yp8HktZL42QvWmT9P", ERC20:"0x71C7656EC7ab88b098defB751B7401B5f6d8976F", BEP20:"bnb1grpf0955h0ykzq3ar5nmum7y6gdfl6lxfn46h2", BTC:"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh", SOL:"7KqpRwzkB7zRJpNLbRthXm6kHcDLFXPQ3JZvyCoMGxkV" };
-  const NETS: Record<string,string[]> = { BTC:["BTC"], ETH:["ERC20"], BNB:["BEP20"], SOL:["SOL"], USDT:["TRC20","ERC20","BEP20"], USDC:["ERC20","BEP20"], default:["TRC20","ERC20","BEP20"] };
-  const nets = NETS[selAsset.symbol] || NETS.default;
-  const filtered = assets.filter(a => a.symbol.includes(searchCoin.toUpperCase()) || a.nameFa.includes(searchCoin)).slice(0,30);
-  return (
-    <div style={{ display:"flex", gap:20, padding:"24px 0", alignItems:"flex-start" }}>
-      <div style={{ width:220, flexShrink:0 }}>
-        <div style={{ fontSize:14, fontWeight:800, marginBottom:10 }}>انتخاب رمزارز</div>
-        <input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{ marginBottom:8, fontSize:12 }}/>
-        <div style={{ background:"var(--w-card)", border:"1px solid var(--w-border)", borderRadius:10, overflow:"hidden", maxHeight:360, overflowY:"auto" }}>
-          {filtered.map(a => (
-            <div key={a.id} onClick={()=>{setSelAsset(a);const ns=NETS[a.symbol]||NETS.default;setNetwork(ns[0] as any);}} style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", cursor:"pointer", background:selAsset.id===a.id?"rgba(8,145,178,0.08)":"transparent", borderBottom:"1px solid var(--w-border)", transition:"background 0.1s" }}>
-              <div style={{ width:24, height:24, borderRadius:"50%", background:a.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:8, fontWeight:900, flexShrink:0 }}>{a.symbol.slice(0,3)}</div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:700 }}>{a.symbol}</div>
-                <div style={{ fontSize:10, color:"var(--w-muted)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.nameFa}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ flex:1, maxWidth:560 }}>
-        <h2 style={{ fontSize:17, fontWeight:900, marginBottom:16 }}>واریز {selAsset.symbol}</h2>
-        <div className="w-card" style={{ padding:"22px" }}>
-          <div style={{ marginBottom:16 }}>
-            <label style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:8 }}>شبکه</label>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              {nets.map((n:string)=>(
-                <button key={n} onClick={()=>setNetwork(n as any)} style={{ padding:"7px 16px", borderRadius:8, border:`1.5px solid ${network===n?"rgba(8,145,178,0.5)":"var(--w-border)"}`, background:network===n?"rgba(8,145,178,0.08)":"transparent", color:network===n?"#0891b2":"var(--w-muted)", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Vazirmatn" }}>{n}</button>
-              ))}
-            </div>
-          </div>
-          <div style={{ display:"flex", gap:20, marginBottom:16, alignItems:"flex-start" }}>
-            <div style={{ width:120, height:120, borderRadius:12, background:"var(--w-card2)", border:"1px solid var(--w-border)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <WI n="qr-code" s={44} style={{ opacity:0.25 }}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", marginBottom:6 }}>آدرس واریز ({network})</div>
-              <div style={{ background:"var(--w-card2)", border:"1px solid var(--w-border)", borderRadius:9, padding:"11px", fontSize:11, wordBreak:"break-all", fontFamily:"monospace", letterSpacing:0.3 }}>{ADDR[network] || ADDR.TRC20}</div>
-              <button className="w-btn w-btn-ghost" style={{ marginTop:8, padding:"6px 12px", fontSize:11 }}><WI n="copy" s={12}/> کپی آدرس</button>
-            </div>
-          </div>
-          <div style={{ padding:"11px 14px", background:"rgba(217,119,6,0.07)", border:"1px solid rgba(217,119,6,0.18)", borderRadius:9, fontSize:12, color:"#d97706", lineHeight:1.7 }}>
-            فقط {selAsset.symbol} را روی شبکه {network} ارسال کنید. ارسال توکن‌های دیگر موجب از دست رفتن دارایی می‌شود.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const [selAsset,setSelAsset]=useState<CryptoAsset|null>(assets[0]??null),[networks,setNetworks]=useState<string[]>([]),[network,setNetwork]=useState(""),[address,setAddress]=useState<any>(null),[searchCoin,setSearchCoin]=useState(""),[error,setError]=useState("");
+  const token=getWebToken();
+  useEffect(()=>{if(!selAsset||!token)return;setAddress(null);setError("");fetch(ANSARRAF_API_BASE+"/api/v1/crypto/deposit-networks?asset="+encodeURIComponent(selAsset.symbol),{headers:{authorization:"Bearer "+token}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"deposit_networks_unavailable");const ns=Array.isArray(d.networks)?d.networks:[];setNetworks(ns);setNetwork(ns[0]??"");}).catch(e=>setError(e instanceof Error?e.message:"deposit_networks_unavailable"));},[selAsset?.id,token]);
+  useEffect(()=>{if(!network||!selAsset||!token)return;fetch(ANSARRAF_API_BASE+"/api/v1/crypto/deposit-address?asset="+encodeURIComponent(selAsset.symbol)+"&network="+encodeURIComponent(network),{headers:{authorization:"Bearer "+token}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"deposit_address_unavailable");setAddress(d);}).catch(e=>setError(e instanceof Error?e.message:"deposit_address_unavailable"));},[network,selAsset?.id,token]);
+  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus}/>;
+  const filtered=assets.filter(a=>a.symbol.includes(searchCoin.toUpperCase())||a.nameFa.includes(searchCoin)).slice(0,30);
+  if(!selAsset)return <div style={{padding:40,color:"var(--w-muted)"}}>ارزی برای نمایش وجود ندارد.</div>;
+  return <div style={{display:"flex",gap:20,padding:"24px 0",alignItems:"flex-start"}}><div style={{width:220,flexShrink:0}}><div style={{fontSize:14,fontWeight:800,marginBottom:10}}>انتخاب رمزارز</div><input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{marginBottom:8,fontSize:12}}/><div style={{background:"var(--w-card)",border:"1px solid var(--w-border)",borderRadius:10,overflow:"hidden",maxHeight:360,overflowY:"auto"}}>{filtered.map(a=><div key={a.id} onClick={()=>setSelAsset(a)} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:selAsset.id===a.id?"rgba(8,145,178,0.08)":"transparent",borderBottom:"1px solid var(--w-border)"}}><div style={{width:24,height:24,borderRadius:"50%",background:a.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:900}}>{a.symbol.slice(0,3)}</div><div><div style={{fontSize:12,fontWeight:700}}>{a.symbol}</div><div style={{fontSize:10,color:"var(--w-muted)"}}>{a.nameFa}</div></div></div>)}</div></div><div style={{flex:1,maxWidth:560}}><h2 style={{fontSize:17,fontWeight:900,marginBottom:16}}>واریز {selAsset.symbol}</h2><div className="w-card" style={{padding:22}}><label style={{fontSize:12,fontWeight:700,color:"var(--w-muted)"}}>شبکه</label><div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"8px 0 16px"}}>{networks.map(n=><button key={n} onClick={()=>setNetwork(n)} className={network===n?"w-btn w-btn-primary":"w-btn w-btn-ghost"} style={{padding:"7px 14px"}}>{n}</button>)}</div>{error&&<div style={{color:"#dc2626",fontSize:12,marginBottom:10}}>{error}</div>}<div style={{padding:14,background:"var(--w-card2)",borderRadius:9,wordBreak:"break-all",fontFamily:"monospace",fontSize:12}}>{address?.address??"در حال دریافت آدرس واقعی provider…"}</div>{address?.memo&&<div style={{marginTop:8,fontFamily:"monospace"}}>Memo/Tag: {address.memo}</div>}<button disabled={!address?.address} onClick={()=>address?.address&&navigator.clipboard?.writeText(address.address)} className="w-btn w-btn-ghost" style={{marginTop:8}}>کپی آدرس</button>{address&&!address.safeForAutomaticAttribution&&<div style={{marginTop:12,padding:11,borderRadius:9,background:"rgba(217,119,6,.08)",color:"#b45309",fontSize:11,lineHeight:1.8}}>این آدرس برای اعتباردهی خودکار امن نیست و واریز پس از تطبیق دستی مدیریت انجام می‌شود.</div>}</div></div></div>;
 }
 
-// ── Withdraw Toman Tab ─────────────────────────────
+// ── Withdraw Toman Tab// ── Withdraw Toman Tab ─────────────────────────────
 function WithdrawTomanTab({ kycStatus }: { kycStatus:KycStatus }) {
-  const [amount, setAmount] = useState("");
-  const [card, setCard] = useState("");
-  if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>;
-  return (
-    <div style={{ maxWidth:520, padding:"24px 0" }}>
-      <h2 style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>برداشت تومان</h2>
-      <div className="w-card" style={{ padding:"22px" }}>
-        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-          <div>
-            <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>شماره کارت مقصد</label>
-            <input value={card} onChange={e=>setCard(e.target.value)} placeholder="۱۶ رقم شماره کارت" className="w-input" maxLength={16} inputMode="numeric" style={{ fontFamily:"monospace", letterSpacing:2 }}/>
-          </div>
-          <div>
-            <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>مبلغ (تومان)</label>
-            <div style={{ position:"relative" }}>
-              <input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="حداقل ۱۰۰,۰۰۰ تومان" className="w-input" inputMode="numeric"/>
-            </div>
-          </div>
-          <div style={{ padding:"10px 12px", background:"var(--w-card2)", borderRadius:9, fontSize:12 }}>
-            {[["موجودی قابل برداشت","۳,۲۵۰,۰۰۰ تومان"],["کارمزد برداشت","رایگان"],["زمان واریز","فوری (ساعات اداری)"]].map(([k,v])=>(
-              <div key={k as string} style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                <span style={{ color:"var(--w-muted)" }}>{k}</span><span style={{ fontWeight:700 }}>{v}</span>
-              </div>
-            ))}
-          </div>
-          <button disabled={!card||!amount} className="w-btn w-btn-primary" style={{ padding:"12px", opacity:card&&amount?1:0.5 }}>
-            <WI n="withdraw" s={15}/> درخواست برداشت تومان
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  const [amount,setAmount]=useState(""),[cards,setCards]=useState<any[]>([]),[assetId,setAssetId]=useState(""),[cardId,setCardId]=useState(""),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");
+  useEffect(()=>{const token=getWebToken();if(!token)return;Promise.all([fetch(ANSARRAF_API_BASE+"/api/v1/funding/cards",{headers:{authorization:"Bearer "+token}}).then(r=>r.json()),fetch(ANSARRAF_API_BASE+"/api/v1/assets").then(r=>r.json())]).then(([cb,ab])=>{setCards(Array.isArray(cb.cards)?cb.cards:[]);const a=(ab.assets??[]).find((x:any)=>x.asset_type==="fiat"&&["TMN","TOMAN","IRR"].includes(String(x.symbol).toUpperCase()));if(a)setAssetId(String(a.id));}).catch(()=>setMsg("اطلاعات برداشت در دسترس نیست."));},[]);
+  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus}/>;
+  const submit=async()=>{const token=getWebToken();if(!token)return;setBusy(true);setMsg("");try{const card=cards.find(x=>String(x.id)===cardId);const r=await fetch(ANSARRAF_API_BASE+"/api/v1/withdrawals",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({assetId:Number(assetId),amount:amount.replace(/,/g,""),network:"BANK_CARD",destination:"CARD:"+cardId+":"+String(card?.last4??""),destinationCardId:Number(cardId),idempotencyKey:crypto.randomUUID()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"withdrawal_failed");setMsg("درخواست برداشت ثبت شد و برای بررسی و پرداخت مدیریت ارسال شد.");setAmount("");}catch(e){setMsg(e instanceof Error?e.message:"withdrawal_failed");}finally{setBusy(false);}};
+  return <div style={{maxWidth:520,padding:"24px 0"}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:20}}>برداشت تومان</h2><div className="w-card" style={{padding:22}}><label style={{fontSize:11,fontWeight:700}}>کارت مقصد</label><select className="w-input" value={cardId} onChange={e=>setCardId(e.target.value)} style={{marginTop:6}}><option value="">انتخاب کارت تأییدشده</option>{cards.map((card:any)=><option key={card.id} value={card.id}>{card.bankName??"بانک"} · ****{card.last4}</option>)}</select><label style={{fontSize:11,fontWeight:700,display:"block",marginTop:12}}>مبلغ (تومان)</label><input value={amount} onChange={e=>setAmount(e.target.value.replace(/[^0-9]/g,""))} className="w-input" inputMode="numeric" placeholder="مبلغ واقعی"/>{msg&&<div style={{marginTop:12,color:"#b45309",fontSize:12,lineHeight:1.8}}>{msg}</div>}<button disabled={busy||!cardId||!assetId||!amount} onClick={()=>void submit()} className="w-btn w-btn-primary" style={{width:"100%",marginTop:14}}>{busy?"در حال ثبت…":"ثبت درخواست برداشت"}</button>{cards.length===0&&<div style={{marginTop:10,fontSize:11,color:"var(--w-muted)"}}>فقط کارت‌های ثبت‌شده و تأییدشده مالک قابل انتخاب هستند.</div>}</div></div>;
 }
 
-// ── Withdraw Coin Tab ──────────────────────────────
+// ── Withdraw Coin Tab// ── Withdraw Coin Tab ──────────────────────────────
 function WithdrawCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) {
-  const [selAsset, setSelAsset] = useState(assets[0]);
-  const [network, setNetwork] = useState<string>("TRC20");
-  const [address, setAddress] = useState("");
-  const [wAmount, setWAmount] = useState("");
-  const [step, setStep] = useState<"form"|"otp"|"done">("form");
-  const [otp, setOtp] = useState("");
-  const [searchCoin, setSearchCoin] = useState("");
-  if (kycStatus !== "verified") return <KycGate kycStatus={kycStatus}/>;
-  const NETS: Record<string,string[]> = { BTC:["BTC"], ETH:["ERC20"], BNB:["BEP20"], SOL:["SOL"], USDT:["TRC20","ERC20","BEP20"], default:["TRC20","ERC20","BEP20"] };
-  const nets = NETS[selAsset.symbol] || NETS.default;
-  const feeMap: Record<string,string> = { TRC20:"1 USDT", ERC20:"5 USDT", BEP20:"0.5 USDT", BTC:"0.0001 BTC", SOL:"0.01 SOL" };
-  const filtered = assets.filter(a => a.symbol.includes(searchCoin.toUpperCase()) || a.nameFa.includes(searchCoin)).slice(0,30);
-  if (step === "done") return (
-    <div style={{ textAlign:"center", padding:"60px 24px" }}>
-      <div style={{ width:64, height:64, borderRadius:"50%", background:"rgba(16,185,129,0.12)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", color:"#10b981" }}><WI n="check" s={30}/></div>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:8 }}>درخواست ثبت شد</div>
-      <div style={{ fontSize:13, color:"var(--w-muted)", marginBottom:24 }}>برداشت {wAmount} {selAsset.symbol} در صف پردازش قرار گرفت.</div>
-      <button onClick={()=>{setStep("form");setAddress("");setWAmount("");setOtp("");}} className="w-btn w-btn-ghost">برداشت جدید</button>
-    </div>
-  );
-  if (step === "otp") return (
-    <div style={{ maxWidth:400, padding:"40px 0", margin:"0 auto" }}>
-      <div className="w-card" style={{ padding:"28px", textAlign:"center" }}>
-        <div style={{ fontSize:40, marginBottom:12 }}>📱</div>
-        <div style={{ fontSize:16, fontWeight:900, marginBottom:8 }}>تأیید دو مرحله‌ای</div>
-        <div style={{ fontSize:12, color:"var(--w-muted)", marginBottom:20 }}>کد ۶ رقمی ارسال شده به شماره موبایل خود را وارد کنید</div>
-        <input value={otp} onChange={e=>setOtp(e.target.value)} maxLength={6} className="w-input" style={{ textAlign:"center", fontSize:24, letterSpacing:8, fontFamily:"monospace" }} inputMode="numeric" placeholder="------"/>
-        <div style={{ display:"flex", gap:8, marginTop:16 }}>
-          <button onClick={()=>setStep("form")} className="w-btn w-btn-ghost" style={{ flex:1 }}>بازگشت</button>
-          <button onClick={()=>setStep("done")} disabled={otp.length!==6} className="w-btn w-btn-primary" style={{ flex:1, opacity:otp.length===6?1:0.5 }}>تأیید</button>
-        </div>
-      </div>
-    </div>
-  );
-  return (
-    <div style={{ display:"flex", gap:20, padding:"24px 0", alignItems:"flex-start" }}>
-      <div style={{ width:220, flexShrink:0 }}>
-        <div style={{ fontSize:14, fontWeight:800, marginBottom:10 }}>انتخاب رمزارز</div>
-        <input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{ marginBottom:8, fontSize:12 }}/>
-        <div style={{ background:"var(--w-card)", border:"1px solid var(--w-border)", borderRadius:10, overflow:"hidden", maxHeight:360, overflowY:"auto" }}>
-          {filtered.map(a => (
-            <div key={a.id} onClick={()=>{setSelAsset(a);const ns=NETS[a.symbol]||NETS.default;setNetwork(ns[0]);}} style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", cursor:"pointer", background:selAsset.id===a.id?"rgba(8,145,178,0.08)":"transparent", borderBottom:"1px solid var(--w-border)" }}>
-              <div style={{ width:24, height:24, borderRadius:"50%", background:a.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:8, fontWeight:900, flexShrink:0 }}>{a.symbol.slice(0,3)}</div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:700 }}>{a.symbol}</div>
-                <div style={{ fontSize:10, color:"var(--w-muted)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.nameFa}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{ flex:1, maxWidth:520 }}>
-        <h2 style={{ fontSize:17, fontWeight:900, marginBottom:16 }}>برداشت {selAsset.symbol}</h2>
-        <div className="w-card" style={{ padding:"22px" }}>
-          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:8 }}>شبکه</label>
-              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-                {nets.map((n:string)=>(
-                  <button key={n} onClick={()=>setNetwork(n)} style={{ padding:"7px 16px", borderRadius:8, border:`1.5px solid ${network===n?"rgba(8,145,178,0.5)":"var(--w-border)"}`, background:network===n?"rgba(8,145,178,0.08)":"transparent", color:network===n?"#0891b2":"var(--w-muted)", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"Vazirmatn" }}>{n}</button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>آدرس مقصد</label>
-              <input value={address} onChange={e=>setAddress(e.target.value)} placeholder={`آدرس ${selAsset.symbol} روی ${network}`} className="w-input" style={{ fontFamily:"monospace", fontSize:12 }}/>
-            </div>
-            <div>
-              <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>مقدار ({selAsset.symbol})</label>
-              <div style={{ position:"relative" }}>
-                <input value={wAmount} onChange={e=>setWAmount(e.target.value)} placeholder="0.00" className="w-input" style={{ paddingLeft:50 }} inputMode="decimal"/>
-                <button onClick={()=>setWAmount("0.5")} style={{ position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", fontSize:11, fontWeight:700, color:"#0891b2", background:"none", border:"none", cursor:"pointer" }}>MAX</button>
-              </div>
-            </div>
-            <div style={{ padding:"10px 12px", background:"var(--w-card2)", borderRadius:9, fontSize:12 }}>
-              {[["کارمزد شبکه",feeMap[network]||"—"],["دریافتی",wAmount?`${Math.max(0,parseFloat(wAmount)-0.001).toFixed(4)} ${selAsset.symbol}`:"—"]].map(([k,v])=>(
-                <div key={k as string} style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-                  <span style={{ color:"var(--w-muted)" }}>{k}</span><span style={{ fontWeight:700 }}>{v}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ padding:"10px 12px", background:"rgba(220,38,38,0.06)", borderRadius:9, fontSize:11, color:"#dc2626" }}>
-              آدرس را با دقت بررسی کنید. تراکنش‌های ارز دیجیتال برگشت‌پذیر نیستند.
-            </div>
-            <button disabled={!address||!wAmount} onClick={()=>setStep("otp")} className="w-btn w-btn-primary" style={{ padding:"12px", opacity:address&&wAmount?1:0.5 }}>
-              <WI n="withdraw" s={15}/> ادامه و تأیید
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const [selAsset,setSelAsset]=useState<CryptoAsset|null>(assets[0]??null),[networks,setNetworks]=useState<string[]>([]),[network,setNetwork]=useState(""),[address,setAddress]=useState(""),[wAmount,setWAmount]=useState(""),[balance,setBalance]=useState<Record<string,number>>({}),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");
+  const token=getWebToken();
+  useEffect(()=>{if(!token||!selAsset)return;void sarrafWalletMap().then(setBalance).catch(()=>{});fetch(ANSARRAF_API_BASE+"/api/v1/crypto/deposit-networks?asset="+encodeURIComponent(selAsset.symbol),{headers:{authorization:"Bearer "+token}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"networks_unavailable");const ns=Array.isArray(d.networks)?d.networks:[];setNetworks(ns);setNetwork(ns[0]??"");}).catch(e=>setMsg(e instanceof Error?e.message:"networks_unavailable"));},[selAsset?.id,token]);
+  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus}/>;
+  if(!selAsset)return <div style={{padding:40,color:"var(--w-muted)"}}>ارزی برای نمایش وجود ندارد.</div>;
+  const available=Number(balance[selAsset.symbol]??0);
+  const submit=async()=>{if(!token)return;setBusy(true);setMsg("");try{const r=await fetch(ANSARRAF_API_BASE+"/api/v1/withdrawals",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({assetId:Number(selAsset.id),amount:wAmount,network,destination:address.trim(),idempotencyKey:crypto.randomUUID()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"withdrawal_failed");setMsg("درخواست برداشت ثبت شد و پس از کنترل‌های امنیتی و تأیید مدیریت پردازش می‌شود.");setWAmount("");setAddress("");}catch(e){setMsg(e instanceof Error?e.message:"withdrawal_failed");}finally{setBusy(false);}};
+  const filtered=assets.filter(a=>a.symbol.includes((address?"": "").toUpperCase())||true).slice(0,30);
+  return <div style={{display:"flex",gap:20,padding:"24px 0",alignItems:"flex-start"}}><div style={{width:220,flexShrink:0}}><div style={{fontSize:14,fontWeight:800,marginBottom:10}}>انتخاب رمزارز</div><div style={{background:"var(--w-card)",border:"1px solid var(--w-border)",borderRadius:10,overflow:"hidden",maxHeight:360,overflowY:"auto"}}>{filtered.map(a=><div key={a.id} onClick={()=>setSelAsset(a)} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:selAsset.id===a.id?"rgba(8,145,178,0.08)":"transparent",borderBottom:"1px solid var(--w-border)"}}><div style={{width:24,height:24,borderRadius:"50%",background:a.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:900}}>{a.symbol.slice(0,3)}</div><div><div style={{fontSize:12,fontWeight:700}}>{a.symbol}</div><div style={{fontSize:10,color:"var(--w-muted)"}}>{a.nameFa}</div></div></div>)}</div></div><div style={{flex:1,maxWidth:520}}><h2 style={{fontSize:17,fontWeight:900,marginBottom:16}}>برداشت {selAsset.symbol}</h2><div className="w-card" style={{padding:22}}><label style={{fontSize:11,fontWeight:700}}>شبکه</label><div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"8px 0 14px"}}>{networks.map(n=><button key={n} onClick={()=>setNetwork(n)} className={network===n?"w-btn w-btn-primary":"w-btn w-btn-ghost"} style={{padding:"7px 14px"}}>{n}</button>)}</div><label style={{fontSize:11,fontWeight:700}}>آدرس مقصد</label><input value={address} onChange={e=>setAddress(e.target.value)} placeholder={"آدرس "+selAsset.symbol+" روی "+network} className="w-input" style={{marginTop:6,fontFamily:"monospace"}}/><label style={{fontSize:11,fontWeight:700,display:"block",marginTop:12}}>مقدار</label><input value={wAmount} onChange={e=>setWAmount(e.target.value)} className="w-input" inputMode="decimal" placeholder="مقدار واقعی"/><div style={{fontSize:11,color:"var(--w-muted)",marginTop:7}}>موجودی قابل برداشت: {available.toFixed(8)} {selAsset.symbol}</div>{msg&&<div style={{marginTop:12,color:"#b45309",fontSize:12,lineHeight:1.8}}>{msg}</div>}<button disabled={busy||!network||!address.trim()||!wAmount} onClick={()=>void submit()} className="w-btn w-btn-primary" style={{width:"100%",marginTop:14}}>{busy?"در حال ثبت…":"ثبت درخواست برداشت"}</button></div></div></div>;
 }
 
-// ── Orders Tab ─────────────────────────────────────
+// ── Orders Tab// ── Orders Tab ─────────────────────────────────────
 function OrdersTab({orders}:{orders:any[]}) {
   const [activeTab,setActiveTab]=useState<"open"|"history">("open");
   const rows=activeTab==="open"?orders.filter(o=>["open","partially_filled"].includes(String(o.status))):orders;
