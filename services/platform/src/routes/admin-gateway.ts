@@ -199,6 +199,27 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     });
     return reply.code(result.status).send(result.body);
   });
+  // Browser-facing admin proxy for An Sarraf Forex Bot.
+  app.get('/api/v1/admin/ecosystem/ansarraf/forex-bot/requests', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/forex-bot/requests' + q, { headers: forwardUser(request) });
+    return reply.code(result.status).send(result.body);
+  });
+  app.post('/api/v1/admin/ecosystem/ansarraf/forex-bot/requests/:id/decision', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/forex-bot/requests/' + encodeURIComponent((request.params as any).id) + '/decision', { method:'POST', headers:forwardUser(request), body:JSON.stringify(request.body??{}) });
+    return reply.code(result.status).send(result.body);
+  });
+  app.post('/api/v1/admin/ecosystem/ansarraf/forex-bot/accounts/:id/pnl', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/forex-bot/accounts/' + encodeURIComponent((request.params as any).id) + '/pnl', { method:'POST', headers:forwardUser(request), body:JSON.stringify(request.body??{}) });
+    return reply.code(result.status).send(result.body);
+  });
+
   // Browser-facing admin proxy for An Sarraf manual Toman funding.
   app.get('/api/v1/admin/ecosystem/ansarraf/deposits/manual', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
