@@ -222,7 +222,7 @@ type SarrafAssetRecord={id:number|string;symbol:string;status?:string};async fun
 }
 
 async function anpardazRequest(path:string,init:RequestInit={}){const token=window.localStorage.getItem("anpardaz:accessToken")??"";if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");const headers=new Headers(init.headers);headers.set("accept","application/json");if(token)headers.set("authorization",`Bearer ${token}`);if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");const deviceToken=sessionStorage.getItem("anpardaz:deviceSecurityToken");if(deviceToken)headers.set("x-anpardaz-device-token",deviceToken);const res=await fetch(`${ANPARDAZ_API_BASE}${path}`,{...init,headers,cache:"no-store"});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(String(data?.error??"anpardaz_request_failed"));return data;}
-type UserSettings={theme:"dark"|"light";notificationsEnabled:boolean;keySoundEnabled:boolean;fontScale:number;pinEnabled:boolean;updatedAt:string};
+type UserSettings={theme:"dark"|"light";notificationsEnabled:boolean;keySoundEnabled:boolean;fontScale:number;homeServices:string[];homePlatforms:string[];showCashback:boolean;pinEnabled:boolean;updatedAt:string};
 async function userSettingsRequest(path:string,init:RequestInit={}){
   const token=window.localStorage.getItem("anpardaz:accessToken")??"";
   if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");
@@ -4539,6 +4539,9 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
       setNotifications(settings.notificationsEnabled);
       setKeySoundEnabled(settings.keySoundEnabled);
       setFontScaleState(settings.fontScale);
+      if(Array.isArray(settings.homeServices)&&settings.homeServices.length)setHomeServices(settings.homeServices);
+      if(Array.isArray(settings.homePlatforms)&&settings.homePlatforms.length)setHomePlatforms(settings.homePlatforms);
+      if(typeof settings.showCashback==="boolean")setShowCashback(settings.showCashback);
       localStorage.setItem(`anp_notifications_${user.uid}`,settings.notificationsEnabled?"on":"off");
       localStorage.setItem("anp_key_sound",settings.keySoundEnabled?"on":"off");
       localStorage.setItem("anp_font_scale",String(settings.fontScale));
@@ -6815,7 +6818,7 @@ export default function App() {
         const next=[...prev];
         const si=next.indexOf(src);const oi=next.indexOf(over);
         if(si>=0&&oi>=0){next.splice(si,1);next.splice(oi,0,src);}
-        if(user)localStorage.setItem(`anp_home_services_${user.uid}`,JSON.stringify(next));
+        if(user){localStorage.setItem(`anp_home_services_${user.uid}`,JSON.stringify(next));persistHomePreferences({homeServices:next});}
         return next;
       });
     } else if(!longPressActivatedRef.current&&!hasScrolledRef.current&&!homeEditMode&&svc.action!=="disabled"){
@@ -6853,7 +6856,7 @@ export default function App() {
 
   const removeService=(id:string,e?:React.MouseEvent)=>{
     const next=homeServices.filter(sid=>sid!==id);
-    setHomeServices(next);if(user)localStorage.setItem(`anp_home_services_${user.uid}`,JSON.stringify(next));
+    setHomeServices(next);if(user){localStorage.setItem(`anp_home_services_${user.uid}`,JSON.stringify(next));persistHomePreferences({homeServices:next});}
     playPopSound();
     const colors=["#00D6B0","#4a9eff","#f472b6","#fb923c","#a78bfa","#34d399","#f5c23d","#e85c5c"];
     const cx=e?e.clientX:window.innerWidth/2;
@@ -7071,6 +7074,8 @@ export default function App() {
     return()=>window.removeEventListener("popstate",handle);
   },[]);
 
+  const persistHomePreferences=useCallback((patch:{homeServices?:string[];homePlatforms?:string[];showCashback?:boolean})=>{if(!user)return;void userSettingsRequest("/api/v1/user/settings",{method:"PATCH",body:JSON.stringify(patch)}).catch(()=>{});},[user?.uid]);
+
   const updateUser=useCallback((u:UserData)=>{DB.saveUser(u);setUser(u)},[]);
   const updateWithTx=useCallback((u:UserData,tx:TxRecord)=>{const txs=[tx,...transactions];DB.saveUser(u);DB.saveTx(u.phone,txs);setUser(u);setTransactions(txs);if(localStorage.getItem(`anp_notifications_${u.uid}`)!=="off")playChime()},[transactions]);
 
@@ -7247,7 +7252,7 @@ function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;
       <AnHooshScreen onBack={goBack}/>
     </div>
   );
-  if(subPage==="all-services")return <div key="all-services" className={`app${lt} app-slide`} dir="rtl"><AllServicesScreen onBack={goBack} onServiceTap={(action,label)=>{void handleService(action,label)}} homeServices={homeServices} setHomeServices={v=>{setHomeServices(v);if(user)localStorage.setItem(`anp_home_services_${user.uid}`,JSON.stringify(v));}} homePlatforms={homePlatforms} setHomePlatforms={v=>{setHomePlatforms(v);if(user)localStorage.setItem(`anp_home_platforms_${user.uid}`,JSON.stringify(v));}} showCashback={showCashback} setShowCashback={v=>{setShowCashback(v);if(user)localStorage.setItem(`anp_show_cashback_${user.uid}`,String(v));}}/><SNAV/></div>;
+  if(subPage==="all-services")return <div key="all-services" className={`app${lt} app-slide`} dir="rtl"><AllServicesScreen onBack={goBack} onServiceTap={(action,label)=>{void handleService(action,label)}} homeServices={homeServices} setHomeServices={v=>{setHomeServices(v);if(user){localStorage.setItem(`anp_home_services_${user.uid}`,JSON.stringify(v));persistHomePreferences({homeServices:v});}}} homePlatforms={homePlatforms} setHomePlatforms={v=>{setHomePlatforms(v);if(user){localStorage.setItem(`anp_home_platforms_${user.uid}`,JSON.stringify(v));persistHomePreferences({homePlatforms:v});}}} showCashback={showCashback} setShowCashback={v=>{setShowCashback(v);if(user){localStorage.setItem(`anp_show_cashback_${user.uid}`,String(v));persistHomePreferences({showCashback:v});}}}/><SNAV/></div>;
 
   return <div className={`app${lightTheme?" light-theme":""}`} dir="rtl">
     <header className="app-header">
@@ -7448,7 +7453,7 @@ function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;
                     {homeEditMode&&(
                       <span role="button"
                         onPointerDown={e=>e.stopPropagation()}
-                        onClick={e=>{e.stopPropagation();const next=homePlatforms.filter(x=>x!==p.id);setHomePlatforms(next);if(user)localStorage.setItem(`anp_home_platforms_${user.uid}`,JSON.stringify(next));}}
+                        onClick={e=>{e.stopPropagation();const next=homePlatforms.filter(x=>x!==p.id);setHomePlatforms(next);if(user){localStorage.setItem(`anp_home_platforms_${user.uid}`,JSON.stringify(next));persistHomePreferences({homePlatforms:next});}}}
                         style={{position:"absolute",top:-6,right:-6,width:22,height:22,borderRadius:"50%",background:"#e85c5c",border:"2px solid var(--card-bg)",color:"#fff",fontSize:14,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:8,lineHeight:1}}>×</span>
                     )}
                   </div>
@@ -7480,7 +7485,7 @@ function AnMarketScreen({onBack,user,lightTheme}:{onBack:()=>void;user:UserData;
             {homeEditMode&&(
               <span role="button"
                 onPointerDown={e=>e.stopPropagation()}
-                onClick={e=>{e.stopPropagation();setShowCashback(false);if(user)localStorage.setItem(`anp_show_cashback_${user.uid}`,"false");}}
+                onClick={e=>{e.stopPropagation();setShowCashback(false);if(user){localStorage.setItem(`anp_show_cashback_${user.uid}`,"false");persistHomePreferences({showCashback:false});}}}
                 style={{position:"absolute",top:-6,right:-6,width:22,height:22,borderRadius:"50%",background:"#e85c5c",border:"2px solid var(--card-bg)",color:"#fff",fontSize:14,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:8,lineHeight:1}}>×</span>
             )}
           </div>
