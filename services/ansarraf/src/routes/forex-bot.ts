@@ -94,6 +94,10 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
       if (body.action === 'activate') {
         if (!amount(body.amount) || Number(body.amount) > Number(MAX_INVESTMENT)) throw new Error('forex_bot_max_investment_30_usd');
         if (a.status !== 'inactive') throw new Error('forex_bot_activation_not_allowed');
+        if (a.deactivated_at) {
+          const cooldown = await client.query("SELECT (NOW() >= $1::timestamptz + INTERVAL '24 hours') AS allowed",[a.deactivated_at]);
+          if (!cooldown.rows[0].allowed) throw new Error('forex_bot_cooldown_24h');
+        }
         const requested = String(body.amount);
         const usdt = await client.query(`SELECT id FROM assets WHERE symbol='USDT' AND status='active' LIMIT 1`);
         if (!usdt.rows[0]) throw new Error('usdt_asset_not_available');
@@ -131,6 +135,10 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
       }
 
       if (a.status !== 'active') throw new Error('forex_bot_deactivation_not_allowed');
+      if (a.activated_at) {
+        const cooldown = await client.query("SELECT (NOW() >= $1::timestamptz + INTERVAL '24 hours') AS allowed",[a.activated_at]);
+        if (!cooldown.rows[0].allowed) throw new Error('forex_bot_cooldown_24h');
+      }
       const req = await client.query(
         `INSERT INTO forex_bot_requests(account_id,action,idempotency_key,user_note,operation_id)
          VALUES($1,'deactivate',$2,$3,$4) RETURNING *`,
@@ -197,7 +205,7 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
       if (row.action === 'activate') {
         if (body.approve) {
           await client.query(
-            `UPDATE forex_bot_accounts SET status='active',activated_at=COALESCE(activated_at,NOW()),deactivated_at=NULL,updated_at=NOW(),version=version+1 WHERE id=$1`,
+            `UPDATE forex_bot_accounts SET status='active',activated_at=NOW(),deactivated_at=NULL,updated_at=NOW(),version=version+1 WHERE id=$1`,
             [row.account_id],
           );
           await client.query(
