@@ -22,7 +22,20 @@ async function postAccounting(customerId:string,operationId:string,amount:string
   if(!r.ok)throw new Error('accounting_post_failed');
 }
 function decimal18(v:string){const x=String(v).trim();if(!/^\d+(?:\.\d+)?$/.test(x))throw new Error('invalid_ledger_decimal');const [a,b='']=x.split('.');return BigInt(a)*1000000000000000000n+BigInt((b+'000000000000000000').slice(0,18));}
-async function ledgerCustomerBalance(customerId:number,currency:string){const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!base||!token)throw new Error('accounting_service_not_configured');const code='anpardaz.customer.'+customerId+'.liability.'+currency;const r=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(8000)});if(r.status===404)return '0';if(!r.ok)throw new Error('accounting_balance_lookup_failed');const id=Number((await r.json() as any)?.account?.id);if(!Number.isSafeInteger(id))throw new Error('accounting_account_invalid');const b=await fetch(base+'/internal/v1/ledger/accounts/'+id+'/balance',{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(8000)});if(!b.ok)throw new Error('accounting_balance_lookup_failed');return String((await b.json() as any)?.balance?.balance??'0');}
+async function accountingHold(customerId:number,operationId:string,amount:string,currency:string){
+  const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!base||!token)throw new Error('accounting_service_not_configured');
+  const account=await ledgerAccount(base,token,'anpardaz.customer.'+customerId+'.liability.'+currency,'An Pardaz customer '+customerId+' '+currency,'liability',currency);
+  const r=await fetch(base+'/internal/v1/ledger/holds',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({accountId:account,referenceType:'anpardaz_service',referenceId:operationId,amount,currency}),signal:AbortSignal.timeout(10000)});
+  const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data?.error??'accounting_hold_failed'));
+}
+async function accountingHoldAction(operationId:string,action:'capture'|'release'){
+  const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!base||!token)throw new Error('accounting_service_not_configured');
+  const q=await fetch(base+'/internal/v1/ledger/holds/by-reference?referenceType=anpardaz_service&referenceId='+encodeURIComponent(operationId),{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(8000)});
+  if(q.status===404)return false;if(!q.ok)throw new Error('accounting_hold_lookup_failed');
+  const data=await q.json() as any;const id=Number(data?.hold?.id);if(!Number.isSafeInteger(id))throw new Error('accounting_hold_invalid');if(String(data?.hold?.status)!=='active')return true;
+  const rr=await fetch(base+'/internal/v1/ledger/holds/'+id+'/'+action,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:'{}',signal:AbortSignal.timeout(8000)});
+  if(!rr.ok)throw new Error('accounting_hold_'+action+'_failed');return true;
+}
 function payloadEncryptionKey(){
   const raw=process.env.FINTECH_PAYLOAD_ENCRYPTION_KEY_B64?.trim();
   if(!raw)throw new Error('FINTECH_PAYLOAD_ENCRYPTION_KEY_B64_not_configured');
@@ -70,25 +83,31 @@ export class FintechServiceWorker{
       }
       const payload=decryptProviderPayload(String(op.provider_payload_enc));
       const requestedAmount=payload.amount;
-      if(typeof requestedAmount==='string'&&/^(?:0|[1-9]\\d{0,15})(?:\\.\\d{1,8})?$/.test(requestedAmount)&&requestedAmount!=='0'){
-        const available=await ledgerCustomerBalance(Number(op.customer_id),'IRR');
-        if(decimal18(available)<decimal18(requestedAmount)){
-          await this.pool.query("UPDATE fintech_service_operations SET status='failed',accounting_status='failed',failure_code='INSUFFICIENT_FUNDS',failure_message='insufficient_ledger_balance',updated_at=NOW() WHERE operation_id=$1",[op.operation_id]);
-          await this.pool.query("UPDATE fintech_provider_outbox SET status='failed',last_error='insufficient_ledger_balance',updated_at=NOW() WHERE id=$1",[row.id]);
-          return true;
-        }
-      }
-      const result=await provider.execute({serviceCode:op.service_code,operationId:op.operation_id,payload});
-      let status=result.status;
-      let accountingStatus=op.accounting_status;
-      if(status==='completed'){
-        const raw=(result.data as any)?.amount??(result.data as any)?.amountPaid??payload.amount;
-        const amount=typeof raw==='number'?String(raw):typeof raw==='string'&&/^(?:0|[1-9]\d{0,15})(?:\.\d{1,8})?$/.test(raw)?raw:null;
-        if(!amount||amount==='0'){status='manual_review';accountingStatus='failed';}
-        else{try{await postAccounting(String(op.customer_id),op.operation_id,amount,'IRR');accountingStatus='posted';}catch{status='manual_review';accountingStatus='failed';}}
-      }else if(status==='failed'||status==='manual_review')accountingStatus='failed';
-      else accountingStatus='pending';
-      await this.pool.query(`UPDATE fintech_service_operations SET status=$1,provider_operation_id=COALESCE($2,provider_operation_id),external_reference=COALESCE($3,external_reference),failure_code=$4,failure_message=$5,response_metadata=$6,accounting_status=$7,updated_at=NOW(),completed_at=CASE WHEN $1='completed' THEN NOW() ELSE completed_at END WHERE operation_id=$8`,
+       let held=false;
+       if(typeof requestedAmount==='string'&&/^(?:0|[1-9]\\d{0,15})(?:\\.\\d{1,8})?$/.test(requestedAmount)&&requestedAmount!=='0'){
+         await accountingHold(Number(op.customer_id),op.operation_id,requestedAmount,'IRR');
+         held=true;
+       }
+       const result=await provider.execute({serviceCode:op.service_code,operationId:op.operation_id,payload});
+       let status=result.status;
+       let accountingStatus=op.accounting_status;
+       if(status==='completed'){
+         const raw=(result.data as any)?.amount??(result.data as any)?.amountPaid??payload.amount;
+         const amount=typeof raw==='number'?String(raw):typeof raw==='string'&&/^(?:0|[1-9]\\d{0,15})(?:\\.\\d{1,8})?$/.test(raw)?raw:null;
+         if(!amount||amount==='0'){status='manual_review';accountingStatus='failed';}
+         else{
+           try{
+             await postAccounting(String(op.customer_id),op.operation_id,amount,'IRR');
+             accountingStatus='posted';
+             if(held)await accountingHoldAction(op.operation_id,'capture');
+           }catch{status='manual_review';accountingStatus='failed';}
+         }
+       }else if(status==='failed'){
+         accountingStatus='failed';
+         if(held)await accountingHoldAction(op.operation_id,'release');
+       }else if(status==='manual_review')accountingStatus='failed';
+       else accountingStatus='pending';
+       await this.pool.query(`UPDATE fintech_service_operations SET status=$1,provider_operation_id=COALESCE($2,provider_operation_id),external_reference=COALESCE($3,external_reference),failure_code=$4,failure_message=$5,response_metadata=$6,accounting_status=$7,updated_at=NOW(),completed_at=CASE WHEN $1='completed' THEN NOW() ELSE completed_at END WHERE operation_id=$8`,
         [status,result.providerOperationId??null,result.externalReference??null,result.errorCode??null,status==='manual_review'&&accountingStatus==='failed'?'ACCOUNTING_REQUIRED':result.errorMessage??null,JSON.stringify(result.data??{}),accountingStatus,op.operation_id]);
       if(status==='completed')await this.pool.query("UPDATE fintech_provider_outbox SET status='completed',last_error=NULL,updated_at=NOW() WHERE id=$1",[row.id]);
       else if(status==='failed'||status==='manual_review')await this.pool.query("UPDATE fintech_provider_outbox SET status=$2,last_error=$3,updated_at=NOW() WHERE id=$1",[row.id,status,result.errorMessage??result.errorCode??null]);
