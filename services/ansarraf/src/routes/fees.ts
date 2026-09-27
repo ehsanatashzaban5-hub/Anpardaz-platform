@@ -19,6 +19,6 @@ export function registerFeeRoutes(app: FastifyInstance, pool: Pool) {
        WHERE effective_from<=NOW() AND (effective_to IS NULL OR effective_to>NOW())
        ORDER BY effective_from DESC,id DESC`,
     );
-    return { customerId, customerRules: rules.rows, providerRules: provider.rows, source:'database' };
+    return { customerId, rules: rules.rows, customerRules: rules.rows, providerRules: provider.rows, source:'database' };
   });
 }
