@@ -4965,7 +4965,7 @@ function CardBalanceScreen({user,onBack,onDone}:{user:UserData;onBack:()=>void;o
 
   const selCard=cards.find(c=>c.id===selectedCardId);
   const fmtCardInput=(v:string)=>v.replace(/\D/g,"").slice(0,16).replace(/(.{4})(?=.)/g,"$1 ");
-  const activeRaw=selCard?selCard.number:manualNum.replace(/\s/g,"");
+  const selectedRaw=selCard?.number?.replace(/\s/g,"")??""; const activeRaw=/^\d{16}$/.test(selectedRaw)?selectedRaw:manualNum.replace(/\s/g,"");
   const cardBank=activeRaw.length>=4?detectBank(activeRaw):"";
 
   const resetSensitive=()=>{setOtp("");setCvv2("");setExpM("");setExpY("")};
@@ -5022,6 +5022,8 @@ function CardBalanceScreen({user,onBack,onDone}:{user:UserData;onBack:()=>void;o
               </div>
             )}
           </button>
+
+        {selCard && !/^\d{16}$/.test(selectedRaw) && <div style={{marginBottom:12}}><label className="field-label">شماره کامل کارت برای استعلام</label><AnimatedCardInput value={toFaDigits(manualNum)} onChange={v=>setManualNum(toLatinDigits(v).replace(/\D/g,"").slice(0,16))} inputMode="numeric" maxLength={19} dir="ltr" autoComplete="cc-number"/><div style={{fontSize:10,color:"var(--text-muted)",lineHeight:1.7,marginTop:5}}>شماره کامل کارت فقط برای همین استعلام ارسال می‌شود و در آن‌پرداز ذخیره نمی‌شود.</div></div>}
 
         {/* ── رمز پویا ── */}
         <div className="fin-otp-row">
