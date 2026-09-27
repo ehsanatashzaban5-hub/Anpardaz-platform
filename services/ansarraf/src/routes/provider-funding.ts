@@ -20,7 +20,7 @@ export function registerProviderFundingRoutes(app:FastifyInstance,pool:Pool){
   const registry=createProviderRegistry();
   app.get('/api/v1/funding/cards',{preHandler:requireAuth},async(req,reply)=>{
     const identityId=String((req as R).auth.sub);
-    const base=(process.env.ANPARDAZ_SERVICE_URL??'').replace(/\\/$/,'');
+    const base=(process.env.ANPARDAZ_SERVICE_URL??'').replace(/\/$/,'');
     const token=process.env.ANPARDAZ_INTERNAL_TOKEN;
     if(!base||!token)return reply.code(503).send({error:'anpardaz_card_verification_not_configured'});
     const response=await fetch(base+'/internal/v1/admin/cards/lookup?identityId='+encodeURIComponent(identityId),{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(Number(process.env.ANPARDAZ_HTTP_TIMEOUT_MS??5000))});
