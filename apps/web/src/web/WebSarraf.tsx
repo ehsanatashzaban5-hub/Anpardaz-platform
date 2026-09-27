@@ -79,6 +79,9 @@ function MarketsTab({ assets, search, onSearch, sortBy, onSort, filterFav, onFil
   totalCount: number;
 }) {
   const isMob = useIsMobile(900);
+  const [resolution,setResolution]=useState("60"),[candles,setCandles]=useState<any[]>([]),[candleLoading,setCandleLoading]=useState(true),[candleError,setCandleError]=useState("");
+  useEffect(()=>{let active=true;const load=async()=>{setCandleLoading(true);setCandleError("");try{const to=Math.floor(Date.now()/1000),from=to-7*24*60*60;const r=await fetch(ANSARRAF_API_BASE+"/api/v1/market-data/candles?symbol="+encodeURIComponent(a.symbol+"/USDT")+"&resolution="+encodeURIComponent(resolution)+"&from="+from+"&to="+to,{cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"market_candles_unavailable");if(active)setCandles(Array.isArray(d?.candles)?d.candles:[]);}catch(e){if(active){setCandles([]);setCandleError(e instanceof Error?e.message:"market_candles_unavailable");}}finally{if(active)setCandleLoading(false);}};void load();const timer=window.setInterval(()=>void load(),30000);return()=>{active=false;window.clearInterval(timer)}},[a.symbol,resolution]);
+  const candlePoints=candles.map((x:any)=>Number(x.close)).filter(Number.isFinite),cMin=candlePoints.length?Math.min(...candlePoints):0,cMax=candlePoints.length?Math.max(...candlePoints):0,cSpan=Math.max(cMax-cMin,1),cPoly=candlePoints.map((v:number,i:number)=>String(candlePoints.length===1?200:i*400/(candlePoints.length-1))+","+String(110-(v-cMin)/cSpan*95)).join(" ");
   return (
     <div>
       {/* Controls bar */}
@@ -212,22 +215,9 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
               </button>
             </div>
           </div>
-          {/* Chart placeholder */}
-          <div style={{ height:340, background:"var(--w-card)", border:"1px solid var(--w-border)", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:8, marginBottom:16, position:"relative", overflow:"hidden" }}>
-            <svg viewBox="0 0 400 120" style={{ position:"absolute", bottom:0, left:0, width:"100%", opacity:0.6 }}>
-              <defs>
-                <linearGradient id={`cg${a.id}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0891b2" stopOpacity="0.3"/>
-                  <stop offset="100%" stopColor="#0891b2" stopOpacity="0"/>
-                </linearGradient>
-              </defs>
-              <path d="M0,80 L30,70 L60,75 L90,50 L120,55 L150,35 L180,40 L210,25 L240,30 L270,15 L300,20 L330,10 L360,18 L400,8 L400,120 L0,120Z" fill={`url(#cg${a.id})`}/>
-              <path d="M0,80 L30,70 L60,75 L90,50 L120,55 L150,35 L180,40 L210,25 L240,30 L270,15 L300,20 L330,10 L360,18 L400,8" fill="none" stroke="#0891b2" strokeWidth="2"/>
-            </svg>
-            <div style={{ zIndex:1, textAlign:"center", color:"var(--w-muted)", fontSize:13 }}>
-              <WI n="bar-chart" s={28} style={{ marginBottom:4, opacity:0.3 }}/>
-              <div>نمودار قیمت — اتصال به API</div>
-            </div>
+          <div className="w-card" style={{height:340,padding:14,marginBottom:16,boxSizing:"border-box"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><b style={{fontSize:13}}>نمودار واقعی والکس</b><div style={{display:"flex",gap:4}}>{[["15","۱۵د"],["60","۱س"],["240","۴س"],["1D","۱روز"]].map(([v,l])=><button key={v} onClick={()=>setResolution(v)} className={resolution===v?"w-btn w-btn-primary":"w-btn w-btn-ghost"} style={{padding:"4px 8px",fontSize:10}}>{l}</button>)}</div></div>
+            {candleLoading?<div style={{height:285,display:"grid",placeItems:"center",color:"var(--w-muted)",fontSize:12}}>در حال دریافت کندل‌های واقعی…</div>:candleError||!candlePoints.length?<div style={{height:285,display:"grid",placeItems:"center",color:"var(--w-muted)",fontSize:12}}>{candleError?"داده کندل در دسترس نیست.":"برای این بازار داده کندل موجود نیست."}</div>:<svg viewBox="0 0 400 120" preserveAspectRatio="none" style={{width:"100%",height:285,display:"block"}}><polyline points={cPoly} fill="none" stroke="#0891b2" strokeWidth="1.8" vectorEffect="non-scaling-stroke"/></svg>}
           </div>
         </div>
         {/* Stats */}
