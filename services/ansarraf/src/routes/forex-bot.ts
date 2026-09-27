@@ -270,39 +270,4 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
     } finally { client.release(); }
   });
 
-  app.post('/api/v1/admin/forex-bot/accounts/:id/pnl', { preHandler: requireAuth }, async (request, reply) => {
-    const a = auth(request).auth;
-    if (!REVIEW_ROLES.includes(a.role)) return reply.code(403).send({ error:'forbidden' });
-    const accountId = Number((request.params as any).id);
-    const body = (request.body ?? {}) as { amount?: string; sourceReference?: string; reason?: string; idempotencyKey?: string };
-    if (!Number.isSafeInteger(accountId) || typeof body.amount !== 'string' || !body.sourceReference?.trim() || !body.reason?.trim() || !body.idempotencyKey) return reply.code(400).send({error:'invalid_pnl'});
-    const raw = String(body.amount).trim();
-    if (!/^-?(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/.test(raw) || Number(raw)===0) return reply.code(400).send({error:'invalid_pnl_amount'});
-    const client=await pool.connect();
-    try{
-      await client.query('BEGIN');
-      const existing=await client.query('SELECT * FROM forex_bot_pnl_events WHERE idempotency_key=$1 FOR UPDATE',[body.idempotencyKey]);
-      if(existing.rows[0]){await client.query('ROLLBACK');return{event:existing.rows[0],idempotent:true};}
-      const q=await client.query(`SELECT * FROM forex_bot_accounts WHERE id=$1 FOR UPDATE`,[accountId]);
-      if(!q.rows[0]||q.rows[0].status!=='active')throw new Error('forex_bot_not_active');
-      const row=q.rows[0];
-      const next=await client.query('SELECT ($1::numeric+$2::numeric)::text AS pnl,($3::numeric+$1::numeric+$2::numeric)::text AS total,($3::numeric+$1::numeric+$2::numeric>=0) AS ok',[row.total_pnl,raw,row.investment_amount]);
-      if(!next.rows[0].ok)throw new Error('forex_bot_pnl_exceeds_investment_loss');
-      const customerId=Number(row.customer_id);
-      const usdt=await client.query(`SELECT id FROM assets WHERE symbol='USDT' AND status='active' LIMIT 1`);
-      const wallet=await client.query('SELECT * FROM wallets WHERE customer_id=$1 AND asset_id=$2 FOR UPDATE',[customerId,usdt.rows[0].id]);
-      if(!wallet.rows[0])throw new Error('usdt_wallet_not_found');
-      const lockedChange=raw;
-      if(Number(raw)<0 && Number(wallet.rows[0].locked_balance)<Math.abs(Number(raw)))throw new Error('forex_bot_locked_balance_invariant_failed');
-      await client.query(`UPDATE wallets SET locked_balance=locked_balance+$1::numeric WHERE id=$2`,[lockedChange,wallet.rows[0].id]);
-      const operationId='ANSARRAF-FBP-'+randomUUID();
-      const event=await client.query(`INSERT INTO forex_bot_pnl_events(account_id,amount,source_reference,reason,idempotency_key,admin_identity_id,operation_id) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,[accountId,raw,body.sourceReference.trim().slice(0,200),body.reason.trim().slice(0,2000),body.idempotencyKey,a.sub,operationId]);
-      await client.query(`UPDATE forex_bot_accounts SET total_pnl=$1,updated_at=NOW(),version=version+1 WHERE id=$2`,[next.rows[0].pnl,accountId]);
-      await addOutbox(client,'forex_bot.pnl',''+event.rows[0].id,{operationId,customerId,amount:raw,eventId:event.rows[0].id},'ansarraf:forexbot:pnl:'+event.rows[0].id);
-      await client.query(`INSERT INTO forex_bot_audit_events(account_id,event_type,actor_type,actor_identity_id,payload) VALUES($1,'pnl_recorded','admin',$2,$3)`,[accountId,a.sub,{amount:raw,sourceReference:body.sourceReference,reason:body.reason}]);
-      await client.query('COMMIT');
-      return {event:event.rows[0]};
-    }catch(e){await client.query('ROLLBACK');return reply.code(400).send({error:e instanceof Error?e.message:'forex_bot_pnl_failed'});}
-    finally{client.release();}
-  });
 }
