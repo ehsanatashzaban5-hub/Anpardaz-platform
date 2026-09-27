@@ -7147,6 +7147,1710 @@ function ComparisonPopup({ids,onClose,onMinimize,minimized,onProduct}:{ids:strin
     <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>{prods.map(p=><button key={p.id} onClick={()=>onProduct(p.id)} style={{textAlign:"right",background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:14,padding:12,fontFamily:"Vazirmatn"}}><img src={p.img} alt="" style={{width:"100%",aspectRatio:1,objectFit:"cover",borderRadius:10}}/><div style={{fontWeight:800,fontSize:12,marginTop:8}}>{p.title}</div><div style={{color:"var(--am-accent)",fontWeight:900,marginTop:5}}>{fa(p.priceMin)} تومان</div><div style={{fontSize:10,color:"var(--am-muted)",marginTop:4}}>{toFaDigits(String(p.storeCount))} فروشگاه</div></button>)}</div>
   </div>;
 }
+function AnMarketHome({onProduct,onCat,onGoCats,onSearch,compareMode,compareSelected,onCompareToggle,onBack}:{
+  onProduct:(pid:string)=>void;onCat:(cid:string)=>void;onGoCats:()=>void;onSearch:(q:string)=>void;
+  compareMode?:boolean;compareSelected?:string[];onCompareToggle?:(pid:string)=>void;onBack?:()=>void;
+}){
+  const [searchQ,setSearchQ]=useState("");
+  const [imgPreview,setImgPreview]=useState<string|null>(null);
+  const [imgName,setImgName]=useState<string|null>(null);
+  const fileRef=useRef<HTMLInputElement>(null);
+
+  const handleSearch=()=>{
+    if(imgName){const q=`__img__${imgName}`;setImgPreview(null);setImgName(null);setSearchQ("");onSearch(q);return;}
+    const q=searchQ.trim();if(q){setSearchQ("");onSearch(q);}
+  };
+  const handleImgChange=(e:React.ChangeEvent<HTMLInputElement>)=>{
+    const file=e.target.files?.[0];
+    if(!file)return;
+    setImgName(file.name);
+    const reader=new FileReader();
+    reader.onload=(ev)=>setImgPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    if(fileRef.current)fileRef.current.value="";
+  };;
+
+  /* ── Category data ── */
+  const CATS_DISPLAY=[
+    {id:"mobile",label:"موبایل و دیجیتال",path:"M12 18h.01M8 21h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"},
+    {id:"laptop",label:"لپ‌تاپ و کامپیوتر",path:"M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 0 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 0-2-2V9m0 0h18"},
+    {id:"hypermarket",label:"هایپرمارکت",path:"M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z M3 6h18 M16 10a4 4 0 0 1-8 0"},
+    {id:"appliance",label:"لوازم خانگی",path:"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10"},
+    {id:"fashion",label:"مد و پوشاک",path:"M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"},
+    {id:"beauty",label:"زیبایی و بهداشت",path:"M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"},
+    {id:"av",label:"صوتی و تصویری",path:"M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"},
+    {id:"car",label:"خودرو",path:"M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2 M17 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M7 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"},
+    {id:"health",label:"سلامت و پزشکی",path:"M22 12h-4l-3 9L9 3l-3 9H2"},
+    {id:"culture",label:"فرهنگ و هنر",path:"M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"},
+    {id:"sport",label:"ورزش",path:"M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zM2.5 12.5h19M12 2.5C9.5 8 9.5 16 12 22M12 2.5c2.5 5.5 2.5 13.5 0 19"},
+    {id:"toy",label:"اسباب‌بازی",path:"M9 19V6l12-3v13 M9 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z M21 16a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"},
+    {id:"kids",label:"کودک و نوزاد",path:"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75"},
+    {id:"building",label:"ساختمان",path:"M2 20h20 M4 20V10l8-6 8 6v10"},
+    {id:"tool",label:"ابزارآلات",path:"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"},
+    {id:"travel",label:"سفر و کمپینگ",path:"M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z M12 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"},
+    {id:"pet",label:"حیوانات خانگی",path:"M10 5.172C10 3.782 8.423 2.679 6.5 3c-2.823.47-4.113 6.006-4 7 .08.703 1.725 1.722 3.656 1 1.261-.472 1.96-1.45 2.344-2.5 M14.267 5.172c0-1.39 1.577-2.493 3.5-2.172 2.823.47 4.113 6.006 4 7-.08.703-1.725 1.722-3.656 1-1.261-.472-1.96-1.45-2.344-2.5 M8 14v.5 M16 14v.5 M11.25 16.25h1.5L12 17l-.75-.75z M4.42 11.247A13.152 13.152 0 0 0 4 14.556C4 18.728 7.582 22 12 22s8-3.272 8-7.444c0-1.1-.2-2.2-.5-3.2"},
+    {id:"industrial",label:"صنعتی",path:"M12 22V12 M12 12L2 7l10-5 10 5-10 5z M2 17l10 5 10-5 M2 12l10 5 10-5"},
+    {id:"gold",label:"ارز و طلا",path:"M12 1v22 M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"},
+    {id:"storeEquip",label:"لوازم فروشگاهی",path:"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10"},
+    {id:"other",label:"سایر دسته‌ها",path:"M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z M12 16v-4 M12 8h.01"},
+  ];
+
+  /* ── Product data ── */
+  const deals=MARKET_PRODUCTS.filter(p=>p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p);
+  const topRated=[...MARKET_PRODUCTS].sort((a,b)=>b.rating-a.rating).slice(0,30);
+  const mostCompared=[...MARKET_PRODUCTS].sort((a,b)=>b.storeCount-a.storeCount).slice(0,30);
+  const budget=MARKET_PRODUCTS.filter(p=>p.priceMin<15000000).slice(0,30);
+  const highValue=[...MARKET_PRODUCTS].sort((a,b)=>b.reviews-a.reviews).slice(0,30);
+  const mostReviewed=[...MARKET_PRODUCTS].sort((a,b)=>b.reviews-a.reviews).slice(5,35);
+
+  const [trending,setTrending]=useState<string[]>([]);
+  useEffect(()=>{let active=true;(async()=>{try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/trending?limit=15",{cache:"no-store"});if(!r.ok)return;const d=await r.json();const items=Array.isArray(d?.items)?d.items.map((x:any)=>String(x.query??"").trim()).filter(Boolean):[];if(active)setTrending(items);}catch{} })();return()=>{active=false};},[]);
+
+  /* Auto-scroll ref for price-drop deals */
+  const dealsScrollRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    const el=dealsScrollRef.current;
+    if(!el)return;
+    let paused=false;
+    const pause=()=>{paused=true;};
+    const resume=()=>{setTimeout(()=>{paused=false;},1800);};
+    el.addEventListener("touchstart",pause,{passive:true});
+    el.addEventListener("touchend",resume,{passive:true});
+    el.addEventListener("mouseenter",pause);
+    el.addEventListener("mouseleave",resume);
+    const iv=setInterval(()=>{
+      if(paused||!el)return;
+      const maxScroll=el.scrollWidth-el.clientWidth;
+      if(maxScroll<=0)return;
+      if(el.scrollLeft>=maxScroll-2){el.scrollLeft=0;return;}
+      el.scrollLeft+=1.2;
+    },16);
+    return()=>{clearInterval(iv);el.removeEventListener("touchstart",pause);el.removeEventListener("touchend",resume);el.removeEventListener("mouseenter",pause);el.removeEventListener("mouseleave",resume);};
+  },[deals.length]);
+
+  return(
+    <div style={{paddingBottom:110}}>
+
+      {/* ─── Search Hero ─── */}
+      <div style={{background:"var(--am-card)",borderBottom:"1px solid var(--am-border)",padding:"18px 16px 16px",boxShadow:"0 2px 12px rgba(10,25,41,0.05)"}}>
+        {/* Brand row */}
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+          <div style={{width:42,height:42,borderRadius:14,background:"var(--am-accent)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 4px 16px rgba(10,158,140,0.28), 0 1px 4px rgba(10,158,140,0.16)"}}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:17,fontWeight:900,color:"var(--am-text)",letterSpacing:"-0.01em"}}>آن مارکت</div>
+            <div style={{fontSize:11,color:"var(--am-muted)"}}>مقایسه قیمت از فروشگاه‌های متصل</div>
+          </div>
+          {onBack&&(
+            <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:5,background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:20,padding:"5px 12px 5px 10px",cursor:"pointer",fontFamily:"Vazirmatn",fontSize:11,fontWeight:700,color:"var(--am-text2)",boxShadow:"var(--am-shadow)",flexShrink:0,whiteSpace:"nowrap" as const}}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--am-muted)" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+              بازگشت به آن‌پرداز
+            </button>
+          )}
+        </div>
+
+        {/* Main search box */}
+        <div style={{background:"var(--am-card)",borderRadius:18,border:"1.5px solid rgba(100,140,180,0.22)",boxShadow:"0 2px 12px rgba(10,25,41,0.08)",overflow:"hidden",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",padding:"4px 10px 4px 14px",gap:8}}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--am-muted)" strokeWidth="2.5" strokeLinecap="round" style={{flexShrink:0}}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input
+              value={searchQ}
+              onChange={e=>setSearchQ(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter")handleSearch();}}
+              placeholder="جستجو در محصولات واقعی..."
+              className="am-home-search"
+            />
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleImgChange}/>
+            {imgPreview&&(
+              <div style={{position:"relative",flexShrink:0}}>
+                <img src={imgPreview} alt="تصویر انتخابی" style={{width:32,height:32,borderRadius:8,objectFit:"cover",border:"1.5px solid var(--am-accent)"}}/>
+                <button onClick={()=>{setImgPreview(null);setImgName(null);}} style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:"50%",background:"var(--am-accent)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",padding:0}}>
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            )}
+            <button onClick={()=>fileRef.current?.click()} title="جستجوی تصویری" style={{width:36,height:36,borderRadius:10,background:imgPreview?"rgba(10,158,140,0.08)":"var(--am-bg)",border:`1.5px solid ${imgPreview?"var(--am-accent)":"var(--am-border)"}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:imgPreview?"var(--am-accent)":"var(--am-muted)",flexShrink:0}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </button>
+            <button onClick={handleSearch} style={{height:38,padding:"0 16px",borderRadius:12,background:searchQ.trim()?"var(--am-accent)":"var(--am-bg)",border:`1.5px solid ${searchQ.trim()?"var(--am-accent)":"var(--am-border)"}`,color:searchQ.trim()?"#FFFFFF":"var(--am-muted)",fontSize:13,fontWeight:800,fontFamily:"Vazirmatn",cursor:"pointer",flexShrink:0,transition:"all .15s",display:"flex",alignItems:"center",gap:6}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              جستجو
+            </button>
+          </div>
+        </div>
+
+        {/* Compare button — glowing brown lamp effect */}
+        <button onClick={()=>onCompareToggle?.("__mode__")} style={{display:"flex",alignItems:"center",gap:8,width:"100%",marginBottom:12,padding:"11px 18px",background:compareMode?"linear-gradient(135deg,#92400e,#b45309)":"linear-gradient(135deg,rgba(180,83,9,0.06),rgba(217,119,6,0.04))",border:`1.8px solid ${compareMode?"#b45309":"rgba(180,83,9,0.35)"}`,borderRadius:14,cursor:"pointer",fontFamily:"Vazirmatn",color:compareMode?"#FFFFFF":"#92400e",fontSize:13,fontWeight:800,boxShadow:compareMode?"0 0 20px rgba(180,83,9,0.45),0 0 8px rgba(217,119,6,0.3)":"0 0 10px rgba(180,83,9,0.12)",animation:compareMode?"none":"compare-glow 2s ease-in-out infinite",transition:"all .25s"}}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+          {compareMode?"مقایسه فعال است":"مقایسه کن"}
+          {compareMode&&compareSelected&&compareSelected.length>0&&<span style={{background:"rgba(255,255,255,0.25)",borderRadius:8,padding:"1px 8px",fontSize:11,marginRight:"auto"}}>{compareSelected.length} محصول</span>}
+          {!compareMode&&<span style={{marginRight:"auto",fontSize:11,opacity:0.65,fontWeight:600}}>قیمت محصولات را با هم مقایسه کنید</span>}
+          <span style={{width:10,height:10,borderRadius:"50%",background:compareMode?"rgba(255,255,255,0.8)":"#d97706",boxShadow:compareMode?"0 0 8px rgba(255,255,255,0.8)":"0 0 8px rgba(217,119,6,0.9)",animation:"compare-lamp 1.5s ease-in-out infinite",flexShrink:0}}/>
+        </button>
+
+        {/* Trending searches — infinite auto-scroll marquee */}
+        <div className="am-marquee-wrap" style={{paddingBottom:2}}>
+          <div className="am-marquee-track">
+            {[...trending,...trending].map((t,i)=>(
+              <button key={i} onClick={()=>onSearch(t)} className="am-trending-pill" style={{flexShrink:0}}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2.5" strokeLinecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Category shortcuts ─── */}
+      <div style={{background:"var(--am-card)",borderBottom:"1px solid var(--am-border)",paddingTop:14,paddingBottom:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"0 16px",marginBottom:10}}>
+          <div style={{fontSize:13,fontWeight:800,color:"var(--am-text)"}}>دسته‌بندی‌ها</div>
+          <button onClick={onGoCats} style={{fontSize:12,fontWeight:700,color:"var(--am-accent)",background:"none",border:"none",cursor:"pointer",fontFamily:"Vazirmatn"}}>همه دسته‌ها ←</button>
+        </div>
+        <div style={{overflowX:"auto",display:"flex",paddingRight:16,paddingLeft:8,scrollbarWidth:"none" as const,gap:4}}>
+          {CATS_DISPLAY.map(cat=>(
+            <button key={cat.id} onClick={()=>onCat(cat.id)} className="am-cat-chip">
+              <div className="am-cat-chip-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={cat.path}/></svg>
+              </div>
+              <span className="am-cat-chip-label">{cat.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Product sections ─── */}
+      <div style={{paddingTop:8}}>
+
+        {/* 1. Special offers banner */}
+        {deals.length>0&&(
+          <div style={{margin:"8px 16px 0",borderRadius:18,overflow:"hidden",background:"linear-gradient(135deg,var(--am-accent),#076B5F)",padding:"18px",marginBottom:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              <div style={{fontSize:15,fontWeight:900,color:"#FFFFFF"}}>کاهش قیمت اخیر</div>
+              <div style={{marginRight:"auto",fontSize:11,color:"rgba(255,255,255,0.8)"}}>{toFaDigits(String(deals.length))} محصول</div>
+            </div>
+            <div ref={dealsScrollRef} style={{overflowX:"auto",display:"flex",gap:10,scrollbarWidth:"none" as const,marginBottom:0}}>
+              {deals.slice(0,16).map(p=>{
+                const drop=Math.round((p.ph[0].p-p.ph[p.ph.length-1].p)/p.ph[0].p*100);
+                return(
+                  <button key={p.id} onClick={()=>onProduct(p.id)} style={{flexShrink:0,width:120,background:"rgba(255,255,255,0.12)",borderRadius:14,padding:"10px",border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",fontFamily:"Vazirmatn",textAlign:"right"}}>
+                    <div style={{width:"100%",aspectRatio:"1",borderRadius:10,overflow:"hidden",background:"rgba(255,255,255,0.1)",marginBottom:8}}>
+                      <img src={p.img} alt={p.title} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                    </div>
+                    <div style={{fontSize:10,fontWeight:700,color:"rgba(255,255,255,0.9)",lineHeight:1.4,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",marginBottom:6}}>{p.title.split(" ").slice(0,4).join(" ")}</div>
+                    <div style={{fontSize:12,fontWeight:900,color:"#FFFFFF"}}>{fa(p.priceMin)} <span style={{fontSize:9}}>ت</span></div>
+                    <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",textDecoration:"line-through",marginTop:1}}>{fa(p.ph[0].p)}</div>
+                    <div style={{display:"inline-block",background:"rgba(255,255,255,0.25)",borderRadius:6,padding:"2px 7px",fontSize:9,color:"#FFFFFF",fontWeight:800,marginTop:4}}>↓{toFaDigits(String(drop))}٪</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 2. Most compared */}
+        <AnCarousel title="بیشترین مقایسه‌شده‌ها" products={mostCompared} onProduct={onProduct} onMore={()=>onSearch("پرمقایسه‌ترین محصولات")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>
+
+        {/* 3. Top rated */}
+        <AnCarousel title="بهترین امتیاز کاربران" products={topRated} onProduct={onProduct} onMore={()=>onSearch("محصولات با بهترین امتیاز کاربران")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>
+
+        {/* 4. Mobile */}
+        {(()=>{const prods=getAnCatProds("mobile",30);return prods.length>0?<AnCarousel title="موبایل و کالای دیجیتال" products={prods} onProduct={onProduct} onMore={()=>onCat("mobile")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 5. Laptop */}
+        {(()=>{const prods=getAnCatProds("laptop",30);return prods.length>0?<AnCarousel title="لپ‌تاپ و کامپیوتر" products={prods} onProduct={onProduct} onMore={()=>onCat("laptop")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 6. High value banner */}
+        <div style={{margin:"4px 16px 10px",background:"rgba(99,102,241,0.05)",border:"1px solid rgba(99,102,241,0.15)",borderRadius:14,padding:"13px 16px",display:"flex",alignItems:"center",gap:12}}>
+          <div style={{width:40,height:40,borderRadius:12,background:"rgba(99,102,241,0.1)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:800,color:"var(--am-text)"}}>ارزش خرید بالا</div>
+            <div style={{fontSize:11,color:"var(--am-muted)"}}>بیشترین رضایت در برابر قیمت</div>
+          </div>
+        </div>
+        <AnCarousel title="ارزش خرید بالا" products={highValue} onProduct={onProduct} onMore={()=>onSearch("محصولات ارزش خرید بالا")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>
+
+        {/* 7. Appliance */}
+        {(()=>{const prods=getAnCatProds("appliance",30);return prods.length>0?<AnCarousel title="لوازم خانگی محبوب" products={prods} onProduct={onProduct} onMore={()=>onCat("appliance")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 8. Budget */}
+        <AnCarousel title="محصولات اقتصادی" products={budget} onProduct={onProduct} onMore={()=>onSearch("محصولات اقتصادی با قیمت مناسب")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>
+
+        {/* 9. AV */}
+        {(()=>{const prods=getAnCatProds("av",30);return prods.length>0?<AnCarousel title="صوتی و تصویری" products={prods} onProduct={onProduct} onMore={()=>onCat("av")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 10. Beauty */}
+        {(()=>{const prods=getAnCatProds("beauty",30);return prods.length>0?<AnCarousel title="زیبایی و بهداشت" products={prods} onProduct={onProduct} onMore={()=>onCat("beauty")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 11. Most reviewed */}
+        <AnCarousel title="پرنظرترین محصولات" products={mostReviewed} onProduct={onProduct} onMore={()=>onSearch("پرنظرترین و پرامتیازترین محصولات")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>
+
+        {/* 12. Fashion */}
+        {(()=>{const prods=getAnCatProds("fashion",30);return prods.length>0?<AnCarousel title="مد و پوشاک" products={prods} onProduct={onProduct} onMore={()=>onCat("fashion")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 13. Sport */}
+        {(()=>{const prods=getAnCatProds("sport",30);return prods.length>0?<AnCarousel title="ورزش و تناسب اندام" products={prods} onProduct={onProduct} onMore={()=>onCat("sport")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 14. Health */}
+        {(()=>{const prods=getAnCatProds("health",30);return prods.length>0?<AnCarousel title="سلامت و پزشکی" products={prods} onProduct={onProduct} onMore={()=>onCat("health")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 15. Travel */}
+        {(()=>{const prods=getAnCatProds("travel",30);return prods.length>0?<AnCarousel title="سفر و کمپینگ" products={prods} onProduct={onProduct} onMore={()=>onCat("travel")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 16. Hypermarket */}
+        {(()=>{const prods=getAnCatProds("hypermarket",30);return prods.length>0?<AnCarousel title="هایپرمارکت" products={prods} onProduct={onProduct} onMore={()=>onCat("hypermarket")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 17. Toy */}
+        {(()=>{const prods=getAnCatProds("toy",30);return prods.length>0?<AnCarousel title="اسباب‌بازی و سرگرمی" products={prods} onProduct={onProduct} onMore={()=>onCat("toy")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 18. Car */}
+        {(()=>{const prods=getAnCatProds("car",30);return prods.length>0?<AnCarousel title="خودرو و لوازم" products={prods} onProduct={onProduct} onMore={()=>onCat("car")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 19. Culture */}
+        {(()=>{const prods=getAnCatProds("culture",30);return prods.length>0?<AnCarousel title="فرهنگ و هنر" products={prods} onProduct={onProduct} onMore={()=>onCat("culture")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 20. Kids */}
+        {(()=>{const prods=getAnCatProds("kids",30);return prods.length>0?<AnCarousel title="کودک و نوزاد" products={prods} onProduct={onProduct} onMore={()=>onCat("kids")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+        {/* 21. Gold */}
+        {(()=>{const prods=getAnCatProds("gold",30);return prods.length>0?<AnCarousel title="ارز و طلا" products={prods} onProduct={onProduct} onMore={()=>onCat("gold")} compareMode={compareMode} compareSelected={compareSelected} onCompareToggle={onCompareToggle}/>:null;})()}
+
+      </div>
+
+      {/* ─── Bottom discovery button ─── */}
+      <div style={{padding:"12px 16px 16px"}}>
+        <button onClick={onGoCats} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:12,padding:"18px",background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:18,cursor:"pointer",fontFamily:"Vazirmatn",color:"var(--am-muted)",fontSize:14,fontWeight:800,boxShadow:"var(--am-shadow)"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          <span>پیدا نشد؟ جستجو در دسته‌بندی‌ها</span>
+        </button>
+      </div>
+
+    </div>
+  );
+}
+function AnAssistantChat({onProduct,compareMode,compareSelected,onCompareToggle,onBack}:{
+  onProduct:(pid:string)=>void;
+  compareMode?:boolean;compareSelected?:string[];onCompareToggle?:(pid:string)=>void;
+  onBack?:()=>void;
+}){
+  const [msgs,setMsgs]=useState<{id:string;role:"user"|"ai";text:string;img?:string}[]>([
+    {id:"init",role:"ai",text:"سلام! من دستیار هوشمند خرید آن مارکت هستم. بگو چه محصولی می‌خوای — بودجه‌ات، کاربردت، برند مورد علاقه‌ات — من از محصولات و پیشنهادهای واقعی آن مارکت بهترین گزینه‌ها رو پیدا می‌کنم."}
+  ]);
+  const [input,setInput]=useState("");
+  const [thinking,setThinking]=useState(false);
+  const [showResults,setShowResults]=useState(false);
+  const [results,setResults]=useState<AnProduct[]>([]);
+  const [lastQ,setLastQ]=useState("");
+  const [copied,setCopied]=useState<string|null>(null);
+  const scrollRef=useRef<HTMLDivElement>(null);
+  const fileRef=useRef<HTMLInputElement>(null);
+
+  const scrollToBottom=()=>setTimeout(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight;},80);
+
+  const copyMsg=(id:string,text:string)=>{
+    navigator.clipboard.writeText(text).catch(()=>{});
+    setCopied(id);setTimeout(()=>setCopied(null),1500);
+  };
+
+
+  const sendMsg=async()=>{
+    const txt=input.trim();if(!txt||thinking)return;
+    const uid=Date.now().toString();setMsgs(p=>[...p,{id:uid,role:"user",text:txt}]);setInput("");setThinking(true);setLastQ(txt);scrollToBottom();
+    try{
+      const token=localStorage.getItem("anpardaz:accessToken")??"";
+      const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/ai/assist",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({input:txt})});
+      const d=await r.json();if(!r.ok)throw new Error(d?.error??"ai_unavailable");
+      const text=d?.result?.text??d?.result?.output??d?.result?.content??"پاسخ هوش مصنوعی دریافت نشد.";
+      const found=anSearch(txt).slice(0,30);setResults(found);
+      setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:String(text)}]);setShowResults(found.length>0);
+    }catch{setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:"دستیار هوشمند در حال حاضر در دسترس نیست."}]);setShowResults(false)}
+    finally{setThinking(false);scrollToBottom()}
+  };
+
+  const newChat=()=>{
+    setMsgs([{id:"init2",role:"ai",text:"گفتگوی جدید شروع شد. چه محصولی می‌خوای؟"}]);
+    setInput("");setThinking(false);setShowResults(false);setResults([]);setLastQ("");
+  };
+
+  const handleImg=(e:React.ChangeEvent<HTMLInputElement>)=>{
+    const f=e.target.files?.[0];if(!f)return;
+    const uid=Date.now().toString();
+    const url=URL.createObjectURL(f);
+    setMsgs(p=>[...p,{id:uid,role:"user",text:"[تصویر پیوست شد]",img:url}]);
+    setThinking(false);
+    setMsgs(p=>[...p,{id:(Date.now()+1).toString(),role:"ai",text:"جستجوی تصویری هنوز به سرویس پردازش تصویر متصل نشده است. برای جلوگیری از پاسخ ساختگی، فعلاً توضیح متنی محصول را وارد کنید."}]);
+    e.target.value="";
+  };
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100%",paddingBottom:0}}>
+      {/* Top bar */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px 10px",background:"var(--am-card)",borderBottom:"1px solid var(--am-border)",flexShrink:0,gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,flex:1,minWidth:0}}>
+          <div style={{width:36,height:36,borderRadius:11,background:"var(--am-accent)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2z"/></svg>
+          </div>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:15,fontWeight:900,color:"var(--am-text)"}}>دستیار هوشمند</div>
+            <div style={{fontSize:11,color:"#22C55E",fontWeight:600}}>● آنلاین</div>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <button onClick={newChat} style={{display:"flex",alignItems:"center",gap:7,padding:"9px 14px",background:"var(--am-bg)",border:"1.5px solid var(--am-border)",borderRadius:11,cursor:"pointer",fontFamily:"Vazirmatn",color:"var(--am-muted)",fontSize:12,fontWeight:700}}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            گفتگوی جدید
+          </button>
+          {onBack&&<button onClick={onBack} style={{display:"flex",alignItems:"center",gap:5,background:"rgba(10,158,140,0.07)",border:"1px solid rgba(10,158,140,0.2)",borderRadius:20,padding:"6px 12px 6px 10px",cursor:"pointer",fontFamily:"Vazirmatn",fontSize:11,fontWeight:700,color:"var(--am-accent)",flexShrink:0,whiteSpace:"nowrap"}}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+            بازگشت به آن‌پرداز
+          </button>}
+        </div>
+      </div>
+
+      {/* Scrollable chat history */}
+      <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:"16px",display:"flex",flexDirection:"column",gap:14,minHeight:0}}>
+        {msgs.map(m=>(
+          <div key={m.id} style={{display:"flex",flexDirection:m.role==="ai"?"row":"row-reverse",gap:10,alignItems:"flex-start"}}>
+            {m.role==="ai"&&(
+              <div style={{width:32,height:32,borderRadius:10,background:"var(--am-accent)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2z"/></svg>
+              </div>
+            )}
+            <div style={{maxWidth:"78%",position:"relative"}}>
+              {m.img&&<img src={m.img} alt="پیوست" style={{width:"100%",maxWidth:200,borderRadius:12,display:"block",marginBottom:6,objectFit:"cover"}}/>}
+              <div style={{
+                background:m.role==="ai"?"var(--am-card2)":"var(--am-accent)",
+                border:m.role==="ai"?"1.5px solid var(--am-border)":"none",
+                borderRadius:m.role==="ai"?"4px 16px 16px 16px":"16px 4px 16px 16px",
+                padding:"12px 14px",
+                fontSize:14,color:m.role==="ai"?"var(--am-text)":"#FFFFFF",
+                lineHeight:1.75,fontWeight:500,
+                boxShadow:m.role==="ai"?"var(--am-shadow)":"none",
+                direction:"rtl",
+              }}>
+                {m.text}
+              </div>
+              <button
+                onClick={()=>copyMsg(m.id,m.text)}
+                title="کپی"
+                style={{
+                  position:"absolute",bottom:-8,right:m.role==="ai"?8:undefined,left:m.role==="user"?8:undefined,
+                  width:24,height:24,borderRadius:8,
+                  background:copied===m.id?"#22C55E":"var(--am-card)",
+                  border:"1px solid var(--am-border)",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  cursor:"pointer",boxShadow:"0 1px 4px rgba(0,0,0,0.08)",
+                  transition:"background .2s",
+                }}
+              >
+                {copied===m.id
+                  ?<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  :<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                }
+              </button>
+            </div>
+          </div>
+        ))}
+        {thinking&&(
+          <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            <div style={{width:32,height:32,borderRadius:10,background:"var(--am-accent)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2z"/></svg>
+            </div>
+            <div style={{background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:"4px 16px 16px 16px",padding:"14px 16px",boxShadow:"var(--am-shadow)"}}>
+              <div style={{display:"flex",gap:5}}>
+                {[0,1,2].map(i=><div key={i} className="am-typing-dot" style={{animation:`pulse 1.2s ${i*0.2}s ease-in-out infinite`}}/>)}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Composer */}
+      <div style={{flexShrink:0,background:"var(--am-card)",borderTop:"1.5px solid var(--am-border)",padding:"12px 14px"}}>
+        <div style={{background:"var(--am-bg)",borderRadius:16,border:"1.5px solid var(--am-border)",overflow:"hidden"}}>
+          <textarea
+            value={input}
+            onChange={e=>setInput(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMsg();}}}
+            rows={2}
+            placeholder="پیام خود را بنویسید..."
+            disabled={thinking}
+            style={{width:"100%",border:"none",outline:"none",padding:"14px 14px 8px",fontSize:14,fontFamily:"Vazirmatn",color:"var(--am-text)",resize:"none",direction:"rtl",lineHeight:1.7,background:"transparent",boxSizing:"border-box",display:"block"}}
+          />
+          <div style={{display:"flex",alignItems:"center",padding:"6px 10px 10px",gap:8}}>
+            <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleImg}/>
+            <button onClick={()=>fileRef.current?.click()} title="پیوست تصویر" style={{width:36,height:36,borderRadius:10,background:"none",border:"1.5px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--am-muted)",flexShrink:0}}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </button>
+            <div style={{flex:1}}/>
+            <button
+              onClick={sendMsg}
+              disabled={!input.trim()||thinking}
+              style={{width:38,height:38,borderRadius:11,background:input.trim()&&!thinking?"var(--am-accent)":"var(--am-bg)",border:`1.5px solid ${input.trim()&&!thinking?"var(--am-accent)":"var(--am-border)"}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:input.trim()&&!thinking?"pointer":"default",flexShrink:0,transition:"all .15s"}}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={input.trim()&&!thinking?"#FFFFFF":"var(--am-muted)"} strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Show results button */}
+        {results.length>0&&!thinking&&(
+          <button
+            onClick={()=>setShowResults(v=>!v)}
+            style={{marginTop:10,width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,padding:"13px",background:showResults?"var(--am-accent)":"var(--am-accent-light)",border:`2px solid var(--am-accent)`,borderRadius:14,cursor:"pointer",fontFamily:"Vazirmatn",color:showResults?"#FFFFFF":"var(--am-accent)",fontSize:14,fontWeight:900,transition:"all .15s"}}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            {showResults?"پنهان کردن نتایج":`نمایش نتایج دستیار هوشمند (${toFaDigits(String(results.length))} محصول)`}
+          </button>
+        )}
+      </div>
+
+      {/* Results panel */}
+      {showResults&&results.length>0&&(
+        <div style={{flexShrink:0,borderTop:"1.5px solid var(--am-border)",maxHeight:"50vh",overflowY:"auto",background:"var(--am-bg)"}}>
+          <div style={{padding:"16px 16px 8px",display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:"var(--am-accent)"}}/>
+            <span style={{fontSize:15,fontWeight:900,color:"var(--am-text)"}}>مواردی که دستیار برات پیدا کرد</span>
+            <span style={{marginRight:"auto",fontSize:12,color:"var(--am-muted)"}}>{toFaDigits(String(results.length))} محصول</span>
+          </div>
+          <div style={{padding:"0 16px 8px"}}>
+            <button onClick={()=>onCompareToggle?.("__mode__")} className={`am-compare-btn${compareMode?" active":""}`} style={{marginBottom:10}}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+              {compareMode?`مقایسه فعال — ${compareSelected?.length||0} انتخابی`:"مقایسه محصولات"}
+              {compareMode&&<span className="am-pulse-dot"/>}
+            </button>
+            {results.map(p=>(
+              <AnSearchResultCard key={p.id} p={p} onPress={onProduct} aiComment={getAiComment(lastQ,p)} compareMode={compareMode} compareSelected={compareSelected?.includes(p.id)} onCompareToggle={onCompareToggle}/>
+            ))}
+            <div style={{padding:"12px 0",textAlign:"center",fontSize:11,color:"var(--am-muted)",lineHeight:1.7}}>اطلاعات بر اساس داده‌های موجود در آن مارکت و منابع قابل‌دسترسی است و ممکن است کامل یا به‌روز نباشد.</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+function AnChatPage({q,onProduct,compareMode,compareSelected,onCompareToggle}:{
+  q:string;onProduct:(pid:string)=>void;
+  compareMode?:boolean;compareSelected?:string[];onCompareToggle?:(pid:string)=>void;
+}){
+  const [thinking,setThinking]=useState(true);
+  const [sort,setSort]=useState<"relevance"|"price-asc"|"price-desc"|"rating">("relevance");
+  const [showFilters,setShowFilters]=useState(false);
+  const [selectedBrands,setSelectedBrands]=useState<string[]>([]);
+  const [visibleCount,setVisibleCount]=useState(10);
+  const sentinelRef=useRef<HTMLDivElement>(null);
+
+  const rawResults=useMemo(()=>anSearch(q),[q]);
+  const brands=useMemo(()=>[...new Set(rawResults.map(p=>p.brand))].slice(0,12),[rawResults]);
+
+  const results=useMemo(()=>{
+    let r=rawResults.length>0?rawResults:MARKET_PRODUCTS.slice(0,30);
+    if(selectedBrands.length>0) r=r.filter(p=>selectedBrands.includes(p.brand));
+    if(sort==="price-asc")r=[...r].sort((a,b)=>a.priceMin-b.priceMin);
+    else if(sort==="price-desc")r=[...r].sort((a,b)=>b.priceMin-a.priceMin);
+    else if(sort==="rating")r=[...r].sort((a,b)=>b.rating-a.rating);
+    return r;
+  },[rawResults,sort,selectedBrands]);
+
+  useEffect(()=>{const t=setTimeout(()=>setThinking(false),1200);return()=>clearTimeout(t);},[q]);
+  useEffect(()=>setVisibleCount(10),[results]);
+
+  useEffect(()=>{
+    const el=sentinelRef.current;if(!el)return;
+    const obs=new IntersectionObserver(entries=>{if(entries[0].isIntersecting)setVisibleCount(v=>Math.min(v+10,results.length));});
+    obs.observe(el);return()=>obs.disconnect();
+  },[results]);
+
+  const sortLabels:{[k:string]:string}={"relevance":"مرتبط‌ترین","price-asc":"ارزان‌ترین","price-desc":"گران‌ترین","rating":"بهترین امتیاز"};
+  const hasResults=rawResults.length>0;
+
+  const isImgSearch=q.startsWith("__img__");
+  const imgFileName=isImgSearch?q.slice(7):"";
+  const displayQ=isImgSearch?"جستجوی تصویری":q;
+
+  return(
+    <div>
+      <div style={{padding:"12px 16px",borderBottom:"1px solid var(--am-border)",background:"var(--am-card)"}}>
+        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+          {isImgSearch?(
+            <div style={{flex:1,display:"flex",alignItems:"center",gap:10,background:"var(--am-bg)",borderRadius:12,padding:"9px 14px"}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              <div>
+                <div style={{fontSize:13,fontWeight:800,color:"var(--am-text)"}}>{displayQ}</div>
+                <div style={{fontSize:11,color:"var(--am-muted)"}}>{imgFileName}</div>
+              </div>
+            </div>
+          ):(
+            <div style={{flex:1,background:"var(--am-bg)",borderRadius:12,padding:"11px 14px",fontSize:14,color:"var(--am-text)",fontFamily:"Vazirmatn",direction:"rtl",lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:1,WebkitBoxOrient:"vertical",overflow:"hidden",fontWeight:600}}>{displayQ}</div>
+          )}
+          <button onClick={()=>onProduct("__back__")} style={{flexShrink:0,padding:"9px 16px",background:"var(--am-accent-light)",border:"1.5px solid var(--am-accent-border)",borderRadius:11,color:"var(--am-accent)",fontSize:13,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:800}}>ویرایش</button>
+        </div>
+      </div>
+
+      <div style={{padding:"10px 16px",borderBottom:"1px solid var(--am-border)",background:"var(--am-card)"}}>
+        <div style={{display:"flex",gap:7,overflowX:"auto",paddingBottom:2,scrollbarWidth:"none"} as React.CSSProperties}>
+          <button onClick={()=>setShowFilters(v=>!v)} style={{display:"flex",alignItems:"center",gap:6,padding:"9px 15px",background:showFilters?"var(--am-accent-light)":"var(--am-bg)",border:`1.5px solid ${showFilters?"var(--am-accent-border)":"var(--am-border)"}`,borderRadius:20,cursor:"pointer",fontFamily:"Vazirmatn",color:showFilters?"var(--am-accent)":"var(--am-muted)",fontSize:13,fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            فیلتر{selectedBrands.length>0?` (${toFaDigits(String(selectedBrands.length))})` :""}
+          </button>
+          {(["relevance","price-asc","price-desc","rating"] as const).map(s=>(
+            <button key={s} onClick={()=>setSort(s)} style={{padding:"9px 15px",background:sort===s?"var(--am-accent-light)":"var(--am-bg)",border:`1.5px solid ${sort===s?"var(--am-accent-border)":"var(--am-border)"}`,borderRadius:20,cursor:"pointer",fontFamily:"Vazirmatn",color:sort===s?"var(--am-accent)":"var(--am-muted)",fontSize:13,fontWeight:sort===s?800:600,flexShrink:0,whiteSpace:"nowrap"}}>{sortLabels[s]}</button>
+          ))}
+        </div>
+        {showFilters&&brands.length>0&&(
+          <div style={{marginTop:10,padding:"13px 14px",background:"var(--am-bg)",borderRadius:14}}>
+            <div style={{fontSize:13,fontWeight:700,color:"var(--am-text)",marginBottom:9}}>برند</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {brands.map(b=>(
+                <button key={b} onClick={()=>setSelectedBrands(prev=>prev.includes(b)?prev.filter(x=>x!==b):[...prev,b])} style={{padding:"6px 13px",borderRadius:20,background:selectedBrands.includes(b)?"var(--am-accent-light)":"var(--am-card2)",border:`1.5px solid ${selectedBrands.includes(b)?"var(--am-accent-border)":"var(--am-border)"}`,color:selectedBrands.includes(b)?"var(--am-accent)":"var(--am-muted)",fontSize:12,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:selectedBrands.includes(b)?700:500}}>{b}</button>
+              ))}
+            </div>
+            {selectedBrands.length>0&&<button onClick={()=>setSelectedBrands([])} style={{marginTop:9,fontSize:12,color:"var(--am-muted)",background:"none",border:"none",cursor:"pointer",fontFamily:"Vazirmatn"}}>پاک کردن فیلترها</button>}
+          </div>
+        )}
+      </div>
+
+      <div style={{padding:"16px 16px 100px"}}>
+        <div style={{display:"flex",gap:10,alignItems:"flex-start",marginBottom:18}}>
+          <div style={{width:36,height:36,borderRadius:11,background:"var(--am-accent-light)",border:"1.5px solid var(--am-accent-border)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2" strokeLinecap="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2z"/></svg>
+          </div>
+          <div style={{flex:1,background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:"4px 18px 18px 18px",padding:"14px 16px",boxShadow:"var(--am-shadow)"}}>
+            {thinking?(
+              <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                {[0,1,2].map(i=><div key={i} className="am-typing-dot" style={{animation:`pulse 1.2s ease-in-out ${i*0.2}s infinite`}}/>)}
+                <span style={{fontSize:13,color:"var(--am-muted)",marginRight:8}}>دارم دنبال بهترین گزینه‌ها می‌گردم...</span>
+              </div>
+            ):(
+              <div>
+                <div style={{fontSize:14,color:"var(--am-text)",fontWeight:700,marginBottom:5}}>
+                  {hasResults?`${toFaDigits(String(rawResults.length))} محصول پیدا کردم.`:"نتیجه دقیقی پیدا نشد، اما این‌ها رو پیشنهاد می‌دم:"}
+                </div>
+                <div style={{fontSize:12,color:"var(--am-muted)",lineHeight:1.8}}>
+                  {hasResults?"این‌ها گزینه‌هایی هستند که به چیزی که می‌خواهی نزدیک‌ترند.":"عبارت دیگری امتحان کن یا از دسته‌بندی‌ها جستجو کن."}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <button onClick={()=>onCompareToggle?.("__mode__")} className={`am-compare-btn${compareMode?" active":""}`} style={{marginBottom:16}}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+          {compareMode?`مقایسه فعال — ${compareSelected?.length||0} محصول`:"برام مقایسه کن"}
+          {compareMode&&<span className="am-pulse-dot"/>}
+        </button>
+
+        {!thinking&&(
+          <div>
+            <AnSH title={hasResults?"همه نتایج":"پیشنهادهای آن مارکت"}/>
+            {results.slice(0,visibleCount).map(p=>(
+              <AnSearchResultCard key={p.id} p={p} onPress={onProduct} aiComment={getAiComment(q,p)} compareMode={compareMode} compareSelected={compareSelected?.includes(p.id)} onCompareToggle={onCompareToggle}/>
+            ))}
+            {visibleCount<results.length&&(
+              <div ref={sentinelRef} style={{padding:"20px",textAlign:"center"}}>
+                <div style={{display:"flex",justifyContent:"center",gap:7}}>
+                  {[0,1,2].map(i=><div key={i} className="am-typing-dot" style={{animation:`pulse 1.2s ${i*0.15}s infinite`}}/>)}
+                </div>
+                <div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>در حال بارگذاری موارد بیشتر...</div>
+              </div>
+            )}
+            {visibleCount>=results.length&&results.length>0&&(
+              <div style={{textAlign:"center",padding:"20px",fontSize:12,color:"var(--am-muted)"}}>همه {toFaDigits(String(results.length))} محصول نمایش داده شد</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+function AnPriceSparkline({ph}:{ph:{d:string;p:number}[]}){
+  if(ph.length<2)return null;
+  const prices=ph.map(x=>x.p);
+  const min=Math.min(...prices);
+  const max=Math.max(...prices);
+  const range=max-min||1;
+  const W=260,H=52;
+  const pts=prices.map((p,i)=>{
+    const x=i/(prices.length-1)*W;
+    const y=H-((p-min)/range)*(H-8)-4;
+    return`${x},${y}`;
+  }).join(" ");
+  const firstCoords=pts.split(" ")[0].split(",");
+  const lastCoords=pts.split(" ").slice(-1)[0].split(",");
+  const lastX=Number(lastCoords[0]);
+  const lastY=Number(lastCoords[1]);
+  const isDown=prices[prices.length-1]<prices[0];
+  const color=isDown?"#10B981":"#F59E0B";
+  return(
+    <div style={{overflowX:"auto",paddingBottom:4}}>
+      <svg width={W} height={H+16} style={{display:"block"}}>
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx={Number(firstCoords[0])} cy={Number(firstCoords[1])} r="3" fill={color} opacity="0.4"/>
+        <circle cx={lastX} cy={lastY} r="4" fill={color}/>
+        {ph.map((x,i)=>{
+          const px=i/(prices.length-1)*W;
+          return<text key={i} x={px} y={H+14} textAnchor="middle" fontSize="9" fill="#9DB4C0" fontFamily="Vazirmatn">{x.d}</text>;
+        })}
+      </svg>
+    </div>
+  );
+}
+function AnProductDetail({pid,onProduct,onSearch,onBack}:{pid:string;onProduct:(pid:string)=>void;onSearch:(q:string)=>void;onBack:()=>void}){
+  const p=MARKET_PRODUCTS.find(x=>x.id===pid);
+  const [remoteOffers,setRemoteOffers]=useState<AnOffer[]>([]);
+  const [reviewRows,setReviewRows]=useState<any[]>([]);
+  useEffect(()=>{(async()=>{try{const base=ANMARKET_PLATFORM_API_BASE;const [productRes,reviewsRes]=await Promise.all([fetch(base+"/api/v1/market/products/"+encodeURIComponent(pid),{cache:"no-store"}),fetch(base+"/api/v1/market/products/"+encodeURIComponent(pid)+"/reviews",{cache:"no-store"})]);if(productRes.ok){const d=await productRes.json();setRemoteOffers((d.offers??[]).map((o:any)=>({sid:String(o.store_id??o.id),offerId:Number(o.id),storeName:o.store_name??o.seller_name??"",price:Number(o.price??0),ship:o.shipping_cost?String(o.shipping_cost):"",warranty:"",inStock:o.availability!=="out_of_stock",upd:o.updated_at??"",productUrl:o.product_url??o.seller_url??"",iframeMode:o.iframe_mode??"unknown"})));}if(reviewsRes.ok){const d=await reviewsRes.json();setReviewRows(Array.isArray(d.reviews)?d.reviews:[]);}}catch{setReviewRows([])}})()},[pid]);
+  const [tab,setTab]=useState<"sellers"|"specs"|"reviews"|"similar">("sellers");
+  const [alert,setAlert]=useState(false);
+  const [fav,setFav]=useState(false);
+  const [sellerSort,setSellerSort]=useState<"price"|"rating"|"avail">("price");
+  const [imgIdx,setImgIdx]=useState(0);
+  const [showZoom,setShowZoom]=useState(false);
+  const [aiInput,setAiInput]=useState("");
+  const offers=remoteOffers;
+  useBackHandler(onBack);
+  useEffect(()=>{let active=true;(async()=>{try{const token=localStorage.getItem("anpardaz:accessToken")??"";const favRes=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/me/favorites",{headers:{authorization:"Bearer "+token}});void fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/products/"+encodeURIComponent(pid)+"/view",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({surface:"mobile"})});if(active&&favRes.ok){const d=await favRes.json();setFav((d.products??[]).some((x:any)=>String(x.id)===String(pid)));}}catch{}})();return()=>{active=false}},[pid]);
+  if(!p)return<div style={{padding:24,textAlign:"center",color:"var(--am-muted)"}}>محصول یافت نشد<br/><button onClick={onBack} style={{marginTop:16,padding:"10px 24px",background:"var(--am-accent)",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"Vazirmatn",fontWeight:700,color:"#FFFFFF"}}>بازگشت</button></div>;
+
+  const sortedOffers=sortOffers(offers,sellerSort);
+  const avg=Math.round(sortedOffers.reduce((a,o)=>a+o.price,0)/(sortedOffers.length||1));
+  const similar=MARKET_PRODUCTS.filter(x=>x.catId===p.catId&&x.id!==p.id).slice(0,8);
+  const cheaper=MARKET_PRODUCTS.filter(x=>x.catId===p.catId&&x.priceMin<p.priceMin&&x.id!==p.id).sort((a,b)=>a.priceMin-b.priceMin).slice(0,4);
+  const pricier=MARKET_PRODUCTS.filter(x=>x.catId===p.catId&&x.priceMin>p.priceMin&&x.id!==p.id&&x.rating>=p.rating).sort((a,b)=>a.priceMin-b.priceMin).slice(0,3);
+  const strengths=getProductStrengths(p);
+  const weaknesses=getProductWeaknesses(p);
+  const [frameUrl,setFrameUrl]=useState("");
+  const openOffer=async(o:AnOffer)=>{if(!o.offerId)return;try{const token=localStorage.getItem("anpardaz:accessToken")??"";const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/clickout",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({offerId:o.offerId,surface:"mobile"})});const d=await r.json();if(!r.ok)throw new Error();if(d.mode==="iframe")setFrameUrl(d.url);else window.open(d.url,"_blank","noopener,noreferrer")}catch{setFrameUrl("")}};
+  const drop=p.ph.length>1&&p.ph[p.ph.length-1].p<p.ph[0].p?Math.round((p.ph[0].p-p.ph[p.ph.length-1].p)/p.ph[0].p*100):0;
+  const TABS=([["sellers","فروشگاه‌ها"],["specs","مشخصات"],["reviews","نظرات"],["similar","گزینه‌ها"]] as const);
+  // Use only media actually returned by the real catalog API.
+  const galleryImgs=(p.media&&p.media.length?p.media:[p.img]).filter(Boolean).slice(0,8);
+
+  return(
+    <div style={{paddingBottom:100}}>
+      {/* ─── Image gallery ─── */}
+      <div style={{background:"var(--am-bg)",position:"relative"}}>
+        <div style={{width:"100%",aspectRatio:"1",background:"var(--am-bg)",overflow:"hidden",position:"relative",cursor:"pointer"}} onClick={()=>setShowZoom(true)}>
+          <img src={galleryImgs[imgIdx]} alt={p.title} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}} loading="eager"/>
+          {drop>0&&<div style={{position:"absolute",top:14,right:14,background:"#DC2626",color:"#fff",fontSize:12,fontWeight:800,borderRadius:10,padding:"6px 14px"}}>↓{toFaDigits(String(drop))}٪ کاهش قیمت</div>}
+          <div style={{position:"absolute",bottom:14,left:14,background:"rgba(0,0,0,0.5)",color:"#fff",fontSize:11,fontWeight:700,borderRadius:8,padding:"5px 11px",backdropFilter:"blur(4px)"}}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{display:"inline",verticalAlign:"middle",marginLeft:4}}><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            بزرگ‌نمایی
+          </div>
+          <div style={{position:"absolute",top:14,left:14,display:"flex",gap:5}}>
+            <button onClick={e=>{e.stopPropagation();void (async()=>{const token=localStorage.getItem("anpardaz:accessToken")??"";try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/products/"+encodeURIComponent(pid)+"/favorite",{method:"POST",headers:{authorization:"Bearer "+token}});const d=await r.json();if(r.ok)setFav(Boolean(d.favorite));}catch{}})();}} style={{width:36,height:36,borderRadius:10,background:"var(--am-card)",border:"1px solid var(--am-border)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:fav?"#DB2777":"var(--am-muted)"}}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill={fav?"#DB2777":"none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            </button>
+          </div>
+        </div>
+        {/* Thumbnails */}
+        <div style={{display:"flex",gap:8,padding:"10px 16px",background:"var(--am-card)",borderBottom:"1px solid var(--am-border)"}}>
+          {galleryImgs.map((img,i)=>(
+            <button key={i} onClick={()=>setImgIdx(i)} style={{width:60,height:60,borderRadius:10,overflow:"hidden",border:`2px solid ${imgIdx===i?"var(--am-accent)":"var(--am-border)"}`,padding:0,cursor:"pointer",flexShrink:0,background:"var(--am-bg)"}}>
+              <img src={img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} loading="lazy"/>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Lightbox */}
+      {showZoom&&(
+        <div onClick={()=>setShowZoom(false)} style={{position:"fixed",inset:0,zIndex:500,background:"rgba(0,0,0,0.94)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <button onClick={()=>setShowZoom(false)} style={{position:"absolute",top:16,right:16,width:40,height:40,borderRadius:12,background:"rgba(255,255,255,0.12)",border:"none",color:"#fff",fontSize:22,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          <img src={galleryImgs[imgIdx]} alt={p.title} style={{maxWidth:"95vw",maxHeight:"90vh",objectFit:"contain",borderRadius:12}}/>
+          <div style={{position:"absolute",bottom:24,left:"50%",transform:"translateX(-50%)",display:"flex",gap:8}}>
+            {galleryImgs.map((_,i)=>(
+              <button key={i} onClick={e=>{e.stopPropagation();setImgIdx(i);}} style={{width:i===imgIdx?24:8,height:8,borderRadius:4,background:i===imgIdx?"#FFFFFF":"rgba(255,255,255,0.35)",border:"none",cursor:"pointer",transition:"all .2s",padding:0}}/>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Product info ─── */}
+      <div style={{background:"var(--am-card)",borderBottom:"1px solid var(--am-border)",padding:"20px 18px 18px"}}>
+        <div style={{fontSize:13,color:"var(--am-accent)",fontWeight:700,marginBottom:4}}>{p.brand}</div>
+        <h1 style={{fontSize:19,fontWeight:900,color:"var(--am-text)",lineHeight:1.5,margin:"0 0 10px"}}>{p.title}</h1>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+          <AnStars r={p.rating}/>
+          <span style={{fontSize:12,color:"var(--am-muted)"}}>{toFaDigits(String(p.rating))} از ۵ · {toFaDigits(String(p.reviews))} نظر کاربران</span>
+        </div>
+        <div className="am-stat-grid">
+          {([["پایین‌ترین قیمت",fa(p.priceMin)+" ت","var(--am-accent)"],["میانگین قیمت",fa(avg)+" ت","var(--am-text)"],["تعداد فروشگاه",toFaDigits(String(sortedOffers.length))+" فروشگاه","var(--am-text)"]] as [string,string,string][]).map(([l,v,clr])=>(
+            <div key={l} className="am-stat-tile">
+              <div className="label">{l}</div>
+              <div className="value" style={{color:clr,fontSize:13}}>{v}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button onClick={()=>setAlert(v=>!v)} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:6,padding:"13px",background:alert?"var(--am-accent)":"var(--am-bg)",border:`1.5px solid ${alert?"var(--am-accent)":"var(--am-border)"}`,borderRadius:13,cursor:"pointer",fontFamily:"Vazirmatn",color:alert?"#FFFFFF":"var(--am-muted)",fontSize:13,fontWeight:700,transition:"all .15s"}}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            {alert?"هشدار فعال است":"هشدار کاهش قیمت"}
+          </button>
+          <button onClick={()=>setFav(v=>!v)} style={{width:52,display:"flex",alignItems:"center",justifyContent:"center",background:fav?"rgba(219,39,119,0.07)":"var(--am-bg)",border:`1.5px solid ${fav?"rgba(219,39,119,0.3)":"var(--am-border)"}`,borderRadius:13,cursor:"pointer",color:fav?"#DB2777":"var(--am-muted)",transition:"all .15s"}}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill={fav?"#DB2777":"none"} stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      {/* ─── AI Analysis ─── */}
+      <div style={{padding:"18px 16px",borderBottom:"1px solid var(--am-border)",background:"var(--am-card)"}}>
+        <AnSH title="تحلیل دستیار هوشمند"/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+          <div className="am-str-card pos">
+            <div className="am-str-head">نقاط قوت</div>
+            {strengths.map((s,i)=>(
+              <div key={i} className="am-str-item">
+                <span className="am-str-icon" style={{color:"#059669"}}>✓</span>
+                <span style={{fontSize:12,color:"var(--am-muted)",lineHeight:1.65}}>{s}</span>
+              </div>
+            ))}
+          </div>
+          <div className="am-str-card neg">
+            <div className="am-str-head">نکات مهم</div>
+            {weaknesses.map((s,i)=>(
+              <div key={i} className="am-str-item">
+                <span className="am-str-icon" style={{color:"#D97706"}}>!</span>
+                <span style={{fontSize:12,color:"var(--am-muted)",lineHeight:1.65}}>{s}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{fontSize:10,color:"var(--am-faint)",lineHeight:1.8}}>این اطلاعات بر اساس داده‌های موجود است و ممکن است کامل یا به‌روز نباشد. ما فقط از لحاظ فنی اطلاعات را بررسی می‌کنیم.</div>
+      </div>
+
+      {/* ─── Price History ─── */}
+      {p.ph.length>1&&(
+        <div style={{padding:"18px 16px",borderBottom:"1px solid var(--am-border)",background:"var(--am-card)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <AnSH title="سابقه قیمت"/>
+            {drop>0&&<span style={{fontSize:11,background:"rgba(16,185,129,0.1)",color:"#059669",borderRadius:8,padding:"4px 10px",fontWeight:700}}>↓{toFaDigits(String(drop))}٪ کاهش</span>}
+          </div>
+          <AnPriceSparkline ph={p.ph}/>
+          <div style={{display:"flex",justifyContent:"space-between",marginTop:8}}>
+            <span style={{fontSize:11,color:"var(--am-muted)"}}>کمترین: {fa(Math.min(...p.ph.map(x=>x.p)))} ت</span>
+            <span style={{fontSize:11,color:"var(--am-muted)"}}>بیشترین: {fa(Math.max(...p.ph.map(x=>x.p)))} ت</span>
+          </div>
+          <button onClick={()=>setAlert(v=>!v)} style={{width:"100%",marginTop:12,padding:"11px",background:alert?"var(--am-accent)":"rgba(10,158,140,0.06)",border:`1.5px solid ${alert?"var(--am-accent)":"rgba(10,158,140,0.25)"}`,borderRadius:12,color:alert?"#FFFFFF":"var(--am-accent)",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"Vazirmatn",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            {alert?"هشدار قیمت فعال است":"هشدار کاهش قیمت بگذار"}
+          </button>
+        </div>
+      )}
+
+      {/* ─── Ask assistant ─── */}
+      <div style={{padding:"14px 16px",borderBottom:"1px solid var(--am-border)",background:"rgba(10,158,140,0.03)"}}>
+        <div style={{fontSize:12,fontWeight:800,color:"var(--am-accent)",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2z"/></svg>
+          از دستیار بپرس
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <input value={aiInput} onChange={e=>setAiInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&aiInput.trim()){onSearch(aiInput.trim());setAiInput("");}}} placeholder="مثلاً: مدلی با باتری بهتر پیشنهاد بده..." style={{flex:1,background:"var(--am-card)",border:"1.5px solid var(--am-border)",borderRadius:12,padding:"11px 14px",color:"var(--am-text)",fontSize:13,fontFamily:"Vazirmatn",outline:"none",direction:"rtl"}}/>
+          <button onClick={()=>{if(aiInput.trim()){onSearch(aiInput.trim());setAiInput("");}}} style={{padding:"0 16px",background:"var(--am-accent)",border:"none",borderRadius:12,color:"#FFFFFF",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn",flexShrink:0}}>ارسال</button>
+        </div>
+      </div>
+
+      {/* ─── Tabs ─── */}
+      <div className="am-detail-tab-bar">
+        {TABS.map(([k,lbl])=>(
+          <button key={k} onClick={()=>setTab(k)} className={`am-detail-tab${tab===k?" active":""}`}>{lbl}</button>
+        ))}
+      </div>
+
+      <div style={{padding:"16px 16px"}}>
+        {/* ─── Sellers tab ─── */}
+        {tab==="sellers"&&(
+          <>
+            <div style={{display:"flex",gap:7,marginBottom:16,flexWrap:"wrap"}}>
+              {([["price","ارزان‌ترین"],["rating","معتبرترین"],["avail","فقط موجود"]] as const).map(([s,l])=>(
+                <button key={s} onClick={()=>setSellerSort(s)} style={{padding:"9px 16px",borderRadius:20,background:sellerSort===s?"var(--am-accent-light)":"var(--am-bg)",border:`1.5px solid ${sellerSort===s?"var(--am-accent-border)":"var(--am-border)"}`,color:sellerSort===s?"var(--am-accent)":"var(--am-muted)",fontSize:13,fontFamily:"Vazirmatn",cursor:"pointer",fontWeight:sellerSort===s?700:500}}>{l}</button>
+              ))}
+            </div>
+            <AnSH title={`${toFaDigits(String(sortedOffers.length))} فروشگاه — مقایسه قیمت‌ها`}/>
+            {sortedOffers.map((o,i)=>{
+              const store={n:o.storeName??o.sid,sc:0};
+              const best=i===0&&sellerSort==="price";
+              const priceDiff=o.price-p.priceMin;
+              return(
+                <div key={o.sid} className={`am-seller-card${best?" best":""}`}>
+                  {best&&<div className="am-best-badge">کمترین قیمت</div>}
+                  <div style={{marginTop:best?10:0}}>
+                    {/* Store header */}
+                    <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:12}}>
+                      <div style={{width:48,height:48,borderRadius:12,background:best?"rgba(10,158,140,0.1)":"var(--am-bg)",border:`1px solid ${best?"rgba(10,158,140,0.2)":"var(--am-border)"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>
+                        🏪
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:15,fontWeight:800,color:"var(--am-text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{store.n}</div>
+                        <div style={{display:"flex",alignItems:"center",gap:5,marginTop:3}}>
+                          <span style={{fontSize:12,color:"#F59E0B",fontWeight:700}}>★ {toFaDigits(String(store.sc))}</span>
+                          <span style={{fontSize:11,color:"var(--am-muted)"}}>· بر اساس داده‌های موجود</span>
+                        </div>
+                      </div>
+                      <div style={{textAlign:"left",flexShrink:0}}>
+                        <div style={{fontSize:17,fontWeight:900,color:best?"var(--am-accent)":"var(--am-text)"}}>{fa(o.price)}</div>
+                        <div style={{fontSize:10,color:"var(--am-muted)",textAlign:"left"}}>تومان</div>
+                        {priceDiff>0&&<div style={{fontSize:10,color:"#F59E0B",fontWeight:600}}>+{fa(priceDiff)}</div>}
+                      </div>
+                    </div>
+                    {/* Tags */}
+                    <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+                      {o.inStock
+                        ?<span style={{fontSize:11,background:"rgba(16,185,129,0.1)",color:"#059669",borderRadius:7,padding:"4px 10px",fontWeight:700}}>✓ موجود</span>
+                        :<span style={{fontSize:11,background:"rgba(245,158,11,0.1)",color:"#D97706",borderRadius:7,padding:"4px 10px",fontWeight:700}}>ناموجود</span>}
+                      {o.warranty&&<span style={{fontSize:11,background:"var(--am-bg)",color:"var(--am-muted)",borderRadius:7,padding:"4px 10px",border:"1px solid var(--am-border)"}}>{o.warranty}</span>}
+                      {o.ship&&<span style={{fontSize:11,background:"var(--am-bg)",color:"var(--am-muted)",borderRadius:7,padding:"4px 10px",border:"1px solid var(--am-border)"}}>{o.ship}</span>}
+                    </div>
+                    {o.inStock&&(
+                      <button onClick={()=>void openOffer(o)} style={{width:"100%",padding:"13px",background:"var(--am-accent)",border:"none",borderRadius:12,color:"#FFFFFF",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        مشاهده و خرید
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {/* ─── Specs tab ─── */}
+        {tab==="specs"&&(
+          <div>
+            <AnSH title="مشخصات فنی کامل"/>
+            {Object.entries(p.specs).map(([k,v],i)=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"13px 0",borderBottom:"1px solid var(--am-border)",background:i%2===0?"transparent":"rgba(10,158,140,0.02)"}}>
+                <span style={{fontSize:13,color:"var(--am-muted)",fontWeight:500}}>{k}</span>
+                <span style={{fontSize:13,fontWeight:700,color:"var(--am-text)",textAlign:"left",maxWidth:"60%",wordBreak:"break-word"}}>{v}</span>
+              </div>
+            ))}
+            <div style={{marginTop:16,padding:"13px 14px",background:"var(--am-bg)",borderRadius:14,border:"1px solid var(--am-border)"}}>
+              <div style={{fontSize:11,color:"var(--am-muted)",lineHeight:1.85}}>مشخصات فنی بر اساس اطلاعات موجود و ممکن است کامل یا به‌روز نباشد. برای اطلاعات دقیق‌تر به سایت رسمی برند مراجعه کنید.</div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Reviews tab ─── */}
+        {tab==="reviews"&&(
+          <>
+            <div style={{marginBottom:20}}>
+              <div style={{display:"flex",gap:16,alignItems:"center",background:"rgba(10,158,140,0.04)",borderRadius:16,padding:"16px",marginBottom:18,border:"1px solid var(--am-border)"}}>
+                <div style={{textAlign:"center",flexShrink:0}}>
+                  <div style={{fontSize:42,fontWeight:900,color:"var(--am-accent)",lineHeight:1}}>{toFaDigits(String(p.rating))}</div>
+                  <AnStars r={p.rating}/>
+                  <div style={{fontSize:11,color:"var(--am-muted)",marginTop:4}}>{toFaDigits(String(p.reviews))} نظر</div>
+                </div>
+                <div style={{flex:1}}>
+                  {([5,4,3,2,1]).map(star=>{
+                    const pct=p.reviews>0?Math.round(((reviewRows.filter((r:any)=>Number(r.rating)===star).length)/p.reviews)*100):0;
+                    return(
+                      <div key={star} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                        <span style={{fontSize:11,color:"var(--am-muted)",width:12,textAlign:"center"}}>{star}</span>
+                        <span style={{fontSize:10,color:"#F59E0B"}}>★</span>
+                        <div style={{flex:1,height:6,background:"var(--am-bg)",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{width:`${Math.min(100,pct)}%`,height:"100%",background:star>=4?"#10B981":star===3?"#F59E0B":"#EF4444",borderRadius:3}}/>
+                        </div>
+                        <span style={{fontSize:10,color:"var(--am-muted)",width:28}}>{toFaDigits(String(Math.min(100,pct)))}٪</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <AnSH title="نظرات واقعی کاربران"/>
+              {reviewRows.length===0
+                ? <div style={{padding:"18px 4px",color:"var(--am-muted)",fontSize:12,lineHeight:1.9}}>هنوز نظر منتشرشده‌ای برای این محصول ثبت نشده است.</div>
+                : reviewRows.slice(0,20).map((r:any)=>(
+                  <div key={r.id} style={{padding:"14px 0",borderBottom:"1px solid var(--am-border)"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",gap:12,marginBottom:6}}>
+                      <span style={{fontWeight:800,color:"var(--am-text)"}}>{toFaDigits(String(r.rating))} از ۵</span>
+                      <span style={{fontSize:10,color:"var(--am-muted)"}}>{r.verified_purchase?"خرید تأییدشده":""}</span>
+                    </div>
+                    {r.title&&<div style={{fontWeight:700,fontSize:12,marginBottom:5}}>{r.title}</div>}
+                    <div style={{fontSize:12,lineHeight:1.9,color:"var(--am-muted)"}}>{r.body}</div>
+                  </div>
+                ))}
+            </div>
+            <div style={{padding:"14px",background:"var(--am-bg)",borderRadius:14,border:"1px solid var(--am-border)"}}>
+              <div style={{fontSize:11,color:"var(--am-muted)",lineHeight:1.9}}>امتیاز و نظرات این بخش فقط از نظرات منتشرشده واقعی کاربران دریافت می‌شود و هیچ مقدار تخمینی یا ساختگی نمایش داده نمی‌شود.</div>
+            </div>         </>
+        )}
+
+        {/* ─── Alternatives tab ─── */}
+        {tab==="similar"&&(
+          <>
+            {cheaper.length>0&&(
+              <div style={{marginBottom:22}}>
+                <AnSH title="مدل‌های ارزان‌تر"/>
+                {cheaper.map(sp=>{
+                  const diff=Math.round((p.priceMin-sp.priceMin)/p.priceMin*100);
+                  return(
+                    <button key={sp.id} onClick={()=>onProduct(sp.id)} style={{display:"flex",gap:14,alignItems:"center",width:"100%",background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:16,padding:"14px",marginBottom:10,cursor:"pointer",fontFamily:"Vazirmatn",textAlign:"right",boxShadow:"var(--am-shadow)"}}>
+                      <img src={sp.img} alt={sp.title} style={{width:60,height:60,borderRadius:12,objectFit:"cover",flexShrink:0}} loading="lazy"/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:700,color:"var(--am-text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sp.title}</div>
+                        <div style={{fontSize:12,color:"var(--am-muted)",marginTop:3}}>{sp.brand}</div>
+                        <div style={{fontSize:13,color:"var(--am-accent)",fontWeight:800,marginTop:5}}>{fa(sp.priceMin)} تومان</div>
+                      </div>
+                      <div style={{textAlign:"center",flexShrink:0}}>
+                        <span style={{fontSize:11,background:"rgba(16,185,129,0.1)",color:"#059669",borderRadius:8,padding:"4px 10px",fontWeight:700,display:"block",whiteSpace:"nowrap"}}>↓{toFaDigits(String(diff))}٪</span>
+                        <span style={{fontSize:10,color:"var(--am-muted)",marginTop:4,display:"block"}}>ارزان‌تر</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {pricier.length>0&&(
+              <div style={{marginBottom:22}}>
+                <AnSH title="گزینه‌های با ارزش خرید بالاتر"/>
+                {pricier.map(sp=>{
+                  const diff=Math.round((sp.priceMin-p.priceMin)/p.priceMin*100);
+                  return(
+                    <button key={sp.id} onClick={()=>onProduct(sp.id)} style={{display:"flex",gap:14,alignItems:"center",width:"100%",background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:16,padding:"14px",marginBottom:10,cursor:"pointer",fontFamily:"Vazirmatn",textAlign:"right",boxShadow:"var(--am-shadow)"}}>
+                      <img src={sp.img} alt={sp.title} style={{width:60,height:60,borderRadius:12,objectFit:"cover",flexShrink:0}} loading="lazy"/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:700,color:"var(--am-text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sp.title}</div>
+                        <div style={{fontSize:12,color:"var(--am-muted)",marginTop:3}}>{sp.brand}</div>
+                        <div style={{fontSize:13,color:"var(--am-text)",fontWeight:800,marginTop:5}}>{fa(sp.priceMin)} تومان</div>
+                      </div>
+                      <div style={{textAlign:"center",flexShrink:0}}>
+                        <span style={{fontSize:11,background:"rgba(245,158,11,0.1)",color:"#D97706",borderRadius:8,padding:"4px 10px",fontWeight:700,display:"block",whiteSpace:"nowrap"}}>+{toFaDigits(String(diff))}٪</span>
+                        <span style={{fontSize:10,color:"var(--am-muted)",marginTop:4,display:"block"}}>امکانات بیشتر</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {similar.length>0&&(
+              <div>
+                <AnSH title="محصولات مشابه"/>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                  {similar.map(sp=><AnProductMiniCard key={sp.id} p={sp} onPress={onProduct}/>)}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+function AnCatPage({onCat,onSub,onSearch}:{onCat:(cid:string)=>void;onSub:(cid:string,sid:string)=>void;onSearch:(q:string)=>void}){
+  const [q,setQ]=useState("");
+  void onSub;
+  const filtered=q.trim()
+    ?AN_CATS.filter(c=>c.title.includes(q.trim())||c.subcats.some(s=>s.title.includes(q.trim())))
+    :AN_CATS;
+  const CAT_COLORS:Record<string,string>={
+    mobile:"#3B82F6",laptop:"#8B5CF6",hypermarket:"#F59E0B",appliance:"#EF4444",
+    fashion:"#EC4899",beauty:"#A855F7",av:"#6366F1",car:"#F97316",
+    health:"#10B981",culture:"#0EA5E9",sport:"#84CC16",toy:"#FB923C",
+    kids:"#F472B6",building:"#78716C",tool:"#64748B",travel:"#14B8A6",
+    pet:"#A3E635",industrial:"#94A3B8",gold:"#EAB308",storeEquip:"#6B7280",other:"#9CA3AF",
+  };
+  return(
+    <div style={{paddingBottom:100}}>
+      {/* Search */}
+      <div style={{padding:"14px 16px",background:"var(--am-card)",borderBottom:"1px solid var(--am-border)",position:"sticky",top:0,zIndex:10}}>
+        <div style={{display:"flex",gap:10,alignItems:"center",background:"var(--am-bg)",border:"1.5px solid var(--am-border)",borderRadius:16,padding:"12px 16px"}}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--am-accent)" strokeWidth="2.5" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&q.trim())onSearch(q.trim());}} placeholder="جستجو در دسته‌بندی‌ها..." style={{flex:1,background:"none",border:"none",outline:"none",color:"var(--am-text)",fontSize:15,fontFamily:"Vazirmatn",direction:"rtl"}}/>
+          {q&&<button onClick={()=>setQ("")} style={{background:"none",border:"none",color:"var(--am-faint)",cursor:"pointer",fontSize:20,lineHeight:1,padding:0}}>×</button>}
+        </div>
+      </div>
+      {/* Category list */}
+      <div style={{padding:"14px 16px"}}>
+        {filtered.map(cat=>{
+          const color=CAT_COLORS[cat.id]||"#6B7280";
+          const totalProds=getAnCatProds(cat.id,999).length;
+          return(
+            <button key={cat.id} onClick={()=>onCat(cat.id)} className="am-cat-row">
+              <div className="am-cat-row-icon" style={{background:`${color}14`,color}}>
+                <AnCatSvg cid={cat.id} sz={24}/>
+              </div>
+              <div style={{flex:1,textAlign:"right"}}>
+                <div style={{fontSize:15,fontWeight:700,color:"var(--am-text)",lineHeight:1.3}}>{cat.title}</div>
+                <div style={{fontSize:12,color:"var(--am-muted)",marginTop:3}}>
+                  {toFaDigits(String(cat.subcats.length))} زیرگروه
+                  {totalProds>0&&<> · {toFaDigits(String(totalProds))}+ محصول</>}
+                </div>
+              </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--am-faint)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+function AnCatDetailPage({cid,onSub,onBack}:{cid:string;onSub:(cid:string,sid:string)=>void;onBack:()=>void}){
+  const cat=AN_CATS.find(c=>c.id===cid);
+  if(!cat)return<div style={{padding:24,textAlign:"center",color:"var(--am-muted)"}}>دسته‌بندی یافت نشد<br/><button onClick={onBack} style={{marginTop:16,padding:"11px 22px",background:"var(--am-accent)",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"Vazirmatn",fontWeight:700,color:"#FFFFFF"}}>بازگشت</button></div>;
+  const catProds=getAnCatProds(cid,999);
+  return(
+    <div style={{paddingBottom:100}}>
+      {/* Hero banner */}
+      <div style={{background:"linear-gradient(135deg,rgba(10,158,140,0.08),rgba(10,158,140,0.03))",borderBottom:"1px solid var(--am-border)",padding:"18px 16px"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+          <div style={{width:46,height:46,borderRadius:13,background:"rgba(10,158,140,0.1)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--am-accent)"}}>
+            <AnCatSvg cid={cid} sz={22}/>
+          </div>
+          <div>
+            <div style={{fontSize:17,fontWeight:900,color:"var(--am-text)"}}>{cat.title}</div>
+            <div style={{fontSize:12,color:"var(--am-muted)",marginTop:2}}>{toFaDigits(String(cat.subcats.length))} زیرگروه · {toFaDigits(String(catProds.length))}+ محصول</div>
+          </div>
+        </div>
+      </div>
+      {/* Subcategory list */}
+      <div style={{padding:"14px 16px"}}>
+        <div style={{fontSize:13,fontWeight:700,color:"var(--am-muted)",marginBottom:12}}>زیرگروه‌ها</div>
+        {cat.subcats.map(sub=>{
+          const cnt=catProds.filter(p=>p.subId===sub.id).length+sub.pids.length;
+          return(
+            <button key={sub.id} onClick={()=>onSub(cid,sub.id)} className="am-subcat-row">
+              <div style={{width:8,height:8,borderRadius:"50%",background:"var(--am-accent)",flexShrink:0,opacity:0.6}}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:15,fontWeight:700,color:"var(--am-text)"}}>{sub.title}</div>
+                <div style={{fontSize:12,color:"var(--am-muted)",marginTop:2}}>{cnt>0?`${toFaDigits(String(cnt))} محصول`:"مشاهده محصولات"}</div>
+              </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--am-faint)" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+function AnSubDetailPage({cid,sid,onProduct,onSearch,compareMode,compareSelected,onCompareToggle}:{
+  cid:string;sid:string;onProduct:(pid:string)=>void;onSearch?:(q:string)=>void;
+  compareMode?:boolean;compareSelected?:string[];onCompareToggle?:(pid:string)=>void;
+}){
+  const cat=AN_CATS.find(c=>c.id===cid);
+  const sub=cat?.subcats.find(s=>s.id===sid);
+  const [sort,setSort]=useState<"relevance"|"price-asc"|"price-desc"|"rating">("relevance");
+  const rawProds=MARKET_PRODUCTS.filter(p=>p.subId===sid||p.catId===cid||(sub?.pids||[]).includes(p.id));
+  const prods=useMemo(()=>{
+    let r=[...rawProds];
+    if(sort==="price-asc")r.sort((a,b)=>a.priceMin-b.priceMin);
+    else if(sort==="price-desc")r.sort((a,b)=>b.priceMin-a.priceMin);
+    else if(sort==="rating")r.sort((a,b)=>b.rating-a.rating);
+    return r;
+  },[rawProds,sort]);
+  if(rawProds.length===0)return(
+    <div style={{padding:"48px 24px",textAlign:"center"}}>
+      <div style={{fontSize:40,marginBottom:16}}>🔍</div>
+      <div style={{fontSize:16,fontWeight:700,color:"var(--am-text)",marginBottom:8}}>محصولی یافت نشد</div>
+      <div style={{fontSize:13,color:"var(--am-muted)",lineHeight:1.7}}>در این دسته‌بندی محصولی موجود نیست. از دستیار هوشمند بپرسید.</div>
+      {onSearch&&<button onClick={()=>onSearch(sub?.title||"")} style={{marginTop:20,padding:"13px 24px",background:"var(--am-accent)",border:"none",borderRadius:13,color:"#FFFFFF",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn"}}>جستجو با دستیار</button>}
+    </div>
+  );
+  const sortLabels={"relevance":"مرتبط‌ترین","price-asc":"ارزان‌ترین","price-desc":"گران‌ترین","rating":"بهترین امتیاز"};
+  return(
+    <div style={{paddingBottom:120}}>
+      {/* Compare button */}
+      {prods.length>=2&&(
+        <div style={{padding:"12px 16px",background:"var(--am-card)",borderBottom:"1px solid var(--am-border)"}}>
+          <button onClick={()=>onCompareToggle?.("__mode__")} className={`am-compare-btn${compareMode?" active":""}`}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+            {compareMode?`مقایسه فعال — ${compareSelected?.length||0} محصول انتخابی`:"برام مقایسه کن"}
+            {compareMode&&<span className="am-pulse-dot"/>}
+          </button>
+        </div>
+      )}
+      {/* Sort bar */}
+      <div className="am-filter-bar">
+        {(["relevance","price-asc","price-desc","rating"] as const).map(s=>(
+          <button key={s} onClick={()=>setSort(s)} className={`am-filter-btn${sort===s?" active":""}`}>{sortLabels[s]}</button>
+        ))}
+      </div>
+      {/* Count */}
+      <div style={{padding:"12px 16px 4px",background:"var(--am-bg)"}}>
+        <span style={{fontSize:13,color:"var(--am-muted)",fontWeight:600}}>{toFaDigits(String(prods.length))} محصول</span>
+      </div>
+      {/* Products */}
+      <div style={{padding:"8px 16px"}}>
+        {prods.map(p=>(
+          <AnSearchResultCard key={p.id} p={p} onPress={onProduct} aiComment={getAiComment(sub?.title||"",p)} compareMode={compareMode} compareSelected={compareSelected?.includes(p.id)} onCompareToggle={onCompareToggle}/>
+        ))}
+      </div>
+    </div>
+  );
+}
+function AnTicketsSubPage({onBack}:{onBack:()=>void}){
+  type Ticket={id:number;subject:string;status:string;priority:string;updated_at:string;created_at:string};
+  const [tickets,setTickets]=useState<Ticket[]>([]);const[selected,setSelected]=useState<Ticket|null>(null);const[messages,setMessages]=useState<any[]>([]);const[subject,setSubject]=useState("");const[message,setMessage]=useState("");const[reply,setReply]=useState("");const[loading,setLoading]=useState(true);const[sending,setSending]=useState(false);
+  const token=()=>localStorage.getItem("anpardaz:accessToken")??"";
+  const load=async()=>{setLoading(true);try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/me/tickets",{headers:{authorization:"Bearer "+token()}});if(r.ok){const d=await r.json();setTickets(d.tickets??[])}}catch{}finally{setLoading(false)}};
+  useEffect(()=>{void load()},[]);
+  const open=async(t:Ticket)=>{setSelected(t);try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/me/tickets/"+t.id,{headers:{authorization:"Bearer "+token()}});if(r.ok){const d=await r.json();setMessages(d.messages??[])}}catch{}};
+  const sendReply=async()=>{if(!selected||!reply.trim()||sending||selected.status==="closed")return;setSending(true);try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/me/tickets/"+selected.id+"/messages",{method:"POST",headers:{authorization:"Bearer "+token(),"content-type":"application/json"},body:JSON.stringify({message:reply.trim()})});if(r.ok){setReply("");await open(selected);await load()}}catch{}finally{setSending(false)}};
+  const create=async()=>{if(!subject.trim()||!message.trim())return;setSending(true);try{const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/tickets",{method:"POST",headers:{authorization:"Bearer "+token(),"content-type":"application/json"},body:JSON.stringify({subject:subject.trim(),message:message.trim()})});if(r.ok){setSubject("");setMessage("");await load()}}catch{}finally{setSending(false)}};
+  useBackHandler(()=>{if(selected){setSelected(null);setMessages([])}else onBack()});
+  if(selected)return <div style={{display:"flex",flexDirection:"column",height:"100%"}}><div style={{padding:"14px 16px",background:"#fff",borderBottom:"1px solid var(--am-border)",display:"flex",gap:10,alignItems:"center"}}><button onClick={()=>{setSelected(null);setMessages([]);setReply("")}} style={{background:"none",border:"none",fontSize:22}}>‹</button><div style={{fontWeight:900}}>{selected.subject}<div style={{fontSize:10,color:"var(--am-muted)",marginTop:3}}>#{selected.id} · {selected.status}</div></div></div><div style={{flex:1,overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:10}}>{messages.map((m,i)=><div key={i} style={{alignSelf:m.author_type==="user"?"flex-start":"flex-end",maxWidth:"80%",padding:12,borderRadius:14,background:m.author_type==="user"?"var(--am-accent)":"#fff",color:m.author_type==="user"?"#fff":"var(--am-text)",border:"1px solid var(--am-border)"}}>{m.message}</div>)}</div>{selected.status!=="closed"&&<div style={{padding:12,background:"#fff",borderTop:"1px solid var(--am-border)"}}><textarea value={reply} onChange={e=>setReply(e.target.value)} placeholder="پاسخ شما..." rows={3} style={{width:"100%",boxSizing:"border-box",padding:10,border:"1px solid var(--am-border)",borderRadius:10,fontFamily:"Vazirmatn",resize:"vertical"}}/><button disabled={sending||!reply.trim()} onClick={()=>void sendReply()} style={{width:"100%",marginTop:8,padding:12,border:0,borderRadius:10,background:"var(--am-accent)",color:"#fff",fontFamily:"Vazirmatn",fontWeight:800}}>{sending?"در حال ارسال...":"ارسال پاسخ"}</button></div>}</div>;
+  return <div style={{paddingBottom:110}}><div style={{padding:"16px",background:"#fff",borderBottom:"1px solid var(--am-border)"}}><div style={{fontSize:17,fontWeight:900}}>تیکت‌های پشتیبانی</div><div style={{fontSize:12,color:"var(--am-muted)",marginTop:4}}>ثبت و پیگیری مستقیم در سیستم پشتیبانی آن مارکت</div></div><div style={{padding:16}}>{loading?<div style={{padding:30,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت...</div>:tickets.map(t=><button key={t.id} onClick={()=>void open(t)} style={{width:"100%",textAlign:"right",background:"#fff",border:"1px solid var(--am-border)",borderRadius:14,padding:14,marginBottom:10,fontFamily:"Vazirmatn"}}><div style={{fontWeight:800}}>{t.subject}</div><div style={{fontSize:11,color:"var(--am-muted)",marginTop:5}}>#{t.id} · {t.status} · {t.updated_at}</div></button>)}{!loading&&tickets.length===0&&<div style={{padding:24,textAlign:"center",color:"var(--am-muted)"}}>تیکتی ثبت نشده است.</div>}<div style={{marginTop:18,background:"#fff",border:"1px solid var(--am-border)",borderRadius:16,padding:16}}><div style={{fontWeight:900,marginBottom:10}}>تیکت جدید</div><input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع" style={{width:"100%",boxSizing:"border-box",padding:12,border:"1px solid var(--am-border)",borderRadius:10,marginBottom:10,fontFamily:"Vazirmatn"}}/><textarea value={message} onChange={e=>setMessage(e.target.value)} placeholder="شرح مشکل یا سؤال" rows={5} style={{width:"100%",boxSizing:"border-box",padding:12,border:"1px solid var(--am-border)",borderRadius:10,fontFamily:"Vazirmatn",resize:"vertical"}}/><button disabled={sending||!subject.trim()||!message.trim()} onClick={()=>void create()} style={{width:"100%",marginTop:10,padding:13,border:0,borderRadius:11,background:"var(--am-accent)",color:"#fff",fontFamily:"Vazirmatn",fontWeight:800}}>{sending?"در حال ارسال...":"ثبت تیکت"}</button></div></div></div>;
+}
+function CameraCardScanModal({onClose,onDetect}:{onClose:()=>void;onDetect:(num:string)=>void}){
+  const videoRef=useRef<HTMLVideoElement>(null);
+  const canvasRef=useRef<HTMLCanvasElement>(null);
+  const streamRef=useRef<MediaStream|null>(null);
+  const [phase,setPhase]=useState<"camera"|"captured"|"result">("camera");
+  const [loading,setLoading]=useState(false);
+  const [detectedNum,setDetectedNum]=useState("");
+  const [capturedImg,setCapturedImg]=useState("");
+  const [camErr,setCamErr]=useState("");
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+        streamRef.current=s;
+        if(videoRef.current){videoRef.current.srcObject=s;videoRef.current.play();}
+      }catch{setCamErr("دسترسی به دوربین امکان‌پذیر نیست. لطفاً مجوز دوربین را فعال کنید.");}
+    })();
+    return()=>{streamRef.current?.getTracks().forEach(t=>t.stop());};
+  },[]);
+
+  const capture=()=>{
+    const v=videoRef.current;const c=canvasRef.current;
+    if(!v||!c)return;
+    c.width=v.videoWidth||320;c.height=v.videoHeight||240;
+    const ctx=c.getContext("2d");if(!ctx)return;
+    ctx.drawImage(v,0,0);
+    setCapturedImg(c.toDataURL("image/jpeg",0.8));
+    streamRef.current?.getTracks().forEach(t=>t.stop());
+    setLoading(false);setDetectedNum("");setPhase("result");
+  };
+
+  useBackHandler(onClose);
+  return createPortal(<div style={{position:"fixed",inset:0,background:"#000",zIndex:1000,display:"flex",flexDirection:"column",fontFamily:"Vazirmatn",direction:"rtl"}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px",background:"rgba(0,0,0,0.8)",color:"#fff"}}>
+      <h2 style={{margin:0,fontSize:16,fontWeight:700}}>اسکن کارت</h2>
+      <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:"#fff",padding:4}}><Icon name="x" size={22}/></button>
+    </div>
+    {camErr?<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{textAlign:"center",color:"#fff"}}>
+        <div style={{fontSize:14,lineHeight:1.8,marginBottom:20}}>{camErr}</div>
+        <button onClick={onClose} className="primary-button">بستن</button>
+      </div>
+    </div>:<>
+      <div style={{flex:1,position:"relative",display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
+        {phase==="camera"&&<video ref={videoRef} style={{width:"100%",height:"100%",objectFit:"cover"}} playsInline muted autoPlay/>}
+        {(phase==="captured"||phase==="result")&&capturedImg&&<img src={capturedImg} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>}
+        {/* Viewfinder */}
+        {phase==="camera"&&<div style={{position:"absolute",width:"80%",maxWidth:340,height:120,border:"2px solid rgba(0,214,176,0.8)",borderRadius:12,boxShadow:"0 0 0 1000px rgba(0,0,0,0.4)"}}>
+          <div style={{position:"absolute",top:-1,right:-1,width:20,height:20,borderTop:"3px solid #00D6B0",borderRight:"3px solid #00D6B0",borderRadius:"0 4px 0 0"}}/>
+          <div style={{position:"absolute",top:-1,left:-1,width:20,height:20,borderTop:"3px solid #00D6B0",borderLeft:"3px solid #00D6B0",borderRadius:"4px 0 0 0"}}/>
+          <div style={{position:"absolute",bottom:-1,right:-1,width:20,height:20,borderBottom:"3px solid #00D6B0",borderRight:"3px solid #00D6B0",borderRadius:"0 0 4px 0"}}/>
+          <div style={{position:"absolute",bottom:-1,left:-1,width:20,height:20,borderBottom:"3px solid #00D6B0",borderLeft:"3px solid #00D6B0",borderRadius:"0 0 0 4px"}}/>
+        </div>}
+        {loading&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{textAlign:"center",color:"#fff"}}>
+            <div style={{width:40,height:40,border:"3px solid rgba(0,214,176,0.3)",borderTop:"3px solid #00D6B0",borderRadius:"50%",margin:"0 auto 12px",animation:"spin 1s linear infinite"}}/>
+            <div style={{fontSize:13}}>در حال آماده‌سازی تصویر...</div>
+          </div>
+        </div>}
+      </div>
+      <canvas ref={canvasRef} style={{display:"none"}}/>
+      <div style={{padding:"20px 16px",background:"rgba(0,0,0,0.9)"}}>
+        {phase==="camera"&&<>
+          <p style={{color:"rgba(255,255,255,0.6)",fontSize:12,textAlign:"center",marginBottom:16,lineHeight:1.7}}>از شماره کارت عکس بگیرید؛ تصویر فقط برای بازبینی شما ثبت می‌شود. تشخیص خودکار شماره کارت تا اتصال سرویس OCR واقعی فعال نیست.</p>
+          <button onClick={capture} style={{width:"100%",background:"var(--accent)",border:"none",borderRadius:14,padding:"15px",color:"#031522",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"Vazirmatn"}}>گرفتن عکس</button>
+        </>}
+        {phase==="result"&&<>
+          <p style={{color:"rgba(255,255,255,0.7)",fontSize:12,textAlign:"center",marginBottom:12}}>شماره کارت تشخیص داده نشد — لطفاً به صورت دستی وارد کنید</p>
+          <input dir="ltr" value={detectedNum} onChange={e=>setDetectedNum(toLatinDigits(e.target.value).replace(/\D/g,"").slice(0,16))} placeholder="شماره کارت ۱۶ رقمی" inputMode="numeric" maxLength={16} style={{width:"100%",background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,padding:"12px",color:"#fff",fontSize:16,fontFamily:"Vazirmatn",textAlign:"center",letterSpacing:"0.15em",outline:"none",boxSizing:"border-box",marginBottom:12}}/>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{streamRef.current=null;setPhase("camera");setCapturedImg("");setDetectedNum("");(async()=>{try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});streamRef.current=s;if(videoRef.current){videoRef.current.srcObject=s;videoRef.current.play();}}catch{}})();}} className="outline-button" style={{flex:1,color:"#fff",borderColor:"rgba(255,255,255,0.3)"}}>دوباره</button>
+            <button onClick={()=>{if(detectedNum.length===16)onDetect(detectedNum);else if(detectedNum.length>0)onDetect(detectedNum);}} disabled={!detectedNum} className="primary-button" style={{flex:1,opacity:detectedNum?1:0.4}}>تأیید</button>
+          </div>
+        </>}
+      </div>
+    </>}
+  </div>,document.body);
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [appState,setAppState]=useState<AppState>("splash");
+  const [pendingPhone,setPendingPhone]=useState("");
+  const [user,setUser]=useState<UserData|null>(null);
+  const [tab,setTab]=useState<MainTab>("home");
+  const [subPage,setSubPage]=useState<SubPage>(null);
+  const [rate,setRate]=useState(0);const [rateLoading,setRateLoading]=useState(true);
+  const [showBal,setShowBal]=useState(true);
+  const [assetModal,setAssetModal]=useState(false);
+  const [transactions,setTransactions]=useState<TxRecord[]>([]);
+  const [selectedTx,setSelectedTx]=useState<TxRecord|null>(null);
+  const [menuOpen,setMenuOpen]=useState(false);
+  const [showFinancialNotifications,setShowFinancialNotifications]=useState(false);
+  const [financialNotifications,setFinancialNotifications]=useState<any[]>([]);
+  const [financialUnread,setFinancialUnread]=useState(0);
+  const [showGlobalHelp,setShowGlobalHelp]=useState(false);
+  const [showExitDialog,setShowExitDialog]=useState(false);
+  const [pendingTour,setPendingTour]=useState(false);
+  const [homeSkeleton,setHomeSkeleton]=useState(true);
+  const [chargePayData,setChargePayData]=useState<{phone:string;operator:Operator|null;amount:string;type:"charge"|"internet"}|null>(null);
+  const [chargePayOrigin,setChargePayOrigin]=useState<SubPage>("charge");
+  const [charityPayData,setCharityPayData]=useState<{orgId:string;orgName:string;amount:string}|null>(null);
+  const [billsPayData,setBillsPayData]=useState<{billType:string;billName:string;billIcon:string;amount:string;inputVal:string;ownerName:string}|null>(null);
+  const [violationsPayData,setViolationsPayData]=useState<{plate:string;amount:string;ownerName:string}|null>(null);
+  const [serviceName,setServiceName]=useState("");
+  const [lightTheme,setLightThemeState]=useState(()=>localStorage.getItem("anp_theme")==="light");
+  const [insuranceTab,setInsuranceTab]=useState<"third-party"|"body"|"motorcycle">("third-party");
+  const [systemNotice,setSystemNotice]=useState("");
+  const [protectedAccessNotice,setProtectedAccessNotice]=useState("");
+  const [homeSlide,setHomeSlide]=useState(0);
+  const [homeSliderPaused,setHomeSliderPaused]=useState(false);
+  const internetStateRef=useRef<{phone:string;step:InternetStep}|null>(null);
+  const [homeEditMode,setHomeEditMode]=useState(false);
+  const [homeServices,setHomeServices]=useState<string[]>(()=>DEFAULT_HOME_SERVICES);
+  const [homePlatforms,setHomePlatforms]=useState<string[]>(()=>DEFAULT_HOME_PLATFORMS);
+  const [showCashback,setShowCashback]=useState(true);
+  const longPressTimerRef=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const longPressActivatedRef=useRef(false);
+  const touchStartPosRef=useRef<{x:number;y:number}|null>(null);
+  const hasScrolledRef=useRef(false);
+  const dragSrcRef=useRef<string|null>(null);
+  const touchDragIdRef=useRef<string|null>(null);
+  const [dragOverId,setDragOverId]=useState<string|null>(null);
+  const svcGridRef=useRef<HTMLDivElement>(null);
+  const prevRectsRef=useRef<Record<string,DOMRect>>({});
+  const [confettiItems,setConfettiItems]=useState<{id:number;x:number;y:number;color:string;cx:number;cy:number}[]>([]);
+
+  const setLightTheme=(v:boolean)=>{
+    setLightThemeState(v);
+    localStorage.setItem("anp_theme",v?"light":"dark");
+    void userSettingsRequest("/api/v1/user/settings",{method:"PATCH",body:JSON.stringify({theme:v?"light":"dark"})}).catch(()=>{});
+  };
+  useEffect(()=>{document.body.classList.toggle("light-theme",lightTheme)},[lightTheme]);
+  useEffect(()=>{let active=true;
+  const refreshRegisteredCards=async()=>{if(!user||!active)return;try{const cards=await anpardazCards();if(!active)return;const next={...user,cards};DB.saveUser(next);setUser(next);}catch{}};
+  const p=new URLSearchParams(window.location.search);
+  void refreshRegisteredCards();
+  if(p.get("card_registration")==="verified"){setSystemNotice("کارت بانکی با موفقیت در آن‌پرداز ثبت و تأیید شد.");void refreshRegisteredCards();const clean=window.location.pathname+window.location.hash;window.history.replaceState({},document.title,clean)}
+  const onCardsUpdated=()=>{void refreshRegisteredCards()};
+  window.addEventListener("anp-cards-updated",onCardsUpdated);
+  return()=>{active=false;window.removeEventListener("anp-cards-updated",onCardsUpdated)};
+},[user?.uid]);
+
+  useEffect(()=>{
+    if(!user)return;
+    let active=true;
+    void userSettingsRequest("/api/v1/user/settings").then(({settings})=>{
+      if(!active||!settings)return;
+      setLightThemeState(settings.theme==="light");
+      localStorage.setItem("anp_theme",settings.theme);
+      const root=document.getElementById("root");
+      if(root)root.style.zoom=settings.fontScale===0?"":String(1+settings.fontScale*0.07);
+    }).catch(()=>{});
+    return()=>{active=false};
+  },[user?.uid]);
+
+  // Long-press handlers for service buttons — 600ms, touch-slop aware
+  const startLongPress=(id:string,e:React.TouchEvent|React.MouseEvent)=>{
+    longPressActivatedRef.current=false;
+    hasScrolledRef.current=false;
+    const pos='touches' in e
+      ?{x:e.touches[0].clientX,y:e.touches[0].clientY}
+      :{x:(e as React.MouseEvent).clientX,y:(e as React.MouseEvent).clientY};
+    touchStartPosRef.current=pos;
+    if(homeEditMode){
+      // already in edit mode: start a touch drag immediately
+      touchDragIdRef.current=id;
+      dragSrcRef.current=id;
+      e.preventDefault();
+    } else {
+      longPressTimerRef.current=setTimeout(()=>{longPressActivatedRef.current=true;touchDragIdRef.current=id;dragSrcRef.current=id;setHomeEditMode(true);},600);
+    }
+  };
+  const moveLongPress=(e:React.TouchEvent)=>{
+    if(!touchStartPosRef.current)return;
+    const touch=e.touches[0];
+    const dx=touch.clientX-touchStartPosRef.current.x;
+    const dy=touch.clientY-touchStartPosRef.current.y;
+    if(homeEditMode&&touchDragIdRef.current){
+      // handle touch drag: find element under touch point
+      e.preventDefault();
+      const el=document.elementFromPoint(touch.clientX,touch.clientY);
+      const btn=el?.closest("[data-sid]") as HTMLElement|null;
+      const overId=btn?.dataset.sid||null;
+      if(overId&&overId!==touchDragIdRef.current){setDragOverId(overId);}
+      return;
+    }
+    if(Math.sqrt(dx*dx+dy*dy)>10){
+      hasScrolledRef.current=true;
+      if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;longPressActivatedRef.current=false;}
+    }
+  };
+  const endPress=(e:React.MouseEvent|React.TouchEvent,svc:{id:string;action:string;label:string})=>{
+    if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}
+    if(homeEditMode&&touchDragIdRef.current&&dragOverId){
+      // commit touch-based reorder
+      const src=touchDragIdRef.current;
+      const over=dragOverId;
+      setHomeServices(prev=>{
+        const next=[...prev];
+        const si=next.indexOf(src);const oi=next.indexOf(over);
+        if(si>=0&&oi>=0){next.splice(si,1);next.splice(oi,0,src);}
+        if(user)localStorage.setItem(`anp_home_services_${user.uid}`,JSON.stringify(next));
+        return next;
+      });
+    } else if(!longPressActivatedRef.current&&!hasScrolledRef.current&&!homeEditMode&&svc.action!=="disabled"){
+      handleService(svc.action,svc.label);
+    }
+    touchDragIdRef.current=null;
+    dragSrcRef.current=null;
+    setDragOverId(null);
+    longPressActivatedRef.current=false;
+    hasScrolledRef.current=false;
+    touchStartPosRef.current=null;
+  };
+  const cancelLongPress=()=>{
+    if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}
+    touchDragIdRef.current=null;
+    longPressActivatedRef.current=false;
+    hasScrolledRef.current=false;
+    touchStartPosRef.current=null;
+  };
+
+  function playPopSound(){
+    try{
+      const ctx=new AudioContext();
+      const osc=ctx.createOscillator();
+      const gain=ctx.createGain();
+      osc.connect(gain);gain.connect(ctx.destination);
+      osc.type="sine";
+      osc.frequency.setValueAtTime(600,ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(900,ctx.currentTime+0.08);
+      gain.gain.setValueAtTime(0.3,ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.25);
+      osc.start();osc.stop(ctx.currentTime+0.25);
+    }catch{}
+  }
+
+  const removeService=(id:string,e?:React.MouseEvent)=>{
+    const next=homeServices.filter(sid=>sid!==id);
+    setHomeServices(next);if(user)localStorage.setItem(`anp_home_services_${user.uid}`,JSON.stringify(next));
+    playPopSound();
+    const colors=["#00D6B0","#4a9eff","#f472b6","#fb923c","#a78bfa","#34d399","#f5c23d","#e85c5c"];
+    const cx=e?e.clientX:window.innerWidth/2;
+    const cy=e?e.clientY:window.innerHeight/2;
+    const particles=Array.from({length:12},(_,i)=>({
+      id:Date.now()+i,x:cx,y:cy,
+      color:colors[i%colors.length],
+      cx:(Math.random()-0.5)*120,
+      cy:(Math.random()-1.5)*100,
+    }));
+    setConfettiItems(particles);
+    setTimeout(()=>setConfettiItems([]),900);
+  };
+
+  // Preview services order during drag
+  const previewServices=useMemo(()=>{
+    const src=dragSrcRef.current;
+    if(!src||!dragOverId||src===dragOverId)return homeServices;
+    const si=homeServices.indexOf(src);const di=homeServices.indexOf(dragOverId);
+    if(si<0||di<0)return homeServices;
+    const next=[...homeServices];const[m]=next.splice(si,1);next.splice(di,0,m);
+    return next;
+  },[homeServices,dragOverId]);
+
+  // FLIP animation when preview order changes
+  useLayoutEffect(()=>{
+    const grid=svcGridRef.current;if(!grid)return;
+    const newRects:Record<string,DOMRect>={};
+    grid.querySelectorAll<HTMLElement>('[data-sid]').forEach(el=>{
+      const id=el.dataset.sid!;
+      newRects[id]=el.getBoundingClientRect();
+      const prev=prevRectsRef.current[id];
+      if(prev){
+        const dx=prev.left-newRects[id].left,dy=prev.top-newRects[id].top;
+        if(Math.abs(dx)>0.5||Math.abs(dy)>0.5){
+          el.style.transition='none';el.style.transform=`translate(${dx}px,${dy}px)`;
+          requestAnimationFrame(()=>requestAnimationFrame(()=>{
+            el.style.transition='transform 0.3s cubic-bezier(0.4,0,0.2,1)';el.style.transform='none';
+          }));
+        }
+      }
+    });
+    prevRectsRef.current=newRects;
+  },[previewServices]);
+
+  // Font scale: apply persisted value on mount
+  useEffect(()=>{
+    const saved=Number(localStorage.getItem("anp_font_scale")||"0");
+    if(saved>0){const root=document.getElementById("root");if(root)root.style.zoom=String(1+saved*0.07);}
+  },[]);
+
+  // Keyboard sound
+  useEffect(()=>{
+    let ctx:AudioContext|null=null;
+    const getCtx=()=>{if(!ctx)ctx=new (window.AudioContext||(window as any).webkitAudioContext)();return ctx;};
+    const playClick=()=>{
+      if(localStorage.getItem("anp_key_sound")==="off")return;
+      try{
+        const c=getCtx();const g=c.createGain();const o=c.createOscillator();
+        g.gain.setValueAtTime(0.07,c.currentTime);g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+0.045);
+        o.frequency.setValueAtTime(1200,c.currentTime);o.frequency.exponentialRampToValueAtTime(800,c.currentTime+0.04);
+        o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+0.05);
+      }catch{}
+    };
+    const onKey=(e:KeyboardEvent)=>{
+      const el=document.activeElement;
+      if(!(el instanceof HTMLInputElement||el instanceof HTMLTextAreaElement))return;
+      if(e.key.length===1||e.key==="Backspace"||e.key==="Delete")playClick();
+    };
+    document.addEventListener("keydown",onKey);
+    return()=>document.removeEventListener("keydown",onKey);
+  },[]);
+
+  // Elastic surface deformation — scaleY stretches cards/buttons/rounded panels
+  useEffect(()=>{
+    let startY=0;
+    let scrollEl:HTMLElement|null=null;
+    let atTopStart=false;
+    let pulling=false;
+    const getScrollParent=(el:Element|null):HTMLElement|null=>{
+      if(!el||el===document.body)return null;
+      const s=window.getComputedStyle(el);
+      if(/(auto|scroll)/.test(s.overflowY)&&(el as HTMLElement).scrollHeight>(el as HTMLElement).clientHeight+2)return el as HTMLElement;
+      return getScrollParent(el.parentElement);
+    };
+    const onStart=(e:TouchEvent)=>{
+      startY=e.touches[0].clientY;
+      // Only apply effect on the home tab's app-content scroll container
+      if(_tabRef.current!=="home"){scrollEl=null;return;}
+      const candidate=getScrollParent(e.target as Element);
+      scrollEl=candidate?.classList.contains("app-content")?candidate:null;
+      if(scrollEl){
+        atTopStart=scrollEl.scrollTop<=0;
+      }
+      pulling=false;
+    };
+    const onMove=(e:TouchEvent)=>{
+      if(!scrollEl)return;
+      const dy=e.touches[0].clientY-startY;
+      const atTop=scrollEl.scrollTop<=0;
+      const atBottom=scrollEl.scrollTop+scrollEl.clientHeight>=scrollEl.scrollHeight-2;
+      const goingDown=dy>0;
+      const goingUp=dy<0;
+      if((atTop&&goingDown&&dy>6)||(atBottom&&goingUp&&dy<-6)){
+        pulling=true;
+        const raw=Math.abs(dy);
+        // logarithmic damping — feels elastic, resists hard pulls
+        const damped=Math.log1p(raw)*10;
+        const maxStretch=55;
+        const stretch=Math.min(damped,maxStretch);
+        const h=scrollEl.clientHeight||1;
+        // scaleY stretches the entire surface including cards/buttons/rounded corners
+        const scaleY=1+stretch/h;
+        const origin=atTop?"top center":"bottom center";
+        scrollEl.style.transform=`scaleY(${scaleY.toFixed(4)})`;
+        scrollEl.style.transformOrigin=origin;
+        scrollEl.style.transition="none";
+        scrollEl.style.willChange="transform";
+      }
+    };
+    const onEnd=()=>{
+      if(pulling&&scrollEl){
+        const el=scrollEl;
+        el.style.transition="transform 0.46s cubic-bezier(0.18,1.2,0.4,1)";
+        el.style.transform="scaleY(1)";
+        const cleanup=()=>{
+          el.style.transform="";
+          el.style.transition="";
+          el.style.transformOrigin="";
+          el.style.willChange="";
+        };
+        el.addEventListener("transitionend",cleanup,{once:true});
+        setTimeout(cleanup,600);
+      }
+      pulling=false;
+      scrollEl=null;
+    };
+    document.addEventListener("touchstart",onStart,{passive:true});
+    document.addEventListener("touchmove",onMove,{passive:true});
+    document.addEventListener("touchend",onEnd);
+    document.addEventListener("touchcancel",onEnd);
+    return()=>{
+      document.removeEventListener("touchstart",onStart);
+      document.removeEventListener("touchmove",onMove);
+      document.removeEventListener("touchend",onEnd);
+      document.removeEventListener("touchcancel",onEnd);
+    };
+  },[]);
+
+  useEffect(()=>{let active=true;const hydrate=async()=>{if(!user||!localStorage.getItem("anpardaz:accessToken"))return;try{const [profile,cards,accounts,settings,activity,kyc]=await Promise.all([anpardazRequest("/api/v1/customer/profile"),anpardazCards(),anpardazAccounts(),userSettingsRequest("/api/v1/user/settings"),anpardazActivity(),sarrafRequest("/api/v1/kyc")]);if(!active)return;const p=profile?.profile??{};const toman=accounts.find((a:any)=>String(a.currency).trim()==="IRR"||String(a.currency).trim()==="TMN"||String(a.currency).trim()==="TOMAN");const usdt=accounts.find((a:any)=>String(a.currency).trim()==="USDT");const next={...user,name:String(p.first_name??user.name??""),family:String(p.last_name??user.family??""),nationalId:String(p.national_id??user.nationalId??""),birthDate:p.birth_date?String(p.birth_date).slice(0,10):user.birthDate,phone:String(p.phone??user.phone),cards,pinEnabled:Boolean(settings?.settings?.pinEnabled),tomanBalance:Number(toman?.balance??0),usdtBalance:Number(usdt?.balance??0),kycStatus:String(kyc?.kyc?.status??"unverified"),kycDone:String(kyc?.kyc?.status??"") === "verified"};DB.saveUser(next);setUser(next);const mappedTx=activity.map((x:any)=>({id:String(x.reference??x.id),userId:String(p.id??user.uid),type:["deposit","withdraw","transfer","service"].includes(String(x.type))?String(x.type):"service",fromAsset:String(x.currency??"IRR"),toAsset:String(x.currency??"IRR"),amount:Number(x.amount??0),fee:0,status:["completed","success"].includes(String(x.status))?"done":String(x.status)==="failed"?"failed":"pending",createdAt:String(x.created_at??new Date().toISOString()),note:String(x.description??x.type??"")})) as TxRecord[];setTransactions(mappedTx);}catch{/* Keep cached non-financial profile only; financial values remain server-backed on next successful refresh. */}};void hydrate();const timer=window.setInterval(()=>void hydrate(),30000);return()=>{active=false;window.clearInterval(timer)}},[user?.uid]);
+
+  useEffect(()=>{let active=true;let timer:ReturnType<typeof setInterval>|null=null;const sessionId=localStorage.getItem("anp:shaparak:registrationSession");if(!user||!sessionId)return()=>{};const check=async()=>{try{const d=await shaparakRegistrationStatus(sessionId);const st=String(d?.registration?.status??"pending");if(st==="verified"){if(timer)clearInterval(timer);localStorage.removeItem("anp:shaparak:registrationSession");const cards=await anpardazCards();if(active){const next={...user,cards};DB.saveUser(next);setUser(next);window.dispatchEvent(new Event("anp-cards-updated"));}}else if(["rejected","expired","cancelled","error"].includes(st)){if(timer)clearInterval(timer);localStorage.removeItem("anp:shaparak:registrationSession");}}catch{}};void check();timer=setInterval(()=>void check(),3000);const stop=setTimeout(()=>{if(timer)clearInterval(timer)},120000);return()=>{active=false;if(timer)clearInterval(timer);clearTimeout(stop)}},[user?.uid]);
+  useEffect(()=>{let active=true;const bootstrap=async()=>{await new Promise(r=>setTimeout(r,2200));if(!active)return;const token=localStorage.getItem("anpardaz:accessToken")??"";if(!token){DB.setCurrentPhone("");setUser(null);setTransactions([]);setAppState("login");return;}try{const me=await anpardazRequest("/api/v1/auth/me");if(!active)return;const phone=DB.currentPhone();const cached=phone?DB.getUser(phone):null;if(cached){setUser(cached);setTransactions([]);const hs=localStorage.getItem(`anp_home_services_${cached.uid}`);if(hs){try{const p=JSON.parse(hs);if(Array.isArray(p)){const merged=[...p,...DEFAULT_HOME_SERVICES.filter(id=>!p.includes(id))];const cleaned=merged.filter(id=>id!=="credit-score");if(cleaned.length!==p.length||cleaned.some((id,i)=>id!==merged[i]))localStorage.setItem(`anp_home_services_${cached.uid}`,JSON.stringify(cleaned));setHomeServices(cleaned);}}catch{}}const hp=localStorage.getItem(`anp_home_platforms_${cached.uid}`);if(hp){try{const p=JSON.parse(hp);if(Array.isArray(p))setHomePlatforms(p);}catch{}}if(localStorage.getItem(`anp_show_cashback_${cached.uid}`)===`false`)setShowCashback(false);}else{const profile=await anpardazRequest("/api/v1/customer/profile");const p=profile?.profile??{};const fresh:UserData={uid:String(me?.user?.id??me?.user?.identity_id??_genUid()),phone:String(p.phone??""),name:String(p.first_name??""),family:String(p.last_name??""),nationalId:String(p.national_id??""),birthDate:p.birth_date?String(p.birth_date).slice(0,10):"",photo:String(p.photo??""),pinEnabled:false,tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};if(!fresh.phone){throw new Error("customer_profile_phone_missing");}DB.setCurrentPhone(fresh.phone);DB.saveUser(fresh);setUser(fresh);}setAppState("ready");}catch{localStorage.removeItem("anpardaz:accessToken");DB.setCurrentPhone("");setUser(null);setTransactions([]);setAppState("login");}};void bootstrap();return()=>{active=false}},[]);
+  useEffect(()=>{if(appState==="ready"){const t=setTimeout(()=>setHomeSkeleton(false),5000);return()=>clearTimeout(t)}},[appState]);
+  useEffect(()=>{let active=true;const load=async()=>{const r=await fetchUSDTRate();if(!active)return;setRate(r??0);setRateLoading(false)};void load();const iv=setInterval(()=>{void fetchUSDTRate().then(r=>{if(active&&r!=null)setRate(r)})},5000);return()=>{active=false;clearInterval(iv)}},[]);
+  useEffect(()=>{if(homeSliderPaused)return;const t=setInterval(()=>setHomeSlide(s=>(s+1)%3),5000);return()=>clearInterval(t);},[homeSliderPaused]);
+  // Auto-start tour once after first successful registration + verification
+  useEffect(()=>{
+    if(!pendingTour||appState!=="ready"||!user||subPage!==null||tab!=="home")return;
+    const tourKey=`anp_tour_done_${user.phone}`;
+    if(localStorage.getItem(tourKey)){setPendingTour(false);return;}
+    // Hide skeleton first so all data-help-id elements are rendered, then start tour
+    setHomeSkeleton(false);
+    let tid:ReturnType<typeof setTimeout>;
+    const raf=requestAnimationFrame(()=>{
+      tid=setTimeout(()=>{setShowGlobalHelp(true);setPendingTour(false);},900);
+    });
+    return()=>{cancelAnimationFrame(raf);clearTimeout(tid);};
+  },[pendingTour,appState,user,subPage,tab]);
+  useEffect(()=>{const original=window.alert;window.alert=(message?:unknown)=>{const node=document.createElement("div");node.className="native-notice";node.innerHTML=`<div class="native-notice-card"><img src="${anPardazLogo}" alt="آن‌پرداز"><h3>پیام آن‌پرداز</h3><p>${String(message??"")}</p><button>متوجه شدم</button></div>`;node.querySelector("button")?.addEventListener("click",()=>node.remove());document.body.append(node)};return()=>{window.alert=original}},[]);
+  useEffect(()=>{
+    const normalize=(root:Node)=>{const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node:Text|null;while(node=walker.nextNode() as Text|null){const parent=node.parentElement;if(!parent||["INPUT","TEXTAREA","SCRIPT","STYLE"].includes(parent.tagName))continue;const next=toFaDigits(node.nodeValue||"");if(next!==node.nodeValue)node.nodeValue=next}};
+    normalize(document.body);const observer=new MutationObserver(records=>records.forEach(r=>r.addedNodes.forEach(normalize)));observer.observe(document.body,{childList:true,subtree:true});return()=>observer.disconnect();
+  },[]);
+
+  // Refs for back handler (avoids stale closures in popstate listener)
+  const _appStateRef=useRef(appState);_appStateRef.current=appState;
+  const _showHelpRef=useRef(showGlobalHelp);_showHelpRef.current=showGlobalHelp;
+  const _menuOpenRef=useRef(menuOpen);_menuOpenRef.current=menuOpen;
+  const _subPageRef=useRef(subPage);_subPageRef.current=subPage;
+  const _tabRef=useRef(tab);_tabRef.current=tab;
+  const _chargePayRef=useRef(chargePayData);_chargePayRef.current=chargePayData;
+  const _chargePayOriginRef=useRef(chargePayOrigin);_chargePayOriginRef.current=chargePayOrigin;
+  const _showExitDialogRef=useRef(showExitDialog);_showExitDialogRef.current=showExitDialog;
+
+  useEffect(()=>{
+    // Ensure there is always a sentinel history entry so back-press stays in the app
+    window.history.pushState({_anp:1},"");
+    const handle=()=>{
+      if(_appStateRef.current!=="ready"){return;} // don't intercept during onboarding
+      // Always re-push so next back-press is also intercepted
+      window.history.pushState({_anp:1},"");
+      // Dismiss exit dialog if open
+      if(_showExitDialogRef.current){setShowExitDialog(false);return;}
+      // Innermost screen handler wins
+      if(_ANP_BACK.length>0){_ANP_BACK[_ANP_BACK.length-1]();return;}
+      // App-level: close modals then navigate up
+      if(_showHelpRef.current){setShowGlobalHelp(false);return;}
+      if(_menuOpenRef.current){setMenuOpen(false);return;}
+      const sp=_subPageRef.current;
+      if(sp!==null){
+        if(sp==="bills-payment")setSubPage("bills");
+        else if(sp==="violations-payment")setSubPage("violations");
+        else if(sp==="charity-payment")setSubPage("charity");
+        else if(sp==="charge-payment")setSubPage(_chargePayOriginRef.current);
+       
+        else setSubPage(null);
+        return;
+      }
+      if(_tabRef.current!=="home"){setTab("home");return;}
+      // At root AnPardaz home: show exit confirmation dialog
+      setShowExitDialog(true);
+    };
+    window.addEventListener("popstate",handle);
+    return()=>window.removeEventListener("popstate",handle);
+  },[]);
+
+  const updateUser=useCallback((u:UserData)=>{DB.saveUser(u);setUser(u)},[]);
+  const updateWithTx=useCallback((u:UserData,tx:TxRecord)=>{const txs=[tx,...transactions];DB.saveUser(u);DB.saveTx(u.phone,txs);setUser(u);setTransactions(txs);if(localStorage.getItem(`anp_notifications_${u.uid}`)!=="off")playChime()},[transactions]);
+
+  const handleVerified=(phone:string,accessToken:string,email:string)=>{localStorage.setItem("anpardaz:accessToken",accessToken);localStorage.setItem("anpardaz:web:email",email);DB.setCurrentPhone(phone);const existing=DB.getUser(phone);if(existing){setUser(existing);setTransactions(DB.getTx(phone));const hs=localStorage.getItem(`anp_home_services_${existing.uid}`);if(hs){try{const p=JSON.parse(hs);if(Array.isArray(p))setHomeServices(p);}catch{}}const hp=localStorage.getItem(`anp_home_platforms_${existing.uid}`);if(hp){try{const p=JSON.parse(hp);if(Array.isArray(p))setHomePlatforms(p);}catch{}}setShowCashback(localStorage.getItem(`anp_show_cashback_${existing.uid}`)!=="false");setAppState(existing.pinEnabled?"unlock-pin":"ready")}else{const uid=_genUid();const newUser:UserData={uid,name:"",family:"",nationalId:"",birthDate:"",phone,photo:"",pinEnabled:false,tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(newUser);DB.setCurrentPhone(phone);setUser(newUser);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setPendingTour(true);setAppState("ready")}};
+  const handleLogout=()=>{localStorage.removeItem("anpardaz:accessToken");localStorage.removeItem("anpardaz:web:email");sessionStorage.removeItem("anpardaz:deviceSecurityToken");sessionStorage.removeItem("anpardaz:deviceSecurityVerifiedAt");DB.setCurrentPhone("");setUser(null);setTransactions([]);setHomeServices(DEFAULT_HOME_SERVICES);setHomePlatforms(DEFAULT_HOME_PLATFORMS);setShowCashback(true);setTab("home");setSubPage(null);setAppState("login")};
+
+  const [obPhoto,setObPhoto]=useState("");
+  const [obProfile,setObProfile]=useState({name:"",family:"",nationalId:"",birthDate:""});
+  const [pendingPin,setPendingPin]=useState("");
+  const [obLegalAccepted,setObLegalAccepted]=useState(false);
+
+  if(appState==="splash")return <SplashScreen/>;
+  if(appState==="login")return <PhoneLogin onSend={(p)=>{setPendingPhone(p);setAppState("otp")}}/>;
+  if(appState==="otp")return <OTPVerify phone={pendingPhone} onVerified={handleVerified} onBack={()=>setAppState("login")}/>;
+  if(appState==="onboard-photo")return <OnboardPhoto onDone={p=>{setObPhoto(p);setObLegalAccepted(true);setAppState("onboard-profile")}} onBack={()=>setAppState("otp")} initialAccepted={obLegalAccepted}/>;
+  if(appState==="onboard-profile")return <OnboardProfile onDone={d=>{setObProfile(d);setAppState("onboard-pin")}} onBack={()=>setAppState("onboard-photo")} initialData={obProfile}/>;
+  if(appState==="unlock-pin"&&user)return <PinUnlock user={user} onVerified={()=>setAppState("ready")}/>;
+  if(appState==="onboard-pin")return <OnboardPin onDone={pin=>{setPendingPin(pin);setAppState("verify-anim")}} onSkip={()=>{setPendingPin("");setAppState("verify-anim")}} onBack={()=>setAppState("onboard-profile")}/>;
+  if(appState==="verify-anim")return <VerificationAnimation onVerify={async()=>{try{await anpardazRequest("/api/v1/customer/profile",{method:"PATCH",body:JSON.stringify({phone:pendingPhone,firstName:obProfile.name,lastName:obProfile.family,nationalId:obProfile.nationalId,birthDate:obProfile.birthDate})});if(pendingPin)await userSettingsRequest("/api/v1/user/settings/pin/enable",{method:"POST",body:JSON.stringify({newPin:pendingPin})});const u:UserData={uid:_genUid(),...obProfile,phone:pendingPhone,photo:obPhoto,pinEnabled:Boolean(pendingPin),tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(u);DB.setCurrentPhone(u.phone);setUser(u);setTransactions([]);setHomeServices(SERVICES.slice(0,8).map(s=>s.id));setHomeSkeleton(false);setAppState("ready");setPendingTour(true);return true;}catch{setAppState("onboard-profile");return false;}}} onFail={()=>{setPendingPin("");setAppState("onboard-pin")}}/>;
+  if(!user)return null;
+
+  const initials=(user.name?.[0]??"")+(user.family?.[0]??"")||"؟";
+  const recentTx=transactions.filter(tx=>tx.source!=="exchange"&&!tx.note?.includes("[صرافی]")&&!(tx.note?.includes("ربات فارکس")&&tx.note?.includes("تخصیص"))).slice(0,3);
+  const lt=lightTheme?" light-theme":"";
+
+  const handleService=async(action:string,label:string)=>{
+    if(!(await checkProtectedServiceAccess(setProtectedAccessNotice)))return;
+    setMenuOpen(false);
+    if(action==="transfer"){setTab("home");setSubPage("transfer")}
+    else if(action==="exchange"){setTab("home");setSubPage("exchange")}
+    else if(action==="tether-swap"){setTab("home");setSubPage("tether-swap")}
+    else if(action==="charge"){setTab("home");setSubPage("charge")}
+    else if(action==="internet"){setTab("home");setSubPage("internet")}
+    else if(action==="bills"){setTab("home");setSubPage("bills")}
+    else if(action==="car-services"){setTab("home");setSubPage("car-services")}
+    else if(action==="violations"){setTab("home");setSubPage("violations")}
+    else if(action==="freeway"){setTab("home");setSubPage("freeway")}
+    else if(action==="tehran-traffic"){setTab("home");setSubPage("tehran-traffic")}
+    else if(action==="insurance"){setInsuranceTab("third-party");setTab("home");setSubPage("insurance")}
+    else if(action==="insurance-body"){setInsuranceTab("body");setTab("home");setSubPage("insurance")}
+    else if(action==="insurance-moto"){setInsuranceTab("motorcycle");setTab("home");setSubPage("insurance")}
+    else if(action==="sana"){setTab("home");setSubPage("sana")}
+    else if(action==="judiciary-bill"){setTab("home");setSubPage("judiciary-bill")}
+    else if(action==="property-reg"){setTab("home");setSubPage("property-reg")}
+    else if(action==="charity"){setTab("home");setSubPage("charity")}
+    else if(action==="card-balance"){setTab("home");setSubPage("card-balance")}
+    else if(action==="sayad"){setTab("home");setSubPage("sayad")}
+    else if(action==="cashback"){setTab("home");setSubPage("cashback")}
+    else if(action==="financial-center"){setTab("home");setSubPage("financial-center")}
+    else if(action==="an-market"){setSubPage("an-market");}
+    else if(action==="an-banner"){setSubPage("an-banner");}
+    else if(action==="an-hoosh"){setSubPage("an-hoosh");}
+    else if(action==="all-services"){setTab("home");setSubPage("all-services")}
+    else if(action==="soon")setSystemNotice("این خدمت به‌زودی در دسترس خواهد بود.")
+    else if(action==="deposit")setSystemNotice("درگاه واریز به‌زودی فعال می‌شود. به محض فعال‌سازی، از همین بخش اطلاع‌رسانی می‌کنیم.")
+    else{setServiceName(label);setTab("home");setSubPage("service")}
+  };
+
+  const SNAV=()=><nav className="bottom-nav">{([{id:"history",label:"تراکنش‌ها",icon:"chart"},{id:"home",label:"خانه",icon:"home"},{id:"profile",label:"پروفایل",icon:"user"}] as {id:MainTab;label:string;icon:string}[]).map(n=><button key={n.id} data-help-id={`nav-${n.id}`} onClick={()=>{setSubPage(null);setTab(n.id)}} className={tab===n.id?"active":""}><Icon name={n.icon}/><span>{n.label}</span></button>)}</nav>;
+
+  const goBack=()=>setSubPage(null);
+  const goHome=()=>{setSubPage(null);setTab("home")};
+  if(subPage==="sayad")return <div key="sayad" className={`app${lt} app-slide`} dir="rtl"><SayadScreen onBack={goBack}/><SNAV/></div>;
+  if(subPage==="transfer")return <div key="transfer" className={`app${lt} app-slide`} dir="rtl"><TransferScreen user={user} rate={rate} onUpdate={updateWithTx} transactions={transactions} onBack={goBack} onDone={goHome}/><SNAV/></div>;
+  if(subPage==="tether-swap")return <div key="tether-swap" className={`app${lt} app-slide`} dir="rtl"><TetherSwapScreen user={user} rate={rate} onUpdate={updateWithTx} onBack={goBack}/><SNAV/></div>;
+  if(subPage==="exchange")return <div key="exchange" className={`app${lt} app-slide`} dir="rtl"><ExchangeScreen user={user} onBack={goBack} onUpdate={updateWithTx} onUpdateUser={updateUser} transactions={transactions}/></div>;
+  if(subPage==="charge")return <div key="charge" className={`app${lt} app-slide`} dir="rtl"><ChargeScreen type="charge" user={user!} onUpdate={updateWithTx} onBack={goBack} onGoToPayment={d=>{setChargePayData(d);setChargePayOrigin("charge");setSubPage("charge-payment")}}/><SNAV/></div>;
+  if(subPage==="internet")return <div key="internet" className={`app${lt} app-slide`} dir="rtl" style={{position:"relative"}}><InternetPackageScreen user={user!} onUpdate={updateWithTx} onBack={()=>{internetStateRef.current=null;goBack();}} onGoToPayment={d=>{setChargePayData(d);setChargePayOrigin("internet");setSubPage("charge-payment")}} initialState={internetStateRef.current} onBeforeNavigate={s=>{internetStateRef.current=s;}}/><SNAV/></div>;
+  if(subPage==="service")return <div key="service" className={`app${lt} app-slide`} dir="rtl"><ServiceScreen name={serviceName} onBack={goBack}/><SNAV/></div>;
+  if(subPage==="bills")return <div key="bills" className={`app${lt} app-slide`} dir="rtl"><BillsScreen onBack={goBack} onGoToPayment={d=>{setBillsPayData(d);setSubPage("bills-payment")}}/><SNAV/></div>;
+  if(subPage==="bills-payment")return <div key="bills-payment" className={`app${lt} app-slide`} dir="rtl"><BillsPaymentScreen data={billsPayData!} user={user!} onUpdate={updateWithTx} onBack={()=>setSubPage("bills")} onDone={goHome}/><SNAV/></div>;
+  if(subPage==="car-services")return <div key="car-services" className={`app${lt} app-slide`} dir="rtl"><CarServicesScreen onBack={goBack}/><SNAV/></div>;
+  if(subPage==="violations")return <div key="violations" className={`app${lt} app-slide`} dir="rtl"><ViolationsScreen onBack={goBack} onGoToPayment={d=>{setViolationsPayData(d);setSubPage("violations-payment")}}/><SNAV/></div>;
+  if(subPage==="violations-payment")return <div key="violations-payment" className={`app${lt} app-slide`} dir="rtl"><ViolationsPaymentScreen data={violationsPayData!} user={user!} onUpdate={updateWithTx} onBack={()=>setSubPage("violations")} onDone={goHome}/><SNAV/></div>;
+  if(subPage==="freeway")return <div key="freeway" className={`app${lt} app-slide`} dir="rtl"><FreewayScreen onBack={goBack}/><SNAV/></div>;
+  if(subPage==="tehran-traffic")return <div key="tehran-traffic" className={`app${lt} app-slide`} dir="rtl"><TrafficScreen onBack={goBack}/><SNAV/></div>;
+  if(subPage==="insurance")return <div key="insurance" className={`app${lt} app-slide`} dir="rtl"><InsuranceScreen initialTab={insuranceTab} user={user!} onUpdate={updateWithTx} onBack={goBack}/><SNAV/></div>;
+  if(subPage==="sana")return <div key="sana" className={`app${lt} app-slide`} dir="rtl"><SanaScreen onBack={goBack}/><SNAV/></div>;
+  if(subPage==="judiciary-bill")return <div key="judiciary-bill" className={`app${lt} app-slide`} dir="rtl"><JudiciaryBillScreen user={user!} onUpdate={updateWithTx} onBack={goBack} onDone={goHome}/><SNAV/></div>;
+  if(subPage==="property-reg")return <div key="property-reg" className={`app${lt} app-slide`} dir="rtl"><PropertyRegBillScreen user={user!} onUpdate={updateWithTx} onBack={goBack} onDone={goHome}/><SNAV/></div>;
+  if(subPage==="charity")return <div key="charity" className={`app${lt} app-slide`} dir="rtl"><CharityScreen onBack={goBack} onGoToPayment={d=>{setCharityPayData(d);setSubPage("charity-payment")}}/><SNAV/></div>;
+  if(subPage==="charity-payment")return <div key="charity-payment" className={`app${lt} app-slide`} dir="rtl"><CharityPaymentScreen data={charityPayData!} user={user!} onUpdate={updateWithTx} onBack={()=>setSubPage("charity")} onDone={goHome}/><SNAV/></div>;
+  if(subPage==="card-balance")return <div key="card-balance" className={`app${lt} app-slide`} dir="rtl"><CardBalanceScreen user={user!} onBack={goBack} onDone={goHome}/><SNAV/></div>;
+  if(subPage==="charge-payment")return <div key="charge-payment" className={`app${lt} app-slide`} dir="rtl"><ChargePaymentScreen data={chargePayData!} user={user!} onUpdate={updateWithTx} onBack={()=>setSubPage(chargePayOrigin)} onDone={goHome}/><SNAV/></div>;
+  if(subPage==="cashback")return <div key="cashback" className={`app${lt} app-slide`} dir="rtl"><CashbackScreen user={user!} transactions={transactions} onBack={goBack} onUpdate={(u,tx)=>{setUser(u);const newTxs=[tx,...transactions];setTransactions(newTxs);if(u)DB.saveTx(u.phone,newTxs);DB.saveUser(u);}}/><SNAV/></div>;
+  if(subPage==="financial-center")return <div key="financial-center" className={`app${lt} app-slide`} dir="rtl"><FinancialCenterLive onBack={goBack}/><SNAV/></div>;
+function ComparisonPopup({ids,onClose,onMinimize,minimized,onProduct}:{ids:string[];onClose:()=>void;onMinimize:()=>void;minimized:boolean;onProduct:(pid:string)=>void}){
+  const prods=ids.map(id=>MARKET_PRODUCTS.find(p=>p.id===id)).filter(Boolean) as AnProduct[];
+  const [aiText,setAiText]=useState("");
+  useEffect(()=>{if(prods.length<2)return;void (async()=>{try{const token=localStorage.getItem("anpardaz:accessToken")??"";const input=JSON.stringify(prods.map(p=>({id:p.id,title:p.title,brand:p.brand,priceMin:p.priceMin,priceMax:p.priceMax,specs:p.specs,storeCount:p.storeCount})));const r=await fetch(ANMARKET_PLATFORM_API_BASE+"/api/v1/market/ai/assist",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({workflowCode:"market.compare",input:"مقایسه فنی و خرید این محصولات فقط بر اساس داده‌های ارائه‌شده؛ چیزی را حدس نزن و عدم قطعیت را صریح بگو. "+input,compareIds:ids})});const d=await r.json();if(r.ok)setAiText(d?.result?.text??"");}catch{}})()},[ids.join(",")]);
+  if(minimized)return <div style={{position:"fixed",bottom:70,left:12,right:12,zIndex:300,background:"var(--am-card)",border:"1px solid var(--am-accent-border)",borderRadius:16,padding:12,display:"flex",gap:8,alignItems:"center",boxShadow:"0 8px 30px rgba(0,0,0,.15)"}}><b style={{flex:1,fontSize:12}}>مقایسه {toFaDigits(String(prods.length))} محصول</b><button onClick={onMinimize} style={{background:"var(--am-accent)",color:"#fff",border:0,borderRadius:9,padding:"8px 14px",fontFamily:"Vazirmatn"}}>مشاهده</button><button onClick={onClose} style={{background:"none",border:0,color:"var(--am-muted)"}}>×</button></div>;
+  return <div style={{position:"fixed",inset:0,zIndex:300,background:"var(--am-bg)",overflowY:"auto",padding:16}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}><b style={{fontSize:17,flex:1}}>مقایسه محصولات</b><button onClick={onMinimize}>کوچک</button><button onClick={onClose}>×</button></div>
+    {aiText&&<div style={{background:"var(--am-card)",border:"1px solid var(--am-accent-border)",borderRadius:16,padding:14,marginBottom:14}}><div style={{fontWeight:800,color:"var(--am-accent)",marginBottom:7}}>تحلیل دستیار هوشمند</div><div style={{fontSize:12,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{aiText}</div></div>}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>{prods.map(p=><button key={p.id} onClick={()=>onProduct(p.id)} style={{textAlign:"right",background:"var(--am-card)",border:"1px solid var(--am-border)",borderRadius:14,padding:12,fontFamily:"Vazirmatn"}}><img src={p.img} alt="" style={{width:"100%",aspectRatio:1,objectFit:"cover",borderRadius:10}}/><div style={{fontWeight:800,fontSize:12,marginTop:8}}>{p.title}</div><div style={{color:"var(--am-accent)",fontWeight:900,marginTop:5}}>{fa(p.priceMin)} تومان</div><div style={{fontSize:10,color:"var(--am-muted)",marginTop:4}}>{toFaDigits(String(p.storeCount))} فروشگاه</div></button>)}</div>
+  </div>;
+}
+
 function AnMarketMe({onPush}:{onPush:(v:AnView)=>void}){
   const items:[string,AnView,string][]=[
     ["خریدهای من",{t:"me-orders"},"فعالیت خروج به فروشگاه‌ها"],
