@@ -18,6 +18,7 @@ import { registerManualFundingAdminRoutes } from './routes/manual-funding-admin.
 import { requireIranIpInProduction } from '@anpardaz/ip-region-policy';
 import { registerProviderFundingRoutes } from './routes/provider-funding.js';
 import { ProviderDepositWorker } from './provider-deposit-worker.js';
+import { registerForexBotRoutes } from './routes/forex-bot.js';
 
 const isProduction=process.env.NODE_ENV==='production';
 validateAnSarrafProductionConfig(process.env);
@@ -79,6 +80,7 @@ if(pool){
   registerInternalAdminRoutes(app,pool);
   registerManualFundingAdminRoutes(app,pool);
   registerProviderFundingRoutes(app,pool);
+  registerForexBotRoutes(app,pool);
   registerKycRoutes(app,pool);
   app.get('/api/v1/auth/me',{preHandler:requireAuth},async(request)=>{
     const auth=(request as typeof request&{auth:any}).auth;
