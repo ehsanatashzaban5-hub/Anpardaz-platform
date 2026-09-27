@@ -3679,7 +3679,7 @@ function PairLogos({base,quote="TMN",baseSize=26,quoteSize=15}:{base:string;quot
 type BotStatus = "inactive"|"pending"|"active";
 interface BotSession{id:string;amount:number;activatedAt:string;deactivatedAt?:string;pnl?:number}
 function getBotState(_phone:string):{status:BotStatus;amount:number;activatedAt?:string;lastDeactivatedAt?:string;sessions:BotSession[]}{return{status:"inactive",amount:0,sessions:[]};}
-function saveBotState(_phone:string,_s:ReturnType<typeof getBotState>){}
+
 
 function ForexBotScreen({user,onUpdate,onBack}:{user:UserData;onUpdate:(u:UserData,tx:TxRecord)=>void;onBack:()=>void}){
   const [bs,setBs]=useState(()=>getBotState(user.phone));
