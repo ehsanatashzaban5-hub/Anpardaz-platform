@@ -5,7 +5,8 @@ import { ensureCustomer, requireAuth } from '../auth.js';
 
 type AuthRequest = FastifyRequest & { auth: { sub: string; role: string } };
 const auth = (r: FastifyRequest) => r as AuthRequest;
-const ADMIN_ROLES = ['admin','super_admin','operator'];
+const REVIEW_ROLES = ['admin','super_admin'];
+const VIEW_ROLES = ['admin','super_admin','operator'];
 const amount = (v: unknown) => typeof v === 'string' && /^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/.test(v) && Number(v) > 0;
 const MAX_INVESTMENT = '30';
 
@@ -162,7 +163,7 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
 
   app.get('/api/v1/admin/forex-bot/requests', { preHandler: requireAuth }, async (request, reply) => {
     const a = auth(request).auth;
-    if (!ADMIN_ROLES.includes(a.role)) return reply.code(403).send({ error:'forbidden' });
+    if (!VIEW_ROLES.includes(a.role)) return reply.code(403).send({ error:'forbidden' });
     const q = request.query as { status?: string };
     const status = q.status?.trim();
     const rows = await pool.query(
@@ -178,7 +179,7 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
 
   app.post('/api/v1/admin/forex-bot/requests/:id/decision', { preHandler: requireAuth }, async (request, reply) => {
     const a = auth(request).auth;
-    if (!ADMIN_ROLES.includes(a.role)) return reply.code(403).send({ error:'forbidden' });
+    if (!REVIEW_ROLES.includes(a.role)) return reply.code(403).send({ error:'forbidden' });
     const id = Number((request.params as any).id);
     const body = (request.body ?? {}) as { approve?: boolean; reason?: string };
     if (!Number.isSafeInteger(id) || typeof body.approve !== 'boolean') return reply.code(400).send({ error:'invalid_decision' });
@@ -264,7 +265,7 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
 
   app.post('/api/v1/admin/forex-bot/accounts/:id/pnl', { preHandler: requireAuth }, async (request, reply) => {
     const a = auth(request).auth;
-    if (!ADMIN_ROLES.includes(a.role)) return reply.code(403).send({ error:'forbidden' });
+    if (!REVIEW_ROLES.includes(a.role)) return reply.code(403).send({ error:'forbidden' });
     const accountId = Number((request.params as any).id);
     const body = (request.body ?? {}) as { amount?: string; sourceReference?: string; reason?: string; idempotencyKey?: string };
     if (!Number.isSafeInteger(accountId) || typeof body.amount !== 'string' || !body.sourceReference?.trim() || !body.reason?.trim() || !body.idempotencyKey) return reply.code(400).send({error:'invalid_pnl'});
