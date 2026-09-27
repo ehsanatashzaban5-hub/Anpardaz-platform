@@ -248,15 +248,6 @@ function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asse
               </div>
             ))}
           </div>
-          <div className="w-card" style={{ padding:"16px" }}>
-            <div style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", marginBottom:10 }}>قیمت در شبکه‌ها</div>
-            {["TRC20","ERC20","BEP20"].map(net => (
-              <div key={net} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", fontSize:12, borderBottom:"1px solid var(--w-border)" }}>
-                <span style={{ color:"var(--w-muted)" }}>{net}</span>
-                <span style={{ fontWeight:700 }}>${fmtP(a.price*(1+Math.random()*0.001))}</span>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>
