@@ -181,7 +181,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      const existing=await client.query('SELECT * FROM withdrawals WHERE customer_id=$1 AND idempotency_key=$2 FOR UPDATE',[customer,b.idempotencyKey]);
      if(existing.rows[0]){
        const e=existing.rows[0];
-       const existingFingerprint=fp({assetId:e.asset_id,amount:e.amount,network:e.network,destination:e.destination,memo:e.destination_memo??null});
+       const existingFingerprint=fp({assetId:e.asset_id,amount:e.amount,network:e.network,destination:e.destination,memo:e.destination_memo??null,destinationCardId:e.destination_card_id??null});
        if(existingFingerprint!==requestFingerprint){await client.query('ROLLBACK');return reply.code(409).send({error:'idempotency_key_reused'});}
        await client.query('ROLLBACK');return{withdrawal:e,idempotent:true};
      }
