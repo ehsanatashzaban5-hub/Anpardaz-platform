@@ -8,7 +8,7 @@ export function registerForumRoutes(app: FastifyInstance, pool: Pool) {
   app.get('/api/v1/forum/rooms', async () => ({ rooms: (await pool.query("SELECT id,name,slug,description,status,created_at FROM forum_rooms WHERE status='open' ORDER BY id")).rows }));
   app.get<{ Params: { roomId: string } }>('/api/v1/forum/rooms/:roomId/messages', async (request, reply) => {
     const roomId=Number(request.params.roomId);if(!Number.isSafeInteger(roomId)||roomId<=0)return reply.code(400).send({error:'invalid_room'});
-    return {messages:(await pool.query("SELECT id,room_id,identity_id,body,created_at FROM forum_room_messages WHERE room_id=$1 AND status='visible' ORDER BY id DESC LIMIT 100",[roomId])).rows};
+    return {messages:(await pool.query("SELECT m.id,m.room_id,m.body,m.created_at,u.display_name FROM forum_room_messages m LEFT JOIN platform_users u ON u.identity_id=m.identity_id WHERE m.room_id=$1 AND m.status='visible' ORDER BY m.id DESC LIMIT 100",[roomId])).rows};
   });
   app.post<{ Params: { roomId: string }; Body: { body?: string } }>('/api/v1/forum/rooms/:roomId/messages',{preHandler:requireAuth},async(request,reply)=>{
     const roomId=Number(request.params.roomId);const body=String(request.body?.body??'').trim();if(!Number.isSafeInteger(roomId)||roomId<=0||!body||body.length>10000)return reply.code(400).send({error:'invalid_message'});
