@@ -48,24 +48,6 @@ export function registerBankingRoutes(app:FastifyInstance,pool:Pool){
     return reply.code(409).send({error:'card_registration_required',message:'کارت بانکی فقط پس از تأیید فرایند ثبت کارت و مالکیت آن قابل اضافه‌شدن است.'});
   });
 
-  app.post('/api/v1/cards/otp/request',{preHandler:requireAuth},async(req,reply)=>{
-    const c=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;
-    const cardNumber=String(b.cardNumber??'').replace(/\s/g,'');
-    if(!/^\d{16}$/.test(cardNumber))return reply.code(400).send({error:'invalid_card_number'});
-    if(!idem(b.idempotencyKey))return reply.code(400).send({error:'invalid_idempotency_key'});
-    const provider=providerOr503(reply);if(!provider)return;
-    const operationId=`ANPARDAZ-OTP-${randomUUID()}`;
-    try{
-      const result=await provider.execute({serviceCode:'card_otp',operationId,payload:{card:cardNumber,...(b.clientId?{clientId:String(b.clientId)}:{})}});
-      if(result.status==='failed')return reply.code(502).send({error:result.errorCode??'card_otp_failed'});
-      if(result.status==='manual_review')return reply.code(503).send({error:'card_otp_outcome_uncertain',operationId});
-      return {requested:true,status:result.status,operationId,providerReference:result.externalReference??null};
-    }catch(e){
-      req.log.warn({error:e,customerId:c,operationId},'card OTP provider request failed');
-      return reply.code(503).send({error:'card_otp_provider_unavailable',operationId});
-    }
-  });
-
   app.post('/api/v1/cards/balance',{preHandler:requireAuth},async(req,reply)=>{
     const c=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;
     const cardNumber=String(b.cardNumber??'').replace(/\s/g,'');
