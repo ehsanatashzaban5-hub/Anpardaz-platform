@@ -5,6 +5,7 @@ import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
 import {provisionProviderExecution} from '../provider-execution.js';
 import {ensureKycRequired} from '../kyc.js';
 import {requireTomanWithdrawalSecurity} from '../funding-security.js';
+import {calculateOperationalFee} from '../fee-engine.js';
 type R=FastifyRequest&{auth:AuthClaims};const r=(x:FastifyRequest)=>x as R;
 const dec=/^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/;const amount=(v:unknown)=>typeof v==='string'&&dec.test(v)&&v!=='0'&&!/^0\.0+$/.test(v);const id=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;const idem=(v:unknown)=>typeof v==='string'&&v.length>=8&&v.length<=200;const fp=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 
@@ -185,15 +186,17 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
        if(existingFingerprint!==requestFingerprint){await client.query('ROLLBACK');return reply.code(409).send({error:'idempotency_key_reused'});}
        await client.query('ROLLBACK');return{withdrawal:e,idempotent:true};
      }
-     const asset=await client.query("SELECT id FROM assets WHERE id=$1 AND status='active'",[b.assetId]);
+     const asset=await client.query("SELECT id,symbol,asset_type FROM assets WHERE id=$1 AND status='active'",[b.assetId]);
      if(!asset.rows[0])throw new Error('asset_not_available');
+     const fee=await calculateOperationalFee(client,'withdrawal',Number(b.assetId),String(b.amount),String(b.network).trim());
      await client.query('INSERT INTO wallets(customer_id,asset_id) VALUES($1,$2) ON CONFLICT(customer_id,asset_id) DO NOTHING',[customer,b.assetId]);
      const wallet=await client.query('SELECT * FROM wallets WHERE customer_id=$1 AND asset_id=$2 FOR UPDATE',[customer,b.assetId]);
      if(!wallet.rows[0])throw new Error('wallet_not_found');
-     const moved=await client.query('UPDATE wallets SET available_balance=available_balance-$1,locked_balance=locked_balance+$1 WHERE id=$2 AND available_balance >= $1 RETURNING id',[b.amount,wallet.rows[0].id]);
+     const debitAmount=await client.query('SELECT ($1::numeric+$2::numeric)::text AS amount',[b.amount,fee.amount]);
+     const moved=await client.query('UPDATE wallets SET available_balance=available_balance-$1,locked_balance=locked_balance+$1 WHERE id=$2 AND available_balance >= $1 RETURNING id',[debitAmount.rows[0].amount,wallet.rows[0].id]);
      if(!moved.rows[0])throw new Error('insufficient_available_balance');
      const operationId='ANSARRAF-WD-'+randomUUID();
-     const w=await client.query("INSERT INTO withdrawals(customer_id,asset_id,amount,network,destination,destination_memo,idempotency_key,operation_id,approval_status,destination_card_id,destination_card_last4,admin_review_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',$9,$10,'PENDING') RETURNING *",[customer,b.assetId,b.amount,b.network.trim(),b.destination.trim(),b.memo??null,b.idempotencyKey,operationId,fundingSecurity.card?.id??null,fundingSecurity.card?.last4??null]);
+     const w=await client.query("INSERT INTO withdrawals(customer_id,asset_id,amount,fee_amount,fee_asset_id,net_amount,network,destination,destination_memo,idempotency_key,operation_id,approval_status,destination_card_id,destination_card_last4,admin_review_status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'PENDING',$12,$13,'PENDING') RETURNING *",[customer,b.assetId,b.amount,fee.amount,fee.feeAssetId,fee.netAmount,b.network.trim(),b.destination.trim(),b.memo??null,b.idempotencyKey,operationId,fundingSecurity.card?.id??null,fundingSecurity.card?.last4??null]);
      await client.query('INSERT INTO withdrawal_reservations(withdrawal_id,wallet_id,asset_id,amount) VALUES($1,$2,$3,$4)',[w.rows[0].id,wallet.rows[0].id,b.assetId,b.amount]);
      await client.query('COMMIT');
      return reply.code(201).send({withdrawal:w.rows[0]});
