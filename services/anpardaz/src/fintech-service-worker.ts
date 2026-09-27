@@ -61,7 +61,12 @@ export class FintechServiceWorker{
       const op=(await this.pool.query('SELECT * FROM fintech_service_operations WHERE operation_id=$1',[row.operation_id])).rows[0];
       if(!op){await this.fail(row.id,'operation_not_found');return true;}
       const provider=new FintechProvider();
-      const payload=op.provider_payload_enc ? decryptProviderPayload(String(op.provider_payload_enc)) : (op.request_metadata?.payload??{}) as Record<string,unknown>;
+      if(!op.provider_payload_enc){
+        await this.pool.query("UPDATE fintech_service_operations SET status='manual_review',accounting_status='failed',failure_code='LEGACY_PAYLOAD_REQUIRES_REVIEW',failure_message='Provider payload was created before encrypted payload storage was enabled',updated_at=NOW() WHERE operation_id=$1",[op.operation_id]);
+        await this.pool.query("UPDATE fintech_provider_outbox SET status='manual_review',last_error='LEGACY_PAYLOAD_REQUIRES_REVIEW',updated_at=NOW() WHERE id=$1",[row.id]);
+        return true;
+      }
+      const payload=decryptProviderPayload(String(op.provider_payload_enc));
       const result=await provider.execute({serviceCode:op.service_code,operationId:op.operation_id,payload});
       let status=result.status;
       let accountingStatus=op.accounting_status;
