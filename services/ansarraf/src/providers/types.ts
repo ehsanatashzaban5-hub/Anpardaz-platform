@@ -54,5 +54,6 @@ export interface LiquidityProviderAdapter{
   submitWithdrawal(request:ProviderWithdrawalRequest):Promise<ProviderWithdrawalResult>;
   getWithdrawal(providerWithdrawalId:string):Promise<ProviderWithdrawalResult>;
   getDepositAddress(asset:string,network:string):Promise<ProviderDepositAddress>;
+  listDepositNetworks(asset:string):Promise<string[]>;
   listDeposits(page?:number,perPage?:number):Promise<ProviderDepositEvent[]>;
 }
