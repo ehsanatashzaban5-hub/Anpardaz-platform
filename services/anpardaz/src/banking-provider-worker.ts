@@ -42,6 +42,21 @@ async function postInternalTransferLedger(referenceId:string,operationId:string,
   if(!r.ok)throw new Error('accounting_post_failed');
 }
 
+async function accountingHold(customerId:number,operationId:string,amount:string,currency:string){
+  const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!base||!token)throw new Error('accounting_service_not_configured');
+  const account=await ledgerAccount(base,token,'anpardaz.customer.'+customerId+'.liability.'+currency,'An Pardaz customer '+customerId+' '+currency,'liability',currency);
+  const rr=await fetch(base+'/internal/v1/ledger/holds',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({accountId:account,referenceType:'anpardaz_transfer',referenceId:operationId,amount,currency}),signal:AbortSignal.timeout(10000)});
+  const data=await rr.json().catch(()=>({}));if(!rr.ok)throw new Error(String(data?.error??'accounting_hold_failed'));
+}
+async function accountingHoldAction(operationId:string,action:'capture'|'release'){
+  const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!base||!token)throw new Error('accounting_service_not_configured');
+  const q=await fetch(base+'/internal/v1/ledger/holds/by-reference?referenceType=anpardaz_transfer&referenceId='+encodeURIComponent(operationId),{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(8000)});
+  if(q.status===404)return false;if(!q.ok)throw new Error('accounting_hold_lookup_failed');
+  const data=await q.json() as any;const id=Number(data?.hold?.id);if(!Number.isSafeInteger(id))throw new Error('accounting_hold_invalid');if(String(data?.hold?.status)!=='active')return true;
+  const rr=await fetch(base+'/internal/v1/ledger/holds/'+id+'/'+action,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:'{}',signal:AbortSignal.timeout(8000)});
+  if(!rr.ok)throw new Error('accounting_hold_'+action+'_failed');return true;
+}
+
 export class BankingProviderWorker{
   private timer:NodeJS.Timeout|undefined;private running=false;
   constructor(private readonly pool:Pool){}
@@ -80,21 +95,21 @@ export class BankingProviderWorker{
           await this.pool.query("UPDATE banking_provider_outbox SET status='completed',last_error=NULL,updated_at=NOW() WHERE id=$1",[row.id]);
           return true;
         }
-        const externalBalance=await ledgerCustomerBalance(Number(x.customer_id),String(x.currency));
-        if(decimal18(externalBalance)<decimal18(String(x.amount))){
-          await this.pool.query("UPDATE transfer_requests SET status='failed',provider_status='failed',provider_error_code='INSUFFICIENT_FUNDS',provider_error_message='insufficient_ledger_balance',updated_at=NOW() WHERE operation_id=$1",[x.operation_id]);
-          await this.pool.query("UPDATE banking_provider_outbox SET status='failed',last_error='insufficient_ledger_balance',updated_at=NOW() WHERE id=$1",[row.id]);
-          return true;
-        }
+        await accountingHold(Number(x.customer_id),x.operation_id,String(x.amount),String(x.currency));
         const result=await provider.execute({serviceCode:'transfer',operationId:x.operation_id,payload:{amount:String(x.amount),currency:x.currency,destinationExternal:x.destination_external??undefined,description:x.description??undefined,sourceAccountId:String(x.source_account_id)}});
         const status=result.status==='completed'?'completed':result.status==='failed'?'failed':result.status==='manual_review'?'manual_review':'processing';
         await this.pool.query("UPDATE transfer_requests SET status=$1,provider_operation_id=COALESCE($2,provider_operation_id),provider_reference=COALESCE($3,provider_reference),provider_status=$4,provider_error_code=$5,provider_error_message=$6,provider_metadata=$7,updated_at=NOW() WHERE operation_id=$8",[status==='completed'?'processing':status,result.providerOperationId??null,result.externalReference??null,result.status,result.errorCode??null,result.errorMessage??null,JSON.stringify(result.data??{}),x.operation_id]);
         if(status==='completed'){
           await postLedger('anpardaz_transfer',String(x.id),x.operation_id,Number(x.customer_id),String(x.provider_code??'FINTECH'),String(x.currency),String(x.amount),'debit');
+          await accountingHoldAction(x.operation_id,'capture');
           await this.pool.query("UPDATE transfer_requests SET status='completed',updated_at=NOW() WHERE operation_id=$1",[x.operation_id]);
           await this.pool.query("UPDATE banking_provider_outbox SET status='completed',last_error=NULL,updated_at=NOW() WHERE id=$1",[row.id]);
-        }else if(status==='failed'||status==='manual_review')await this.pool.query("UPDATE banking_provider_outbox SET status=$2,last_error=$3,updated_at=NOW() WHERE id=$1",[row.id,status,result.errorMessage??result.errorCode??null]);
-        else await this.pool.query("UPDATE banking_provider_outbox SET status='processing',next_attempt_at=NOW()+INTERVAL '30 seconds',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,result.errorMessage??null]);
+        }else if(status==='failed'){
+          await accountingHoldAction(x.operation_id,'release');
+          await this.pool.query("UPDATE banking_provider_outbox SET status='failed',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,result.errorMessage??result.errorCode??null]);
+        }else if(status==='manual_review'){
+          await this.pool.query("UPDATE banking_provider_outbox SET status='manual_review',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,result.errorMessage??result.errorCode??null]);
+        }else await this.pool.query("UPDATE banking_provider_outbox SET status='processing',next_attempt_at=NOW()+INTERVAL '30 seconds',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,result.errorMessage??null]);
         return true;
       }
       if(row.operation_type==='topup'){
