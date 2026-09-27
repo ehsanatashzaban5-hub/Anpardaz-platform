@@ -9,6 +9,8 @@ const REVIEW_ROLES = ['admin','super_admin'];
 const VIEW_ROLES = ['admin','super_admin','operator'];
 const amount = (v: unknown) => typeof v === 'string' && /^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/.test(v) && Number(v) > 0;
 const MAX_INVESTMENT = '30';
+const FOREX_EXECUTION_AVAILABLE = process.env.FOREX_EXECUTION_ENABLED === 'true' && Boolean(process.env.FOREX_BROKER_PROVIDER_URL);
+
 
 async function botSnapshot(pool: Pool, customerId: string) {
   const account = await pool.query(
@@ -57,7 +59,7 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
        FROM wallets w JOIN assets a ON a.id=w.asset_id
        WHERE w.customer_id=$1 AND a.symbol='USDT' LIMIT 1`, [customerId],
     );
-    return { ...snapshot, wallet: wallet.rows[0] ?? { available_balance: '0', locked_balance: '0', symbol: 'USDT' }, maxInvestment: MAX_INVESTMENT };
+    return { ...snapshot, executionAvailable: FOREX_EXECUTION_AVAILABLE, wallet: wallet.rows[0] ?? { available_balance: '0', locked_balance: '0', symbol: 'USDT' }, maxInvestment: MAX_INVESTMENT };
   });
 
   app.post('/api/v1/forex-bot/requests', { preHandler: requireAuth }, async (request, reply) => {
@@ -93,6 +95,7 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
       const operationId = 'ANSARRAF-FB-' + randomUUID();
 
       if (body.action === 'activate') {
+        if (!FOREX_EXECUTION_AVAILABLE) throw new Error('forex_execution_not_configured');
         if (!amount(body.amount) || Number(body.amount) > Number(MAX_INVESTMENT)) throw new Error('forex_bot_max_investment_30_usd');
         if (a.status !== 'inactive') throw new Error('forex_bot_activation_not_allowed');
         if (a.deactivated_at) {
