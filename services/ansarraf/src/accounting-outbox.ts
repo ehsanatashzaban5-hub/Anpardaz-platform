@@ -30,6 +30,8 @@ export class AccountingOutboxWorker{
     const p=row.payload??{};
     if(row.event_type==='exchange.provider_trade.settled')return this.postProviderTrade(row,p);
     if(row.event_type==='exchange.withdrawal.settled')return this.postWithdrawal(row,p);
+    if(row.event_type==='forex_bot.funding_transfer')return this.postForexBotFunding(row,p);
+    if(row.event_type==='forex_bot.pnl')return this.postForexBotPnl(row,p);
     if(row.event_type!=='exchange.trade.settled')throw new Error('unsupported_accounting_event');const required=['tradeId','operationId','buyerCustomerId','sellerCustomerId','baseAssetId','quoteAssetId','quantity','quoteAmount'];
     for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_outbox_field:'+key);
     const base=await this.asset(Number(p.baseAssetId));const quote=await this.asset(Number(p.quoteAssetId));
@@ -128,6 +130,26 @@ export class AccountingOutboxWorker{
       entries
     });
   }
+  private async ensureForexBotAccount(customerId:number,symbol:string){
+    const code='ansarraf.forex_bot.customer.'+customerId+'.asset.'+symbol;
+    let r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));
+    if(r.ok)return Number(r.body.account.id);
+    if(r.status!==404)throw new Error('forex_bot_account_lookup_failed:'+r.status);
+    r=await this.accountRequest('POST','/internal/v1/ledger/accounts',{accountCode:code,accountName:'An Sarraf Forex Bot customer '+customerId+' '+symbol,accountType:'liability',currency:symbol});
+    if(r.ok)return Number(r.body.account.id);
+    if(r.status===409){r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));if(r.ok)return Number(r.body.account.id);}
+    throw new Error('forex_bot_account_create_failed:'+r.status);
+  }
+  private async ensureForexBotReserveAsset(symbol:string){
+    const code='ansarraf.forex_bot.reserve.asset.'+symbol;
+    let r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));
+    if(r.ok)return Number(r.body.account.id);
+    if(r.status!==404)throw new Error('forex_bot_reserve_lookup_failed:'+r.status);
+    r=await this.accountRequest('POST','/internal/v1/ledger/accounts',{accountCode:code,accountName:'An Sarraf Forex Bot external reserve '+symbol,accountType:'asset',currency:symbol});
+    if(r.ok)return Number(r.body.account.id);
+    if(r.status===409){r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));if(r.ok)return Number(r.body.account.id);}
+    throw new Error('forex_bot_reserve_create_failed:'+r.status);
+  }
   private async ensureProviderAssetAccount(providerCode:string,symbol:string){
     const code='ansarraf.provider.'+providerCode+'.asset.'+symbol;
     let r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));
@@ -147,6 +169,44 @@ export class AccountingOutboxWorker{
     if(r.ok)return Number(r.body.account.id);
     if(r.status===409){r=await this.accountRequest('GET','/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code));if(r.ok)return Number(r.body.account.id);}
     throw new Error('provider_expense_account_create_failed:'+r.status);
+  }
+  private async postForexBotFunding(row:any,p:any){
+    const required=['operationId','customerId','amount','direction','requestId'];
+    for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_forex_bot_funding_field:'+key);
+    const amount=String(p.amount);
+    if(!/^(?:0|[1-9]\\d{0,27})(?:\\.\\d{1,18})?$/.test(amount)||Number(amount)<=0)throw new Error('invalid_forex_bot_funding_amount');
+    const customer=await this.ensureAccount(Number(p.customerId),'USDT');
+    const bot=await this.ensureForexBotAccount(Number(p.customerId),'USDT');
+    const entries=String(p.direction)==='customer_to_bot'
+      ? [
+          {accountId:customer,currency:'USDT',direction:'debit',amount,metadata:{requestId:p.requestId,type:'forex_bot_investment'}},
+          {accountId:bot,currency:'USDT',direction:'credit',amount,metadata:{requestId:p.requestId,type:'forex_bot_investment'}}
+        ]
+      : [
+          {accountId:bot,currency:'USDT',direction:'debit',amount,metadata:{requestId:p.requestId,type:'forex_bot_release'}},
+          {accountId:customer,currency:'USDT',direction:'credit',amount,metadata:{requestId:p.requestId,type:'forex_bot_release'}}
+        ];
+    await this.postLedger({operationId:String(p.operationId),referenceType:'forex_bot_funding',referenceId:String(p.requestId),idempotencyKey:row.idempotency_key,description:'Forex bot funding '+p.direction,entries});
+  }
+  private async postForexBotPnl(row:any,p:any){
+    const required=['operationId','customerId','amount','eventId'];
+    for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_forex_bot_pnl_field:'+key);
+    const raw=String(p.amount);
+    if(!/^-?(?:0|[1-9]\\d{0,27})(?:\\.\\d{1,18})?$/.test(raw)||Number(raw)===0)throw new Error('invalid_forex_bot_pnl_amount');
+    const bot=await this.ensureForexBotAccount(Number(p.customerId),'USDT');
+    const reserve=await this.ensureForexBotReserveAsset('USDT');
+    const positive=Number(raw)>0;
+    const absolute=(await this.pool.query('SELECT ABS($1::numeric)::text AS amount',[raw])).rows[0].amount;
+    const entries=positive
+      ? [
+          {accountId:reserve,currency:'USDT',direction:'debit',amount:absolute,metadata:{eventId:p.eventId,type:'forex_bot_reported_profit'}},
+          {accountId:bot,currency:'USDT',direction:'credit',amount:absolute,metadata:{eventId:p.eventId,type:'forex_bot_reported_profit'}}
+        ]
+      : [
+          {accountId:bot,currency:'USDT',direction:'debit',amount:absolute,metadata:{eventId:p.eventId,type:'forex_bot_reported_loss'}},
+          {accountId:reserve,currency:'USDT',direction:'credit',amount:absolute,metadata:{eventId:p.eventId,type:'forex_bot_reported_loss'}}
+        ];
+    await this.postLedger({operationId:String(p.operationId),referenceType:'forex_bot_pnl',referenceId:String(p.eventId),idempotencyKey:row.idempotency_key,description:'Forex bot reported P&L',entries});
   }
   private async recordAudit(row:any){
     const operationId=String(row.payload?.operationId??'').trim();
