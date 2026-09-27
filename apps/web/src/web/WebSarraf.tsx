@@ -436,41 +436,57 @@ function TxDetailView({ tx, onBack }: { tx:any; onBack:()=>void }) {
 
 // ── Fees Tab ───────────────────────────────────────
 function FeesTab() {
-  const tiers = [
-    { label:"عادی",    vol:"کمتر از ۵۰۰ دلار",   maker:"۰.۱۵٪",  taker:"۰.۱۸٪" },
-    { label:"VIP 1",   vol:"۵۰۰ تا ۵۰۰۰",       maker:"۰.۱۲٪",  taker:"۰.۱۵٪" },
-    { label:"VIP 2",   vol:"۵۰۰۰ تا ۵۰۰۰۰",     maker:"۰.۱۰٪",  taker:"۰.۱۲٪" },
-    { label:"VIP 3",   vol:"۵۰۰۰۰ تا ۵۰۰۰۰۰",   maker:"۰.۰۸٪",  taker:"۰.۱۰٪" },
-    { label:"Market Maker",vol:"+۵۰۰,۰۰۰",       maker:"۰.۰۰٪",  taker:"۰.۰۵٪" },
-  ];
-  return (
-    <div style={{ padding:"24px 0" }}>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>جدول کارمزدها</div>
-      <div className="w-card" style={{ overflow:"hidden" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-          <thead>
-            <tr style={{ background:"var(--w-card2)" }}>
-              {["سطح","حجم ۳۰ روزه (USDT)","کارمزد Maker","کارمزد Taker"].map(h=>(
-                <th key={h} style={{ padding:"12px 16px", textAlign:"right", color:"var(--w-muted)", fontWeight:600, fontSize:11 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tiers.map((t,i) => (
-              <tr key={i} style={{ borderBottom:"1px solid var(--w-border)", background:i===0?"rgba(8,145,178,0.04)":"transparent" }}>
-                <td style={{ padding:"12px 16px", fontWeight:700 }}>{t.label}{i===0&&<span style={{ fontSize:10, marginRight:6, background:"rgba(8,145,178,0.1)", color:"#0891b2", padding:"2px 6px", borderRadius:4 }}>سطح شما</span>}</td>
-                <td style={{ padding:"12px 16px" }}>{t.vol}</td>
-                <td style={{ padding:"12px 16px", color:"#10b981", fontWeight:700 }}>{t.maker}</td>
-                <td style={{ padding:"12px 16px", color:"#f43f5e", fontWeight:700 }}>{t.taker}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+  const [data,setData]=useState<any>(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    let active=true;
+    const load=async()=>{
+      const token=getWebToken();
+      if(!token){if(active){setData(null);setLoading(false);}return;}
+      try{
+        const r=await fetch(ANSARRAF_API_BASE+"/api/v1/fees",{headers:{authorization:"Bearer "+token,accept:"application/json"},cache:"no-store"});
+        const d=await r.json().catch(()=>({}));
+        if(!r.ok)throw new Error(d?.error??"fee_rules_unavailable");
+        if(active){setData(d);setError("");}
+      }catch(e){if(active)setError(e instanceof Error?e.message:"fee_rules_unavailable");}
+      finally{if(active)setLoading(false);}
+    };
+    void load();
+    return()=>{active=false};
+  },[]);
+  const customerRules=Array.isArray(data?.customerRules)?data.customerRules:[];
+  const providerRules=Array.isArray(data?.providerRules)?data.providerRules:[];
+  const pct=(v:any)=>{const n=Number(v);return Number.isFinite(n)?(n*100).toLocaleString("fa-IR",{maximumFractionDigits:6})+"٪":"—";};
+  const money=(v:any)=>{const n=Number(v);return Number.isFinite(n)?n.toLocaleString("fa-IR",{maximumFractionDigits:8}):"—";};
+  return <div style={{padding:"24px 0"}}>
+    <div style={{fontSize:18,fontWeight:900,marginBottom:8}}>کارمزدهای واقعی آن صراف</div>
+    <div style={{fontSize:11,color:"var(--w-muted)",marginBottom:18,lineHeight:1.8}}>اعداد این صفحه مستقیماً از قوانین فعال ثبت‌شده در دیتابیس آن صراف خوانده می‌شوند و مقدار پیش‌فرض یا جدول ساختگی نمایش داده نمی‌شود.</div>
+    {error&&<div className="w-card" style={{padding:14,color:"#b45309",marginBottom:12}}>{error}</div>}
+    {loading?<div className="w-card" style={{padding:22,color:"var(--w-muted)"}}>در حال دریافت قوانین کارمزد...</div>:<>
+      <div className="w-card" style={{overflow:"hidden",marginBottom:16}}>
+        <div style={{padding:14,fontWeight:800,borderBottom:"1px solid var(--w-border)"}}>کارمزد کاربر برای معامله</div>
+        {customerRules.length===0?<div style={{padding:18,color:"var(--w-muted)",fontSize:12}}>هیچ قانون کارمزد فعال برای معاملات ثبت نشده است.</div>:
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead><tr style={{background:"var(--w-card2)"}}>{["بازار","دارایی","درصد","مبلغ ثابت","حداقل","حداکثر","دارایی کارمزد"].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"right",color:"var(--w-muted)",fontWeight:600,fontSize:10}}>{h}</th>)}</tr></thead>
+          <tbody>{customerRules.map((x:any)=><tr key={x.id} style={{borderBottom:"1px solid var(--w-border)"}}>
+            <td style={{padding:"10px 12px"}}>{x.market_symbol??"همه بازارها"}</td><td style={{padding:"10px 12px"}}>{x.asset_symbol??"همه"}</td><td style={{padding:"10px 12px",fontWeight:800}}>{pct(x.percentage)}</td><td style={{padding:"10px 12px"}}>{money(x.fixed_amount)}</td><td style={{padding:"10px 12px"}}>{x.min_amount==null?"—":money(x.min_amount)}</td><td style={{padding:"10px 12px"}}>{x.max_amount==null?"—":money(x.max_amount)}</td><td style={{padding:"10px 12px"}}>{x.fee_asset_symbol??"—"}</td>
+          </tr>)}</tbody>
+        </table>}
       </div>
-    </div>
-  );
+      <div className="w-card" style={{overflow:"hidden"}}>
+        <div style={{padding:14,fontWeight:800,borderBottom:"1px solid var(--w-border)"}}>کارمزد Provider</div>
+        {providerRules.length===0?<div style={{padding:18,color:"var(--w-muted)",fontSize:12}}>هیچ قانون کارمزد Provider فعال ثبت نشده است.</div>:
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead><tr style={{background:"var(--w-card2)"}}>{["Provider","بازار","سمت","Maker","Taker","مبلغ ثابت","دارایی"].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"right",color:"var(--w-muted)",fontWeight:600,fontSize:10}}>{h}</th>)}</tr></thead>
+          <tbody>{providerRules.map((x:any)=><tr key={x.id} style={{borderBottom:"1px solid var(--w-border)"}}>
+            <td style={{padding:"10px 12px"}}>{x.provider_code}</td><td style={{padding:"10px 12px"}}>{x.market_symbol??"همه بازارها"}</td><td style={{padding:"10px 12px"}}>{x.side??"همه"}</td><td style={{padding:"10px 12px"}}>{pct(x.maker_rate)}</td><td style={{padding:"10px 12px"}}>{pct(x.taker_rate)}</td><td style={{padding:"10px 12px"}}>{money(x.fixed_fee)}</td><td style={{padding:"10px 12px"}}>{x.fee_asset_symbol??"—"}</td>
+          </tr>)}</tbody>
+        </table>}
+      </div>
+    </>}
+  </div>;
 }
-
 // ── Security Tab ───────────────────────────────────
 function SecurityTab() {
   return (
