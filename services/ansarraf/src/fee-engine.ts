@@ -91,7 +91,14 @@ export async function calculateInternalTradeFee(client:Pool|PoolClient,baseAsset
   if(!result.rule)return {customerFeeAmount:'0',feeAssetId:null,providerFeeAmount:'0',providerFeeAssetId:null,companyRevenueAmount:'0'};
   const feeAssetSymbol=String(result.rule.fee_asset_symbol??base.symbol);
   if(feeAssetSymbol!==String(base.symbol))throw new Error('unsupported_customer_fee_asset');
-  const feeAmount=result.fee;
+  const feeInBase=await client.query(
+    `SELECT LEAST(
+       GREATEST(($1::numeric*$2::numeric)+$3::numeric,COALESCE($4::numeric,0)),
+       COALESCE($5::numeric,($1::numeric*$2::numeric)+$3::numeric)
+     )::text AS amount`,
+    [quantity,result.rule.percentage,result.rule.fixed_amount,result.rule.min_amount,result.rule.max_amount],
+  );
+  const feeAmount=feeInBase.rows[0].amount;
   const valid=await client.query('SELECT ($1::numeric>=0 AND $1::numeric<=$2::numeric) AS valid',[feeAmount,quantity]);
   if(!valid.rows[0].valid)throw new Error('customer_fee_exceeds_trade_quantity');
   return {customerFeeAmount:feeAmount,feeAssetId:baseAssetId,providerFeeAmount:'0',providerFeeAssetId:null,companyRevenueAmount:feeAmount};
