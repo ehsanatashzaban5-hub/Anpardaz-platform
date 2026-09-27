@@ -3450,7 +3450,7 @@ function ExchangeInstantTrade({initialAsset,user,coins,onBack,onUpdate}:{initial
   const [pickerSearch,setPickerSearch]=useState("");
   const [processing,setProcessing]=useState(false);
   const [result,setResult]=useState<ReceiptData|null>(null);
-  const [error,setError]=useState(""); const [liveWallets,setLiveWallets]=useState<Record<string,number>>({}); useEffect(()=>{let active=true;const load=async()=>{try{const w=await sarrafWalletMap();if(active)setLiveWallets(w);}catch{}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;clearInterval(id)}},[]);
+  const [error,setError]=useState(""); const [feeRule,setFeeRule]=useState<any>(null); const [liveWallets,setLiveWallets]=useState<Record<string,number>>({}); useEffect(()=>{let active=true;const load=async()=>{try{const w=await sarrafWalletMap();if(active)setLiveWallets(w);}catch{}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;clearInterval(id)}},[]);
 
   const selected=coins.find(c=>c.symbol===asset)??coins[0];
   // In buy mode: amount = quote currency (TMN or USDT). In sell mode: amount = base coin.
@@ -3525,7 +3525,7 @@ function ExchangeInstantTrade({initialAsset,user,coins,onBack,onUpdate}:{initial
       <div><span>قیمت لحظه‌ای</span><b>{fmtQ(priceInQuote)} {quoteLabel}</b></div>
       <span className="pair-label">{asset} / {quote}</span>
     </section>
-    <section className="instant-fee"><span>کارمزد <b>۰٫۳۰٪</b></span><b>{fmtQ(fee)} {quoteLabel}</b></section>
+    <section className="instant-fee"><span>کارمزد</span><b>{feeRule?((Number(feeRule.percentage||0)*100).toLocaleString("fa-IR",{maximumFractionDigits:6})+"٪ از قانون فعال"): "طبق قانون فعال Backend"}</b></section>
 
     {error&&<div style={{margin:"0 0 12px",padding:"14px 16px",borderRadius:12,background:"rgba(232,92,92,0.1)",border:"1px solid rgba(232,92,92,0.3)",display:"flex",alignItems:"center",gap:10,direction:"rtl"}}><span style={{flex:1,fontSize:13,color:"#e85c5c",fontWeight:600}}>{error}</span><button onClick={()=>setError("")} style={{width:24,height:24,borderRadius:8,background:"rgba(232,92,92,0.15)",border:"none",color:"#e85c5c",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:12}}>✕</button></div>}
     <button className={`instant-submit ${side}`} onClick={place}>{side==="buy"?"خرید":"فروش"} {asset}</button>
