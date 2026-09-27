@@ -19,6 +19,7 @@ import { requireIranIpInProduction } from '@anpardaz/ip-region-policy';
 import { registerProviderFundingRoutes } from './routes/provider-funding.js';
 import { registerForexBotRoutes } from './routes/forex-bot.js';
 import { ProviderDepositWorker } from './provider-deposit-worker.js';
+import { registerFeeRoutes } from './routes/fees.js';
 
 const isProduction=process.env.NODE_ENV==='production';
 validateAnSarrafProductionConfig(process.env);
@@ -82,6 +83,7 @@ if(pool){
   registerProviderFundingRoutes(app,pool);
   registerForexBotRoutes(app,pool);
   registerKycRoutes(app,pool);
+  registerFeeRoutes(app,pool);
   app.get('/api/v1/auth/me',{preHandler:requireAuth},async(request)=>{
     const auth=(request as typeof request&{auth:any}).auth;
     const id=await ensureCustomer(pool,auth);
