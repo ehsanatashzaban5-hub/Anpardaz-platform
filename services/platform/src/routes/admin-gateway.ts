@@ -239,6 +239,30 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
+  // Browser-facing admin proxy for An Sarraf fee configuration.
+  app.get('/api/v1/admin/ecosystem/ansarraf/fees', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/fees', { headers: forwardUser(request) });
+    return reply.code(result.status).send(result.body);
+  });
+  app.post('/api/v1/admin/ecosystem/ansarraf/fees', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/fees', {
+      method: 'POST', headers: { ...forwardUser(request), 'content-type': 'application/json' }, body: JSON.stringify(request.body ?? {}),
+    });
+    return reply.code(result.status).send(result.body);
+  });
+  app.post('/api/v1/admin/ecosystem/ansarraf/fees/:id/close', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const result = await fetchJson(sarrafBase() + '/api/v1/admin/fees/' + encodeURIComponent((request.params as any).id) + '/close', {
+      method: 'POST', headers: forwardUser(request),
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
   // Browser-facing admin proxy for An Pardaz banking/service operations.
   const anpardazBase = () => (process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001').replace(/\/$/, '');
 
