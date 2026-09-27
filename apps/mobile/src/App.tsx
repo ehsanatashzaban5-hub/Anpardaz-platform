@@ -3577,70 +3577,6 @@ const TMN_LOGO=(()=>{const s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
 function PairLogos({base,quote="TMN",baseSize=26,quoteSize=15}:{base:string;quote?:string;baseSize?:number;quoteSize?:number}){const overlap=Math.round(quoteSize*.55);const qSrc=quote==="TMN"?TMN_LOGO:`https://assets.coincap.io/assets/icons/${quote.toLowerCase()}@2x.png`;return <span style={{display:"inline-flex",alignItems:"flex-end",flexShrink:0,verticalAlign:"middle",direction:"ltr"} as React.CSSProperties}><img className="coin-logo" width={baseSize} height={baseSize} style={{flexShrink:0} as React.CSSProperties} src={`https://assets.coincap.io/assets/icons/${base.toLowerCase()}@2x.png`} alt={base} onError={e=>{(e.currentTarget as HTMLImageElement).style.visibility="hidden"}}/><img width={quoteSize} height={quoteSize} style={{marginLeft:-overlap,flexShrink:0,borderRadius:"50%",display:"block"} as React.CSSProperties} src={qSrc} alt={quote}/></span>}
 // ─── Forex Bot Screen ─────────────────────────────────────────────────────────
 
-function WithdrawOtpModal({onConfirm,onClose}:{onConfirm:()=>void;onClose:()=>void}){
-  const [emailOtp,setEmailOtp]=useState("");
-  const [phoneOtp,setPhoneOtp]=useState("");
-  const [secs,setSecs]=useState(60);
-  const [expired,setExpired]=useState(false);
-  const [verifying,setVerifying]=useState(false);
-  const [emailErr,setEmailErr]=useState("");
-  const [phoneErr,setPhoneErr]=useState("");
-  useEffect(()=>{
-    if(expired)return;
-    if(secs<=0){setExpired(true);return;}
-    const t=setTimeout(()=>setSecs(s=>s-1),1000);
-    return()=>clearTimeout(t);
-  },[secs,expired]);
-  const resend=()=>{setSecs(60);setExpired(false);setEmailOtp("");setPhoneOtp("");setEmailErr("");setPhoneErr("");};
-  const verify=()=>{
-    if(expired)return;
-    let ok=true;
-    if(emailOtp.length<4){setEmailErr("کد واردشده صحیح نیست.");ok=false;}
-    if(phoneOtp.length<4){setPhoneErr("کد واردشده صحیح نیست.");ok=false;}
-    if(!ok)return;
-    setVerifying(true);
-    setTimeout(()=>{setVerifying(false);onConfirm();},1400);
-  };
-  const canSubmit=emailOtp.length>=4&&phoneOtp.length>=4&&!expired&&!verifying;
-  const mm=String(Math.floor(secs/60)).padStart(2,"0");
-  const ss=String(secs%60).padStart(2,"0");
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="otp-modal-card" onClick={e=>e.stopPropagation()} dir="rtl">
-        <div className="modal-handle"/>
-        <div className="otp-shield-icon">
-          <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
-            <path d="M16 3L5 7v10c0 6.6 4.6 12.8 11 14.4C22.4 29.8 27 23.6 27 17V7L16 3z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
-            <path d="M11 16l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-        <h3 className="otp-modal-title">تأیید برداشت</h3>
-        <p className="otp-modal-desc">برای تکمیل درخواست برداشت، کدهای ارسال‌شده به ایمیل و شماره موبایل خود را وارد کنید.</p>
-        <div className="otp-field-group" style={{width:"100%"}}>
-          <label className="otp-field-label">کد ارسال‌شده به ایمیل</label>
-          <input className={"otp-input"+(emailErr?" otp-input-err":"")} inputMode="numeric" maxLength={6} placeholder="— — — — — —" value={toFaDigits(emailOtp)} onChange={e=>{setEmailOtp(toLatinDigits(e.target.value).replace(/\D/g,""));setEmailErr("");}} disabled={expired||verifying}/>
-          {emailErr&&<span className="otp-err-msg">{emailErr}</span>}
-        </div>
-        <div className="otp-field-group" style={{width:"100%"}}>
-          <label className="otp-field-label">کد ارسال‌شده به شماره موبایل</label>
-          <input className={"otp-input"+(phoneErr?" otp-input-err":"")} inputMode="numeric" maxLength={6} placeholder="— — — — — —" value={toFaDigits(phoneOtp)} onChange={e=>{setPhoneOtp(toLatinDigits(e.target.value).replace(/\D/g,""));setPhoneErr("");}} disabled={expired||verifying}/>
-          {phoneErr&&<span className="otp-err-msg">{phoneErr}</span>}
-        </div>
-        <div className="otp-timer-row" style={{width:"100%"}}>
-          {expired
-            ?<span className="otp-expired-txt">زمان وارد کردن کدها به پایان رسیده است.</span>
-            :<span className="otp-timer-txt">زمان باقی‌مانده: <b>{toFaDigits(mm+":"+ss)}</b></span>
-          }
-        </div>
-        <button className="primary-button" style={{width:"100%",marginTop:12,opacity:canSubmit?1:0.42}} disabled={!canSubmit} onClick={verify}>
-          {verifying?"در حال تأیید...":"تأیید و برداشت"}
-        </button>
-        {expired&&<button className="outline-button" style={{width:"100%",marginTop:8}} onClick={resend}>ارسال مجدد کد</button>}
-        </div>
-      </div>
-  );
-}
-
 // ─── Shared countdown circle ──────────────────────────────────────────────────
 function CircleTimer({secs,total,color}:{secs:number;total:number;color:string}){
   const r=22;const circ=2*Math.PI*r;const offset=circ*(1-secs/total);
@@ -3783,7 +3719,7 @@ function WithdrawPage({asset,network,available,processing,withdrawAddr,setWithdr
 
 function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions}:{user:UserData;onBack:()=>void;onUpdate:(u:UserData,tx:TxRecord)=>void;onUpdateUser?:(u:UserData)=>void;transactions:TxRecord[]}){
   type View="home"|"markets"|"trade"|"assets"|"withdraw"|"deposit"|"deposit-select"|"history"|"fees"|"guide"|"instant"|"spot"|"margin"|"spot-chart"|"margin-chart"|"support"|"tickets"|"chat"|"withdraw-select"|"toman-withdraw"|"toman-deposit"|"coin-select"|"network-select"|"withdraw-confirm"|"tx-detail"|"trade-type-select"|"trade-display-select"|"forex-bot";
-  const [view,setView]=useState<View>("home"),[search,setSearch]=useState(""),[marketFilter,setMarketFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[asset,setAsset]=useState("USDT"),[network,setNetwork]=useState(""),[amount,setAmount]=useState(""),[address,setAddress]=useState(""),[picker,setPicker]=useState<"coin"|"network"|null>(null),[favorite,setFavorite]=useState<string[]>(()=>{const DEFAULTS=["BTC","ETH","SOL","BNB","DOGE"];try{const s=localStorage.getItem(`anp_exchange_favorites_${user.uid}`);if(s===null){localStorage.setItem(`anp_exchange_favorites_${user.uid}`,JSON.stringify(DEFAULTS));return DEFAULTS;}return JSON.parse(s)}catch{return DEFAULTS}}),[selectedAsset,setSelectedAsset]=useState("USDT"),[tradePicker,setTradePicker]=useState(false),[tradeDisplayPicker,setTradeDisplayPicker]=useState<null|"spot"|"margin">(null),[depositOpen,setDepositOpen]=useState(false),[notice,setNotice]=useState(""),[tradeSide,setTradeSide]=useState<"buy"|"sell">("buy"),[tradeAmount,setTradeAmount]=useState(""),[processing,setProcessing]=useState(false),[receipt,setReceipt]=useState<ReceiptData|null>(null),[coins,setCoins]=useState<ExchangeCoin[]>([]),[liveWallets,setLiveWallets]=useState<Record<string,number>>({}),[marketUpdated,setMarketUpdated]=useState<Date|null>(null),[feeDetail,setFeeDetail]=useState<string|null>(null),[showWithdrawOtp,setShowWithdrawOtp]=useState(false),[withdrawSummary,setWithdrawSummary]=useState<{amount:string;destination:string;network:string;address:string}>({amount:"",destination:"",network:"",address:""}),[txDetailRecord,setTxDetailRecord]=useState<TxRecord|null>(null),[prevView,setPrevView]=useState<View>("history"),[selReturnView,setSelReturnView]=useState<View>("withdraw"),[balUnit,setBalUnit]=useState<"tmn"|"usdt">("tmn"),[hidden,setHidden]=useState(false),[toDepositTab,setToDepositTab]=useState<"card"|"paya">("card"),[withdrawAddr,setWithdrawAddr]=useState(""),[withdrawAmt,setWithdrawAmt]=useState("");
+  const [view,setView]=useState<View>("home"),[search,setSearch]=useState(""),[marketFilter,setMarketFilter]=useState<"همه"|"تومان"|"دلار تتر">("تومان"),[asset,setAsset]=useState("USDT"),[network,setNetwork]=useState(""),[amount,setAmount]=useState(""),[address,setAddress]=useState(""),[picker,setPicker]=useState<"coin"|"network"|null>(null),[favorite,setFavorite]=useState<string[]>(()=>{const DEFAULTS=["BTC","ETH","SOL","BNB","DOGE"];try{const s=localStorage.getItem(`anp_exchange_favorites_${user.uid}`);if(s===null){localStorage.setItem(`anp_exchange_favorites_${user.uid}`,JSON.stringify(DEFAULTS));return DEFAULTS;}return JSON.parse(s)}catch{return DEFAULTS}}),[selectedAsset,setSelectedAsset]=useState("USDT"),[tradePicker,setTradePicker]=useState(false),[tradeDisplayPicker,setTradeDisplayPicker]=useState<null|"spot"|"margin">(null),[depositOpen,setDepositOpen]=useState(false),[depositAddress,setDepositAddress]=useState<{address:string;memo?:string;safeForAutomaticAttribution?:boolean}|null>(null),[notice,setNotice]=useState(""),[tradeSide,setTradeSide]=useState<"buy"|"sell">("buy"),[tradeAmount,setTradeAmount]=useState(""),[processing,setProcessing]=useState(false),[receipt,setReceipt]=useState<ReceiptData|null>(null),[coins,setCoins]=useState<ExchangeCoin[]>([]),[liveWallets,setLiveWallets]=useState<Record<string,number>>({}),[marketUpdated,setMarketUpdated]=useState<Date|null>(null),[feeDetail,setFeeDetail]=useState<string|null>(null),[showWithdrawOtp,setShowWithdrawOtp]=useState(false),[withdrawSummary,setWithdrawSummary]=useState<{amount:string;destination:string;network:string;address:string}>({amount:"",destination:"",network:"",address:""}),[txDetailRecord,setTxDetailRecord]=useState<TxRecord|null>(null),[prevView,setPrevView]=useState<View>("history"),[selReturnView,setSelReturnView]=useState<View>("withdraw"),[balUnit,setBalUnit]=useState<"tmn"|"usdt">("tmn"),[hidden,setHidden]=useState(false),[toDepositTab,setToDepositTab]=useState<"card"|"paya">("card"),[withdrawAddr,setWithdrawAddr]=useState(""),[withdrawAmt,setWithdrawAmt]=useState("");
   const pendingWithdrawCb=useRef<(()=>void)|null>(null); const liveRate=Number(coins.find(c=>c.symbol==="USDT")?.price??0);
   const [kycFlow,setKycFlow]=useState<null|"photo"|"profile"|"anim">(null);
   const [kycPhoto,setKycPhoto]=useState("");
@@ -3793,6 +3729,7 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions}:{user:U
   const goWithKyc=(dest:View)=>{if(user.kycDone){go(dest);return;}setPendingKycDest(dest);setKycFlow("photo");setKycFailed(false);};
   useEffect(()=>{let active=true;const load=async()=>{try{const assets=await sarrafAssets();const r=await fetch(`${ANSARRAF_API_BASE}/api/v1/market-data/quotes`,{signal:AbortSignal.timeout(7000),cache:"no-store"});if(!r.ok)throw new Error("market_data_unavailable");const d=await r.json();const quotes=Array.isArray(d?.quotes)?d.quotes:[];const live=quotes.filter((q:any)=>q.provider==="wallex"&&!q.stale&&Number(q.lastPrice)>0);const bySymbol=new Map<string,any>();for(const q of live)bySymbol.set(String(q.symbol).toUpperCase(),q);const tomanRate=Number(bySymbol.get("USDT/TOMAN")?.lastPrice||0);const mapped=assets.map((a:any)=>{const symbol=String(a.symbol??"").toUpperCase();const usdt=bySymbol.get(`${symbol}/USDT`);const toman=bySymbol.get(`${symbol}/TOMAN`);const price=symbol==="USDT"?tomanRate:(toman?Number(toman.lastPrice):(usdt&&tomanRate>0?tomanRate*Number(usdt.lastPrice):0));return {symbol,fa:String(a.name??symbol),price:Number.isFinite(price)?price:0,change:Number.isFinite(Number(usdt?.change24h))?Number(usdt.change24h):0,networks:Array.isArray(a.networks)?a.networks.map(String):[],volume:Number(usdt?.volume24h??0)};}).filter((x:any)=>x.symbol);if(active){setCoins(mapped);if(!mapped.some((x:any)=>x.symbol===selectedAsset)&&mapped[0])setSelectedAsset(mapped[0].symbol);if(mapped.some((x:any)=>x.symbol==="USDT")&&_viewRef.current!=="withdraw-confirm")setMarketUpdated(new Date());}}catch{}};void load();const id=window.setInterval(()=>void load(),5000);return()=>{active=false;window.clearInterval(id)}},[selectedAsset]);
   useEffect(()=>{let active=true;const loadWallets=async()=>{try{const wallet=await sarrafWalletMap();if(active)setLiveWallets(wallet);}catch{if(active)setLiveWallets({});}};void loadWallets();const id=window.setInterval(()=>void loadWallets(),5000);return()=>{active=false;window.clearInterval(id)}},[]);
+  useEffect(()=>{let active=true;if(view!=="deposit"||!asset||!network){setDepositAddress(null);return()=>{active=false};}void sarrafRequest("/api/v1/crypto/deposit-address?asset="+encodeURIComponent(asset)+"&network="+encodeURIComponent(network)).then((d:any)=>{if(active)setDepositAddress({address:String(d?.address??""),memo:d?.memo??undefined,safeForAutomaticAttribution:d?.safeForAutomaticAttribution});}).catch(()=>{if(active)setDepositAddress(null);});return()=>{active=false}},[view,asset,network]);
   const coin=coins.find(c=>c.symbol===asset)??coins[0]; const available=Number(liveWallets[String(asset).toUpperCase()]??0);
   const navBusy=useRef(false);
   const go=(next:View)=>{if(navBusy.current)return;navBusy.current=true;setView(next);setNotice("");setTimeout(()=>{navBusy.current=false},400)};
@@ -3810,7 +3747,7 @@ function ExchangeScreen({user,onBack,onUpdate,onUpdateUser,transactions}:{user:U
   const selectCoin=(s:string)=>{setAsset(s);setSelectedAsset(s);setNetwork("");setPicker(null)};
   const toggleFavorite=(symbol:string)=>setFavorite(current=>{const next=current.includes(symbol)?current.filter(x=>x!==symbol):[...current,symbol];localStorage.setItem(`anp_exchange_favorites_${user.uid}`,JSON.stringify(next));return next});
   const openSelectedTrading=(target:"instant"|"spot")=>{if(target==="instant"){go("instant")}else{setTradeDisplayPicker(target);go("trade-display-select")}};
-  const addressValue="";
+  const addressValue=depositAddress?.address??"";
   const ExchangeTopBar=()=><div className="exchange-top"><button onClick={onBack} style={{display:"flex",alignItems:"center",gap:4,background:"rgba(124,58,237,0.1)",border:"1.5px solid rgba(124,58,237,0.25)",borderRadius:20,padding:"6px 12px 6px 10px",cursor:"pointer",fontFamily:"Vazirmatn",fontSize:11,fontWeight:700,color:"#9d71ea",flexShrink:0,whiteSpace:"nowrap"}}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>بازگشت به آن‌پرداز</button><div className="exchange-brand"><img src={anPardazLogo} className="exchange-logo-img" alt="آن‌پرداز"/><b>آن صراف</b></div><span className="connection"><i/> {marketUpdated?"نرخ زنده":"در حال اتصال"}</span></div>;
   const ExchangeFooterNav=()=>{
     const NAV_ITEMS:[string,string,JSX.Element][]=[
@@ -4055,7 +3992,7 @@ const NetworkSelectPage=()=>{
       <div className="picker-list">
         {coin.networks.map(n=><button key={n} onClick={()=>{setNetwork(n);go(selReturnView||'withdraw');}}>
           <span><b>{n}</b></span>
-          <em>{asset==='USDT'?'۰٫۵ دلار تتر':'۰٫۰۰۰۵ '+asset}</em>
+          <em>کارمزد و حداقل برداشت پس از دریافت از Backend نمایش داده می‌شود.</em>
         </button>)}
       </div>
     </div>
@@ -5453,7 +5390,7 @@ const HELP_GUIDES:HGuide[]=[
     {text:"از بخش «بازارها» می‌توانید قیمت لحظه‌ای بیت‌کوین، اتریوم، تتر و ۲۱ ارز دیجیتال دیگر را مشاهده کنید.",voice:"از بخش بازارها می‌توانید قیمت لحظه‌ای ارزهای دیجیتال را مشاهده کنید."},
     {text:"«معامله آنی» ساده‌ترین روش خرید و فروش است. مقدار دلخواه را انتخاب کنید و با یک ضربه معامله کنید.",voice:"معامله آنی ساده‌ترین روش خرید و فروش است."},
     {text:"«معامله اسپات» برای تریدرهای حرفه‌ای است. می‌توانید سفارش قیمت ثابت، قیمت بازار یا حد ضرر ثبت کنید.",voice:"معامله اسپات برای تریدرهای حرفه‌ای است."},
-    {text:"«معامله تعهدی» (مارجین) به شما اجازه می‌دهد با اهرم تا ۱۰۰ برابر معامله کنید. این نوع معامله ریسک بسیار بالایی دارد و فقط برای متخصصان مناسب است.",voice:"معامله تعهدی ریسک بسیار بالایی دارد و فقط برای متخصصان مناسب است."},
+    {text:"«معامله تعهدی» (مارجین) در نسخه فعلی تا زمان وجود API اجرایی واقعی provider غیرفعال است. هیچ اهرم یا موقعیت ساختگی نمایش داده نمی‌شود.",voice:"معامله تعهدی فعلاً غیرفعال است تا API اجرایی واقعی provider آماده شود."},
     {text:"از بخش «واریز» می‌توانید کریپتو به کیف پول صرافی خود واریز کنید. آدرس واریز منحصربه‌فرد شما در اینجا نمایش داده می‌شود.",voice:"از بخش واریز می‌توانید کریپتو به کیف پول خود واریز کنید."},
     {text:"از بخش «برداشت» می‌توانید ارز دیجیتال به کیف پول خارجی ارسال کنید. آدرس مقصد را با دقت کامل وارد کنید، زیرا معاملات بلاک‌چین برگشت‌پذیر نیستند.",voice:"از بخش برداشت می‌توانید ارز دیجیتال به کیف پول خارجی ارسال کنید. آدرس مقصد را با دقت وارد کنید."},
     {text:"تاریخچه معاملات تمام خرید، فروش، واریز و برداشت‌های صرافی شما را با جزئیات کامل نشان می‌دهد. آموزش صرافی به پایان رسید.",voice:"آموزش صرافی به پایان رسید.",automs:3500},
