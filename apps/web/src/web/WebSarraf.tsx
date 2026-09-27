@@ -419,7 +419,7 @@ function TxDetailView({ tx, onBack }: { tx:any; onBack:()=>void }) {
           <div style={{ fontSize:22, fontWeight:900, color:tx.color }}>{tx.amount}</div>
           <div style={{ fontSize:13, color:"var(--w-muted)", marginTop:4 }}>{tx.type} — {tx.date}</div>
         </div>
-        {[["وضعیت",tx.status],["شناسه تراکنش",tx.txid],["کارمزد","—"],["زمان ثبت",tx.date]].map(([k,v])=>(
+        {[["وضعیت",tx.status],["شناسه تراکنش",tx.txid],["کارمزد",tx.fee!=null?String(tx.fee):"—"],["زمان ثبت",tx.date]].map(([k,v])=>(
           <div key={k as string} style={{ display:"flex", justifyContent:"space-between", padding:"12px 0", borderBottom:"1px solid var(--w-border)", fontSize:13 }}>
             <span style={{ color:"var(--w-muted)" }}>{k}</span>
             <span style={{ fontWeight:700, fontFamily:k==="شناسه تراکنش"?"monospace":undefined }}>{v}</span>
@@ -436,58 +436,28 @@ function TxDetailView({ tx, onBack }: { tx:any; onBack:()=>void }) {
 
 // ── Fees Tab ───────────────────────────────────────
 function FeesTab() {
-  const [data,setData]=useState<any>(null);
-  const [loading,setLoading]=useState(true);
-  const [error,setError]=useState("");
-  useEffect(()=>{
-    let active=true;
-    const load=async()=>{
-      const token=getWebToken();
-      if(!token){if(active){setData(null);setLoading(false);}return;}
-      try{
-        const r=await fetch(ANSARRAF_API_BASE+"/api/v1/fees",{headers:{authorization:"Bearer "+token,accept:"application/json"},cache:"no-store"});
-        const d=await r.json().catch(()=>({}));
-        if(!r.ok)throw new Error(d?.error??"fee_rules_unavailable");
-        if(active){setData(d);setError("");}
-      }catch(e){if(active)setError(e instanceof Error?e.message:"fee_rules_unavailable");}
-      finally{if(active)setLoading(false);}
-    };
-    void load();
-    return()=>{active=false};
-  },[]);
-  const customerRules=Array.isArray(data?.customerRules)?data.customerRules:[];
-  const providerRules=Array.isArray(data?.providerRules)?data.providerRules:[];
+  const [data,setData]=useState<any>(null),[loading,setLoading]=useState(true),[error,setError]=useState("");
+  useEffect(()=>{let active=true;const load=async()=>{const token=getWebToken();if(!token){if(active){setData(null);setLoading(false)}return}try{const r=await fetch(ANSARRAF_API_BASE+"/api/v1/fees",{headers:{authorization:"Bearer "+token,accept:"application/json"},cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"fee_rules_unavailable");if(active){setData(d);setError("");}}catch(e){if(active)setError(e instanceof Error?e.message:"fee_rules_unavailable")}finally{if(active)setLoading(false)}};void load();const id=window.setInterval(()=>{if(active)void load()},15000);return()=>{active=false;clearInterval(id)}},[]);
+  const customerRules=Array.isArray(data?.customerRules)?data.customerRules:[],providerRules=Array.isArray(data?.providerRules)?data.providerRules:[];
   const pct=(v:any)=>{const n=Number(v);return Number.isFinite(n)?(n*100).toLocaleString("fa-IR",{maximumFractionDigits:6})+"٪":"—";};
   const money=(v:any)=>{const n=Number(v);return Number.isFinite(n)?n.toLocaleString("fa-IR",{maximumFractionDigits:8}):"—";};
+  const opLabel=(v:string)=>({trade:"معامله",deposit:"واریز",withdrawal:"برداشت",transfer:"انتقال"} as any)[v]??v;
   return <div style={{padding:"24px 0"}}>
     <div style={{fontSize:18,fontWeight:900,marginBottom:8}}>کارمزدهای واقعی آن صراف</div>
-    <div style={{fontSize:11,color:"var(--w-muted)",marginBottom:18,lineHeight:1.8}}>اعداد این صفحه مستقیماً از قوانین فعال ثبت‌شده در دیتابیس آن صراف خوانده می‌شوند و مقدار پیش‌فرض یا جدول ساختگی نمایش داده نمی‌شود.</div>
+    <div style={{fontSize:11,color:"var(--w-muted)",marginBottom:18,lineHeight:1.8}}>تنظیمات فعال از Backend خوانده می‌شود و هر تغییر مدیر حداکثر طی چند ثانیه در این صفحه منعکس می‌شود.</div>
     {error&&<div className="w-card" style={{padding:14,color:"#b45309",marginBottom:12}}>{error}</div>}
     {loading?<div className="w-card" style={{padding:22,color:"var(--w-muted)"}}>در حال دریافت قوانین کارمزد...</div>:<>
       <div className="w-card" style={{overflow:"hidden",marginBottom:16}}>
-        <div style={{padding:14,fontWeight:800,borderBottom:"1px solid var(--w-border)"}}>کارمزد کاربر برای معامله</div>
-        {customerRules.length===0?<div style={{padding:18,color:"var(--w-muted)",fontSize:12}}>هیچ قانون کارمزد فعال برای معاملات ثبت نشده است.</div>:
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-          <thead><tr style={{background:"var(--w-card2)"}}>{["بازار","دارایی","درصد","مبلغ ثابت","حداقل","حداکثر","دارایی کارمزد"].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"right",color:"var(--w-muted)",fontWeight:600,fontSize:10}}>{h}</th>)}</tr></thead>
-          <tbody>{customerRules.map((x:any)=><tr key={x.id} style={{borderBottom:"1px solid var(--w-border)"}}>
-            <td style={{padding:"10px 12px"}}>{x.market_symbol??"همه بازارها"}</td><td style={{padding:"10px 12px"}}>{x.asset_symbol??"همه"}</td><td style={{padding:"10px 12px",fontWeight:800}}>{pct(x.percentage)}</td><td style={{padding:"10px 12px"}}>{money(x.fixed_amount)}</td><td style={{padding:"10px 12px"}}>{x.min_amount==null?"—":money(x.min_amount)}</td><td style={{padding:"10px 12px"}}>{x.max_amount==null?"—":money(x.max_amount)}</td><td style={{padding:"10px 12px"}}>{x.fee_asset_symbol??"—"}</td>
-          </tr>)}</tbody>
+        <div style={{padding:14,fontWeight:800,borderBottom:"1px solid var(--w-border)"}}>کارمزد کاربران</div>
+        {customerRules.length===0?<div style={{padding:18,color:"var(--w-muted)",fontSize:12}}>هیچ قانون فعالی ثبت نشده است.</div>:
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr style={{background:"var(--w-card2)"}}>{["عملیات","بازار","دارایی","درصد","ثابت","حداقل","حداکثر","ارز کارمزد"].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"right",color:"var(--w-muted)",fontWeight:600,fontSize:10}}>{h}</th>)}</tr></thead>
+          <tbody>{customerRules.map((x:any)=><tr key={x.id} style={{borderBottom:"1px solid var(--w-border)"}}><td style={{padding:"10px 12px",fontWeight:700}}>{opLabel(x.operation_type)}</td><td style={{padding:"10px 12px"}}>{x.market_symbol??"همه"}</td><td style={{padding:"10px 12px"}}>{x.asset_symbol??"همه"}</td><td style={{padding:"10px 12px"}}>{pct(x.percentage)}</td><td style={{padding:"10px 12px"}}>{money(x.fixed_amount)}</td><td style={{padding:"10px 12px"}}>{x.min_amount==null?"—":money(x.min_amount)}</td><td style={{padding:"10px 12px"}}>{x.max_amount==null?"—":money(x.max_amount)}</td><td style={{padding:"10px 12px"}}>{x.fee_asset_symbol??"—"}</td></tr>)}</tbody>
         </table>}
       </div>
-      <div className="w-card" style={{overflow:"hidden"}}>
-        <div style={{padding:14,fontWeight:800,borderBottom:"1px solid var(--w-border)"}}>کارمزد Provider</div>
-        {providerRules.length===0?<div style={{padding:18,color:"var(--w-muted)",fontSize:12}}>هیچ قانون کارمزد Provider فعال ثبت نشده است.</div>:
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-          <thead><tr style={{background:"var(--w-card2)"}}>{["Provider","بازار","سمت","Maker","Taker","مبلغ ثابت","دارایی"].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"right",color:"var(--w-muted)",fontWeight:600,fontSize:10}}>{h}</th>)}</tr></thead>
-          <tbody>{providerRules.map((x:any)=><tr key={x.id} style={{borderBottom:"1px solid var(--w-border)"}}>
-            <td style={{padding:"10px 12px"}}>{x.provider_code}</td><td style={{padding:"10px 12px"}}>{x.market_symbol??"همه بازارها"}</td><td style={{padding:"10px 12px"}}>{x.side??"همه"}</td><td style={{padding:"10px 12px"}}>{pct(x.maker_rate)}</td><td style={{padding:"10px 12px"}}>{pct(x.taker_rate)}</td><td style={{padding:"10px 12px"}}>{money(x.fixed_fee)}</td><td style={{padding:"10px 12px"}}>{x.fee_asset_symbol??"—"}</td>
-          </tr>)}</tbody>
-        </table>}
-      </div>
+      <div className="w-card" style={{overflow:"hidden"}}><div style={{padding:14,fontWeight:800,borderBottom:"1px solid var(--w-border)"}}>کارمزد Provider</div>{providerRules.length===0?<div style={{padding:18,color:"var(--w-muted)",fontSize:12}}>هیچ قانون کارمزد Provider فعال ثبت نشده است.</div>:<table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr style={{background:"var(--w-card2)"}}>{["Provider","بازار","سمت","Maker","Taker","مبلغ ثابت","دارایی"].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"right",color:"var(--w-muted)",fontWeight:600,fontSize:10}}>{h}</th>)}</tr></thead><tbody>{providerRules.map((x:any)=><tr key={x.id} style={{borderBottom:"1px solid var(--w-border)"}}><td style={{padding:"10px 12px"}}>{x.provider_code}</td><td style={{padding:"10px 12px"}}>{x.market_symbol??"همه بازارها"}</td><td style={{padding:"10px 12px"}}>{x.side??"همه"}</td><td style={{padding:"10px 12px"}}>{pct(x.maker_rate)}</td><td style={{padding:"10px 12px"}}>{pct(x.taker_rate)}</td><td style={{padding:"10px 12px"}}>{money(x.fixed_fee)}</td><td style={{padding:"10px 12px"}}>{x.fee_asset_symbol??"—"}</td></tr>)}</tbody></table>}</div>
     </>}
   </div>;
 }
-// ── Security Tab ───────────────────────────────────
 function SecurityTab() {
   return (
     <div style={{ padding:"24px 0", maxWidth:580 }}>
