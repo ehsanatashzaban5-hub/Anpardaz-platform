@@ -3097,10 +3097,14 @@ function VehicleServiceScreen({serviceCode,title,icon,onBack}:{serviceCode:"free
   </div></div></>;
 }
 function CarServicesScreen({onBack}:{onBack:()=>void}){
-  const services=[{label:"عوارض آزادراهی",code:"freeway_toll" as const,icon:"🛣️"},{label:"خلافی خودرو",code:"vehicle_violations" as const,icon:"🚦"},{label:"طرح ترافیک تهران",code:"tehran_traffic" as const,icon:"📷"}];
+  const [inner,setInner]=useState<null|"freeway"|"traffic"|"violations">(null);
+  if(inner==="freeway")return <VehicleServiceScreen serviceCode="freeway_toll" title="عوارض آزادراهی" icon="🛣️" onBack={()=>setInner(null)}/>;
+  if(inner==="traffic")return <VehicleServiceScreen serviceCode="tehran_traffic" title="طرح ترافیک تهران" icon="📷" onBack={()=>setInner(null)}/>;
+  if(inner==="violations")return <ViolationsScreen onBack={()=>setInner(null)}/>;
+  const services=[["freeway","عوارض آزادراهی","🛣️"],["violations","خلافی خودرو","🚦"],["traffic","طرح ترافیک تهران","📷"]] as const;
   return <div className="subscreen" dir="rtl"><div className="subscreen-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">خدمات خودرویی</h2><div style={{width:36}}/></div><div className="subscreen-body">
-    <div className="anp-card" style={{padding:16,marginBottom:14,textAlign:"center"}}><div style={{fontSize:13,fontWeight:800}}>اطلاعات خودرو از Backend دریافت می‌شود</div><div style={{fontSize:11,color:"var(--text-muted)",marginTop:5,lineHeight:1.8}}>هیچ پلاک، بدهی یا وضعیت پرداخت نمونه‌ای در برنامه نگهداری نمی‌شود. برای استعلام، خدمت موردنظر را انتخاب کنید و پلاک واقعی را وارد کنید.</div></div>
-    {services.map(v=><button key={v.code} onClick={()=>v.code==="freeway_toll"?window.dispatchEvent(new CustomEvent("anp-open-freeway")):v.code==="tehran_traffic"?window.dispatchEvent(new CustomEvent("anp-open-traffic")):window.dispatchEvent(new CustomEvent("anp-open-violations"))} style={{display:"flex",alignItems:"center",width:"100%",background:"var(--card-bg)",border:"1px solid var(--border-color)",borderRadius:14,padding:14,marginBottom:10,cursor:"pointer",color:"var(--text-primary)",fontFamily:"Vazirmatn",textAlign:"right"}}><span style={{fontSize:25,width:42}}>{v.icon}</span><span style={{flex:1,fontWeight:800}}>{v.label}</span><Icon name="arrow" size={16}/></button>)}
+    <div className="anp-card" style={{padding:16,marginBottom:14,textAlign:"center"}}><div style={{fontSize:13,fontWeight:800}}>اطلاعات خودرو از Backend دریافت می‌شود</div><div style={{fontSize:11,color:"var(--text-muted)",marginTop:5,lineHeight:1.8}}>هیچ پلاک، بدهی یا وضعیت پرداخت نمونه‌ای در برنامه نگهداری نمی‌شود.</div></div>
+    {services.map(([id,label,icon])=><button key={id} onClick={()=>setInner(id)} style={{display:"flex",alignItems:"center",width:"100%",background:"var(--card-bg)",border:"1px solid var(--border-color)",borderRadius:14,padding:14,marginBottom:10,cursor:"pointer",color:"var(--text-primary)",fontFamily:"Vazirmatn",textAlign:"right"}}><span style={{fontSize:25,width:42}}>{icon}</span><span style={{flex:1,fontWeight:800}}>{label}</span><Icon name="arrow" size={16}/></button>)}
   </div></div>;
 }
 function FreewayScreen({onBack}:{onBack:()=>void}){return <VehicleServiceScreen serviceCode="freeway_toll" title="عوارض آزادراهی" icon="🛣️" onBack={onBack}/>}
