@@ -27,7 +27,7 @@ const fmtVol = (n: number) => {
 };
 const clr = (n: number) => n >= 0 ? "#10b981" : "#f43f5e";
 
-type SarrafTab = "markets"|"trade-select"|"instant"|"spot"|"margin"|"assets"|"deposit"|"deposit-coin"|"withdraw"|"withdraw-coin"|"orders"|"transactions"|"fees"|"security"|"support"|"guide"|"forexbot";
+type SarrafTab = "markets"|"trade-select"|"instant"|"spot"|"margin"|"assets"|"deposit"|"deposit-coin"|"withdraw"|"withdraw-coin"|"orders"|"transactions"|"fees"|"security"|"support"|"guide";
 
 interface SarrafProps {
   onNavigate: (p: WebPage) => void;
@@ -40,7 +40,6 @@ const TAB_GROUPS = [
   { label:"بازارها",   items:[{ id:"markets" as SarrafTab,        icon:"sarraf",    label:"بازارها" }] },
   { label:"معاملات",   items:[
     { id:"trade-select" as SarrafTab, icon:"swap",      label:"معامله" },
-    { id:"forexbot" as SarrafTab,     icon:"cpu",       label:"فارکس بات" },
   ]},
   { label:"حساب",      items:[
     { id:"assets" as SarrafTab,       icon:"wallet",    label:"دارایی‌ها" },
@@ -244,7 +243,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
     void load();
     const id = window.setInterval(() => void load(), 3000);
     return () => { active = false; window.clearInterval(id); };
-  }, [selectedAsset.symbol]);  const PROTECTED_TABS: SarrafTab[] = ["assets","deposit","deposit-coin","withdraw","withdraw-coin","orders","transactions","security","forexbot"];
+  }, [selectedAsset.symbol]);  const PROTECTED_TABS: SarrafTab[] = ["assets","deposit","deposit-coin","withdraw","withdraw-coin","orders","transactions","security"];
   const PROTECTED = PROTECTED_TABS.includes(tab);
 
   const navItems = TAB_GROUPS.flatMap(g => g.items);
@@ -1382,66 +1381,3 @@ function GuideTab() {
   </div>;
 }
 
-// ── Forex Bot Tab ──────────────────────────────────
-function ForexBotTab({ asset }: { asset:CryptoAsset }) {
-  const [state,setState]=useState<any>(null);
-  const [amount,setAmount]=useState("30");
-  const [busy,setBusy]=useState(false);
-  const [error,setError]=useState("");
-  const base=ANSARRAF_API_BASE;
-  const load=useCallback(async()=>{
-    const token=getWebToken(); if(!token){setState(null);return;}
-    try{
-      const r=await fetch(base+"/api/v1/forex-bot",{headers:{authorization:"Bearer "+token},cache:"no-store"});
-      const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d?.error??"forex_bot_unavailable");
-      setState(d);
-      if(d?.account?.investment_amount) setAmount(String(d.account.investment_amount));
-      setError("");
-    }catch(e){setError(e instanceof Error?e.message:"forex_bot_unavailable");}
-  },[base]);
-  useEffect(()=>{void load();const id=window.setInterval(()=>void load(),5000);return()=>window.clearInterval(id)},[load]);
-  const request=async(action:"activate"|"deactivate")=>{
-    const token=getWebToken(); if(!token)return;
-    setBusy(true);setError("");
-    try{
-      const r=await fetch(base+"/api/v1/forex-bot/requests",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({action,amount:action==="activate"?amount:undefined,idempotencyKey:crypto.randomUUID()})});
-      const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d?.error??"forex_bot_request_failed");
-      await load();
-    }catch(e){setError(e instanceof Error?e.message:"forex_bot_request_failed");}
-    finally{setBusy(false);}
-  };
-  const account=state?.account;
-  const status=account?.status??"inactive";
-  const pnl=Number(account?.total_pnl??0);
-  const events=Array.isArray(state?.pnlEvents)?[...state.pnlEvents].reverse():[];
-  const points=events.map((x:any,i:number)=>({x:i,y:Number(x.amount)||0}));
-  const max= Math.max(1,...points.map((p:any)=>Math.abs(p.y)));
-  return <div style={{padding:"24px 0",maxWidth:620}}>
-    <div className="w-card" style={{padding:22}}>
-      <div style={{fontSize:16,fontWeight:900,marginBottom:8}}>فارکس بات آن صراف</div>
-      <div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>
-        سرمایه‌گذاری هر کاربر حداکثر ۳۰ دلار USDT است. فعال‌سازی و غیرفعال‌سازی فقط پس از تأیید مدیریت انجام می‌شود.
-      </div>
-      {error&&<div style={{marginTop:12,padding:"9px 11px",borderRadius:8,background:"rgba(220,38,38,.08)",color:"#dc2626",fontSize:11}}>{error}</div>}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:14}}>
-        <div style={{padding:12,border:"1px solid var(--w-border)",borderRadius:10}}><div style={{fontSize:10,color:"var(--w-muted)"}}>وضعیت</div><div style={{fontWeight:900,marginTop:5}}>{status==="active"?"فعال":status==="activation_pending"?"در انتظار تأیید فعال‌سازی":status==="deactivation_pending"?"در انتظار تأیید غیرفعال‌سازی":"غیرفعال"}</div></div>
-        <div style={{padding:12,border:"1px solid var(--w-border)",borderRadius:10}}><div style={{fontSize:10,color:"var(--w-muted)"}}>سود/زیان ثبت‌شده</div><div dir="ltr" style={{fontWeight:900,marginTop:5,color:pnl>=0?"#059669":"#dc2626"}}>{pnl.toFixed(4)} USDT</div></div>
-      </div>
-      {status==="inactive"&&<div style={{marginTop:14}}>
-        <label style={{fontSize:11,color:"var(--w-muted)"}}>سرمایه‌گذاری USDT (حداکثر ۳۰)</label>
-        <input className="w-input" value={amount} onChange={e=>setAmount(e.target.value)} inputMode="decimal" dir="ltr" style={{marginTop:6}}/>
-        <button className="w-btn w-btn-primary" disabled={busy} onClick={()=>void request("activate")} style={{marginTop:8,width:"100%"}}>{busy?"در حال ثبت…":"فعال‌سازی ربات"}</button>
-      </div>}
-      {status==="activation_pending"&&<div style={{marginTop:14,padding:12,borderRadius:10,background:"rgba(217,119,6,.08)",color:"#b45309",fontSize:12}}>درخواست شما ثبت شده و در انتظار تأیید مدیریت است. پس از تأیید، ربات فعال می‌شود؛ در صورت رد، مبلغ رزروشده آزاد خواهد شد.</div>}
-      {status==="active"&&<button className="w-btn w-btn-ghost" disabled={busy} onClick={()=>void request("deactivate")} style={{marginTop:14,width:"100%"}}>{busy?"در حال ثبت…":"درخواست غیرفعال‌سازی"}</button>}
-      {status==="deactivation_pending"&&<div style={{marginTop:14,padding:12,borderRadius:10,background:"rgba(217,119,6,.08)",color:"#b45309",fontSize:12}}>درخواست غیرفعال‌سازی در انتظار تأیید مدیریت است. تا تصمیم مدیریت، ربات در وضعیت فعلی باقی می‌ماند.</div>}
-      {events.length>0&&<div style={{marginTop:18}}>
-        <div style={{fontWeight:800,fontSize:13,marginBottom:8}}>نمودار سود/زیان ثبت‌شده</div>
-        <div style={{height:170,border:"1px solid var(--w-border)",borderRadius:10,padding:12,display:"flex",alignItems:"flex-end",gap:5}}>
-          {events.slice(-24).map((x:any,i:number)=>{const v=Number(x.amount)||0;return <div key={x.id??i} title={`${v} USDT · ${x.reason??""}`} style={{flex:1,maxWidth:22,height:Math.max(4,Math.min(100,Math.abs(v)/max*100))+"%",alignSelf:v>=0?"flex-end":"flex-end",background:v>=0?"#10b981":"#f43f5e",borderRadius:4}}/>})}
-        </div>
-      </div>}
-      <div style={{marginTop:12,padding:"10px 12px",background:"var(--w-card2)",borderRadius:9,fontSize:11}}>بازار مرجع: {asset.symbol ? asset.symbol+"/USDT" : "USDT"} · داده‌های سود و وضعیت فقط از Backend خوانده می‌شوند.</div>
-    </div>
-  </div>;
-}
