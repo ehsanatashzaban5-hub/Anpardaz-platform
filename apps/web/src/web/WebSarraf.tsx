@@ -168,7 +168,12 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
           const toman = bySymbol.get(`${a.symbol}/TOMAN`);
           const price = usdt ? Number(usdt.lastPrice) : 0;
           const priceIrt = toman ? Number(toman.lastPrice) : (price > 0 && tomanRate > 0 ? price * tomanRate : 0);
-          return { ...a, price, priceIrt };
+          const change=usdt?.change24h??usdt?.change_percent??usdt?.change??0;
+           const volume=usdt?.volume24h??usdt?.volume_24h??usdt?.volume??0;
+           const marketCap=usdt?.marketCap??usdt?.market_cap??0;
+           const high=usdt?.high24h??usdt?.high_24h??usdt?.high??0;
+           const low=usdt?.low24h??usdt?.low_24h??usdt?.low??0;
+           return { ...a, price, priceIrt, change24h:Number(change)||0, volume24h:Number(volume)||0, marketCap:Number(marketCap)||0, high24h:Number(high)||0, low24h:Number(low)||0 };
         }));
       } catch {
         // Keep verified backend data already rendered; never synthesize a mock quote.
@@ -205,7 +210,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   const selectAndTrade = (a: CryptoAsset) => { setAsset(a); setTab("trade-select"); };
 
   const needsLogin = !isLoggedIn;
-  const needsKyc   = isLoggedIn && kycStatus !== "verified";
+  const needsKyc   = isLoggedIn && effectiveKycStatus !== "verified";
 
   const [asks, setAsks] = useState<OrderBookEntry[]>([]);
   const [bids, setBids] = useState<OrderBookEntry[]>([]);
@@ -1034,14 +1039,14 @@ function DepositTomanTab({ kycStatus }: { kycStatus:KycStatus }) {
 }
 // ── Deposit Coin Tab ───────────────────────────────
 function DepositCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) {
-  const [selAsset,setSelAsset]=useState(assets[0]),[network,setNetwork]=useState("TRC20"),[searchCoin,setSearchCoin]=useState("");
+  const [selAsset,setSelAsset]=useState(assets[0]),[network,setNetwork]=useState(""),[networks,setNetworks]=useState<string[]>([]),[address,setAddress]=useState(""),[memo,setMemo]=useState(""),[loading,setLoading]=useState(false),[error,setError]=useState(""),[searchCoin,setSearchCoin]=useState("");
   if(kycStatus!=="verified") return <KycGate kycStatus={kycStatus}/>;
   const NETS:Record<string,string[]>={BTC:["BTC"],ETH:["ERC20"],BNB:["BEP20"],SOL:["SOL"],USDT:["TRC20","ERC20","BEP20"],USDC:["ERC20","BEP20"],default:["TRC20","ERC20","BEP20"]};
   const nets=NETS[selAsset?.symbol]||NETS.default;
   const filtered=assets.filter(a=>a.symbol.includes(searchCoin.toUpperCase())||a.nameFa.includes(searchCoin)).slice(0,30);
   return <div style={{display:"flex",gap:20,padding:"24px 0",alignItems:"flex-start",flexWrap:"wrap"}}>
     <div style={{width:220,flexShrink:0}}><div style={{fontSize:14,fontWeight:800,marginBottom:10}}>انتخاب رمزارز</div><input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{marginBottom:8,fontSize:12}}/>
-      <div className="w-card" style={{overflow:"hidden",maxHeight:360,overflowY:"auto"}}>{filtered.map(a=><div key={a.id} onClick={()=>{setSelAsset(a);setNetwork((NETS[a.symbol]||NETS.default)[0]);}} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:selAsset?.id===a.id?"rgba(8,145,178,.08)":"transparent",borderBottom:"1px solid var(--w-border)"}}><div style={{width:24,height:24,borderRadius:"50%",background:a.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:900}}>{a.symbol.slice(0,3)}</div><div><div style={{fontSize:12,fontWeight:700}}>{a.symbol}</div><div style={{fontSize:10,color:"var(--w-muted)"}}>{a.nameFa}</div></div></div>)}</div>
+      <div className="w-card" style={{overflow:"hidden",maxHeight:360,overflowY:"auto"}}>{filtered.map(a=><div key={a.id} onClick={()=>{setSelAsset(a);setNetwork("");}} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:selAsset?.id===a.id?"rgba(8,145,178,.08)":"transparent",borderBottom:"1px solid var(--w-border)"}}><div style={{width:24,height:24,borderRadius:"50%",background:a.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:900}}>{a.symbol.slice(0,3)}</div><div><div style={{fontSize:12,fontWeight:700}}>{a.symbol}</div><div style={{fontSize:10,color:"var(--w-muted)"}}>{a.nameFa}</div></div></div>)}</div>
     </div>
     <div style={{flex:1,minWidth:300,maxWidth:600}}><h2 style={{fontSize:17,fontWeight:900,marginBottom:16}}>واریز {selAsset?.symbol}</h2><div className="w-card" style={{padding:22}}>
       <div style={{padding:"12px 14px",background:"rgba(217,119,6,.07)",border:"1px solid rgba(217,119,6,.18)",borderRadius:9,fontSize:12,color:"#b45309",lineHeight:1.8}}>آدرس واریز واقعی از زیرساخت کیف‌پول در API فعلی ارائه نشده است؛ بنابراین هیچ آدرس ساختگی نمایش داده نمی‌شود.</div>
