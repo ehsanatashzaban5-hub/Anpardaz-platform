@@ -259,8 +259,7 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
     if (!ADMIN_ROLES.includes(a.role)) return reply.code(403).send({ error:'forbidden' });
     const accountId = Number((request.params as any).id);
     const body = (request.body ?? {}) as { amount?: string; sourceReference?: string; reason?: string; idempotencyKey?: string };
-    if (!Number.isSafeInteger(accountId) || !body.amount || !amount(body.amount) || !body.sourceReference?.trim() || !body.reason?.trim() || !body.idempotencyKey) return reply.code(400).send({error:'invalid_pnl'});
-    const signed = body.amount.startsWith('-') ? body.amount : body.amount;
+    if (!Number.isSafeInteger(accountId) || typeof body.amount !== 'string' || !body.sourceReference?.trim() || !body.reason?.trim() || !body.idempotencyKey) return reply.code(400).send({error:'invalid_pnl'});
     const raw = String(body.amount).trim();
     if (!/^-?(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/.test(raw) || Number(raw)===0) return reply.code(400).send({error:'invalid_pnl_amount'});
     const client=await pool.connect();
