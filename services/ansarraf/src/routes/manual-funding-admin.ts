@@ -77,7 +77,7 @@ export function registerManualFundingAdminRoutes(app:FastifyInstance,pool:Pool){
     let depositId=Number(existing?.id??0);
     if(!depositId){
       const q=await pool.query(`INSERT INTO deposits(customer_id,asset_id,amount,fee_amount,fee_asset_id,net_amount,network,external_reference,status,funding_source,source_card_last4,source_card_provider_reference,source_card_verified_at,admin_actor_identity_id,accounting_operation_id)
-        VALUES($1,$2,$3,$4,$5,$6,'BANK_CARD',$7,'pending','manual',$5,$6,NOW(),$7,$8)
+        VALUES($1,$2,$3,$4,$5,$6,'BANK_CARD',$7,'pending','manual',$8,$9,NOW(),$10,$11)
         ON CONFLICT(external_reference) DO NOTHING
         RETURNING id`,[customer.id,asset.id,amount,fee.amount,fee.feeAssetId,fee.netAmount,externalReference,cardNumber.slice(-4),verified.provider_reference??null,actorIdentityId,operationId]);
       depositId=Number(q.rows[0].id);
