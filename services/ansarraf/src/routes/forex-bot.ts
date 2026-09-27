@@ -9,6 +9,8 @@ const REVIEW_ROLES = ['admin','super_admin'];
 const VIEW_ROLES = ['admin','super_admin','operator'];
 const amount = (v: unknown) => typeof v === 'string' && /^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/.test(v) && Number(v) > 0;
 const MAX_INVESTMENT = '30';
+const executionAvailable=()=>process.env.FOREX_BOT_EXECUTION_ENABLED==='true'&&!!process.env.FOREX_BOT_EXECUTION_URL&&!!process.env.FOREX_BOT_EXECUTION_TOKEN;
+
 const FOREX_EXECUTION_AVAILABLE = process.env.FOREX_EXECUTION_ENABLED === 'true' && Boolean(process.env.FOREX_BROKER_PROVIDER_URL);
 
 
@@ -17,7 +19,7 @@ async function botSnapshot(pool: Pool, customerId: string) {
     `SELECT id,customer_id,status,investment_amount::text,total_pnl::text,activated_at,deactivated_at,version,created_at,updated_at
      FROM forex_bot_accounts WHERE customer_id=$1 LIMIT 1`, [customerId],
   );
-  if (!account.rows[0]) return { account: null, pendingRequest: null, pnlEvents: [] };
+  if (!account.rows[0]) return { account: null, pendingRequest: null, pnlEvents: [], executionAvailable: executionAvailable() };
   const a = account.rows[0];
   const [pending, events] = await Promise.all([
     pool.query(
@@ -29,7 +31,7 @@ async function botSnapshot(pool: Pool, customerId: string) {
        FROM forex_bot_pnl_events WHERE account_id=$1 ORDER BY created_at DESC LIMIT 100`, [a.id],
     ),
   ]);
-  return { account: a, pendingRequest: pending.rows[0] ?? null, pnlEvents: events.rows };
+  return { account: a, pendingRequest: pending.rows[0] ?? null, pnlEvents: events.rows, executionAvailable: executionAvailable() };
 }
 
 async function ensureBotAccount(pool: Pool, customerId: string) {
@@ -97,6 +99,7 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
       if (body.action === 'activate') {
         if (!FOREX_EXECUTION_AVAILABLE) throw new Error('forex_execution_not_configured');
         if (!amount(body.amount) || Number(body.amount) > Number(MAX_INVESTMENT)) throw new Error('forex_bot_max_investment_30_usd');
+        if (!executionAvailable()) throw new Error('forex_bot_execution_not_configured');
         if (a.status !== 'inactive') throw new Error('forex_bot_activation_not_allowed');
         if (a.deactivated_at) {
           const cooldown = await client.query("SELECT (NOW() >= $1::timestamptz + INTERVAL '24 hours') AS allowed",[a.deactivated_at]);
