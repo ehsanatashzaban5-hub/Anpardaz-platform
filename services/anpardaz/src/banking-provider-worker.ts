@@ -42,6 +42,16 @@ async function postInternalTransferLedger(referenceId:string,operationId:string,
   if(!r.ok)throw new Error('accounting_post_failed');
 }
 
+async function ledgerAccount(base:string,token:string,code:string,name:string,type:'asset'|'liability',currency:string){
+  const headers={authorization:'Bearer '+token};
+  let r=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers,signal:AbortSignal.timeout(8000)});
+  if(r.ok)return Number((await r.json() as any).account.id);
+  if(r.status!==404)throw new Error('account_lookup_failed');
+  r=await fetch(base+'/internal/v1/ledger/accounts',{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify({accountCode:code,accountName:name,accountType:type,currency}),signal:AbortSignal.timeout(8000)});
+  if(r.ok)return Number((await r.json() as any).account.id);
+  if(r.status===409){r=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers,signal:AbortSignal.timeout(8000)});if(r.ok)return Number((await r.json() as any).account.id);}
+  throw new Error('account_create_failed');
+}
 async function accountingHold(customerId:number,operationId:string,amount:string,currency:string){
   const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!base||!token)throw new Error('accounting_service_not_configured');
   const account=await ledgerAccount(base,token,'anpardaz.customer.'+customerId+'.liability.'+currency,'An Pardaz customer '+customerId+' '+currency,'liability',currency);
