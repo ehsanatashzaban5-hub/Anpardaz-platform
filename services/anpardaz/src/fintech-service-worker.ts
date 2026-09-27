@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import {createDecipheriv} from 'node:crypto';
 import { FintechProvider } from './fintech-provider.js';
 
 async function ledgerAccount(base:string,token:string,code:string,name:string,type:'asset'|'liability',currency:string){
@@ -19,6 +20,23 @@ async function postAccounting(customerId:string,operationId:string,amount:string
   const customer=await ledgerAccount(base,token,'anpardaz.customer.'+customerId+'.liability.'+currency,'An Pardaz customer '+customerId+' '+currency,'liability',currency);
   const r=await fetch(base+'/internal/v1/ledger/transactions',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({referenceType:'anpardaz_service',referenceId:operationId,operationId,idempotencyKey:'anpardaz:service:'+operationId,description:'An Pardaz fintech service settlement',entries:[{accountId:customer,direction:'debit',amount,currency},{accountId:provider,direction:'credit',amount,currency}]}),signal:AbortSignal.timeout(10000)});
   if(!r.ok)throw new Error('accounting_post_failed');
+}
+function payloadEncryptionKey(){
+  const raw=process.env.FINTECH_PAYLOAD_ENCRYPTION_KEY_B64?.trim();
+  if(!raw)throw new Error('FINTECH_PAYLOAD_ENCRYPTION_KEY_B64_not_configured');
+  const key=Buffer.from(raw,'base64');
+  if(key.length!==32)throw new Error('FINTECH_PAYLOAD_ENCRYPTION_KEY_B64_must_be_32_bytes_base64');
+  return key;
+}
+function decryptProviderPayload(value:string):Record<string,unknown>{
+  const [ivB64,tagB64,dataB64]=value.split('.');
+  if(!ivB64||!tagB64||!dataB64)throw new Error('invalid_provider_payload_ciphertext');
+  const decipher=createDecipheriv('aes-256-gcm',payloadEncryptionKey(),Buffer.from(ivB64,'base64'));
+  decipher.setAuthTag(Buffer.from(tagB64,'base64'));
+  const raw=Buffer.concat([decipher.update(Buffer.from(dataB64,'base64')),decipher.final()]).toString('utf8');
+  const parsed=JSON.parse(raw);
+  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw new Error('invalid_provider_payload');
+  return parsed as Record<string,unknown>;
 }
 export class FintechServiceWorker{
   private timer:NodeJS.Timeout|undefined; private running=false;
@@ -43,7 +61,7 @@ export class FintechServiceWorker{
       const op=(await this.pool.query('SELECT * FROM fintech_service_operations WHERE operation_id=$1',[row.operation_id])).rows[0];
       if(!op){await this.fail(row.id,'operation_not_found');return true;}
       const provider=new FintechProvider();
-      const payload=(op.request_metadata?.payload??{}) as Record<string,unknown>;
+      const payload=op.provider_payload_enc ? decryptProviderPayload(String(op.provider_payload_enc)) : (op.request_metadata?.payload??{}) as Record<string,unknown>;
       const result=await provider.execute({serviceCode:op.service_code,operationId:op.operation_id,payload});
       let status=result.status;
       let accountingStatus=op.accounting_status;
