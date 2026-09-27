@@ -21,6 +21,8 @@ async function postAccounting(customerId:string,operationId:string,amount:string
   const r=await fetch(base+'/internal/v1/ledger/transactions',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({referenceType:'anpardaz_service',referenceId:operationId,operationId,idempotencyKey:'anpardaz:service:'+operationId,description:'An Pardaz fintech service settlement',entries:[{accountId:customer,direction:'debit',amount,currency},{accountId:provider,direction:'credit',amount,currency}]}),signal:AbortSignal.timeout(10000)});
   if(!r.ok)throw new Error('accounting_post_failed');
 }
+function decimal18(v:string){const x=String(v).trim();if(!/^\\d+(?:\\.\\d+)?$/.test(x))throw new Error('invalid_ledger_decimal');const [a,b='']=x.split('.');return BigInt(a)*1000000000000000000n+BigInt((b+'000000000000000000').slice(0,18));}
+async function ledgerCustomerBalance(customerId:number,currency:string){const base=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\\/$/,'');const token=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!base||!token)throw new Error('accounting_service_not_configured');const code='anpardaz.customer.'+customerId+'.liability.'+currency;const r=await fetch(base+'/internal/v1/ledger/accounts/by-code/'+encodeURIComponent(code),{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(8000)});if(r.status===404)return '0';if(!r.ok)throw new Error('accounting_balance_lookup_failed');const id=Number((await r.json() as any)?.account?.id);if(!Number.isSafeInteger(id))throw new Error('accounting_account_invalid');const b=await fetch(base+'/internal/v1/ledger/accounts/'+id+'/balance',{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(8000)});if(!b.ok)throw new Error('accounting_balance_lookup_failed');return String((await b.json() as any)?.balance?.balance??'0');}
 function payloadEncryptionKey(){
   const raw=process.env.FINTECH_PAYLOAD_ENCRYPTION_KEY_B64?.trim();
   if(!raw)throw new Error('FINTECH_PAYLOAD_ENCRYPTION_KEY_B64_not_configured');
@@ -67,6 +69,15 @@ export class FintechServiceWorker{
         return true;
       }
       const payload=decryptProviderPayload(String(op.provider_payload_enc));
+      const requestedAmount=payload.amount;
+      if(typeof requestedAmount==='string'&&/^(?:0|[1-9]\\d{0,15})(?:\\.\\d{1,8})?$/.test(requestedAmount)&&requestedAmount!=='0'){
+        const available=await ledgerCustomerBalance(Number(op.customer_id),'IRR');
+        if(decimal18(available)<decimal18(requestedAmount)){
+          await this.pool.query("UPDATE fintech_service_operations SET status='failed',accounting_status='failed',failure_code='INSUFFICIENT_FUNDS',failure_message='insufficient_ledger_balance',updated_at=NOW() WHERE operation_id=$1",[op.operation_id]);
+          await this.pool.query("UPDATE fintech_provider_outbox SET status='failed',last_error='insufficient_ledger_balance',updated_at=NOW() WHERE id=$1",[row.id]);
+          return true;
+        }
+      }
       const result=await provider.execute({serviceCode:op.service_code,operationId:op.operation_id,payload});
       let status=result.status;
       let accountingStatus=op.accounting_status;
