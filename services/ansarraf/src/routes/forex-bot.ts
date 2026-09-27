@@ -208,6 +208,7 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
 
       if (row.action === 'activate') {
         if (body.approve) {
+          if (!FOREX_EXECUTION_AVAILABLE) throw new Error('forex_execution_not_configured');
           await client.query(
             `UPDATE forex_bot_accounts SET status='active',activated_at=NOW(),deactivated_at=NULL,updated_at=NOW(),version=version+1 WHERE id=$1`,
             [row.account_id],
