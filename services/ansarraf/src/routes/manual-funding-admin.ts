@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
+import { calculateOperationalFee } from '../fee-engine.js';
 
 const guard = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
   const expected = process.env.ANSARRAF_INTERNAL_TOKEN;
@@ -68,27 +69,29 @@ export function registerManualFundingAdminRoutes(app:FastifyInstance,pool:Pool){
     const asset=(await pool.query(`SELECT id,symbol FROM assets WHERE status='active' AND symbol IN ('TMN','IRT','IRR') ORDER BY CASE symbol WHEN 'TMN' THEN 0 WHEN 'IRT' THEN 1 ELSE 2 END LIMIT 1`)).rows[0];
     if(!asset)return reply.code(503).send({error:'toman_asset_not_configured'});
 
+    const fee=await calculateOperationalFee(pool,'deposit',Number(asset.id),amount,'BANK_CARD');
     const operationId=String(existing?.accounting_operation_id??('ANSARRAF-TMN-'+randomUUID()));
     const accountingUrl=process.env.ACCOUNTING_SERVICE_URL?.replace(/\/$/,'');const accountingToken=process.env.ACCOUNTING_INTERNAL_TOKEN;
     if(!accountingUrl||!accountingToken)return reply.code(503).send({error:'accounting_service_not_configured'});
 
     let depositId=Number(existing?.id??0);
     if(!depositId){
-      const q=await pool.query(`INSERT INTO deposits(customer_id,asset_id,amount,network,external_reference,status,funding_source,source_card_last4,source_card_provider_reference,source_card_verified_at,admin_actor_identity_id,accounting_operation_id)
-        VALUES($1,$2,$3,'BANK_CARD',$4,'pending','manual',$5,$6,NOW(),$7,$8)
+      const q=await pool.query(`INSERT INTO deposits(customer_id,asset_id,amount,fee_amount,fee_asset_id,net_amount,network,external_reference,status,funding_source,source_card_last4,source_card_provider_reference,source_card_verified_at,admin_actor_identity_id,accounting_operation_id)
+        VALUES($1,$2,$3,$4,$5,$6,'BANK_CARD',$7,'pending','manual',$5,$6,NOW(),$7,$8)
         ON CONFLICT(external_reference) DO NOTHING
-        RETURNING id`,[customer.id,asset.id,amount,externalReference,cardNumber.slice(-4),verified.provider_reference??null,actorIdentityId,operationId]);
+        RETURNING id`,[customer.id,asset.id,amount,fee.amount,fee.feeAssetId,fee.netAmount,externalReference,cardNumber.slice(-4),verified.provider_reference??null,actorIdentityId,operationId]);
       depositId=Number(q.rows[0].id);
     }
 
     const customerAccount=await accountingAccount(accountingUrl,accountingToken,'ansarraf.customer.'+customer.id+'.asset.'+asset.symbol,'An Sarraf customer '+customer.id+' '+asset.symbol,'liability',asset.symbol);
     const cashAccount=await accountingAccount(accountingUrl,accountingToken,'ansarraf.cash.bank_toman.'+asset.symbol,'An Sarraf bank cash '+asset.symbol,'asset',asset.symbol);
+    const revenueAccount=await accountingAccount(accountingUrl,accountingToken,'ansarraf.revenue.fees.'+asset.symbol,'An Sarraf deposit fee revenue '+asset.symbol,'revenue',asset.symbol);
     const ledger=await fetch(accountingUrl+'/internal/v1/ledger/transactions',{method:'POST',headers:{authorization:'Bearer '+accountingToken,'content-type':'application/json'},body:JSON.stringify({
       referenceType:'ansarraf_manual_toman_deposit',referenceId:String(depositId),operationId,idempotencyKey:'ansarraf-manual-deposit:'+externalReference,
       description:'Manual bank deposit verified by registered card',
       entries:[
         {accountId:cashAccount,direction:'debit',amount,currency:asset.symbol,metadata:{depositId,cardLast4:cardNumber.slice(-4)}},
-        {accountId:customerAccount,direction:'credit',amount,currency:asset.symbol,metadata:{depositId,customerId:customer.id}}
+        {accountId:customerAccount,direction:'credit',amount:fee.netAmount,currency:asset.symbol,metadata:{depositId,customerId:customer.id}},...(Number(fee.amount)>0?[{accountId:revenueAccount,direction:'credit',amount:fee.amount,currency:asset.symbol,metadata:{depositId,feeRuleId:fee.ruleId}}]:[])
       ]
     }),signal:AbortSignal.timeout(10000)});
     const ledgerBody=await ledger.json().catch(()=>({})) as any;
@@ -99,7 +102,7 @@ export function registerManualFundingAdminRoutes(app:FastifyInstance,pool:Pool){
       await client.query('BEGIN');
       const wallet=(await client.query(`INSERT INTO wallets(customer_id,asset_id,available_balance,locked_balance) VALUES($1,$2,0,0)
         ON CONFLICT(customer_id,asset_id) DO UPDATE SET available_balance=wallets.available_balance RETURNING id`,[customer.id,asset.id])).rows[0];
-      const updated=(await client.query('UPDATE wallets SET available_balance=available_balance+$1 WHERE id=$2 RETURNING available_balance::text AS available_balance',[amount,wallet.id])).rows[0];
+      const updated=(await client.query('UPDATE wallets SET available_balance=available_balance+$1 WHERE id=$2 RETURNING available_balance::text AS available_balance',[fee.netAmount,wallet.id])).rows[0];
       const d=(await client.query(`UPDATE deposits SET status='confirmed',admin_review_status='APPROVED',reviewed_by=$2,reviewed_at=NOW(),accounting_operation_id=$1,admin_actor_identity_id=$2 WHERE id=$3 AND status IN ('pending','confirmed') RETURNING id,customer_id,asset_id,amount::text,status,external_reference,source_card_last4,source_card_provider_reference,accounting_operation_id,created_at`,[operationId,actorIdentityId,depositId])).rows[0];
       if(!d)throw new Error('deposit_not_found');
       await client.query('COMMIT');
