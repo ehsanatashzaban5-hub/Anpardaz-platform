@@ -921,24 +921,30 @@ function OnboardPin({onDone,onSkip,onBack}:{onDone:(pin:string)=>void;onSkip?:()
 }
 
 // ─── Verification Animation ───────────────────────────────────────────────────
-function VerificationAnimation({onSuccess,onFail}:{onSuccess:()=>void;onFail:()=>void}){
+function VerificationAnimation({onVerify,onFail}:{onVerify:()=>Promise<boolean>;onFail:()=>void}){
   const [phase,setPhase]=useState<"loading"|"success"|"fail">("loading");
   const [count,setCount]=useState(6);
   const [fadeOut,setFadeOut]=useState(false);
+  const [busy,setBusy]=useState(false);
 
   useEffect(()=>{
-    if(phase!=="loading")return;
+    if(phase!=="loading"||busy)return;
     if(count<=0){
-      setPhase("success");
-      setTimeout(()=>{
-        setFadeOut(true);
-        setTimeout(()=>onSuccess(),700);
-      },2000);
+      setBusy(true);
+      void onVerify().then(ok=>{
+        if(ok){
+          setPhase("success");
+          setTimeout(()=>{setFadeOut(true);setTimeout(onFail,0);},2000);
+        }else{
+          setPhase("fail");
+          setTimeout(onFail,900);
+        }
+      }).catch(()=>{setPhase("fail");setTimeout(onFail,900);});
       return;
     }
     const t=setTimeout(()=>setCount(c=>c-1),1000);
     return()=>clearTimeout(t);
-  },[count,phase]);
+  },[count,phase,busy,onVerify,onFail]);
 
   return(
     <div style={{position:"fixed",inset:0,background:"#020e18",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",opacity:fadeOut?0:1,transition:"opacity 0.7s ease"}} dir="rtl">
@@ -4572,7 +4578,7 @@ const TxDetailPage=()=>{
 };
   if(kycFlow==="photo")return <OnboardPhoto onDone={p=>{setKycPhoto(p);setKycFlow("profile")}} onBack={()=>setKycFlow(null)} initialAccepted={true}/>;
   if(kycFlow==="profile")return <OnboardProfile onDone={d=>{setKycProfile(d);setKycFlow("anim")}} onBack={()=>setKycFlow("photo")} initialData={kycProfile}/>;
-  if(kycFlow==="anim")return <VerificationAnimation onSuccess={async()=>{try{await sarrafSubmitKyc({fullName:`${kycProfile.name||user.name} ${kycProfile.family||user.family}`.trim(),nationalId:kycProfile.nationalId||user.nationalId,mobile:user.phone,birthDate:kycProfile.birthDate||user.birthDate});const kycResult=await sarrafRequest("/api/v1/kyc");const updated={...user,name:kycProfile.name||user.name,family:kycProfile.family||user.family,nationalId:kycProfile.nationalId||user.nationalId,birthDate:kycProfile.birthDate||user.birthDate,photo:kycPhoto||user.photo,kycStatus:String(kycResult?.kyc?.status??"pending"),kycDone:String(kycResult?.kyc?.status??"") === "verified"};DB.saveUser(updated);if(onUpdateUser)onUpdateUser(updated);setKycFlow(null);go(pendingKycDest);}catch{setKycFailed(true);}}} onFail={()=>setKycFailed(true)}/>;
+  if(kycFlow==="anim")return <VerificationAnimation onVerify={async()=>{try{await sarrafSubmitKyc({fullName:`${kycProfile.name||user.name} ${kycProfile.family||user.family}`.trim(),nationalId:kycProfile.nationalId||user.nationalId,mobile:user.phone,birthDate:kycProfile.birthDate||user.birthDate});const kycResult=await sarrafRequest("/api/v1/kyc");const updated={...user,name:kycProfile.name||user.name,family:kycProfile.family||user.family,nationalId:kycProfile.nationalId||user.nationalId,birthDate:kycProfile.birthDate||user.birthDate,photo:kycPhoto||user.photo,kycStatus:String(kycResult?.kyc?.status??"pending"),kycDone:String(kycResult?.kyc?.status??"") === "verified"};DB.saveUser(updated);if(onUpdateUser)onUpdateUser(updated);setKycFlow(null);go(pendingKycDest);}catch{setKycFailed(true);return false;}}} onFail={()=>setKycFailed(true)}/>;
   if(kycFailed)return <div className="anp-full-page" dir="rtl" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:24}}><div style={{width:72,height:72,borderRadius:"50%",background:"rgba(239,68,68,0.12)",display:"flex",alignItems:"center",justifyContent:"center"}}><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><div style={{fontSize:17,fontWeight:800,color:"var(--text-primary)",textAlign:"center"}}>احراز هویت ناموفق</div><div style={{fontSize:13,color:"var(--text-muted)",textAlign:"center",lineHeight:1.8,maxWidth:300}}>احراز هویت شما ناموفق بود. لطفاً مدارک خود را بررسی کرده و دوباره تلاش کنید.</div><button className="primary-button" onClick={()=>{setKycFailed(false);setKycFlow("photo");}}>تلاش مجدد</button><button className="outline-button" onClick={()=>setKycFailed(false)}>بازگشت به صرافی</button></div>;
   return <div className="subscreen exchange-shell" dir="rtl" style={{display:"flex",flexDirection:"column",height:"100dvh"}}><ExchangeTopBar/><div className="subscreen-body exchange-body" style={{flex:1,overflowY:"auto",paddingBottom:0}}>{view==='home'?<Home/>:view==='spot'?<ExchangeProTrade mode="spot" initialAsset={selectedAsset} user={user} coins={coins} onBack={()=>go('home')} onUpdate={onUpdate} onNavigate={(target,nextAsset)=>{selectCoin(nextAsset);go(target)}} onAssetChange={selectCoin} favorites={favorite} onToggleFavorite={toggleFavorite}/>:view==='margin'?<ExchangeProTrade mode="margin" initialAsset={selectedAsset} user={user} coins={coins} onBack={()=>go('home')} onUpdate={onUpdate} onNavigate={(target,nextAsset)=>{selectCoin(nextAsset);go(target)}} onAssetChange={selectCoin} favorites={favorite} onToggleFavorite={toggleFavorite}/>:view==='spot-chart'?<ExchangeChartPage asset={selectedAsset} coin={coins.find(c=>c.symbol===selectedAsset)??coins[0]} coins={coins} user={user} favorites={favorite} onToggleFavorite={toggleFavorite} onBack={()=>go('home')} onInstant={(a)=>{selectCoin(a);go('instant')}} onUpdate={onUpdate} onPairSelect={(a)=>{selectCoin(a)}}/>:view==='margin-chart'?<MarginChartPage asset={selectedAsset} coin={coins.find(c=>c.symbol===selectedAsset)??coins[0]} coins={coins} user={user} favorites={favorite} onToggleFavorite={toggleFavorite} onBack={()=>go('home')} onUpdate={onUpdate} onAssetChange={selectCoin}/>:view==='instant'?<ExchangeInstantTrade initialAsset={selectedAsset} user={user} coins={coins} onBack={()=>go('home')} onUpdate={onUpdate}/>:view==='fees'?<ExchangeFeesPage onBack={()=>go('home')}/>:view==='guide'?<ExchangeVideoGuide onBack={()=>go('home')}/>:view==='tickets'?<ExchangeSupportCenter onBack={()=>go('home')}/>:view==='chat'?<ExchangeChat onBack={()=>go('home')}/>:view==='markets'?Markets():view==='trade'?<Trade/>:view==='assets'?<Assets/>:view==='deposit'?<Deposit/>:view==='deposit-select'?<DepositSelect/>:view==='withdraw'?<WithdrawPage asset={asset} network={network} available={available} processing={processing} withdrawAddr={withdrawAddr} setWithdrawAddr={setWithdrawAddr} withdrawAmt={withdrawAmt} setWithdrawAmt={setWithdrawAmt} assetSelectEl={<AssetSelect label="نام کوین"/>} networkSelectEl={<NetworkSelect/>} onBack={()=>go("withdraw-select")} onHistory={()=>go("history")} onSubmit={handleWithdrawSubmit}/>:view==='history'?<History/>:view==='withdraw-select'?<WithdrawSelect/>:view==='toman-withdraw'?<TomanWithdrawScreen user={user} available={Number(liveWallets.TMN??0)} onBack={()=>go('withdraw-select')} onGoHome={()=>go('home')} onHistory={()=>go('history')}/>:view==='toman-deposit'?<TomanDepositPage user={user} tab={toDepositTab} setTab={setToDepositTab} onBack={()=>go('assets')}/>:view==='coin-select'?<CoinSelectPage/>:view==='network-select'?<NetworkSelectPage/>:view==='withdraw-confirm'?<WithdrawConfirmPage withdrawSummary={withdrawSummary} pendingWithdrawCb={pendingWithdrawCb} onBack={()=>go("withdraw")} onDone={()=>go("history")} onGoHome={()=>go("home")}/>:view==='tx-detail'?<TxDetailPage/>:view==='trade-type-select'?<TradeTypeSelectPage/>:view==='trade-display-select'?<TradeDisplaySelectPage/>:<Support/>}</div><ExchangeFooterNav/>{notice&&!notice.startsWith("exchange:")&&<div className="exchange-notice"><span>{notice}</span><button onClick={()=>setNotice('')} style={{border:"none",background:"transparent",color:"var(--accent)",fontFamily:"Vazirmatn",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0,padding:"4px 8px"}}>بستن</button></div>}{processing&&<AnPardazLoadingOverlay text="در حال انجام برداشت..."/>}{receipt&&createPortal(<TransactionReceipt data={receipt} onClose={()=>setReceipt(null)}/>,document.body)}</div>;
 }
@@ -4956,7 +4962,7 @@ function ProfilePage({user,onUpdate,onLogout,lightTheme,setLightTheme}:{user:Use
           {user.photo?<img src={user.photo} alt="پروفایل" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:initials}
         </div>
         <div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)"}}>{(user.name+" "+user.family).trim()||"کاربر"}</div>
-        <div style={{fontSize:12,color:"#00D6B0",display:"flex",alignItems:"center",gap:4,marginTop:4}}><Icon name="check" size={12}/>احراز هویت شده</div>
+        <div style={{fontSize:12,color:user.kycStatus==="verified"?"#00D6B0":"#f5a623",display:"flex",alignItems:"center",gap:4,marginTop:4}}><Icon name={user.kycStatus==="verified"?"check":"clock"} size={12}/>{user.kycStatus==="verified"?"احراز هویت شده":user.kycStatus==="pending"||user.kycStatus==="submitted"?"در انتظار بررسی":"احراز هویت نشده"}</div>
       </div>
       <div className="profile-menu">
         {[{icon:"user",label:"اطلاعات شخصی",action:"info"},{icon:"credit",label:"کارت‌های بانکی",action:"addcard"},{icon:"settings",label:"تنظیمات",action:"settings"},{icon:"phone",label:"پشتیبانی",action:"support"}].map((item,i)=><button key={item.label} className="profile-menu-item" style={{borderBottom:i<3?"1px solid var(--border-lighter)":"none"}} onClick={()=>setModal(item.action as any)}>
@@ -7819,7 +7825,7 @@ export default function App() {
   if(appState==="onboard-profile")return <OnboardProfile onDone={d=>{setObProfile(d);setAppState("onboard-pin")}} onBack={()=>setAppState("onboard-photo")} initialData={obProfile}/>;
   if(appState==="unlock-pin"&&user)return <PinUnlock user={user} onVerified={()=>setAppState("ready")}/>;
   if(appState==="onboard-pin")return <OnboardPin onDone={pin=>{setPendingPin(pin);setAppState("verify-anim")}} onSkip={()=>{setPendingPin("");setAppState("verify-anim")}} onBack={()=>setAppState("onboard-profile")}/>;
-  if(appState==="verify-anim")return <VerificationAnimation onSuccess={async()=>{try{await anpardazRequest("/api/v1/customer/profile",{method:"PATCH",body:JSON.stringify({phone:pendingPhone,firstName:obProfile.name,lastName:obProfile.family,nationalId:obProfile.nationalId,birthDate:obProfile.birthDate})});if(pendingPin)await userSettingsRequest("/api/v1/user/settings/pin/enable",{method:"POST",body:JSON.stringify({newPin:pendingPin})});const u:UserData={uid:_genUid(),...obProfile,phone:pendingPhone,photo:obPhoto,pinEnabled:Boolean(pendingPin),tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(u);DB.setCurrentPhone(u.phone);setUser(u);setTransactions([]);setHomeServices(SERVICES.slice(0,8).map(s=>s.id));setHomeSkeleton(false);setAppState("ready");setPendingTour(true);}catch{setAppState("onboard-profile");}}} onFail={()=>{setPendingPin("");setAppState("onboard-pin")}}/>;
+  if(appState==="verify-anim")return <VerificationAnimation onVerify={async()=>{try{await anpardazRequest("/api/v1/customer/profile",{method:"PATCH",body:JSON.stringify({phone:pendingPhone,firstName:obProfile.name,lastName:obProfile.family,nationalId:obProfile.nationalId,birthDate:obProfile.birthDate})});if(pendingPin)await userSettingsRequest("/api/v1/user/settings/pin/enable",{method:"POST",body:JSON.stringify({newPin:pendingPin})});const u:UserData={uid:_genUid(),...obProfile,phone:pendingPhone,photo:obPhoto,pinEnabled:Boolean(pendingPin),tomanBalance:0,usdtBalance:0,cryptoBalances:{},cards:[],registeredAt:new Date().toISOString()};DB.saveUser(u);DB.setCurrentPhone(u.phone);setUser(u);setTransactions([]);setHomeServices(SERVICES.slice(0,8).map(s=>s.id));setHomeSkeleton(false);setAppState("ready");setPendingTour(true);}catch{setAppState("onboard-profile");return false;}}} onFail={()=>{setPendingPin("");setAppState("onboard-pin")}}/>;
   if(!user)return null;
 
   const initials=(user.name?.[0]??"")+(user.family?.[0]??"")||"؟";
