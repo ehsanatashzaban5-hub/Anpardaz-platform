@@ -289,78 +289,44 @@ function AuthGate({ onAuth }: { onAuth:()=>void }) {
 }
 
 // ── Assets Tab ─────────────────────────────────────
-function AssetsTab({ assets, kycStatus, onDeposit, onWithdraw, onDepositCoin, onWithdrawCoin }: { assets:CryptoAsset[]; kycStatus:KycStatus; onDeposit:()=>void; onWithdraw:()=>void; onDepositCoin:()=>void; onWithdrawCoin:()=>void; }) {
-  const portfolioValue = assets.reduce((sum,a) => sum + a.price * (Math.random()*0.5), 0);
-  return (
-    <div style={{ padding:"20px 0" }}>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:24 }}>
-        {[
-          { label:"ارزش کل پورتفولیو", value:`${portfolioValue.toFixed(2)}`, icon:"wallet", color:"#0891b2" },
-          { label:"تغییر امروز", value:"+$124.50", icon:"trending-up", color:"#10b981" },
-          { label:"سود/زیان کل", value:"+$2,840", icon:"bar-chart", color:"#7c3aed" },
-        ].map(c => (
-          <div key={c.label} className="w-card" style={{ padding:"18px" }}>
-            <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-              <div style={{ width:40, height:40, borderRadius:11, background:`${c.color}15`, display:"flex", alignItems:"center", justifyContent:"center", color:c.color }}>
-                <WI n={c.icon} s={20}/>
-              </div>
-              <div>
-                <div style={{ fontSize:11, color:"var(--w-muted)" }}>{c.label}</div>
-                <div style={{ fontSize:18, fontWeight:900, marginTop:2 }}>{c.value}</div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="w-card" style={{ overflow:"hidden" }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 16px", borderBottom:"1px solid var(--w-border)" }}>
-          <div style={{ fontSize:14, fontWeight:800 }}>دارایی‌های من</div>
-          <div style={{ display:"flex", gap:8 }}>
-            <button onClick={onDeposit} className="w-btn w-btn-primary" style={{ padding:"7px 16px", fontSize:12 }}><WI n="deposit" s={13}/> واریز تومان</button>
-            <button onClick={onDepositCoin} className="w-btn w-btn-ghost" style={{ padding:"7px 16px", fontSize:12 }}><WI n="download" s={13}/> واریز رمزارز</button>
-            <button onClick={onWithdraw} className="w-btn w-btn-ghost" style={{ padding:"7px 16px", fontSize:12 }}><WI n="withdraw" s={13}/> برداشت تومان</button>
-            <button onClick={onWithdrawCoin} className="w-btn w-btn-ghost" style={{ padding:"7px 16px", fontSize:12 }}><WI n="upload" s={13}/> برداشت رمزارز</button>
-          </div>
-        </div>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-          <thead>
-            <tr style={{ background:"var(--w-card2)", fontSize:11 }}>
-              {["ارز","موجودی","ارزش (USDT)","تغییر ۲۴ه","قیمت","عملیات"].map(h=>(
-                <th key={h} style={{ padding:"10px 14px", textAlign:"right", color:"var(--w-muted)", fontWeight:600 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {assets.map(a => {
-              const bal = parseFloat((Math.random()*2).toFixed(6));
-              return (
-                <tr key={a.id} style={{ borderBottom:"1px solid var(--w-border)" }}>
-                  <td style={{ padding:"12px 14px" }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                      <div style={{ width:28, height:28, borderRadius:"50%", background:a.logoColor, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:9, fontWeight:900 }}>{a.symbol.slice(0,3)}</div>
-                      <div>
-                        <div style={{ fontWeight:700 }}>{a.symbol}</div>
-                        <div style={{ fontSize:10, color:"var(--w-muted)" }}>{a.nameFa}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{ padding:"12px 14px", fontWeight:700 }}>{bal.toFixed(4)}</td>
-                  <td style={{ padding:"12px 14px" }}>${(bal*a.price).toFixed(2)}</td>
-                  <td style={{ padding:"12px 14px" }}><span style={{ color:clr(a.change24h), fontWeight:700 }}>{a.change24h>0?"+":""}{a.change24h.toFixed(2)}%</span></td>
-                  <td style={{ padding:"12px 14px", color:"var(--w-muted)" }}>${fmtP(a.price)}</td>
-                  <td style={{ padding:"12px 14px" }}>
-                    <div style={{ display:"flex", gap:6 }}>
-                      <button className="w-btn w-btn-muted" style={{ padding:"3px 10px", fontSize:11, borderRadius:5 }}>معامله</button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDepositCoin, onWithdrawCoin }: { assets:CryptoAsset[]; wallets:any[]; kycStatus:KycStatus; onDeposit:()=>void; onWithdraw:()=>void; onDepositCoin:()=>void; onWithdrawCoin:()=>void; }) {
+  const walletMap=new Map(wallets.map((w:any)=>[String(w.symbol).toUpperCase(),Number(w.available_balance??0)+Number(w.locked_balance??0)]));
+  const portfolioValue=assets.reduce((sum,a)=>sum+(walletMap.get(a.symbol.toUpperCase())??0)*a.price,0);
+  const lockedValue=assets.reduce((sum,a)=>sum+Number(wallets.find((w:any)=>String(w.symbol).toUpperCase()===a.symbol.toUpperCase())?.locked_balance??0)*a.price,0);
+  return <div style={{padding:"20px 0"}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:24}}>
+      {[
+        {label:"ارزش کل پورتفولیو",value:portfolioValue.toFixed(2)+" USDT",icon:"wallet",color:"#0891b2"},
+        {label:"ارزش موجودی قفل‌شده",value:lockedValue.toFixed(2)+" USDT",icon:"shield",color:"#d97706"},
+        {label:"دارایی‌های دارای موجودی",value:String(wallets.filter((w:any)=>Number(w.available_balance??0)+Number(w.locked_balance??0)>0).length),icon:"bar-chart",color:"#7c3aed"}
+      ].map(x=><div key={x.label} className="w-card" style={{padding:18}}><div style={{display:"flex",gap:10,alignItems:"center"}}><div style={{width:40,height:40,borderRadius:11,background:x.color+"15",display:"flex",alignItems:"center",justifyContent:"center",color:x.color}}><WI n={x.icon} s={20}/></div><div><div style={{fontSize:11,color:"var(--w-muted)"}}>{x.label}</div><div style={{fontSize:18,fontWeight:900,marginTop:2}}>{x.value}</div></div></div></div>)}
     </div>
-  );
+    <div className="w-card" style={{overflow:"hidden"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",borderBottom:"1px solid var(--w-border)"}}>
+        <div style={{fontSize:14,fontWeight:800}}>دارایی‌های من</div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onDeposit} className="w-btn w-btn-primary" style={{padding:"7px 16px",fontSize:12}}><WI n="deposit" s={13}/> واریز تومان</button>
+          <button onClick={onDepositCoin} className="w-btn w-btn-ghost" style={{padding:"7px 16px",fontSize:12}}><WI n="download" s={13}/> واریز رمزارز</button>
+          <button onClick={onWithdraw} className="w-btn w-btn-ghost" style={{padding:"7px 16px",fontSize:12}}><WI n="withdraw" s={13}/> برداشت تومان</button>
+          <button onClick={onWithdrawCoin} className="w-btn w-btn-ghost" style={{padding:"7px 16px",fontSize:12}}><WI n="upload" s={13}/> برداشت رمزارز</button>
+        </div>
+      </div>
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+        <thead><tr style={{background:"var(--w-card2)",fontSize:11}}>{["ارز","موجودی","ارزش (USDT)","تغییر ۲۴ه","قیمت","عملیات"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"right",color:"var(--w-muted)",fontWeight:600}}>{h}</th>)}</tr></thead>
+        <tbody>{assets.map(a=>{
+          const bal=walletMap.get(a.symbol.toUpperCase())??0;
+          return <tr key={a.id} style={{borderBottom:"1px solid var(--w-border)"}}>
+            <td style={{padding:"12px 14px"}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:28,height:28,borderRadius:"50%",background:a.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:9,fontWeight:900}}>{a.symbol.slice(0,3)}</div><div><div style={{fontWeight:700}}>{a.symbol}</div><div style={{fontSize:10,color:"var(--w-muted)"}}>{a.nameFa}</div></div></div></td>
+            <td style={{padding:"12px 14px",fontWeight:700}}>{bal.toFixed(8)}</td>
+            <td style={{padding:"12px 14px"}}>{a.price>0?(bal*a.price).toFixed(2)+" USDT":"—"}</td>
+            <td style={{padding:"12px 14px"}}><span style={{color:clr(a.change24h),fontWeight:700}}>{a.change24h>0?"+":""}{a.change24h.toFixed(2)}%</span></td>
+            <td style={{padding:"12px 14px",color:"var(--w-muted)"}}>{a.price>0?"$"+fmtP(a.price):"—"}</td>
+            <td style={{padding:"12px 14px"}}><button onClick={()=>onDepositCoin()} className="w-btn w-btn-muted" style={{padding:"3px 10px",fontSize:11,borderRadius:5}}>واریز/برداشت</button></td>
+          </tr>;
+        })}</tbody>
+      </table>
+    </div>
+  </div>;
 }
 
 // ── KYC Gate ───────────────────────────────────────
@@ -618,89 +584,41 @@ function WithdrawCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatu
 }
 
 // ── Orders Tab ─────────────────────────────────────
-function OrdersTab() {
-  const [activeTab, setActiveTab] = useState<"open"|"history">("open");
-  return (
-    <div style={{ padding:"20px 0" }}>
-      <div style={{ display:"flex", gap:12, marginBottom:16 }}>
-        {(["open","history"] as const).map(t => (
-          <button key={t} onClick={()=>setActiveTab(t)} style={{ padding:"8px 20px", borderRadius:8, border:`1px solid ${activeTab===t?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:activeTab===t?"rgba(8,145,178,0.08)":"transparent", color:activeTab===t?"#0891b2":"var(--w-muted)", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"Vazirmatn" }}>
-            {t==="open"?"سفارشات باز":"تاریخچه سفارشات"}
-          </button>
-        ))}
-      </div>
-      <div className="w-card" style={{ padding:"60px", textAlign:"center", color:"var(--w-muted)" }}>
-        <WI n="document" s={40} style={{ opacity:0.2, marginBottom:12 }}/>
-        <div style={{ fontSize:14, fontWeight:700 }}>{activeTab==="open"?"سفارش باز وجود ندارد":"تاریخچه‌ای یافت نشد"}</div>
-        <div style={{ fontSize:12, marginTop:4 }}>سفارشات خود را از بخش معاملات ثبت کنید</div>
-      </div>
+function OrdersTab({orders}:{orders:any[]}) {
+  const [activeTab,setActiveTab]=useState<"open"|"history">("open");
+  const rows=activeTab==="open"?orders.filter(o=>["open","partially_filled"].includes(String(o.status))):orders;
+  return <div style={{padding:"20px 0"}}>
+    <div style={{display:"flex",gap:12,marginBottom:16}}>
+      {(["open","history"] as const).map(t=><button key={t} onClick={()=>setActiveTab(t)} className={t===activeTab?"w-btn w-btn-primary":"w-btn w-btn-ghost"} style={{padding:"8px 20px"}}>{t==="open"?"سفارشات باز":"تاریخچه سفارشات"}</button>)}
     </div>
-  );
+    <div className="w-card" style={{overflow:"auto"}}>
+      {rows.length===0?<div style={{padding:60,textAlign:"center",color:"var(--w-muted)"}}>داده‌ای برای نمایش وجود ندارد.</div>:
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr style={{background:"var(--w-card2)"}}>{["شناسه","نوع","مقدار","قیمت","وضعیت","تاریخ"].map(h=><th key={h} style={{padding:10,textAlign:"right"}}>{h}</th>)}</tr></thead><tbody>{rows.map((o:any)=><tr key={o.id} style={{borderBottom:"1px solid var(--w-border)"}}><td style={{padding:10,fontFamily:"monospace"}}>{o.id}</td><td style={{padding:10}}>{o.side==="buy"?"خرید":"فروش"} {o.order_type}</td><td style={{padding:10}}>{String(o.quantity)}</td><td style={{padding:10}}>{o.price?String(o.price):"بازار"}</td><td style={{padding:10}}>{String(o.status)}</td><td style={{padding:10,color:"var(--w-muted)"}}>{new Date(o.created_at).toLocaleString("fa-IR")}</td></tr>)}</tbody></table>}
+    </div>
+  </div>;
 }
 
-// ── Transactions Tab ───────────────────────────────
-function TransactionsTab({ onSelectTx }: { onSelectTx:(tx:any)=>void }) {
-  const [txType, setTxType] = useState("all");
-  const TXNS = [
-    { type:"خرید", amount:"+0.0321 BTC", date:"۱۴۰۳/۰۸/۲۲", status:"موفق", txid:"abc1234...9ef0", color:"#10b981" },
-    { type:"فروش", amount:"-1.5 ETH", date:"۱۴۰۳/۰۸/۲۰", status:"موفق", txid:"def5678...1ab2", color:"#f43f5e" },
-    { type:"واریز", amount:"+50,000,000 ت", date:"۱۴۰۳/۰۸/۱۸", status:"موفق", txid:"paya-00012345", color:"#0891b2" },
-    { type:"برداشت", amount:"-200 USDT", date:"۱۴۰۳/۰۸/۱۶", status:"در انتظار", txid:"trc20xyz...abc", color:"#d97706" },
-    { type:"خرید", amount:"+500 USDT", date:"۱۴۰۳/۰۸/۱۵", status:"موفق", txid:"bsc3456...7def", color:"#10b981" },
-    { type:"واریز", amount:"+0.05 BTC", date:"۱۴۰۳/۰۸/۱۲", status:"موفق", txid:"btcnet...xyz", color:"#0891b2" },
-    { type:"فروش", amount:"-100 SOL", date:"۱۴۰۳/۰۸/۱۰", status:"موفق", txid:"solana...pqr", color:"#f43f5e" },
-    { type:"برداشت", amount:"-20,000,000 ت", date:"۱۴۰۳/۰۸/۰۸", status:"موفق", txid:"card-00098765", color:"#d97706" },
-  ];
-  const filtered = txType === "all" ? TXNS : TXNS.filter(t => t.type === txType);
-  return (
-    <div style={{ padding:"20px 0" }}>
-      <div style={{ display:"flex", gap:8, marginBottom:16 }}>
-        {["all","خرید","فروش","واریز","برداشت"].map(t=>(
-          <button key={t} onClick={()=>setTxType(t)} style={{ padding:"7px 16px", borderRadius:8, border:`1px solid ${txType===t?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:txType===t?"rgba(8,145,178,0.08)":"transparent", color:txType===t?"#0891b2":"var(--w-muted)", fontWeight:700, fontSize:12, cursor:"pointer", fontFamily:"Vazirmatn" }}>
-            {t==="all"?"همه":t}
-          </button>
-        ))}
-        <button style={{ marginRight:"auto", background:"none", border:"1px solid var(--w-border)", borderRadius:8, padding:"7px 14px", fontSize:12, cursor:"pointer", color:"var(--w-muted)", fontFamily:"Vazirmatn" }}>
-          <WI n="download" s={12}/> خروجی اکسل
-        </button>
-      </div>
-      <div className="w-card" style={{ overflow:"hidden" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-          <thead>
-            <tr style={{ background:"var(--w-card2)" }}>
-              {["نوع","مقدار","تاریخ","وضعیت","شناسه","جزئیات"].map(h=>(
-                <th key={h} style={{ padding:"10px 14px", textAlign:"right", color:"var(--w-muted)", fontWeight:600, fontSize:11 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((tx,i)=>(
-              <tr key={i} style={{ borderBottom:"1px solid var(--w-border)", cursor:"pointer", transition:"background 0.1s" }}
-                onMouseEnter={e=>(e.currentTarget as HTMLTableRowElement).style.background="var(--w-hover)"}
-                onMouseLeave={e=>(e.currentTarget as HTMLTableRowElement).style.background="transparent"}
-              >
-                <td style={{ padding:"12px 14px" }}>
-                  <span style={{ padding:"3px 10px", borderRadius:6, background:`${tx.color}15`, color:tx.color, fontSize:12, fontWeight:700 }}>{tx.type}</span>
-                </td>
-                <td style={{ padding:"12px 14px", fontWeight:800, color:tx.color }}>{tx.amount}</td>
-                <td style={{ padding:"12px 14px", color:"var(--w-muted)", fontSize:12 }}>{tx.date}</td>
-                <td style={{ padding:"12px 14px" }}>
-                  <span style={{ padding:"2px 8px", borderRadius:5, background:tx.status==="موفق"?"rgba(16,185,129,0.1)":"rgba(217,119,6,0.1)", color:tx.status==="موفق"?"#10b981":"#d97706", fontSize:11, fontWeight:700 }}>{tx.status}</span>
-                </td>
-                <td style={{ padding:"12px 14px", fontSize:11, color:"var(--w-muted)", fontFamily:"monospace" }}>{tx.txid}</td>
-                <td style={{ padding:"12px 14px" }}>
-                  <button onClick={()=>onSelectTx(tx)} className="w-btn w-btn-muted" style={{ padding:"4px 12px", fontSize:11, borderRadius:6 }}>مشاهده</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+// ── Transactions Tab// ── Transactions Tab ───────────────────────────────
+function TransactionsTab({ orders, deposits, withdrawals, onSelectTx }: { orders:any[]; deposits:any[]; withdrawals:any[]; onSelectTx:(tx:any)=>void }) {
+  const [txType,setTxType]=useState("all");
+  const rows=[
+    ...orders.map((o:any)=>({type:o.side==="buy"?"خرید":"فروش",amount:String(o.quantity),date:o.created_at,status:String(o.status),txid:"order-"+o.id,color:o.side==="buy"?"#10b981":"#f43f5e",raw:o})),
+    ...deposits.map((d:any)=>({type:"واریز",amount:String(d.amount)+" "+String(d.symbol??""),date:d.created_at,status:String(d.status),txid:d.external_reference??("deposit-"+d.id),color:"#0891b2",raw:d})),
+    ...withdrawals.map((w:any)=>({type:"برداشت",amount:"-"+String(w.amount)+" "+String(w.symbol??""),date:w.created_at,status:String(w.status),txid:w.external_reference??("withdrawal-"+w.id),color:"#d97706",raw:w}))
+  ].sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
+  const filtered=txType==="all"?rows:rows.filter(x=>x.type===txType);
+  return <div style={{padding:"20px 0"}}>
+    <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+      {["all","خرید","فروش","واریز","برداشت"].map(t=><button key={t} onClick={()=>setTxType(t)} className={txType===t?"w-btn w-btn-primary":"w-btn w-btn-ghost"} style={{padding:"7px 16px",fontSize:12}}>{t==="all"?"همه":t}</button>)}
     </div>
-  );
+    <div className="w-card" style={{overflow:"auto"}}>
+      {filtered.length===0?<div style={{padding:60,textAlign:"center",color:"var(--w-muted)"}}>تراکنشی ثبت نشده است.</div>:
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"var(--w-card2)"}}>{["نوع","مقدار","تاریخ","وضعیت","شناسه","جزئیات"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"right",color:"var(--w-muted)",fontWeight:600,fontSize:11}}>{h}</th>)}</tr></thead><tbody>{filtered.map((tx:any,i:number)=><tr key={tx.txid+"-"+i} style={{borderBottom:"1px solid var(--w-border)"}}><td style={{padding:"12px 14px"}}><span style={{padding:"3px 10px",borderRadius:6,background:tx.color+"15",color:tx.color,fontSize:12,fontWeight:700}}>{tx.type}</span></td><td style={{padding:"12px 14px",fontWeight:800,color:tx.color}}>{tx.amount}</td><td style={{padding:"12px 14px",color:"var(--w-muted)",fontSize:12}}>{new Date(tx.date).toLocaleString("fa-IR")}</td><td style={{padding:"12px 14px"}}>{tx.status}</td><td style={{padding:"12px 14px",fontSize:11,color:"var(--w-muted)",fontFamily:"monospace"}}>{tx.txid}</td><td style={{padding:"12px 14px"}}><button onClick={()=>onSelectTx(tx)} className="w-btn w-btn-muted" style={{padding:"4px 12px",fontSize:11}}>مشاهده</button></td></tr>)}</tbody></table>}
+    </div>
+  </div>;
 }
 
-// ── Transaction Detail View ────────────────────────
+// ── Transaction Detail View// ── Transaction Detail View ────────────────────────
 function TxDetailView({ tx, onBack }: { tx:any; onBack:()=>void }) {
   return (
     <div style={{ padding:"24px 0", maxWidth:500 }}>
@@ -818,110 +736,18 @@ function InstantTradeTab({asset,onBack,isLoggedIn,onAuth,kycStatus}:{asset:Crypt
 }
 
 function SupportTab({ isLoggedIn, onAuth }: { isLoggedIn:boolean; onAuth:()=>void }) {
-  const [view, setView] = useState<"list"|"new"|"chat">("list");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
-  const [chatMsg, setChatMsg] = useState("");
-  const [messages, setMessages] = useState([
-    { from:"support", text:"سلام! به پشتیبانی آن صراف خوش آمدید. چطور می‌توانم کمک کنم؟", time:"۱۰:۳۰" },
-  ]);
-  const TICKETS = [
-    { id:"TK-1042", subject:"مشکل در برداشت USDT", status:"در انتظار پاسخ", date:"۱۴۰۳/۰۸/۲۲", color:"#d97706" },
-    { id:"TK-1038", subject:"سؤال درباره کارمزد", status:"پاسخ داده شده", date:"۱۴۰۳/۰۸/۱۸", color:"#10b981" },
-    { id:"TK-1025", subject:"احراز هویت رد شد", status:"بسته شده", date:"۱۴۰۳/۰۸/۱۰", color:"var(--w-muted)" },
-  ];
-  if (!isLoggedIn) return (
-    <div style={{ textAlign:"center", padding:"60px 24px" }}>
-      <WI n="comment" s={40} style={{ opacity:0.2, marginBottom:16 }}/>
-      <div style={{ fontSize:16, fontWeight:800, marginBottom:8 }}>ورود برای مشاهده تیکت‌ها</div>
-      <button onClick={onAuth} className="w-btn w-btn-primary" style={{ padding:"10px 24px", marginTop:8 }}>ورود / ثبت‌نام</button>
-    </div>
-  );
-  if (view === "chat") return (
-    <div style={{ padding:"20px 0", display:"flex", flexDirection:"column", height:"calc(100vh - var(--w-header) - 100px)" }}>
-      <button onClick={()=>setView("list")} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:16 }}>
-        <WI n="arrow-right" s={13}/> بازگشت
-      </button>
-      <div className="w-card" style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        <div style={{ padding:"14px 16px", borderBottom:"1px solid var(--w-border)", fontSize:14, fontWeight:800 }}>چت با پشتیبانی</div>
-        <div style={{ flex:1, overflowY:"auto", padding:"16px" }}>
-          {messages.map((m,i)=>(
-            <div key={i} style={{ display:"flex", gap:10, marginBottom:14, justifyContent:m.from==="user"?"flex-start":"flex-end" }}>
-              {m.from==="support" && <div style={{ width:32, height:32, borderRadius:"50%", background:"rgba(8,145,178,0.1)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, color:"#0891b2", fontSize:12, fontWeight:800 }}>پ</div>}
-              <div style={{ maxWidth:"70%", padding:"10px 14px", borderRadius:12, background:m.from==="user"?"rgba(124,58,237,0.08)":"var(--w-card2)", fontSize:13 }}>
-                {m.text}
-                <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:4, textAlign:"left" }}>{m.time}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ padding:"12px 16px", borderTop:"1px solid var(--w-border)", display:"flex", gap:8 }}>
-          <input value={chatMsg} onChange={e=>setChatMsg(e.target.value)} placeholder="پیام خود را بنویسید..." className="w-input" style={{ flex:1 }}
-            onKeyDown={e=>{if(e.key==="Enter"&&chatMsg.trim()){setMessages(p=>[...p,{from:"user",text:chatMsg.trim(),time:"اکنون"}]);setChatMsg("");setTimeout(()=>setMessages(p=>[...p,{from:"support",text:"پیام شما دریافت شد. کارشناسان ما به زودی پاسخ خواهند داد.",time:"اکنون"}]),1500);}}}
-          />
-          <button onClick={()=>{if(!chatMsg.trim())return;setMessages(p=>[...p,{from:"user",text:chatMsg.trim(),time:"اکنون"}]);setChatMsg("")}} className="w-btn w-btn-primary" style={{ padding:"10px 18px" }}><WI n="send" s={15}/></button>
-        </div>
-      </div>
-    </div>
-  );
-  if (view === "new") return (
-    <div style={{ padding:"24px 0", maxWidth:560 }}>
-      <button onClick={()=>setView("list")} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, marginBottom:20 }}>
-        <WI n="arrow-right" s={13}/> بازگشت به تیکت‌ها
-      </button>
-      <h2 style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>تیکت جدید</h2>
-      <div className="w-card" style={{ padding:"22px", display:"flex", flexDirection:"column", gap:14 }}>
-        <div>
-          <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>موضوع</label>
-          <input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع مشکل یا سؤال خود را بنویسید" className="w-input"/>
-        </div>
-        <div>
-          <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>دسته‌بندی</label>
-          <select className="w-input" style={{ appearance:"none" }}>
-            {["واریز و برداشت","معاملات","احراز هویت","امنیت","سایر"].map(c=><option key={c}>{c}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize:11, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>توضیحات</label>
-          <textarea value={body} onChange={e=>setBody(e.target.value)} placeholder="مشکل خود را با جزئیات توضیح دهید..." className="w-input" rows={5} style={{ resize:"vertical" }}/>
-        </div>
-        <button disabled={!subject||!body} onClick={()=>setView("list")} className="w-btn w-btn-primary" style={{ padding:"12px", opacity:subject&&body?1:0.5 }}>
-          ارسال تیکت
-        </button>
-      </div>
-    </div>
-  );
-  return (
-    <div style={{ padding:"20px 0" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-        <div style={{ fontSize:16, fontWeight:900 }}>تیکت‌های پشتیبانی</div>
-        <div style={{ display:"flex", gap:8 }}>
-          <button onClick={()=>setView("chat")} className="w-btn w-btn-ghost" style={{ padding:"8px 16px", fontSize:12 }}><WI n="comment" s={13}/> چت زنده</button>
-          <button onClick={()=>setView("new")} className="w-btn w-btn-primary" style={{ padding:"8px 16px", fontSize:12 }}>تیکت جدید +</button>
-        </div>
-      </div>
-      <div className="w-card" style={{ overflow:"hidden" }}>
-        {TICKETS.map((t,i) => (
-          <div key={t.id} style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderBottom:i<TICKETS.length-1?"1px solid var(--w-border)":"none", cursor:"pointer", transition:"background 0.1s" }}
-            onMouseEnter={e=>(e.currentTarget as HTMLDivElement).style.background="var(--w-hover)"}
-            onMouseLeave={e=>(e.currentTarget as HTMLDivElement).style.background="transparent"}
-          >
-            <div style={{ width:36, height:36, borderRadius:10, background:`${t.color}15`, display:"flex", alignItems:"center", justifyContent:"center", color:t.color, flexShrink:0 }}>
-              <WI n="comment" s={17}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{t.subject}</div>
-              <div style={{ fontSize:11, color:"var(--w-muted)", marginTop:2 }}>{t.id} · {t.date}</div>
-            </div>
-            <span style={{ fontSize:11, fontWeight:700, padding:"3px 10px", borderRadius:20, background:`${t.color}15`, color:t.color }}>{t.status}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  const [tickets,setTickets]=useState<any[]>([]),[selected,setSelected]=useState<any>(null),[subject,setSubject]=useState(""),[body,setBody]=useState(""),[message,setMessage]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState("");
+  const load=useCallback(async()=>{if(!isLoggedIn)return;const token=getWebToken();if(!token)return;try{const r=await fetch(PLATFORM_API_BASE+"/api/v1/support/tickets",{headers:{authorization:"Bearer "+token},cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"support_unavailable");setTickets(Array.isArray(d.tickets)?d.tickets:[]);setError("");}catch(e){setError(e instanceof Error?e.message:"support_unavailable");}},[isLoggedIn]);
+  useEffect(()=>{void load();},[load]);
+  const openTicket=async(id:number)=>{const token=getWebToken();if(!token)return;const r=await fetch(PLATFORM_API_BASE+"/api/v1/support/tickets/"+id,{headers:{authorization:"Bearer "+token}});const d=await r.json().catch(()=>({}));if(r.ok)setSelected(d);};
+  const create=async()=>{if(!subject.trim()||!body.trim())return;setBusy(true);try{const token=getWebToken();const r=await fetch(PLATFORM_API_BASE+"/api/v1/support/tickets",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({subject,message:body})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"ticket_creation_failed");setSubject("");setBody("");await load();setSelected({ticket:d.ticket,messages:[]});}catch(e){setError(e instanceof Error?e.message:"ticket_creation_failed");}finally{setBusy(false);}};
+  const send=async()=>{if(!selected?.ticket?.id||!message.trim())return;setBusy(true);try{const token=getWebToken();const r=await fetch(PLATFORM_API_BASE+"/api/v1/support/tickets/"+selected.ticket.id+"/messages",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({message})});if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d?.error??"support_message_failed");}setMessage("");await openTicket(selected.ticket.id);}catch(e){setError(e instanceof Error?e.message:"support_message_failed");}finally{setBusy(false);}};
+  if(!isLoggedIn)return <div style={{textAlign:"center",padding:60}}><WI n="comment" s={40} style={{opacity:.2,marginBottom:16}}/><div style={{fontSize:16,fontWeight:800}}>ورود برای مشاهده تیکت‌ها</div><button onClick={onAuth} className="w-btn w-btn-primary" style={{marginTop:12}}>ورود / ثبت‌نام</button></div>;
+  if(selected)return <div style={{padding:"20px 0",maxWidth:700}}><button onClick={()=>setSelected(null)} className="w-btn w-btn-ghost">بازگشت</button><div className="w-card" style={{marginTop:12,padding:18}}><div style={{fontWeight:900}}>{selected.ticket.subject}</div><div style={{fontSize:11,color:"var(--w-muted)",marginTop:4}}>{selected.ticket.status}</div><div style={{marginTop:18}}>{(selected.messages??[]).map((m:any)=><div key={m.id} style={{padding:10,marginBottom:8,borderRadius:9,background:"var(--w-card2)"}}><div>{m.message}</div><div style={{fontSize:10,color:"var(--w-muted)",marginTop:4}}>{new Date(m.created_at).toLocaleString("fa-IR")} · {m.sender_role}</div></div>)}</div>{selected.ticket.status!=="closed"&&<div style={{display:"flex",gap:8,marginTop:12}}><input value={message} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void send()}} className="w-input" placeholder="پیام خود را بنویسید..."/><button disabled={busy||!message.trim()} onClick={()=>void send()} className="w-btn w-btn-primary">ارسال</button></div>}</div></div>;
+  return <div style={{padding:"20px 0",maxWidth:700}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:16,fontWeight:900}}>تیکت‌های پشتیبانی</div><button onClick={()=>setSelected({ticket:{id:0,subject:"تیکت جدید",status:"new"},messages:[]})} className="w-btn w-btn-primary">تیکت جدید +</button></div>{error&&<div style={{color:"#dc2626",fontSize:12,marginBottom:10}}>{error}</div>}{tickets.map((t:any)=><button key={t.id} onClick={()=>void openTicket(t.id)} className="w-card" style={{width:"100%",display:"flex",justifyContent:"space-between",padding:14,marginBottom:8,textAlign:"right",border:"1px solid var(--w-border)",cursor:"pointer"}}><span><b>{t.subject}</b><div style={{fontSize:11,color:"var(--w-muted)",marginTop:4}}>{t.status} · {new Date(t.updated_at).toLocaleString("fa-IR")}</div></span><span>›</span></button>)}{tickets.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--w-muted)"}}>هنوز تیکتی ندارید.</div>}{selected?.ticket?.id===0&&<div className="w-card" style={{padding:18,marginTop:12}}><input value={subject} onChange={e=>setSubject(e.target.value)} className="w-input" placeholder="موضوع"/><textarea value={body} onChange={e=>setBody(e.target.value)} className="w-input" rows={5} style={{marginTop:8}} placeholder="شرح مشکل"/><button disabled={busy||!subject.trim()||!body.trim()} onClick={()=>void create()} className="w-btn w-btn-primary" style={{marginTop:10,width:"100%"}}>ارسال تیکت</button></div>}</div>;
 }
 
-// ── Guide Tab ──────────────────────────────────────
+// ── Guide Tab// ── Guide Tab ──────────────────────────────────────
 function GuideTab() {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(35);
