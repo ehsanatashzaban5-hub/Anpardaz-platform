@@ -18,7 +18,8 @@ const fmtIrt = (n: number) => {
   if (n >= 1_000_000)     return `${(n/1_000_000).toFixed(0)} میلیون تومان`;
   return `${n.toLocaleString("fa-IR")} تومان`;
 };
-const fmtVol = (n: number) => {\n  if (!Number.isFinite(n) || n <= 0) return "—";
+const fmtVol = (n: number) => {
+  if (!Number.isFinite(n) || n <= 0) return "—";
   if (n >= 1e12) return `$${(n/1e12).toFixed(2)}T`;
   if (n >= 1e9)  return `$${(n/1e9).toFixed(2)}B`;
   if (n >= 1e6)  return `$${(n/1e6).toFixed(2)}M`;
