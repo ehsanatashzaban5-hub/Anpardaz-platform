@@ -195,8 +195,8 @@ export class AccountingOutboxWorker{
     const raw=String(p.amount);
     if(!/^-?(?:0|[1-9]\\d{0,27})(?:\\.\\d{1,18})?$/.test(raw)||Number(raw)===0)throw new Error('invalid_forex_bot_pnl_amount');
     const bot=await this.ensureForexBotAccount(Number(p.customerId),'USDT');
-    const pnlAccount=await this.ensureForexBotPnlAccount(positive,'USDT');
     const positive=Number(raw)>0;
+    const pnlAccount=await this.ensureForexBotPnlAccount(positive,'USDT');
     const absolute=(await this.pool.query('SELECT ABS($1::numeric)::text AS amount',[raw])).rows[0].amount;
     const entries=positive
       ? [
