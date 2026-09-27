@@ -119,4 +119,28 @@ app.get('/internal/v1/ledger/holds/by-reference',guard,async(request,reply)=>{
   if(!r.rows[0])return reply.code(404).send({error:'hold_not_found'});
   return{hold:r.rows[0]};
 });
+app.post('/internal/v1/ledger/holds/:id/:action',guard,async(request,reply)=>{
+  const id=Number((request.params as {id:string}).id);
+  const action=String((request.params as {action:string}).action);
+  if(!Number.isSafeInteger(id)||id<=0||!['capture','release'].includes(action))return reply.code(400).send({error:'invalid_hold_action'});
+  const client=await pool.connect();
+  try{
+    await client.query('BEGIN');
+    const row=(await client.query<any>('SELECT * FROM ledger_holds WHERE id=$1 FOR UPDATE',[id])).rows[0];
+    if(!row) { await client.query('ROLLBACK'); return reply.code(404).send({error:'hold_not_found'}); }
+    const target=action==='capture'?'captured':'released';
+    if(row.status===target){await client.query('COMMIT');return{hold:row,idempotent:true};}
+    if(row.status!=='active') { await client.query('ROLLBACK'); return reply.code(409).send({error:'hold_not_active',status:row.status}); }
+    const updated=(await client.query<any>(
+      'UPDATE ledger_holds SET status=$1,released_at=NOW() WHERE id=$2 AND status=\'active\' RETURNING *',
+      [target,id],
+    )).rows[0];
+    await client.query('COMMIT');
+    return{hold:updated,idempotent:false};
+  }catch(e){
+    await client.query('ROLLBACK');
+    request.log.error(e,'ledger hold action failed');
+    return reply.code(400).send({error:e instanceof Error?e.message:'hold_action_failed'});
+  }finally{client.release();}
+});
 const shutdown=async()=>{await app.close();await pool.end()};process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);await app.listen({host:'0.0.0.0',port});
