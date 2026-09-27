@@ -3554,19 +3554,54 @@ function CharityPaymentScreen({data,user,onUpdate,onBack,onDone}:{data:{orgId:st
 // ─── Service Placeholder Screen ───────────────────────────────────────────────
 function ServiceScreen({name,onBack}:{name:string;onBack:()=>void}){
   return <div className="subscreen" dir="rtl">
-    <div className="subscreen-header">
-      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
-      <h2 className="subscreen-title">{name}</h2>
-      <div style={{width:36}}/>
-    </div>
-    <div className="subscreen-body" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:300}}>
-      <div style={{color:"var(--text-muted)",marginBottom:16}}><Icon name="clock" size={56}/></div>
-      <div style={{fontSize:18,fontWeight:700,color:"var(--text-muted)",marginBottom:8}}>به‌زودی</div>
-      <div style={{fontSize:13,color:"var(--text-faint)",textAlign:"center"}}>{name} در حال توسعه است.</div>
+    <div className="subscreen-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">{name}</h2><div style={{width:36}}/></div>
+    <div className="subscreen-body" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:300,textAlign:"center"}}>
+      <div style={{color:"var(--accent)",marginBottom:16}}><Icon name="shield" size={52}/></div>
+      <div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:8}}>اتصال سرویس واقعی</div>
+      <div style={{fontSize:13,color:"var(--text-muted)",lineHeight:2,maxWidth:340}}>این خدمت فقط از مسیر Backend و ارائه‌دهنده واقعی اجرا می‌شود. تا زمانی که endpoint واقعی ارائه‌دهنده در محیط Production پیکربندی نشده باشد، هیچ نتیجه یا مبلغ ساختگی نمایش داده نمی‌شود.</div>
     </div>
   </div>;
 }
 
+type AllServicesScreenProps={
+  onBack:()=>void;
+  onServiceTap:(action:string,label:string)=>void;
+  homeServices:string[];
+  setHomeServices:(v:string[])=>void;
+  homePlatforms:string[];
+  setHomePlatforms:(v:string[])=>void;
+  showCashback:boolean;
+  setShowCashback:(v:boolean)=>void;
+};
+function AllServicesScreen({onBack,onServiceTap,homeServices,setHomeServices,homePlatforms,setHomePlatforms,showCashback,setShowCashback}:AllServicesScreenProps){
+  const toggleHome=(id:string)=>setHomeServices(homeServices.includes(id)?homeServices.filter(x=>x!==id):[...homeServices,id]);
+  const togglePlatform=(id:string)=>setHomePlatforms(homePlatforms.includes(id)?homePlatforms.filter(x=>x!==id):[...homePlatforms,id]);
+  return <div className="anp-full-page" dir="rtl">
+    <div className="anp-page-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">همه خدمات</h2><div style={{width:36}}/></div>
+    <div className="anp-page-body" style={{overflowY:"auto",paddingBottom:90}}>
+      <div className="anp-card" style={{padding:16,marginBottom:14}}><div style={{fontSize:15,fontWeight:900,color:"var(--text-primary)",marginBottom:6}}>خدمات آن پرداز</div><div style={{fontSize:11,color:"var(--text-muted)",lineHeight:1.9}}>تمام خدمات از Backend واقعی اجرا می‌شوند. اگر اتصال ارائه‌دهنده برای خدمتی فعال نباشد، درخواست با وضعیت خطای واقعی برمی‌گردد و هیچ داده آزمایشی نمایش داده نمی‌شود.</div></div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+        {SERVICES.map(s=><div key={s.id} style={{position:"relative"}}>
+          <button onClick={()=>onServiceTap(s.action,s.label)} className="home-service-btn" style={{width:"100%",minHeight:92,background:s.bg,border:"1px solid var(--border-color)",borderRadius:14,padding:"14px 8px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:7,cursor:"pointer",fontFamily:"Vazirmatn"}}>
+            <span style={{color:s.color}}><ServiceIcon id={s.id} color={s.color} size={24}/></span><span className="svc-label">{s.label}</span>
+          </button>
+          <button aria-label={homeServices.includes(s.id)?"حذف از صفحه اصلی":"افزودن به صفحه اصلی"} onClick={()=>toggleHome(s.id)} style={{position:"absolute",top:7,left:7,width:24,height:24,borderRadius:"50%",border:"1px solid var(--border-color)",background:"var(--card-bg)",color:homeServices.includes(s.id)?"#00D6B0":"var(--text-muted)",cursor:"pointer",fontWeight:900}}>{homeServices.includes(s.id)?"✓":"+"}</button>
+        </div>)}
+      </div>
+      <div style={{fontSize:13,fontWeight:900,color:"var(--text-primary)",margin:"24px 0 10px"}}>پلتفرم‌ها</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+        {PLATFORMS.map(p=><div key={p.id} style={{position:"relative"}}>
+          <button onClick={()=>onServiceTap(p.action,p.label)} style={{width:"100%",minHeight:84,background:p.bg,border:"1px solid "+p.border,borderRadius:14,padding:12,cursor:"pointer",fontFamily:"Vazirmatn"}}><div style={{fontWeight:900,color:p.color}}>{p.label}</div><div style={{fontSize:10,color:"var(--text-muted)",marginTop:5}}>{p.desc}</div></button>
+          <button aria-label={homePlatforms.includes(p.id)?"حذف پلتفرم از صفحه اصلی":"افزودن پلتفرم به صفحه اصلی"} onClick={()=>togglePlatform(p.id)} style={{position:"absolute",top:7,left:7,width:24,height:24,borderRadius:"50%",border:"1px solid var(--border-color)",background:"var(--card-bg)",color:homePlatforms.includes(p.id)?"#00D6B0":"var(--text-muted)",cursor:"pointer",fontWeight:900}}>{homePlatforms.includes(p.id)?"✓":"+"}</button>
+        </div>)}
+      </div>
+      <div className="anp-card" style={{padding:14,marginTop:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+        <div><div style={{fontWeight:800,fontSize:13}}>نمایش بازگشت هزینه</div><div style={{fontSize:10,color:"var(--text-muted)",marginTop:3}}>وضعیت واقعی cashback از Backend خوانده می‌شود.</div></div>
+        <button onClick={()=>setShowCashback(!showCashback)} style={{width:50,height:28,border:0,borderRadius:15,background:showCashback?"#00D6B0":"var(--card-bg3)",cursor:"pointer",position:"relative"}}><span style={{position:"absolute",top:3,left:showCashback?25:3,width:22,height:22,borderRadius:"50%",background:"#fff"}}/></button>
+      </div>
+    </div>
+  </div>;
+}
 type SupportTicket={id:string;subject:string;category:string;priority:string;body:string;status:string;createdAt:string;updatedAt:string;unread?:boolean;messages:{from:"user"|"agent";text:string;at:string;attachment?:string}[]};
 function ExchangePopup({children,onClose,onBack}:{children:ReactNode;onClose:()=>void;onBack?:()=>void}){useBackHandler(onBack||onClose);return <div className="exchange-page-view" dir="rtl"><div className="exchange-page-view-header"><button className="exchange-page-back-btn" onClick={onBack||onClose} aria-label="بازگشت"><Icon name="arrow" size={18}/></button><img src={anPardazLogo} alt="لوگوی صرافی آن‌پرداز" style={{height:30,objectFit:"contain",borderRadius:9}}/><button className="exchange-popup-close" onClick={onClose}>بستن</button></div><div className="exchange-page-view-body">{children}</div></div>}
 function ExchangeSupportCenter({onBack}:{onBack:()=>void}){return <div className="exchange-support-page"><div className="exchange-support-head"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={18}/></button><div><b>مرکز پشتیبانی آن صراف</b><small>سرویس پشتیبانی</small></div><img src={anPardazLogo} alt="آن‌پرداز"/></div><div className="exchange-empty" style={{padding:24,textAlign:"center",lineHeight:1.9}}>سامانه تیکت هنوز به Backend پشتیبانی متصل نشده است؛ برای جلوگیری از ثبت یا نمایش اطلاعات ساختگی، این بخش فعلاً غیرفعال است.</div></div>}
