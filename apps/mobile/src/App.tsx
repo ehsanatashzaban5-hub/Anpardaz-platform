@@ -4261,88 +4261,97 @@ function MobileForexBotScreen({user,onBack}:{user:UserData;onBack:()=>void}){
   const [amount,setAmount]=useState("30");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
+
   const load=useCallback(async()=>{
     try{
       const d=await sarrafRequest("/api/v1/forex-bot");
       setState(d);
       if(d?.account?.investment_amount)setAmount(String(d.account.investment_amount));
       setError("");
-    }catch(e){setError(e instanceof Error?e.message:"دریافت وضعیت ربات ناموفق بود.");}
+    }catch(e){
+      setError(e instanceof Error?e.message:"دریافت وضعیت ربات ناموفق بود.");
+    }
   },[]);
-  useEffect(()=>{void load();const id=window.setInterval(()=>void load(),5000);return()=>window.clearInterval(id)},[load]);
+
+  useEffect(()=>{
+    void load();
+    const id=window.setInterval(()=>void load(),5000);
+    return()=>window.clearInterval(id);
+  },[load]);
+
   const request=async(action:"activate"|"deactivate")=>{
-    setBusy(true);setError("");
+    setBusy(true);
+    setError("");
     try{
-      const payload:any={action,idempotencyKey:crypto.randomUUID()};
-      if(action==="activate")payload.amount=amount;
-      await sarrafRequest("/api/v1/forex-bot/requests",{method:"POST",body:JSON.stringify(payload)});
+      await sarrafRequest("/api/v1/forex-bot/requests",{
+        method:"POST",
+        body:JSON.stringify({action,amount:action==="activate"?amount:undefined,idempotencyKey:crypto.randomUUID()})
+      });
       await load();
-    }catch(e){setError(e instanceof Error?e.message:"ثبت درخواست ناموفق بود.");}
-    finally{setBusy(false);}
+    }catch(e){
+      setError(e instanceof Error?e.message:"ثبت درخواست ناموفق بود.");
+    }finally{
+      setBusy(false);
+    }
   };
+
   const account=state?.account;
   const status=account?.status??"inactive";
   const pnl=Number(account?.total_pnl??0);
-  const events=Array.isArray(state?.pnlEvents)?state.pnlEvents.slice(-24).reverse():[];
-  const maxPnl=Math.max(1,...events.map((x:any)=>Math.abs(Number(x.amount)||0)));
-  const statusText=status==="active"?"فعال":status==="activation_pending"?"در انتظار تأیید مدیریت":status==="deactivation_pending"?"در انتظار تأیید غیرفعال‌سازی":"غیرفعال";
-  return (
-    <div className="exchange-page" dir="rtl">
-      <div className="expage-header">
-        <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
-        <h2 className="expage-title">ربات فارکس</h2>
-        <div style={{width:36}}/>
-      </div>
-      <div className="expage-body">
-        <div className="anp-card" style={{padding:18}}>
-          <div style={{fontSize:13,color:"var(--text-muted)",lineHeight:1.9}}>
-            حداکثر سرمایه اولیه هر کاربر ۳۰ USDT است. فعال‌سازی و غیرفعال‌سازی فقط پس از تأیید مدیریت انجام می‌شود.
+  const executionAvailable=state?.executionAvailable===true;
+
+  return <div className="exchange-page" dir="rtl">
+    <div className="expage-header">
+      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
+      <h2 className="expage-title">ربات فارکس</h2>
+      <div style={{width:36}}/>
+    </div>
+    <div className="expage-body">
+      <div className="anp-card" style={{padding:18}}>
+        <div style={{fontSize:13,color:"var(--text-muted)",lineHeight:1.9}}>
+          اجرای واقعی ربات فقط پس از اتصال Broker واقعی و تأیید تنظیمات Production فعال می‌شود.
+        </div>
+        {error&&<div className="field-err" style={{marginTop:10}}>{error}</div>}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:14}}>
+          <div className="anp-card" style={{padding:12}}>
+            <small>وضعیت</small>
+            <b style={{display:"block",marginTop:5}}>
+              {status==="active"?"فعال":status==="activation_pending"?"در انتظار تأیید مدیریت":status==="deactivation_pending"?"در انتظار غیرفعال‌سازی":"غیرفعال"}
+            </b>
           </div>
-          {error ? <div className="field-err" style={{marginTop:10}}>{error}</div> : null}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:14}}>
-            <div className="anp-card" style={{padding:12}}>
-              <small>وضعیت</small>
-              <b style={{display:"block",marginTop:5}}>{statusText}</b>
-            </div>
-            <div className="anp-card" style={{padding:12}}>
-              <small>P&amp;L ثبت‌شده</small>
-              <b dir="ltr" style={{display:"block",marginTop:5,color:pnl>=0?"#00D6B0":"#e85c5c"}}>{pnl.toFixed(4)} USDT</b>
-            </div>
+          <div className="anp-card" style={{padding:12}}>
+            <small>P&L ثبت‌شده</small>
+            <b dir="ltr" style={{display:"block",marginTop:5,color:pnl>=0?"#00D6B0":"#e85c5c"}}>{pnl.toFixed(4)} USDT</b>
           </div>
-          {status==="inactive" ? (
-            <div style={{marginTop:14}}>
-              <label className="exchange-field">
-                سرمایه‌گذاری USDT
-                <input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} inputMode="decimal" dir="ltr"/>
-                <em>حداکثر ۳۰ USDT</em>
-              </label>
-              <button className="primary-button" disabled={busy} onClick={()=>void request("activate")} style={{width:"100%"}}>
-                {busy ? "در حال ثبت…" : "فعال‌سازی ربات"}
-              </button>
-            </div>
-          ) : null}
-          {status==="activation_pending" ? <div className="warning-box" style={{marginTop:12}}>درخواست فعال‌سازی ثبت شده و در انتظار تأیید مدیریت است. در صورت رد، مبلغ رزروشده آزاد می‌شود.</div> : null}
-          {status==="active" ? <button className="outline-button" disabled={busy} onClick={()=>void request("deactivate")} style={{width:"100%",marginTop:12}}>{busy ? "در حال ثبت…" : "درخواست غیرفعال‌سازی"}</button> : null}
-          {status==="deactivation_pending" ? <div className="warning-box" style={{marginTop:12}}>درخواست غیرفعال‌سازی در انتظار تصمیم مدیریت است؛ تا آن زمان وضعیت فعلی حفظ می‌شود.</div> : null}
-          {events.length ? (
-            <div style={{marginTop:18}}>
-              <b>نمودار سود/زیان ثبت‌شده</b>
-              <div style={{height:150,display:"flex",alignItems:"flex-end",gap:4,border:"1px solid var(--border-faint)",borderRadius:12,padding:10,marginTop:8}}>
-                {events.map((event:any,index:number)=>{
-                  const value=Number(event.amount)||0;
-                  const height=Math.max(4,Math.min(100,Math.abs(value)/maxPnl*100));
-                  return <div key={event.id??index} title={String(event.reason??"")} style={{flex:1,maxWidth:18,height:height+"%",background:value>=0?"#00D6B0":"#e85c5c",borderRadius:4}}/>;
-                })}
-              </div>
-            </div>
-          ) : null}
-          <div style={{marginTop:12,fontSize:11,color:"var(--text-muted)",lineHeight:1.8}}>
-            وضعیت و سود/زیان فقط از Backend و گزارش‌های ثبت‌شده مدیریت خوانده می‌شود؛ هیچ مقدار پیش‌فرض یا سود ساختگی نمایش داده نمی‌شود.
-          </div>
+        </div>
+        {!executionAvailable&&<div className="warning-box" style={{marginTop:12}}>
+          Broker واقعی هنوز در محیط Production متصل نشده است؛ بنابراین فعال‌سازی و قفل‌کردن سرمایه انجام نمی‌شود.
+        </div>}
+        {status==="inactive"&&executionAvailable&&<div style={{marginTop:14}}>
+          <label className="exchange-field">
+            سرمایه‌گذاری USDT
+            <input value={toFaDigits(amount)} onChange={e=>setAmount(toLatinDigits(e.target.value).replace(/[^0-9.]/g,""))} inputMode="decimal" dir="ltr"/>
+            <em>حداکثر ۳۰ USDT</em>
+          </label>
+          <button className="primary-button" disabled={busy} onClick={()=>void request("activate")} style={{width:"100%"}}>
+            {busy?"در حال ثبت…":"فعال‌سازی ربات"}
+          </button>
+        </div>}
+        {status==="activation_pending"&&<div className="warning-box" style={{marginTop:12}}>
+          درخواست فعال‌سازی ثبت شده و در انتظار تأیید مدیریت است.
+        </div>}
+        {status==="active"&&<button className="outline-button" disabled={busy} onClick={()=>void request("deactivate")} style={{width:"100%",marginTop:12}}>
+          {busy?"در حال ثبت…":"درخواست غیرفعال‌سازی"}
+        </button>}
+        {status==="deactivation_pending"&&<div className="warning-box" style={{marginTop:12}}>
+          درخواست غیرفعال‌سازی در انتظار تصمیم مدیریت است.
+        </div>}
+        <div style={{marginTop:12,fontSize:11,color:"var(--text-muted)",lineHeight:1.8}}>
+          P&L فقط از Backend خوانده می‌شود؛ هیچ مقدار پیش‌فرض یا سود ساختگی تولید نمی‌شود.
         </div>
       </div>
     </div>
-  );
+  </div>;
 }
 
 function AssetModal({user,rate,onClose}:{user:UserData;rate:number;onClose:()=>void}){
