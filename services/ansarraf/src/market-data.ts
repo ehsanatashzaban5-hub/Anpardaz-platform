@@ -223,5 +223,37 @@ export class MarketDataService {
     });
   }
 
+  async getCandles(symbol: string, resolution: string, from: number, to: number) {
+    const normalized = symbol.toUpperCase().replace(/[-_]/g, '/');
+    const parts = normalized.split('/');
+    if (parts.length !== 2 || !/^[A-Z0-9]+$/.test(parts[0]) || !/^[A-Z0-9]+$/.test(parts[1])) {
+      throw new Error('invalid_market');
+    }
+    const providerSymbol = parts[0] + (parts[1] === 'TOMAN' ? 'TMN' : parts[1]);
+    const safeResolution = resolution || '60';
+    const url = new URL('https://api.wallex.ir/v1/udf/history');
+    url.searchParams.set('symbol', providerSymbol);
+    url.searchParams.set('resolution', safeResolution);
+    url.searchParams.set('from', String(Math.max(0, Math.floor(from))));
+    url.searchParams.set('to', String(Math.max(0, Math.floor(to))));
+    const body = await getJson(url.toString());
+    if (String(body?.s ?? '').toLowerCase() !== 'ok') throw new Error('wallex_candles_unavailable');
+    const t = Array.isArray(body?.t) ? body.t : [];
+    const o = Array.isArray(body?.o) ? body.o : [];
+    const h = Array.isArray(body?.h) ? body.h : [];
+    const l = Array.isArray(body?.l) ? body.l : [];
+    const cl = Array.isArray(body?.c) ? body.c : [];
+    const v = Array.isArray(body?.v) ? body.v : [];
+    const candles = t.map((ts: unknown, i: number) => ({
+      time: Number(ts),
+      open: String(o[i] ?? ''),
+      high: String(h[i] ?? ''),
+      low: String(l[i] ?? ''),
+      close: String(cl[i] ?? ''),
+      volume: String(v[i] ?? '0'),
+    })).filter((x: any) => Number.isFinite(x.time) && [x.open,x.high,x.low,x.close].every((v: string) => /^\d+(?:\.\d+)?$/.test(v)));
+    return { symbol: normalized, resolution: safeResolution, candles };
+  }
+
   health() { return Object.fromEntries(this.providerHealth.entries()); }
 }
