@@ -16,6 +16,26 @@ export function registerMarketRoutes(app: FastifyInstance, pool: Pool, marketDat
       ORDER BY (market_symbol IS NOT NULL) DESC,(asset_symbol IS NOT NULL) DESC,effective_from DESC,id DESC`,[operationType]);
     return {rules:r.rows};
   });
+  app.get('/api/v1/transactions/export', { preHandler: requireAuth }, async (request, reply) => {
+    const customerId = await ensureCustomer(pool, (request as AuthenticatedRequest).auth);
+    const [orders, deposits, withdrawals] = await Promise.all([
+      pool.query(`SELECT o.id,o.created_at,o.status,o.side,o.order_type,o.quantity::text AS amount,a.symbol AS asset_symbol,qa.symbol AS quote_symbol,o.operation_id
+        FROM orders o JOIN assets a ON a.id=o.base_asset_id JOIN assets qa ON qa.id=o.quote_asset_id
+        WHERE o.customer_id=$1 ORDER BY o.created_at DESC LIMIT 5000`, [customerId]),
+      pool.query(`SELECT d.id,d.created_at,d.status,d.amount::text AS amount,a.symbol AS asset_symbol,d.operation_id
+        FROM deposits d JOIN assets a ON a.id=d.asset_id WHERE d.customer_id=$1 ORDER BY d.created_at DESC LIMIT 5000`, [customerId]),
+      pool.query(`SELECT w.id,w.created_at,w.status,w.amount::text AS amount,a.symbol AS asset_symbol,w.operation_id
+        FROM withdrawals w JOIN assets a ON a.id=w.asset_id WHERE w.customer_id=$1 ORDER BY w.created_at DESC LIMIT 5000`, [customerId]),
+    ]);
+    const esc=(v:unknown)=>`"${String(v??'').replace(/"/g,'""')}"`;
+    const rows:string[]=[['نوع','شناسه','تاریخ','وضعیت','جهت','دارایی','دارایی مظنه','مبلغ','عملیات'].map(esc).join(',')];
+    for(const x of orders.rows) rows.push([esc('order'),esc(x.id),esc(x.created_at),esc(x.status),esc(x.side),esc(x.asset_symbol),esc(x.quote_symbol),esc(x.amount),esc(x.operation_id)].join(','));
+    for(const x of deposits.rows) rows.push([esc('deposit'),esc(x.id),esc(x.created_at),esc(x.status),esc(''),esc(x.asset_symbol),esc(''),esc(x.amount),esc(x.operation_id)].join(','));
+    for(const x of withdrawals.rows) rows.push([esc('withdrawal'),esc(x.id),esc(x.created_at),esc(x.status),esc(''),esc(x.asset_symbol),esc(''),esc(x.amount),esc(x.operation_id)].join(','));
+    reply.header('Content-Type','text/csv; charset=utf-8').header('Content-Disposition','attachment; filename="ansarraf-transactions.csv"');
+    return '\uFEFF'+rows.join('\n');
+  });
+
   app.get('/api/v1/assets', async () => {
     const r = await pool.query("SELECT id,symbol,name,asset_type,decimals,status FROM assets WHERE status='active' ORDER BY symbol");
     return { assets: r.rows };
