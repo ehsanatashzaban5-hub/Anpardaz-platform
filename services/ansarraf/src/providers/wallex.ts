@@ -14,6 +14,12 @@ export class WallexAdapter implements LiquidityProviderAdapter{
  async submitOrder(request:ProviderOrderRequest):Promise<ProviderOrderResult>{const body=await this.request('/v1/account/orders',{method:'POST',body:JSON.stringify({symbol:wallexSymbol(request.symbol),type:request.orderType.toUpperCase(),side:request.side.toUpperCase(),quantity:request.quantity,...(request.price?{price:request.price}:{}),client_id:request.clientOrderId})});return this.mapOrder(body,request.clientOrderId);}
  async getOrder(clientOrderId:string,_providerOrderId?:string|null):Promise<ProviderOrderResult>{return this.mapOrder(await this.request('/v1/account/orders/'+encodeURIComponent(clientOrderId)),clientOrderId);}
  async cancelOrder(clientOrderId:string,_providerOrderId?:string|null):Promise<ProviderOrderResult>{return this.mapOrder(await this.request('/v1/account/orders?clientOrderId='+encodeURIComponent(clientOrderId),{method:'DELETE'}),clientOrderId);}
+ async listDepositNetworks(asset:string){
+   const body=await this.request('/v1/account/wallets/'+encodeURIComponent(asset.toLowerCase()));
+   const x=body?.result??body?.data??body;
+   const wallets=Array.isArray(x?.wallets)?x.wallets:Object.values(x?.wallets??{});
+   return [...new Set((wallets as any[]).map((w:any)=>String(w?.network?.name??w?.network??'').trim()).filter(Boolean))];
+ }
  async getDepositAddress(asset:string,network:string){
    const body=await this.request('/v1/account/wallets/'+encodeURIComponent(asset.toLowerCase())+'?network='+encodeURIComponent(network.toLowerCase()));
    const x=body?.result??body?.data??body;
