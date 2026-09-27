@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS card_registration_sessions (
   state TEXT NOT NULL UNIQUE,
   redirect_uri TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending','verified','rejected','expired','cancelled','error')),
+    CHECK (status IN ('pending','processing','verified','rejected','expired','cancelled','error')),
   provider_reference TEXT,
   card_last4 CHAR(4),
   bank_name TEXT,
@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS card_registration_sessions (
   expires_at TIMESTAMPTZ NOT NULL,
   verified_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  callback_attempts INTEGER NOT NULL DEFAULT 0 CHECK (callback_attempts >= 0),
+  callback_received_at TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_card_registration_customer_created
