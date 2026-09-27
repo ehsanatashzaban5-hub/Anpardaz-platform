@@ -2551,9 +2551,33 @@ function InsuranceScreen({initialTab,user,onUpdate,onBack}:{initialTab:"third-pa
   const [motoColor,setMotoColor]=useState("");
   const [motoPicker,setMotoPicker]=useState<"type"|"year"|"color"|null>(null);
   const [submitted,setSubmitted]=useState(false);
-  const [showComingSoon,setShowComingSoon]=useState(false);
-  const processing=false;
-  const confirmSubmit=()=>{setShowComingSoon(true)};
+  const [submitting,setSubmitting]=useState(false);
+  const [submitError,setSubmitError]=useState("");
+  const [operationId,setOperationId]=useState("");
+  const confirmSubmit=async()=>{
+    if(insDisabled||submitting)return;
+    setSubmitting(true);setSubmitError("");setOperationId("");
+    const serviceCode=tab==="third-party"?"third_party_insurance":tab==="body"?"body_insurance":"motorcycle_insurance";
+    const payload={
+      plate:plateNum.join(""),
+      ownershipChange:ownership,
+      hasPreviousBodyInsurance:hasPrev,
+      motorcycleType:motoType,
+      motorcycleYear:motoYear,
+      motorcycleColor:motoColor,
+    };
+    try{
+      const r=await anpardazRequest("/api/v1/services/"+serviceCode,{
+        method:"POST",
+        body:JSON.stringify({idempotencyKey:crypto.randomUUID(),payload}),
+      });
+      const op=r?.operation;
+      setOperationId(String(r?.operationId??op?.operation_id??""));
+      setSubmitted(true);
+    }catch(e){
+      setSubmitError(e instanceof Error?e.message:"ثبت درخواست بیمه انجام نشد.");
+    }finally{setSubmitting(false);}
+  };
 
   const updatePlate=(i:number,v:string)=>{const p=[...plateNum];p[i]=v;setPlateNum(p)};
 
@@ -2648,24 +2672,20 @@ function InsuranceScreen({initialTab,user,onUpdate,onBack}:{initialTab:"third-pa
           <div style={{width:32,height:32,borderRadius:"50%",background:"#4a9eff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Icon name="question" size={16}/></div>
         </div>
       </>}
-      {!submitted&&<StickyActionBtn label="تایید اطلاعات" onClick={confirmSubmit} disabled={insDisabled}/>}
+      {submitError&&<div className="field-err" style={{marginTop:12,textAlign:"center"}}>{submitError}</div>}
+      {submitted&&<div className="receipt-page" dir="rtl">
+        <div className="receipt-page-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>پیگیری درخواست بیمه</h2><div style={{width:36}}/></div>
+        <div className="receipt-page-body" style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 24px",textAlign:"center"}}>
+          <div style={{width:72,height:72,borderRadius:22,background:"rgba(0,214,176,0.12)",border:"1px solid rgba(0,214,176,0.3)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:36}}>✓</div>
+          <div style={{fontSize:17,fontWeight:800,color:"var(--text-primary)",marginBottom:12}}>درخواست در Backend ثبت شد</div>
+          <div style={{fontSize:14,color:"var(--text-secondary)",lineHeight:1.8,marginBottom:12}}>وضعیت نهایی فقط پس از پاسخ Provider مشخص می‌شود. در این مرحله هیچ تأیید یا قیمت ساختگی نمایش داده نمی‌شود.</div>
+          {operationId&&<div dir="ltr" style={{fontSize:11,color:"var(--text-muted)",wordBreak:"break-all"}}>Operation: {operationId}</div>}
+          <button className="primary-button" style={{background:"#4a9eff",width:"100%",marginTop:20}} onClick={onBack}>بازگشت</button>
+        </div>
+      </div>}
+      {!submitted&&<StickyActionBtn label={submitting?"در حال ارسال…":"تایید اطلاعات"} onClick={()=>void confirmSubmit()} disabled={insDisabled||submitting}/>}
     </div>
   </div>
-  {showComingSoon&&<div className="receipt-page" dir="rtl">
-    <div className="receipt-page-header">
-      <button className="back-btn" onClick={()=>setShowComingSoon(false)}><Icon name="arrow" size={20}/></button>
-      <h2 style={{flex:1,textAlign:"center",fontSize:17,fontWeight:800}}>به‌زودی</h2>
-      <div style={{width:36}}/>
-    </div>
-    <div className="receipt-page-body" style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"40px 24px",textAlign:"center"}}>
-      <div style={{width:72,height:72,borderRadius:22,background:"linear-gradient(135deg,rgba(74,158,255,0.15),rgba(74,158,255,0.05))",border:"1px solid rgba(74,158,255,0.3)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:36}}>🛡️</div>
-      <div style={{fontSize:17,fontWeight:800,color:"var(--text-primary)",marginBottom:12}}>به‌زودی</div>
-      <div style={{fontSize:14,color:"var(--text-secondary)",lineHeight:1.8,marginBottom:24}}>
-        سرویس های مربوط به بیمه نامه ها به زودی توسط تیم فنی آن پرداز در دسترس قرار می گیرند.
-      </div>
-      <button className="primary-button" style={{background:"#4a9eff",width:"100%"}} onClick={()=>setShowComingSoon(false)}>متوجه شدم</button>
-    </div>
-  </div>}
   </>;
 }
 
