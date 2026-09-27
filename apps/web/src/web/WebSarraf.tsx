@@ -545,60 +545,55 @@ function SupportTab({ isLoggedIn, onAuth }: { isLoggedIn:boolean; onAuth:()=>voi
 
 // ── Guide Tab// ── Guide Tab ──────────────────────────────────────
 function GuideTab() {
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(35);
-  const VIDEOS = [
-    { title:"آشنایی با آن صراف", duration:"۵:۳۲", done:true },
-    { title:"نحوه واریز و برداشت", duration:"۸:۱۵", done:true },
-    { title:"معامله اسپات برای مبتدیان", duration:"۱۲:۴۰", done:false },
-    { title:"معامله تعهدی (مارجین)", duration:"۱۵:۲۲", done:false },
-    { title:"فارکس بات: تنظیمات", duration:"۹:۵۸", done:false },
-    { title:"امنیت حساب و ۲FA", duration:"۶:۱۰", done:false },
-  ];
+  const [videos,setVideos]=useState<any[]>([]);
+  const [selected,setSelected]=useState<any|null>(null);
+  const [error,setError]=useState("");
+  const API=PLATFORM_API_BASE;
+  useEffect(()=>{
+    let active=true;
+    (async()=>{
+      try{
+        const r=await fetch(API+"/api/v1/content/videos?limit=20&category=sarraf-guide",{cache:"no-store"});
+        const d=await r.json().catch(()=>({}));
+        if(!r.ok)throw new Error(d?.error??"guide_unavailable");
+        const rows=Array.isArray(d?.videos)?d.videos:[];
+        if(active){setVideos(rows);setSelected(rows[0]??null);setError("");}
+      }catch(e){if(active){setVideos([]);setSelected(null);setError(e instanceof Error?e.message:"guide_unavailable");}}
+    })();
+    return()=>{active=false};
+  },[API]);
+  const videoUrl=selected?.id?API+"/api/v1/content/videos/"+encodeURIComponent(String(selected.id)):"";
+  const duration=(n:any)=>Number.isFinite(Number(n))&&Number(n)>0?new Date(Number(n)*1000).toISOString().slice(14,19):"";
   return (
-    <div style={{ padding:"24px 0", display:"flex", gap:24, alignItems:"flex-start" }}>
-      <div style={{ flex:1 }}>
-        <div className="w-card" style={{ overflow:"hidden", marginBottom:16 }}>
-          <div style={{ height:320, background:"#0a0a12", display:"flex", alignItems:"center", justifyContent:"center", position:"relative", cursor:"pointer" }} onClick={()=>setPlaying(!playing)}>
-            <div style={{ position:"absolute", inset:0, background:"linear-gradient(135deg,rgba(8,145,178,0.15),rgba(124,58,237,0.1))" }}/>
-            {!playing ? (
-              <div style={{ width:72, height:72, borderRadius:"50%", background:"rgba(255,255,255,0.15)", backdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                <WI n="play" s={32} style={{ color:"#fff", marginRight:-4 }}/>
-              </div>
-            ) : (
-              <div style={{ display:"flex", gap:4 }}>
-                {[...Array(3)].map((_,i)=><div key={i} style={{ width:4, height:24+i*8, background:"#0891b2", borderRadius:2, animation:`pulse ${0.8+i*0.2}s ease-in-out infinite alternate` }}/>)}
-              </div>
-            )}
-            <div style={{ position:"absolute", bottom:12, right:16, fontSize:13, color:"rgba(255,255,255,0.8)", fontWeight:700 }}>معامله اسپات برای مبتدیان</div>
-          </div>
-          <div style={{ padding:"14px 16px" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
-              <span style={{ fontSize:11, color:"var(--w-muted)" }}>۳:۵۲ / ۱۲:۴۰</span>
-              <div style={{ flex:1, height:4, background:"var(--w-card2)", borderRadius:4, overflow:"hidden", cursor:"pointer" }}
-                onClick={e=>{ const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect(); setProgress(((e.clientX-r.left)/r.width)*100); }}>
-                <div style={{ height:"100%", width:`${progress}%`, background:"#0891b2", transition:"width 0.1s" }}/>
-              </div>
-              <button onClick={()=>setPlaying(!playing)} style={{ background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)" }}>
-                <WI n={playing?"pause":"play"} s={16}/>
-              </button>
+    <div style={{padding:"24px 0",display:"flex",gap:24,alignItems:"flex-start"}}>
+      <div style={{flex:1}}>
+        <div className="w-card" style={{overflow:"hidden",marginBottom:16}}>
+          {selected&&videoUrl?(
+            <video key={selected.id} src={videoUrl} controls preload="metadata" style={{width:"100%",display:"block",background:"#0a0a12",maxHeight:520}}/>
+          ):(
+            <div style={{minHeight:320,display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0a12",color:"var(--w-muted)",padding:30,textAlign:"center"}}>
+              {error?"راهنمای ویدئویی در حال حاضر در دسترس نیست.":"هنوز ویدئوی آموزشی منتشر نشده است."}
             </div>
-          </div>
+          )}
+          {selected&&<div style={{padding:"14px 16px"}}>
+            <div style={{fontSize:15,fontWeight:900}}>{selected.title}</div>
+            {selected.description&&<div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.8,marginTop:6}}>{selected.description}</div>}
+            {duration(selected.duration_seconds)&&<div style={{fontSize:10,color:"var(--w-muted)",marginTop:6}}>مدت: {duration(selected.duration_seconds)}</div>}
+          </div>}
         </div>
       </div>
-      <div style={{ width:280 }}>
-        <div style={{ fontSize:14, fontWeight:800, marginBottom:12 }}>فهرست دروس</div>
-        <div className="w-card" style={{ overflow:"hidden" }}>
-          {VIDEOS.map((v,i)=>(
-            <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", borderBottom:i<VIDEOS.length-1?"1px solid var(--w-border)":"none", cursor:"pointer", background:i===2?"rgba(8,145,178,0.06)":"transparent" }}>
-              <div style={{ width:28, height:28, borderRadius:8, background:v.done?"rgba(16,185,129,0.12)":i===2?"rgba(8,145,178,0.12)":"var(--w-card2)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, color:v.done?"#10b981":i===2?"#0891b2":"var(--w-muted)" }}>
-                {v.done ? <WI n="check" s={13}/> : <WI n="play" s={12}/>}
+      <div style={{width:280}}>
+        <div style={{fontSize:14,fontWeight:800,marginBottom:12}}>فهرست دروس</div>
+        <div className="w-card" style={{overflow:"hidden"}}>
+          {videos.length===0?<div style={{padding:20,color:"var(--w-muted)",fontSize:12,lineHeight:1.8}}>ویدئوی آموزشی واقعی برای این بخش منتشر نشده است.</div>:
+          videos.map((v:any,i:number)=>(
+            <button key={v.id} onClick={()=>setSelected(v)} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"12px 14px",border:0,borderBottom:i<videos.length-1?"1px solid var(--w-border)":"none",cursor:"pointer",background:selected?.id===v.id?"rgba(8,145,178,0.06)":"transparent",textAlign:"right",fontFamily:"Vazirmatn",color:"var(--w-text)"}}>
+              <div style={{width:28,height:28,borderRadius:8,background:"rgba(8,145,178,0.12)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:"#0891b2"}}><WI n="play" s={12}/></div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:selected?.id===v.id?700:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.title}</div>
+                {duration(v.duration_seconds)&&<div style={{fontSize:10,color:"var(--w-muted)",marginTop:1}}>{duration(v.duration_seconds)}</div>}
               </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:v.done||i===2?700:500, color:i===2?"#0891b2":"var(--w-text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.title}</div>
-                <div style={{ fontSize:10, color:"var(--w-muted)", marginTop:1 }}>{v.duration}</div>
-              </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
