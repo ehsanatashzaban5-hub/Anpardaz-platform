@@ -86,8 +86,8 @@ export function registerFeeRoutes(app: FastifyInstance, pool: Pool) {
     try{
       await client.query('BEGIN');
       const row=(await client.query('SELECT * FROM customer_fee_rules WHERE id=$1 AND service=\'ansarraf\' FOR UPDATE',[id])).rows[0];
-      if(!row)return reply.code(404).send({error:'fee_rule_not_found'});
-      if(row.effective_to)return reply.code(409).send({error:'fee_rule_already_closed'});
+      if(!row){await client.query('ROLLBACK');return reply.code(404).send({error:'fee_rule_not_found'});}
+      if(row.effective_to){await client.query('ROLLBACK');return reply.code(409).send({error:'fee_rule_already_closed'});}
       const closed=(await client.query('UPDATE customer_fee_rules SET effective_to=NOW() WHERE id=$1 RETURNING *',[id])).rows[0];
       await client.query('INSERT INTO fee_rule_audit(rule_id,action,actor_identity_id,before_data,after_data) VALUES($1,\'close\',$2,$3,$4)',[id,auth.sub,row,closed]);
       await client.query('COMMIT');
