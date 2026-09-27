@@ -1,6 +1,6 @@
 import type {FastifyInstance,FastifyRequest,FastifyReply} from 'fastify';
 import type {Pool} from 'pg';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createCipheriv,randomBytes} from 'node:crypto';
 import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
 import {FintechProvider,type FintechServiceCode,requestFingerprint} from '../fintech-provider.js';
 import {fetchServiceCatalog,serviceInquiry} from '../service-catalog-provider.js';
@@ -101,10 +101,10 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
       await client.query('BEGIN');
       const op=await client.query(
         `INSERT INTO fintech_service_operations
-          (customer_id,service_code,operation_id,idempotency_key,request_fingerprint,status,request_metadata)
-         VALUES($1,$2,$3,$4,$5,'pending',$6)
+          (customer_id,service_code,operation_id,idempotency_key,request_fingerprint,status,request_metadata,provider_payload_enc)
+         VALUES($1,$2,$3,$4,$5,'pending',$6,$7)
          RETURNING *`,
-        [customerId,serviceCode,operationId,body.idempotencyKey,fingerprint,JSON.stringify({payload:redactedPayload(body.payload)})],
+        [customerId,serviceCode,operationId,body.idempotencyKey,fingerprint,JSON.stringify({payload:redactedPayload(body.payload)}),encryptProviderPayload(body.payload)],
       );
       await client.query(
         `INSERT INTO fintech_provider_outbox(operation_id,event_type) VALUES($1,'provider.execute')`,
@@ -118,6 +118,18 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
 
 }
 
+function payloadEncryptionKey(){
+  const raw=process.env.FINTECH_PAYLOAD_ENCRYPTION_KEY_B64?.trim();
+  if(!raw)throw new Error('FINTECH_PAYLOAD_ENCRYPTION_KEY_B64_not_configured');
+  const key=Buffer.from(raw,'base64');
+  if(key.length!==32)throw new Error('FINTECH_PAYLOAD_ENCRYPTION_KEY_B64_must_be_32_bytes_base64');
+  return key;
+}
+function encryptProviderPayload(payload:Record<string,unknown>){
+  const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',payloadEncryptionKey(),iv);
+  const data=Buffer.concat([cipher.update(JSON.stringify(payload),'utf8'),cipher.final()]);
+  return [iv.toString('base64'),cipher.getAuthTag().toString('base64'),data.toString('base64')].join('.');
+}
 function redactedPayload(payload:Record<string,unknown>){
   const out:Record<string,unknown>={};
   for(const [k,v] of Object.entries(payload)){
