@@ -11,7 +11,9 @@ const amount = (v: unknown) => typeof v === 'string' && /^(?:0|[1-9]\d{0,27})(?:
 const MAX_INVESTMENT = '30';
 const executionAvailable=()=>process.env.FOREX_BOT_EXECUTION_ENABLED==='true'&&!!process.env.FOREX_BOT_EXECUTION_URL&&!!process.env.FOREX_BOT_EXECUTION_TOKEN;
 
-// Fail closed: this repository currently has no concrete Broker execution adapter.\n// An env URL alone must never make the bot appear executable or move customer funds.\nconst FOREX_EXECUTION_AVAILABLE = false;
+// Fail closed: this repository currently has no concrete Broker execution adapter.
+// An env URL alone must never make the bot appear executable or move customer funds.
+const FOREX_EXECUTION_AVAILABLE = false;
 
 
 async function botSnapshot(pool: Pool, customerId: string) {
