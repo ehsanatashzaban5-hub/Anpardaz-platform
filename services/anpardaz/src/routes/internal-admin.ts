@@ -14,7 +14,7 @@ export function registerInternalAdminRoutes(app:FastifyInstance,pool:Pool){
     const status=q.status?.trim();
     const rows=await pool.query(
       `SELECT operation_id,service_code,status,provider_code,provider_operation_id,external_reference,
-              failure_code,failure_message,created_at,updated_at,completed_at
+              failure_code,failure_message,accounting_status,created_at,updated_at,completed_at
        FROM fintech_service_operations
        WHERE ($1::text IS NULL OR status=$1)
        ORDER BY created_at DESC LIMIT $2`,
