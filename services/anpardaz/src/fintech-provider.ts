@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 
 export type FintechServiceCode =
-  | 'card_balance' | 'card_otp' | 'transfer' | 'mobile_charge' | 'internet_package' | 'bill_payment'
+  | 'card_balance' | 'transfer' | 'mobile_charge' | 'internet_package' | 'bill_payment'
   | 'charity' | 'third_party_insurance' | 'body_insurance' | 'motorcycle_insurance'
   | 'vehicle_violations' | 'freeway_toll' | 'tehran_traffic' | 'sana'
   | 'judiciary_bill' | 'property_registration' | 'cashback';
