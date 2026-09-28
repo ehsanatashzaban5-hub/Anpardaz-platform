@@ -73,7 +73,9 @@ export class AccountingOutboxWorker{
       const e=(await client.query("SELECT id,customer_id,asset_id,amount,status FROM provider_deposit_events WHERE id=$1 FOR UPDATE",[eventId])).rows[0];
       if(!e)throw new Error('crypto_deposit_event_not_found');
       if(e.status==='credited'){await client.query('COMMIT');return;}
-      if(Number(e.customer_id)!==customerId||Number(e.asset_id)!==assetId||String(e.amount)!==amount)throw new Error('crypto_deposit_event_payload_mismatch');
+      if(Number(e.customer_id)!==customerId||Number(e.asset_id)!==assetId){throw new Error('crypto_deposit_event_payload_mismatch');}
+      const amountCheck=await client.query('SELECT CASE WHEN amount=$1::numeric THEN 1 ELSE 0 END AS ok FROM provider_deposit_events WHERE id=$2',[amount,eventId]);
+      if(Number(amountCheck.rows[0]?.ok)!==1)throw new Error('crypto_deposit_event_payload_mismatch');
       await client.query('INSERT INTO wallets(customer_id,asset_id,available_balance,locked_balance) VALUES($1,$2,0,0) ON CONFLICT(customer_id,asset_id) DO NOTHING',[customerId,assetId]);
       await client.query("UPDATE wallets SET available_balance=available_balance+$1 WHERE customer_id=$2 AND asset_id=$3",[amount,customerId,assetId]);
       await client.query("UPDATE provider_deposit_events SET status='credited',credited_at=NOW(),confirmed_at=COALESCE(confirmed_at,NOW()) WHERE id=$1 AND status<>'credited'",[eventId]);
