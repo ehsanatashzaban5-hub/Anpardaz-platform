@@ -16,15 +16,15 @@ export type NewsListItem = {
 export class NewsRepository {
   constructor(private readonly pool: Pool) {}
 
-  async listPublished(limit: number, offset: number) {
+  async listPublished(limit: number, offset: number, category?: string | null) {
     const [items, count] = await Promise.all([
       this.pool.query<NewsListItem>(
         `SELECT id,title,slug,summary,published_at,category_slug,meta_title,meta_description,keywords,hashtags FROM news_articles
-         WHERE status='published' ORDER BY published_at DESC NULLS LAST,id DESC LIMIT $1 OFFSET $2`,
-        [limit, offset],
+         WHERE status='published' AND ($3::text IS NULL OR category_slug=$3) ORDER BY published_at DESC NULLS LAST,id DESC LIMIT $1 OFFSET $2`,
+        [limit, offset, category ?? null],
       ),
       this.pool.query<{ total: string }>(
-        `SELECT COUNT(*)::text AS total FROM news_articles WHERE status='published'`,
+        `SELECT COUNT(*)::text AS total FROM news_articles WHERE status='published' AND ($1::text IS NULL OR category_slug=$1)`,
       ),
     ]);
     return { items: items.rows, total: Number(count.rows[0]?.total ?? 0) };
