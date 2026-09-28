@@ -182,8 +182,8 @@ export class MarketDataService {
             const baseType = base === 'USDT' ? 'stablecoin' : 'crypto';
             const normalizedQuote = quoteAsset.toUpperCase() === 'TOMAN' ? 'TOMAN' : quoteAsset.toUpperCase();
             const quoteType = normalizedQuote === 'TOMAN' ? 'fiat' : normalizedQuote === 'USDT' ? 'stablecoin' : 'crypto';
-            await client.query(`INSERT INTO assets(symbol,name,asset_type,decimals,status) VALUES($1,$1,$2,18,'active') ON CONFLICT(symbol) DO UPDATE SET status='active'`, [base.toUpperCase(), baseType]);
-            await client.query(`INSERT INTO assets(symbol,name,asset_type,decimals,status) VALUES($1,$1,$2,18,'active') ON CONFLICT(symbol) DO UPDATE SET status='active'`, [normalizedQuote, quoteType]);
+            await client.query(`INSERT INTO assets(symbol,name,asset_type,decimals,status) VALUES($1,$1,$2,18,'active') ON CONFLICT(symbol) DO NOTHING`, [base.toUpperCase(), baseType]);
+            await client.query(`INSERT INTO assets(symbol,name,asset_type,decimals,status) VALUES($1,$1,$2,18,'active') ON CONFLICT(symbol) DO NOTHING`, [normalizedQuote, quoteType]);
           }
         }
         await client.query(`INSERT INTO market_quotes(provider,symbol,last_price,bid_price,ask_price,change_24h,volume_24h,high_24h,low_24h,fetched_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(provider,symbol) DO UPDATE SET last_price=EXCLUDED.last_price,bid_price=EXCLUDED.bid_price,ask_price=EXCLUDED.ask_price,change_24h=EXCLUDED.change_24h,volume_24h=EXCLUDED.volume_24h,high_24h=EXCLUDED.high_24h,low_24h=EXCLUDED.low_24h,fetched_at=EXCLUDED.fetched_at`, [quote.provider, quote.symbol, quote.lastPrice, quote.bidPrice, quote.askPrice, quote.change24h, quote.volume24h, quote.high24h, quote.low24h, fetchedAt]);
