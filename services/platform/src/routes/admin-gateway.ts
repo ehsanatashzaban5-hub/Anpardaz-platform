@@ -263,6 +263,22 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
+  app.get('/api/v1/admin/ecosystem/anpardaz/cashback/policies', { preHandler: requireAuth }, async (request, reply) => {
+    const req=request as any;
+    if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const internalToken=process.env.ANPARDAZ_INTERNAL_TOKEN;
+    if(!internalToken)return reply.code(503).send({error:'anpardaz_internal_token_not_configured'});
+    return reply.send(await fetchJson(anpardazBase() + '/internal/v1/admin/cashback/policies', { headers:{authorization:'Bearer '+internalToken} }));
+  });
+  app.post('/api/v1/admin/ecosystem/anpardaz/cashback/policies', { preHandler: requireAuth }, async (request, reply) => {
+    const req=request as any;
+    if (!(await hasPermission(pool, req.auth, 'operations.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const internalToken=process.env.ANPARDAZ_INTERNAL_TOKEN;
+    if(!internalToken)return reply.code(503).send({error:'anpardaz_internal_token_not_configured'});
+    const result=await fetchJson(anpardazBase() + '/internal/v1/admin/cashback/policies', { method:'POST', headers:{authorization:'Bearer '+internalToken,'content-type':'application/json'}, body:JSON.stringify(request.body??{}) });
+    return reply.code(result.status).send(result.body);
+  });
+
   // Browser-facing admin proxy for An Pardaz banking/service operations.
   const anpardazBase = () => (process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001').replace(/\/$/, '');
 
