@@ -289,7 +289,7 @@ function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDeposi
           <button onClick={onDeposit} className="w-btn w-btn-primary" style={{padding:"7px 16px",fontSize:12}}><WI n="deposit" s={13}/> واریز تومان</button>
           <button onClick={onDepositCoin} className="w-btn w-btn-ghost" style={{padding:"7px 16px",fontSize:12}}><WI n="download" s={13}/> واریز رمزارز</button>
           <button onClick={onWithdraw} className="w-btn w-btn-ghost" style={{padding:"7px 16px",fontSize:12}}><WI n="withdraw" s={13}/> برداشت تومان</button>
-          <button onClick={onWithdrawCoin} className="w-btn w-btn-ghost" style={{padding:"7px 16px",fontSize:12}}><WI n="upload" s={13}/> برداشت رمزارز</button>
+          {canWithdrawCoin ? <button onClick={onWithdrawCoin} className="w-btn w-btn-ghost" style={{padding:"7px 16px",fontSize:12}}><WI n="upload" s={13}/> برداشت رمزارز</button> : <div style={{fontSize:11,color:"#b45309",lineHeight:1.7,maxWidth:300}}>{withdrawSecurityMessage || "برداشت رمزارز فعلاً به‌دلیل کنترل امنیتی در دسترس نیست."}</div>}
         </div>
       </div>
       <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
