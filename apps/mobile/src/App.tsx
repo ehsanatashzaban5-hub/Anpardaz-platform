@@ -210,12 +210,12 @@ async function anpardazRequest(path:string,init:RequestInit={}){const token=wind
 type UserSettings={theme:"dark"|"light";notificationsEnabled:boolean;keySoundEnabled:boolean;fontScale:number;homeServices:string[];homePlatforms:string[];showCashback:boolean;pinEnabled:boolean;updatedAt:string};
 async function userSettingsRequest(path:string,init:RequestInit={}){
   const token=window.localStorage.getItem("anpardaz:accessToken")??"";
-  if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");
+  if(!AUTH_API_BASE)throw new Error("platform_api_unconfigured");
   const headers=new Headers(init.headers);
   headers.set("accept","application/json");
   if(token)headers.set("authorization",`Bearer ${token}`);
   if(init.body&&!headers.has("content-type"))headers.set("content-type","application/json");
-  const res=await fetch(`${ANPARDAZ_API_BASE}${path}`,{...init,headers,cache:"no-store"});
+  const res=await fetch(`${AUTH_API_BASE}${path}`,{...init,headers,cache:"no-store"});
   const data=await res.json().catch(()=>({}));
   if(!res.ok)throw new Error(String(data?.error??"user_settings_request_failed"));
   return data as {settings?:UserSettings;pinEnabled?:boolean};
