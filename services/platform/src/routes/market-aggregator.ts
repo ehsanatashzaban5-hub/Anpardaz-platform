@@ -36,18 +36,29 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
       WHERE ${where.join(' AND ')}
       GROUP BY p.id,c.id ORDER BY p.updated_at DESC,p.id DESC LIMIT $${lim} OFFSET $${off}`,params);
     const ids=r.rows.map((x:any)=>Number(x.id));
-    let media:any[]=[]; let offers:any[]=[];
+    let media:any[]=[]; let offers:any[]=[]; let priceHistory:any[]=[];
     if(ids.length){
-      const [m,o]=await Promise.all([
+      const [m,o,h]=await Promise.all([
         pool.query('SELECT id,product_id,url,sort_order FROM market_media WHERE product_id=ANY($1::bigint[]) ORDER BY product_id,sort_order,id',[ids]),
         pool.query(`SELECT o.id,o.product_id,o.store_id,o.price,o.currency,o.availability,o.shipping_cost,o.product_url,o.image_url,o.updated_at,s.name store_name,s.domain store_domain,s.iframe_mode FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id WHERE o.product_id=ANY($1::bigint[]) AND s.active=true ORDER BY o.product_id,o.price,o.id`,[ids]),
+        pool.query(`WITH ranked AS (
+          SELECT os.product_id,os.price,os.currency,os.captured_at,
+                 ROW_NUMBER() OVER (PARTITION BY os.product_id ORDER BY os.captured_at DESC,os.id DESC) AS rn
+          FROM market_offer_snapshots os
+          JOIN market_offers o ON o.id=os.offer_id
+          WHERE os.product_id=ANY($1::bigint[])
+        )
+        SELECT product_id,
+               json_agg(json_build_object('p',price,'currency',currency,'capturedAt',captured_at) ORDER BY captured_at) AS history
+        FROM ranked WHERE rn<=30 GROUP BY product_id`,[ids]),
       ]);
-      media=m.rows; offers=o.rows;
+      media=m.rows; offers=o.rows; priceHistory=h.rows;
     }
-    const mediaBy=new Map<number,any[]>(),offersBy=new Map<number,any[]>();
+    const mediaBy=new Map<number,any[]>(),offersBy=new Map<number,any[]>(),historyBy=new Map<number,any[]>();
     for(const m of media){const a=mediaBy.get(Number(m.product_id))??[];a.push(m);mediaBy.set(Number(m.product_id),a);}
     for(const o of offers){const a=offersBy.get(Number(o.product_id))??[];a.push(o);offersBy.set(Number(o.product_id),a);}
-    return{products:r.rows.map((x:any)=>({...x,priceMin:x.price_min,priceMax:x.price_max,storeCount:x.store_count,offerCount:x.offer_count,media:mediaBy.get(Number(x.id))??[],offers:offersBy.get(Number(x.id))??[]})),pagination:{page:p,limit:l}};
+    for(const h of priceHistory){historyBy.set(Number(h.product_id),Array.isArray(h.history)?h.history:[]);}
+    return{products:r.rows.map((x:any)=>({...x,priceMin:x.price_min,priceMax:x.price_max,storeCount:x.store_count,offerCount:x.offer_count,media:mediaBy.get(Number(x.id))??[],offers:offersBy.get(Number(x.id))??[],priceHistory:historyBy.get(Number(x.id))??[]})),pagination:{page:p,limit:l}};
   });
 
   app.get('/api/v1/market/categories',async()=>({categories:(await pool.query(`SELECT id,parent_id,slug,name,name_fa,icon,sort_order FROM market_categories WHERE active=true ORDER BY sort_order,id`)).rows}));
