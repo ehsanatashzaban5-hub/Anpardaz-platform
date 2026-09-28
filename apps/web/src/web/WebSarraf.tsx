@@ -406,6 +406,11 @@ function TransactionsTab({ orders, deposits, withdrawals, onSelectTx }: { orders
 
 // ── Transaction Detail View// ── Transaction Detail View ────────────────────────
 function TxDetailView({ tx, onBack }: { tx:any; onBack:()=>void }) {
+  const [copied,setCopied]=useState(false);
+  const copyReceipt=async()=>{
+    const text=[String(tx.type??""),String(tx.amount??""),String(tx.status??""),String(tx.txid??""),String(tx.date??"")].join(" · ");
+    try{await navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),1500);}catch{}
+  };
   return (
     <div style={{ padding:"24px 0", maxWidth:500 }}>
       <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, fontWeight:600, marginBottom:20 }}>
@@ -426,8 +431,7 @@ function TxDetailView({ tx, onBack }: { tx:any; onBack:()=>void }) {
           </div>
         ))}
         <div style={{ display:"flex", gap:8, marginTop:20 }}>
-          <button className="w-btn w-btn-ghost" style={{ flex:1, padding:"10px" }}><WI n="copy" s={14}/> کپی رسید</button>
-          <button className="w-btn w-btn-ghost" style={{ flex:1, padding:"10px" }}><WI n="download" s={14}/> دانلود PDF</button>
+          <button onClick={()=>void copyReceipt()} className="w-btn w-btn-ghost" style={{ flex:1, padding:"10px" }}><WI n="copy" s={14}/> {copied?"کپی شد":"کپی اطلاعات تراکنش"}</button>
         </div>
       </div>
     </div>
