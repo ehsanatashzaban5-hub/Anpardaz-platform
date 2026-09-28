@@ -6730,6 +6730,21 @@ export default function App() {
       localStorage.setItem("anp_theme",settings.theme);
       const root=document.getElementById("root");
       if(root)root.style.zoom=settings.fontScale===0?"":String(1+settings.fontScale*0.07);
+      // Server settings are the source of truth for persisted Home preferences.
+      // Local storage is only a UI cache and must never override the database.
+      if(Array.isArray(settings.homeServices)){
+        const cleaned=settings.homeServices.filter((id:string)=>id!=="credit-score");
+        setHomeServices(cleaned);
+        localStorage.setItem("anp_home_services_"+user.uid,JSON.stringify(cleaned));
+      }
+      if(Array.isArray(settings.homePlatforms)){
+        setHomePlatforms(settings.homePlatforms);
+        localStorage.setItem("anp_home_platforms_"+user.uid,JSON.stringify(settings.homePlatforms));
+      }
+      if(typeof settings.showCashback==="boolean"){
+        setShowCashback(settings.showCashback);
+        localStorage.setItem("anp_show_cashback_"+user.uid,String(settings.showCashback));
+      }
     }).catch(()=>{});
     return()=>{active=false};
   },[user?.uid]);
