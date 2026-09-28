@@ -26,8 +26,9 @@ export function registerSecurityAdminRoutes(app:FastifyInstance,pool:Pool){
     if(!guard(req,reply))return;
     const id=Number((req.params as any)?.id);
     const actor=String(req.headers['x-admin-identity']??'').trim();
+    const role=String(req.headers['x-admin-role']??'').trim();
     const reason=String((req.body as any)?.reason??'').trim();
-    if(!Number.isSafeInteger(id)||id<=0||!actor||actor.length>200||reason.length<3||reason.length>1000)
+    if(!['admin','super_admin'].includes(role)||!Number.isSafeInteger(id)||id<=0||!actor||actor.length>200||reason.length<3||reason.length>1000)
       return reply.code(400).send({error:'case_id_actor_and_reason_required'});
     const client=await pool.connect();
     try{
