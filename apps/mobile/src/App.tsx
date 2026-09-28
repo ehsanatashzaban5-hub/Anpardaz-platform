@@ -5325,34 +5325,35 @@ function CashbackSvcIcon({id,color}:{id:string;color:string}){
 
 // ─── Cashback Screen ──────────────────────────────────────────────────────────
 function CashbackScreen({onBack}:{onBack:()=>void}) {
+  const [summary,setSummary]=useState<{accrued:string;redeemed:string;reversed:string;manual_review:string}|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  useEffect(()=>{let active=true;(async()=>{try{
+    const token=localStorage.getItem("anpardaz:accessToken")??"";
+    const r=await fetch(ANPARDAZ_API_BASE+"/api/v1/cashback/summary",{headers:{accept:"application/json",authorization:"Bearer "+token},cache:"no-store"});
+    const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(d?.error??"cashback_unavailable"));
+    if(active)setSummary(d?.summary??null);
+  }catch(e){if(active)setError(e instanceof Error?e.message:"cashback_unavailable");}finally{if(active)setLoading(false)}})();return()=>{active=false}},[]);
+  const amount=summary?.accrued??"0";
   return <div className="subscreen" dir="rtl">
-    <div className="subscreen-header">
-      <button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button>
-      <h2 className="subscreen-title">بازگشت هزینه</h2>
-      <div style={{width:36}}/>
-    </div>
+    <div className="subscreen-header"><button className="back-btn" onClick={onBack}><Icon name="arrow" size={20}/></button><h2 className="subscreen-title">بازگشت هزینه</h2><div style={{width:36}}/></div>
     <div className="subscreen-body" style={{padding:"24px 16px 80px"}}>
-      <div className="anp-card" style={{padding:22,textAlign:"center",marginBottom:14}}>
-        <div style={{width:58,height:58,borderRadius:18,background:"rgba(0,214,176,.08)",border:"1px solid rgba(0,214,176,.18)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}>
-          <Icon name="refresh" size={28} stroke={1.8}/>
-        </div>
-        <div style={{fontSize:17,fontWeight:900,color:"var(--text-primary)",marginBottom:8}}>بازگشت هزینه در حال اتصال به حسابداری</div>
-        <div style={{fontSize:12,color:"var(--text-muted)",lineHeight:2}}>
-          مبلغ، نرخ، وضعیت و برداشت بازگشت هزینه فقط باید از ledger و سیاست فعال backend خوانده شود.
-          تا زمانی که این زیرساخت فعال نشده، هیچ درصد، موجودی، مبلغ قابل برداشت یا وضعیت موفق ساختگی نمایش داده نمی‌شود.
-        </div>
-      </div>
-      <div className="anp-card" style={{padding:18}}>
-        <div style={{fontSize:13,fontWeight:800,marginBottom:8}}>وضعیت فعلی</div>
-        <div style={{fontSize:12,color:"var(--text-muted)",lineHeight:1.9}}>
-          سرویس واقعی cashback/reward و تسویه آن به کارت بانکی هنوز در backend تعریف و به accounting متصل نشده است.
-          بنابراین برداشت نیز غیرفعال است و پس از اتصال ledger و سرویس پرداخت فعال خواهد شد.
-        </div>
-      </div>
+      {loading?<div className="anp-card" style={{padding:24,textAlign:"center",color:"var(--text-muted)"}}>در حال دریافت موجودی واقعی بازگشت هزینه…</div>:
+       error?<div className="anp-card" style={{padding:18,textAlign:"center",color:"var(--text-muted)"}}>اطلاعات بازگشت هزینه در دسترس نیست. اتصال سرور را بررسی کنید.</div>:
+       <div className="anp-card" style={{padding:22,textAlign:"center",marginBottom:14}}>
+         <div style={{width:58,height:58,borderRadius:18,background:"rgba(0,214,176,.08)",border:"1px solid rgba(0,214,176,.18)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 14px"}}><Icon name="refresh" size={28} stroke={1.8}/></div>
+         <div style={{fontSize:13,color:"var(--text-muted)",marginBottom:8}}>موجودی قابل ثبت‌شده</div>
+         <div style={{fontSize:28,fontWeight:900,color:"var(--text-primary)"}}>{fa(Number(amount))} <span style={{fontSize:12}}>ریال</span></div>
+         <div style={{fontSize:11,color:"var(--text-muted)",marginTop:10,lineHeight:1.8}}>این مبلغ فقط از rewardهای ثبت‌شده و تسویه‌شده در Backend و Accounting محاسبه می‌شود.</div>
+       </div>}
+      {!loading&&!error&&<div className="anp-card" style={{padding:18}}>
+        <div style={{fontSize:13,fontWeight:800,marginBottom:10}}>وضعیت</div>
+        <div style={{fontSize:12,color:"var(--text-muted)",lineHeight:2}}>پاداش‌ها پس از تکمیل واقعی عملیات و اعمال سیاست فعال Cashback ثبت می‌شوند. اگر سیاستی برای یک خدمت فعال نباشد، هیچ مبلغ ساختگی ایجاد نمی‌شود.</div>
+        {summary?.manual_review&&Number(summary.manual_review)>0&&<div style={{marginTop:10,fontSize:11,color:"#f59e0b"}}>بخشی از پاداش‌ها در انتظار بررسی حسابداری است.</div>}
+      </div>}
     </div>
   </div>;
 }
-
 function buildHomeTourSteps(homeServices:string[],homePlatforms?:string[]){
   const steps:{q:string;title:string;text:string}[]=[
     {q:"[data-help-id='brand']",title:"آن‌پرداز",text:"به صفحه اصلی آن‌پرداز خوش آمدید. از اینجا می‌توانید به تمام خدمات مالی دسترسی داشته باشید."},
