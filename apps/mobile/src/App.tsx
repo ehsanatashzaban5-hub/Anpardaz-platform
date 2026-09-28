@@ -4098,7 +4098,7 @@ const TxDetailPage=()=>{
 
 function MobileForexBotScreen({user,onBack}:{user:UserData;onBack:()=>void}){
   const [state,setState]=useState<any>(null);
-  const [amount,setAmount]=useState("30");
+  const [amount,setAmount]=useState("");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
 
