@@ -110,7 +110,7 @@ jobs:
           if [ "${{ matrix.name }}" = "mobile" ]; then
             pnpm install --no-frozen-lockfile --ignore-workspace
           elif [ "${{ matrix.name }}" = "web" ]; then
-            pnpm install --frozen-lockfile --ignore-workspace
+            pnpm install --no-frozen-lockfile --ignore-workspace
           elif [ -f pnpm-lock.yaml ]; then
             pnpm install --frozen-lockfile
           else
