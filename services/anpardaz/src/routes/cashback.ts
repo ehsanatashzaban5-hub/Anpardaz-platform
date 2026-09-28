@@ -38,7 +38,7 @@ async function accountingPost(pool:Pool,customerId:number,operationId:string,rew
   return String((data as any)?.transaction?.transaction_uuid??(data as any)?.transaction?.id??operationId);
 }
 
-async function accrue(pool:Pool,customerId:number,operationId:string,serviceCode:string,baseAmount:string,currency='IRR'){
+export async function accrue(pool:Pool,customerId:number,operationId:string,serviceCode:string,baseAmount:string,currency='IRR'){
   if(!money.test(baseAmount)||baseAmount==='0')return null;
   const policy=(await pool.query(
     `SELECT rate_bps FROM cashback_policies
