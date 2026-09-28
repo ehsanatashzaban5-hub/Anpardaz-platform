@@ -5430,6 +5430,30 @@ const HELP_GUIDES:HGuide[]=[
   ]},
 ];
 
+
+type AnProduct = {
+  id: string;
+  title: string;
+  brand: string;
+  catId: string;
+  subId: string;
+  img: string;
+  specs: Record<string, unknown>;
+  priceMin: number;
+  priceMax: number;
+  storeCount: number;
+  desc: string;
+  tags: string[];
+  rating: number;
+  reviews: number;
+  ph: Array<{p:number}>;
+  media: string[];
+};
+
+// Product data is server-owned. It starts empty and is populated only by the
+// live An Market catalog API; there is intentionally no demo/mock fallback.
+let MARKET_PRODUCTS: AnProduct[] = [];
+
 function AnMarketHome({onProduct,onCat,onGoCats,onSearch,compareMode,compareSelected,onCompareToggle,onBack}:{
   onProduct:(pid:string)=>void;onCat:(cid:string)=>void;onGoCats:()=>void;onSearch:(q:string)=>void;
   compareMode?:boolean;compareSelected?:string[];onCompareToggle?:(pid:string)=>void;onBack?:()=>void;
