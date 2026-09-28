@@ -73,6 +73,15 @@ export function registerForumRoutes(app: FastifyInstance, pool: Pool) {
       }
 
       const userId = await ensurePlatformUser(pool, auth);
+      if (body.categoryId !== undefined) {
+        const category = await pool.query(
+          "SELECT id FROM forum_categories WHERE id=$1 AND status='open' LIMIT 1",
+          [body.categoryId],
+        );
+        if (!category.rows[0]) {
+          return reply.code(400).send({ error: 'forum_category_not_available' });
+        }
+      }
       const result = await pool.query(
         'INSERT INTO forum_threads(user_id,category_id,title) VALUES($1,$2,$3) RETURNING *',
         [userId, body.categoryId ?? null, body.title.trim()],
