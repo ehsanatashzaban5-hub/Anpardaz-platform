@@ -148,6 +148,10 @@ export class FintechServiceWorker{
                }
              }
            }catch{status='manual_review';accountingStatus='failed';}
+           if(status==='completed'&&accountingStatus==='posted'){
+             try{await accrueCashback(this.pool,Number(op.customer_id),op.operation_id,op.service_code,amount,'IRR');}
+             catch(error){await this.pool.query("UPDATE fintech_service_operations SET response_metadata=response_metadata||$1::jsonb,updated_at=NOW() WHERE operation_id=$2",[JSON.stringify({cashbackError:error instanceof Error?error.message:'cashback_accrual_failed'}),op.operation_id]).catch(()=>{});}
+           }
          }
        }else if(status==='failed'){
          accountingStatus='failed';
