@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import {createDecipheriv} from 'node:crypto';
 import { FintechProvider } from './fintech-provider.js';
+import {accrue as accrueCashback} from './routes/cashback.js';
 
 async function ledgerAccount(base:string,token:string,code:string,name:string,type:'asset'|'liability',currency:string){
   const headers={authorization:'Bearer '+token};
