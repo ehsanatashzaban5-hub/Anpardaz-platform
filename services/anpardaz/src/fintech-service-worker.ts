@@ -75,6 +75,21 @@ export class FintechServiceWorker{
     try{
       const op=(await this.pool.query('SELECT * FROM fintech_service_operations WHERE operation_id=$1',[row.operation_id])).rows[0];
       if(!op){await this.fail(row.id,'operation_not_found');return true;}
+      if(op.provider_operation_id && op.accounting_status==='posted' && op.status==='processing'){
+        try{
+          await accountingHoldAction(op.operation_id,'capture');
+          await this.pool.query("UPDATE fintech_service_operations SET status='completed',completed_at=COALESCE(completed_at,NOW()),updated_at=NOW() WHERE operation_id=$1",[op.operation_id]);
+          await this.pool.query("UPDATE fintech_provider_outbox SET status='completed',last_error=NULL,updated_at=NOW() WHERE id=$1",[row.id]);
+        }catch(e){
+          await this.pool.query("UPDATE fintech_provider_outbox SET status='processing',next_attempt_at=NOW()+INTERVAL '30 seconds',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,e instanceof Error?e.message:'accounting_hold_capture_failed']);
+        }
+        return true;
+      }
+      if(op.provider_operation_id && op.status==='processing' && op.accounting_status!=='posted'){
+        await this.pool.query("UPDATE fintech_service_operations SET status='manual_review',failure_code='PROVIDER_OPERATION_REQUIRES_RECONCILIATION',failure_message='Provider operation already exists; automatic re-execution is disabled without a provider status endpoint',updated_at=NOW() WHERE operation_id=$1",[op.operation_id]);
+        await this.pool.query("UPDATE fintech_provider_outbox SET status='manual_review',last_error='provider_operation_requires_reconciliation_without_safe_status_poll',updated_at=NOW() WHERE id=$1",[row.id]);
+        return true;
+      }
       const provider=new FintechProvider();
       if(!op.provider_payload_enc){
         await this.pool.query("UPDATE fintech_service_operations SET status='manual_review',accounting_status='failed',failure_code='LEGACY_PAYLOAD_REQUIRES_REVIEW',failure_message='Provider payload was created before encrypted payload storage was enabled',updated_at=NOW() WHERE operation_id=$1",[op.operation_id]);
@@ -99,7 +114,15 @@ export class FintechServiceWorker{
            try{
              await postAccounting(String(op.customer_id),op.operation_id,amount,'IRR');
              accountingStatus='posted';
-             if(held)await accountingHoldAction(op.operation_id,'capture');
+             if(held){
+               try{await accountingHoldAction(op.operation_id,'capture');}
+               catch(e){
+                 await this.pool.query("UPDATE fintech_service_operations SET status='processing',accounting_status='posted',provider_operation_id=COALESCE($1,provider_operation_id),external_reference=COALESCE($2,external_reference),failure_code='ACCOUNTING_HOLD_CAPTURE_RETRY',failure_message=$3,response_metadata=$4,updated_at=NOW() WHERE operation_id=$5",
+                   [result.providerOperationId??null,result.externalReference??null,e instanceof Error?e.message:'accounting_hold_capture_failed',JSON.stringify(result.data??{}),op.operation_id]);
+                 await this.pool.query("UPDATE fintech_provider_outbox SET status='processing',next_attempt_at=NOW()+INTERVAL '30 seconds',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,e instanceof Error?e.message:'accounting_hold_capture_failed']);
+                 return true;
+               }
+             }
            }catch{status='manual_review';accountingStatus='failed';}
          }
        }else if(status==='failed'){
