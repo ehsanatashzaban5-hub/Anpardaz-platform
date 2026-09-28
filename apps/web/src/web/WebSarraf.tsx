@@ -459,34 +459,38 @@ function FeesTab() {
   </div>;
 }
 function SecurityTab() {
+  const [kyc,setKyc]=useState<string>("loading");
+  useEffect(()=>{
+    let active=true;
+    const token=getWebToken();
+    if(!token){setKyc("unauthenticated");return;}
+    fetch(ANSARRAF_API_BASE+"/api/v1/kyc",{headers:{authorization:"Bearer "+token,accept:"application/json"},cache:"no-store"})
+      .then(r=>r.ok?r.json():Promise.reject(new Error("kyc_status_unavailable")))
+      .then(d=>{if(active)setKyc(String(d?.kyc?.status??"unverified"));})
+      .catch(()=>{if(active)setKyc("unavailable")});
+    return()=>{active=false};
+  },[]);
+  const label=kyc==="verified"?"تأییدشده":kyc==="pending"?"در انتظار بررسی":kyc==="rejected"?"ردشده":kyc==="unverified"?"تأیید نشده":kyc==="loading"?"در حال دریافت…":"در دسترس نیست";
   return (
-    <div style={{ padding:"24px 0", maxWidth:580 }}>
-      <div style={{ fontSize:18, fontWeight:900, marginBottom:20 }}>امنیت حساب</div>
-      {[
-        { title:"تأیید دو مرحله‌ای (۲FA)", desc:"با Google Authenticator یا پیامک امنیت حساب را بالا ببرید", status:"فعال نشده", color:"#f43f5e", icon:"shield" },
-        { title:"ضد فیشینگ", desc:"یک کد شخصی انتخاب کنید که در همه ایمیل‌های آن صراف نمایش داده شود", status:"تنظیم نشده", color:"#d97706", icon:"lock" },
-        { title:"مدیریت دستگاه‌ها", desc:"مشاهده و مدیریت دستگاه‌هایی که وارد حساب شما شده‌اند", status:"۱ دستگاه", color:"#059669", icon:"device" },
-      ].map(item => (
-        <div key={item.title} className="w-card" style={{ padding:"18px", marginBottom:12 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <div style={{ width:40, height:40, borderRadius:11, background:`${item.color}15`, display:"flex", alignItems:"center", justifyContent:"center", color:item.color }}>
-              <WI n={item.icon} s={20}/>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{item.title}</div>
-              <div style={{ fontSize:11, color:"var(--w-muted)", marginTop:2 }}>{item.desc}</div>
-            </div>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <span style={{ fontSize:11, color:item.color, fontWeight:700 }}>{item.status}</span>
-              <button className="w-btn w-btn-ghost" style={{ padding:"6px 14px", fontSize:12 }}>تنظیم</button>
-            </div>
-          </div>
+    <div style={{padding:"24px 0",maxWidth:650}}>
+      <div style={{fontSize:18,fontWeight:900,marginBottom:8}}>امنیت حساب</div>
+      <div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.8,marginBottom:18}}>
+        این بخش فقط وضعیت‌هایی را نمایش می‌دهد که Backend آن صراف واقعاً ارائه می‌کند؛ هیچ وضعیت امنیتی ساختگی یا «فعال» فرضی نمایش داده نمی‌شود.
+      </div>
+      <div className="w-card" style={{padding:18,marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:800}}>وضعیت احراز هویت</div>
+        <div style={{marginTop:8,fontSize:13,color:kyc==="verified"?"#059669":kyc==="rejected"?"#dc2626":"var(--w-muted)"}}>{label}</div>
+      </div>
+      <div className="w-card" style={{padding:18}}>
+        <div style={{fontSize:13,fontWeight:800,marginBottom:8}}>کنترل‌های امنیتی حساب</div>
+        <div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>
+          ۲FA مستقل، کد ضد‌فیشینگ و مدیریت دستگاه‌های آن صراف هنوز Backend اجرایی اختصاصی ندارند؛ بنابراین کنترل نمایشی یا وضعیت جعلی برای آن‌ها ارائه نمی‌شود.
+          این قابلیت‌ها در ممیزی امنیتی جداگانه باید با احراز هویت، ذخیره‌سازی امن و lifecycle واقعی پیاده‌سازی شوند.
         </div>
-      ))}
+      </div>
     </div>
   );
 }
-
 // ── Trade Select Tab ───────────────────────────────
 
 function TradeSelectTab({asset,onInstant,onSpot,onMargin,isLoggedIn,onAuth}:{asset:CryptoAsset;onInstant:()=>void;onSpot:()=>void;onMargin:()=>void;isLoggedIn:boolean;onAuth:()=>void}) {
