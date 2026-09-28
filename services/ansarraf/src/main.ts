@@ -56,7 +56,10 @@ app.addHook('onSend',async(_request,reply)=>{
   reply.header('X-Content-Type-Options','nosniff');
   reply.header('Referrer-Policy','strict-origin-when-cross-origin');
   reply.header('X-Frame-Options','DENY');
+  reply.header('X-DNS-Prefetch-Control','off');
+  reply.header('Permissions-Policy','camera=(),microphone=(),geolocation=()');
   reply.header('Cache-Control','no-store');
+  if(isProduction)reply.header('Strict-Transport-Security','max-age=31536000; includeSubDomains');
 });
 app.get('/health',async()=>({service:'ansarraf',status:'ok'}));
 app.addHook('onRequest',async(request,reply)=>{if(request.url.startsWith('/api/v1/'))await requireIranIpInProduction(request,reply);});
