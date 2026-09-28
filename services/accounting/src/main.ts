@@ -98,8 +98,8 @@ app.post('/internal/v1/ledger/holds',guard,async(request,reply)=>{
       WHERE a.id=$1
       GROUP BY a.id`,[b.accountId])).rows[0];
     const heldRow=(await client.query<{held:string}>(`SELECT COALESCE(SUM(amount),0)::text AS held FROM ledger_holds WHERE ledger_account_id=$1 AND currency=$2 AND status='active'`,[b.accountId,b.currency])).rows[0];
-    const balance=Number(balanceRow?.balance??0),held=Number(heldRow?.held??0),amount=Number(b.amount);
-    if(!Number.isFinite(balance)||!Number.isFinite(held)||!Number.isFinite(amount)||balance-held<amount)throw new Error('insufficient_available_balance');
+    const balance=decimal18(balanceRow?.balance??'0'),held=decimal18(heldRow?.held??'0'),amount=decimal18(b.amount);
+    if(balance-held<amount)throw new Error('insufficient_available_balance');
     const created=await client.query('INSERT INTO ledger_holds(ledger_account_id,reference_type,reference_id,amount,currency) VALUES($1,$2,$3,$4,$5) RETURNING *',[b.accountId,b.referenceType,b.referenceId,b.amount,b.currency]);
     await client.query('COMMIT');return{hold:created.rows[0],idempotent:false};
   }catch(e:any){
