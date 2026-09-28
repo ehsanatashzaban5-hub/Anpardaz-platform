@@ -63,9 +63,27 @@ export function verifyIdentityToken(t: string): Claims | null {
 
 export async function requireAuth(req: FastifyRequest, reply: FastifyReply) {
   const h = req.headers.authorization;
-  const c = h?.startsWith('Bearer ') ? verifyIdentityToken(h.slice(7)) : null;
+  const token = h?.startsWith('Bearer ') ? h.slice(7) : '';
+  const c = token ? verifyIdentityToken(token) : null;
   if (!c) return reply.code(401).send({ error: 'unauthorized' });
-  (req as FastifyRequest & { auth: Claims }).auth = c;
+  try {
+    const upstream = await fetch(identityUrl() + '/api/v1/auth/me', {
+      headers: { authorization: 'Bearer ' + token, accept: 'application/json' },
+      signal: AbortSignal.timeout(4000),
+      cache: 'no-store',
+    });
+    if (!upstream.ok) return reply.code(upstream.status === 401 || upstream.status === 403 ? 401 : 503)
+      .send({ error: upstream.status === 401 || upstream.status === 403 ? 'unauthorized' : 'identity_service_unavailable' });
+    const data = await upstream.json().catch(() => null) as any;
+    const u = data?.user;
+    if (!u || u.status !== 'active' || String(u.identity_id ?? '') !== c.sub) return reply.code(401).send({ error: 'unauthorized' });
+    if (typeof u.role === 'string') c.role = u.role;
+    if (typeof u.email === 'string') c.email = u.email;
+    (req as FastifyRequest & { auth: Claims }).auth = c;
+  } catch (error) {
+    req.log.warn({ error }, 'identity revalidation failed');
+    return reply.code(503).send({ error: 'identity_service_unavailable' });
+  }
 }
 
 export async function ensureCustomer(pool: Pool, auth: Claims) {
