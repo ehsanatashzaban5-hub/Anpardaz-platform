@@ -34,6 +34,20 @@ async function postServiceAccounting(customerId:number,operationId:string,amount
   if(!r.ok)throw new Error('accounting_post_failed');
 }
 
+function serviceEndpointConfigured(serviceCode:string){
+  const raw=process.env.FINTECH_ENDPOINTS_JSON?.trim();
+  if(!raw)return false;
+  try{
+    const map=JSON.parse(raw) as Record<string,unknown>;
+    return typeof map[serviceCode]==='string'&&String(map[serviceCode]).trim().length>0;
+  }catch{return false;}
+}
+function requireServiceEndpoint(serviceCode:string,reply:FastifyReply){
+  if(serviceEndpointConfigured(serviceCode))return true;
+  void reply.code(503).send({error:'service_not_configured',serviceCode});
+  return false;
+}
+
 function providerOr503(reply:FastifyReply) {
   try { return new FintechProvider(); }
   catch { void reply.code(503).send({error:'fintech_provider_not_configured'}); return null; }
@@ -57,6 +71,7 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
   app.post('/api/v1/services/:serviceCode/inquiry',{preHandler:requireAuth},async(req,reply)=>{
     const serviceCode=String((req.params as any)?.serviceCode??'').trim() as FintechServiceCode;
     if(!allowed.has(serviceCode))return reply.code(400).send({error:'unsupported_service'});
+    if(!requireServiceEndpoint(serviceCode,reply))return;
     const body=(req.body??{}) as Record<string,unknown>;
     if(!Object.keys(body).length)return reply.code(400).send({error:'invalid_inquiry'});
     try{return {inquiry:await serviceInquiry(serviceCode,body),source:'provider'};}catch(error){req.log.warn({error,serviceCode},'service inquiry unavailable');return reply.code(503).send({error:'service_inquiry_unavailable'});}
@@ -84,6 +99,7 @@ export function registerServiceRoutes(app:FastifyInstance,pool:Pool){
     const customerId=await ensureCustomer(pool,asR(req).auth);
     const serviceCode=String((req.params as {serviceCode:string}).serviceCode) as FintechServiceCode;
     if(!allowed.has(serviceCode))return reply.code(400).send({error:'unsupported_service'});
+    if(!requireServiceEndpoint(serviceCode,reply))return;
     const body=(req.body??{}) as {idempotencyKey?:string;payload?:Record<string,unknown>};
     if(!idem(body.idempotencyKey)||!body.payload||typeof body.payload!=='object')return reply.code(400).send({error:'invalid_service_request'});
     const fingerprint=requestFingerprint(body.payload);
