@@ -106,7 +106,14 @@ jobs:
             apps/web/pnpm-lock.yaml
       - name: Install dependencies
         working-directory: ${{ matrix.path }}
-        run: |\n          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install --no-frozen-lockfile; fi
+        run: |
+          if [ "${{ matrix.name }}" = "mobile" ] || [ "${{ matrix.name }}" = "web" ]; then
+            pnpm install --frozen-lockfile --ignore-workspace
+          elif [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          else
+            pnpm install --no-frozen-lockfile
+          fi
       - name: Build
         working-directory: ${{ matrix.path }}
         run: pnpm run build 2>&1 | tee build.log; test ${PIPESTATUS[0]} -eq 0
