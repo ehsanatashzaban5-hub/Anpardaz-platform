@@ -608,6 +608,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [backendKycStatus, setBackendKycStatus] = useState<KycStatus | null>(null);
   const [cryptoWithdrawalSecurity, setCryptoWithdrawalSecurity] = useState<{allowed:boolean;reason?:string;message?:string}>({allowed:false,reason:"loading",message:"در حال بررسی محدودیت‌های امنیتی برداشت رمزارز…"});
+  const [tabNotice, setTabNotice] = useState("");
   const isMobile = useIsMobile(900);
 
   useEffect(() => {
@@ -646,7 +647,6 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   }, [isLoggedIn]);
 
   const effectiveKycStatus = backendKycStatus ?? initialKycStatus;
-  useEffect(()=>{if(tab==='withdraw-coin'&&cryptoWithdrawalSecurity.allowed!==true)setTab('assets');},[tab,cryptoWithdrawalSecurity.allowed]);
   useEffect(()=>{if(!isLoggedIn){setCryptoWithdrawalSecurity({allowed:false,reason:"unauthenticated",message:"برای برداشت رمزارز باید وارد حساب شوید."});return;}let active=true;const load=async()=>{const token=getWebToken();if(!token){if(active)setCryptoWithdrawalSecurity({allowed:false,reason:"unauthenticated",message:"برای برداشت رمزارز باید وارد حساب شوید."});return;}try{const r=await fetch(ANSARRAF_API_BASE+"/api/v1/security/crypto-withdrawal-status",{headers:{authorization:"Bearer "+token},cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.message??d?.error??"withdrawal_security_unavailable");if(active)setCryptoWithdrawalSecurity({allowed:d?.allowed===true,reason:d?.reason,message:d?.message??""});}catch(e){if(active)setCryptoWithdrawalSecurity({allowed:false,reason:"unavailable",message:e instanceof Error?e.message:"وضعیت امنیتی برداشت در دسترس نیست؛ برای حفظ امنیت، برداشت رمزارز موقتاً غیرفعال است."});}};void load();const id=window.setInterval(()=>void load(),30000);return()=>{active=false;window.clearInterval(id)}},[isLoggedIn]);
 
   useEffect(() => {
@@ -776,11 +776,16 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   }, [selectedAsset.symbol]);  const PROTECTED_TABS: SarrafTab[] = ["assets","deposit","deposit-coin","withdraw","withdraw-coin","orders","transactions","security","forexbot"];
   const PROTECTED = PROTECTED_TABS.includes(tab);
 
-  const navItems = TAB_GROUPS.flatMap(g => g.items).filter(item => item.id !== "withdraw-coin" || cryptoWithdrawalSecurity.allowed === true);
+  const navItems = TAB_GROUPS.flatMap(g => g.items);
 
   const handleTabSelect = (id: SarrafTab) => {
+    setTabNotice("");
     if (PROTECTED_TABS.includes(id) && needsLogin) {
       onAuthRequired(); return;
+    }
+    if (id === "withdraw-coin" && cryptoWithdrawalSecurity.allowed !== true) {
+      setTabNotice(cryptoWithdrawalSecurity.message || "برداشت رمزارز در حال حاضر به دلیل کنترل امنیتی قابل انجام نیست. دکمه همچنان فعال است و پس از رفع محدودیت قابل استفاده خواهد بود.");
+      return;
     }
     setTab(id);
     setDrawerOpen(false);
@@ -791,7 +796,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
       {TAB_GROUPS.map(g => (
         <div key={g.label} style={{ marginBottom:12 }}>
           <div style={{ fontSize:10, fontWeight:700, color:"var(--w-muted)", padding:"0 14px 4px", textTransform:"uppercase", letterSpacing:0.5 }}>{g.label}</div>
-          {g.items.filter(item => item.id !== "withdraw-coin" || cryptoWithdrawalSecurity.allowed === true).map(item => (
+          {g.items.map(item => (
             <button key={item.id} onClick={()=>handleTabSelect(item.id)} style={{ width:"100%", display:"flex", alignItems:"center", gap:8, padding:"10px 14px", background:tab===item.id?"rgba(8,145,178,0.1)":"transparent", border:"none", cursor:"pointer", color:tab===item.id?"#0891b2":"var(--w-muted)", fontSize:14, fontWeight:tab===item.id?700:500, borderRight:tab===item.id?"2px solid #0891b2":"2px solid transparent", fontFamily:"Vazirmatn", textAlign:"right", transition:"all 0.12s" }}>
               <WI n={item.icon} s={15}/>{item.label}
             </button>
@@ -816,6 +821,8 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
           </div>
         </div>
       )}
+
+      {tabNotice && <div role="status" style={{margin:"10px 14px 0",padding:"10px 12px",borderRadius:9,background:"rgba(217,119,6,.08)",border:"1px solid rgba(217,119,6,.22)",color:"#92400e",fontSize:12,lineHeight:1.8}}>{tabNotice}</div>}
 
       {/* Platform header bar */}
       <div style={{ background:"var(--w-surface)", borderBottom:"1px solid var(--w-border)" }}>
