@@ -27,7 +27,7 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: apps/mobile/pnpm-lock.yaml
-      - run: if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install --no-frozen-lockfile; fi
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm run build
 
   web:
@@ -45,7 +45,7 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: apps/web/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm run build
 
   ansarraf-service:
@@ -61,7 +61,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: false
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm run build
       - run: pnpm test
