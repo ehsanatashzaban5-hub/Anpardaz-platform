@@ -75,7 +75,7 @@ export class FintechServiceWorker{
     try{
       const op=(await this.pool.query('SELECT * FROM fintech_service_operations WHERE operation_id=$1',[row.operation_id])).rows[0];
       if(!op){await this.fail(row.id,'operation_not_found');return true;}
-      if(op.provider_operation_id && op.accounting_status==='posted' && op.status==='processing'){
+      if((op.provider_operation_id||op.external_reference) && op.accounting_status==='posted' && op.status==='processing'){
         try{
           await accountingHoldAction(op.operation_id,'capture');
           await this.pool.query("UPDATE fintech_service_operations SET status='completed',completed_at=COALESCE(completed_at,NOW()),updated_at=NOW() WHERE operation_id=$1",[op.operation_id]);
@@ -85,7 +85,7 @@ export class FintechServiceWorker{
         }
         return true;
       }
-      if(op.provider_operation_id && op.status==='processing' && op.accounting_status!=='posted'){
+      if((op.provider_operation_id||op.external_reference) && op.status==='processing' && op.accounting_status!=='posted'){
         await this.pool.query("UPDATE fintech_service_operations SET status='manual_review',failure_code='PROVIDER_OPERATION_REQUIRES_RECONCILIATION',failure_message='Provider operation already exists; automatic re-execution is disabled without a provider status endpoint',updated_at=NOW() WHERE operation_id=$1",[op.operation_id]);
         await this.pool.query("UPDATE fintech_provider_outbox SET status='manual_review',last_error='provider_operation_requires_reconciliation_without_safe_status_poll',updated_at=NOW() WHERE id=$1",[row.id]);
         return true;
@@ -104,6 +104,20 @@ export class FintechServiceWorker{
          held=true;
        }
        const result=await provider.execute({serviceCode:op.service_code,operationId:op.operation_id,payload});
+       // Persist the provider outcome BEFORE any accounting hold capture or final-state update.
+       // If the worker crashes after the provider has executed, a retry must never execute the
+       // external operation again just because our later DB/accounting step failed.
+       if(result.providerOperationId||result.externalReference){
+         await this.pool.query(
+           `UPDATE fintech_service_operations
+              SET provider_operation_id=COALESCE($1,provider_operation_id),
+                  external_reference=COALESCE($2,external_reference),
+                  response_metadata=$3,
+                  updated_at=NOW()
+            WHERE operation_id=$4`,
+           [result.providerOperationId??null,result.externalReference??null,JSON.stringify(result.data??{}),op.operation_id],
+         );
+       }
        let status=result.status;
        let accountingStatus=op.accounting_status;
        if(status==='completed'){
