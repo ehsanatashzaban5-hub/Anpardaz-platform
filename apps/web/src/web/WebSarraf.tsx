@@ -646,6 +646,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   }, [isLoggedIn]);
 
   const effectiveKycStatus = backendKycStatus ?? initialKycStatus;
+  useEffect(()=>{if(tab==='withdraw-coin'&&cryptoWithdrawalSecurity.allowed!==true)setTab('assets');},[tab,cryptoWithdrawalSecurity.allowed]);
   useEffect(()=>{if(!isLoggedIn){setCryptoWithdrawalSecurity({allowed:false,reason:"unauthenticated",message:"برای برداشت رمزارز باید وارد حساب شوید."});return;}let active=true;const load=async()=>{const token=getWebToken();if(!token){if(active)setCryptoWithdrawalSecurity({allowed:false,reason:"unauthenticated",message:"برای برداشت رمزارز باید وارد حساب شوید."});return;}try{const r=await fetch(ANSARRAF_API_BASE+"/api/v1/security/crypto-withdrawal-status",{headers:{authorization:"Bearer "+token},cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.message??d?.error??"withdrawal_security_unavailable");if(active)setCryptoWithdrawalSecurity({allowed:d?.allowed===true,reason:d?.reason,message:d?.message??""});}catch(e){if(active)setCryptoWithdrawalSecurity({allowed:false,reason:"unavailable",message:e instanceof Error?e.message:"وضعیت امنیتی برداشت در دسترس نیست؛ برای حفظ امنیت، برداشت رمزارز موقتاً غیرفعال است."});}};void load();const id=window.setInterval(()=>void load(),30000);return()=>{active=false;window.clearInterval(id)}},[isLoggedIn]);
 
   useEffect(() => {
