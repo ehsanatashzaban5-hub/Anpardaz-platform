@@ -109,8 +109,18 @@ export class FintechServiceWorker{
        if(status==='completed'){
          const raw=(result.data as any)?.amount??(result.data as any)?.amountPaid??payload.amount;
          const amount=typeof raw==='number'?String(raw):typeof raw==='string'&&/^(?:0|[1-9]\\d{0,15})(?:\\.\\d{1,8})?$/.test(raw)?raw:null;
-         if(!amount||amount==='0'){status='manual_review';accountingStatus='failed';}
-         else{
+         if(!amount||amount==='0'){status='manual_review';accountingStatus='pending';}
+         else if(typeof requestedAmount==='string'&&/^(?:0|[1-9]\\d{0,15})(?:\\.\\d{1,8})?$/.test(requestedAmount)&&requestedAmount!=='0'&&decimal18(amount)!==decimal18(requestedAmount)){
+           // Never capture a hold for an amount different from what the provider actually completed.
+           // The provider outcome is irreversible here, so keep the original hold active and route
+           // the operation to reconciliation instead of silently over/under-charging the customer.
+           status='manual_review';
+           accountingStatus='pending';
+           await this.pool.query(
+             "UPDATE fintech_service_operations SET failure_code='PROVIDER_AMOUNT_MISMATCH',failure_message=$2,updated_at=NOW() WHERE operation_id=$1",
+             [op.operation_id,'provider amount '+amount+' differs from requested hold '+requestedAmount],
+           );
+         }else{
            try{
              await postAccounting(String(op.customer_id),op.operation_id,amount,'IRR');
              accountingStatus='posted';
