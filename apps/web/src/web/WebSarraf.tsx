@@ -270,7 +270,7 @@ function AuthGate({ onAuth }: { onAuth:()=>void }) {
 }
 
 // ── Assets Tab ─────────────────────────────────────
-function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDepositCoin, onWithdrawCoin }: { assets:CryptoAsset[]; wallets:any[]; kycStatus:KycStatus; onDeposit:()=>void; onWithdraw:()=>void; onDepositCoin:()=>void; onWithdrawCoin:()=>void; }) {
+function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDepositCoin, onWithdrawCoin, canWithdrawCoin, withdrawSecurityMessage }: { assets:CryptoAsset[]; wallets:any[]; kycStatus:KycStatus; onDeposit:()=>void; onWithdraw:()=>void; onDepositCoin:()=>void; onWithdrawCoin:()=>void; canWithdrawCoin:boolean; withdrawSecurityMessage:string; }) {
   const walletMap=new Map(wallets.map((w:any)=>[String(w.symbol).toUpperCase(),Number(w.available_balance??0)+Number(w.locked_balance??0)]));
   const portfolioValue=assets.reduce((sum,a)=>sum+(walletMap.get(a.symbol.toUpperCase())??0)*a.price,0);
   const lockedValue=assets.reduce((sum,a)=>sum+Number(wallets.find((w:any)=>String(w.symbol).toUpperCase()===a.symbol.toUpperCase())?.locked_balance??0)*a.price,0);
@@ -607,6 +607,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   const [deposits, setDeposits] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [backendKycStatus, setBackendKycStatus] = useState<KycStatus | null>(null);
+  const [cryptoWithdrawalSecurity, setCryptoWithdrawalSecurity] = useState<{allowed:boolean;reason?:string;message?:string}>({allowed:false,reason:"loading",message:"در حال بررسی محدودیت‌های امنیتی برداشت رمزارز…"});
   const isMobile = useIsMobile(900);
 
   useEffect(() => {
@@ -645,6 +646,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   }, [isLoggedIn]);
 
   const effectiveKycStatus = backendKycStatus ?? initialKycStatus;
+  useEffect(()=>{if(!isLoggedIn){setCryptoWithdrawalSecurity({allowed:false,reason:"unauthenticated",message:"برای برداشت رمزارز باید وارد حساب شوید."});return;}let active=true;const load=async()=>{const token=getWebToken();if(!token){if(active)setCryptoWithdrawalSecurity({allowed:false,reason:"unauthenticated",message:"برای برداشت رمزارز باید وارد حساب شوید."});return;}try{const r=await fetch(ANSARRAF_API_BASE+"/api/v1/security/crypto-withdrawal-status",{headers:{authorization:"Bearer "+token},cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.message??d?.error??"withdrawal_security_unavailable");if(active)setCryptoWithdrawalSecurity({allowed:d?.allowed===true,reason:d?.reason,message:d?.message??""});}catch(e){if(active)setCryptoWithdrawalSecurity({allowed:false,reason:"unavailable",message:e instanceof Error?e.message:"وضعیت امنیتی برداشت در دسترس نیست؛ برای حفظ امنیت، برداشت رمزارز موقتاً غیرفعال است."});}};void load();const id=window.setInterval(()=>void load(),30000);return()=>{active=false;window.clearInterval(id)}},[isLoggedIn]);
 
   useEffect(() => {
     let active = true;
@@ -773,7 +775,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   }, [selectedAsset.symbol]);  const PROTECTED_TABS: SarrafTab[] = ["assets","deposit","deposit-coin","withdraw","withdraw-coin","orders","transactions","security","forexbot"];
   const PROTECTED = PROTECTED_TABS.includes(tab);
 
-  const navItems = TAB_GROUPS.flatMap(g => g.items);
+  const navItems = TAB_GROUPS.flatMap(g => g.items).filter(item => item.id !== "withdraw-coin" || cryptoWithdrawalSecurity.allowed === true);
 
   const handleTabSelect = (id: SarrafTab) => {
     if (PROTECTED_TABS.includes(id) && needsLogin) {
@@ -788,7 +790,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
       {TAB_GROUPS.map(g => (
         <div key={g.label} style={{ marginBottom:12 }}>
           <div style={{ fontSize:10, fontWeight:700, color:"var(--w-muted)", padding:"0 14px 4px", textTransform:"uppercase", letterSpacing:0.5 }}>{g.label}</div>
-          {g.items.map(item => (
+          {g.items.filter(item => item.id !== "withdraw-coin" || cryptoWithdrawalSecurity.allowed === true).map(item => (
             <button key={item.id} onClick={()=>handleTabSelect(item.id)} style={{ width:"100%", display:"flex", alignItems:"center", gap:8, padding:"10px 14px", background:tab===item.id?"rgba(8,145,178,0.1)":"transparent", border:"none", cursor:"pointer", color:tab===item.id?"#0891b2":"var(--w-muted)", fontSize:14, fontWeight:tab===item.id?700:500, borderRight:tab===item.id?"2px solid #0891b2":"2px solid transparent", fontFamily:"Vazirmatn", textAlign:"right", transition:"all 0.12s" }}>
               <WI n={item.icon} s={15}/>{item.label}
             </button>
@@ -957,7 +959,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
             <AuthGate onAuth={onAuthRequired}/>
           )}
           {tab === "assets" && isLoggedIn && (
-            <AssetsTab assets={liveAssets.slice(0,12)} wallets={wallets} kycStatus={effectiveKycStatus} onDeposit={()=>setTab("deposit")} onWithdraw={()=>setTab("withdraw")} onDepositCoin={()=>setTab("deposit-coin")} onWithdrawCoin={()=>setTab("withdraw-coin")}/>
+            <AssetsTab assets={liveAssets.slice(0,12)} wallets={wallets} kycStatus={effectiveKycStatus} onDeposit={()=>setTab("deposit")} onWithdraw={()=>setTab("withdraw")} onDepositCoin={()=>setTab("deposit-coin")} onWithdrawCoin={()=>setTab("withdraw-coin")} canWithdrawCoin={cryptoWithdrawalSecurity.allowed===true} withdrawSecurityMessage={cryptoWithdrawalSecurity.message??""}/>
           )}
           {tab === "deposit" && isLoggedIn && (
             <DepositTomanTab kycStatus={effectiveKycStatus}/>
