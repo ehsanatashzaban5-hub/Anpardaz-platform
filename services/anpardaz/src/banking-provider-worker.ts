@@ -80,8 +80,18 @@ export class BankingProviderWorker{
       if(row.operation_type==='card_balance'){await this.pool.query("UPDATE banking_provider_outbox SET status='manual_review',last_error='card_balance_retry_requires_sensitive_card_input',updated_at=NOW() WHERE id=$1",[row.id]);await this.pool.query("UPDATE card_balance_checks SET status='manual_review',error_code='RETRY_REQUIRES_CARD_INPUT',error_message='Automatic retry is disabled because sensitive card data is not persisted.' WHERE operation_id=$1 AND status IN ('pending','processing')",[row.operation_id]);return true;}
       const provider=new FintechProvider();
       if(row.operation_type==='transfer'){
-        const x=(await this.pool.query('SELECT * FROM transfer_requests WHERE operation_id=$1',[row.operation_id])).rows[0];if(!x){await this.fail(row.id,'transfer_not_found');return true;}
+        let x=(await this.pool.query('SELECT * FROM transfer_requests WHERE operation_id=$1',[row.operation_id])).rows[0];if(!x){await this.fail(row.id,'transfer_not_found');return true;}
         if(['completed','failed','cancelled'].includes(x.status)){await this.pool.query("UPDATE banking_provider_outbox SET status=$2,updated_at=NOW() WHERE id=$1",[row.id,x.status==='completed'?'completed':'failed']);return true;}
+        const claimed=(await this.pool.query("UPDATE transfer_requests SET status='processing',updated_at=NOW() WHERE operation_id=$1 AND status='pending' RETURNING *",[row.operation_id])).rows[0];
+        if(claimed)x=claimed;
+        else{
+          x=(await this.pool.query('SELECT * FROM transfer_requests WHERE operation_id=$1',[row.operation_id])).rows[0];
+          if(!x){await this.fail(row.id,'transfer_not_found');return true;}
+          if(['completed','failed','cancelled','manual_review'].includes(x.status)){
+            await this.pool.query("UPDATE banking_provider_outbox SET status=$2,updated_at=NOW() WHERE id=$1",[row.id,x.status==='completed'?'completed':x.status==='cancelled'?'failed':x.status]);return true;
+          }
+          throw new Error('transfer_state_changed');
+        }
         if(x.destination_account_id){
           const destination=(await this.pool.query('SELECT id,customer_id,currency,status FROM accounts WHERE id=$1',[x.destination_account_id])).rows[0];
           if(!destination||destination.status!=='active'||destination.currency!==x.currency){await this.fail(row.id,'invalid_internal_destination');return true;}
