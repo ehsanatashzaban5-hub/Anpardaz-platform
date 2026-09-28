@@ -42,3 +42,20 @@ export async function requireTomanWithdrawalSecurity(pool:Pool,request:FastifyRe
   if(!window.allowed)throw new Error('crypto_withdrawal_locked_24h');
   return {asset,card:null};
 }
+export async function getCryptoWithdrawalSecurity(pool:Pool,customerId:string){
+  const customer=(await pool.query('SELECT status,security_hold_reason,security_hold_at FROM customers WHERE id=$1 LIMIT 1',[customerId])).rows[0];
+  if(!customer)return {allowed:false,reason:'customer_not_found',message:'حساب کاربری پیدا نشد.'};
+  if(customer.status==='blocked'&&customer.security_hold_reason==='RAPID_TOMAN_CRYPTO_CONVERSION'){
+    const c=(await pool.query("SELECT id,created_at,reason_code,reason_message,metadata FROM funding_security_cases WHERE customer_id=$1 AND status='open' ORDER BY created_at DESC LIMIT 1",[customerId])).rows[0];
+    return {allowed:false,reason:'security_hold',message:'به‌دلیل رفتار مشکوک در واریز تومان و تبدیل سریع به رمزارز، حساب شما موقتاً در حال بررسی مدیر است. تا تأیید مدیر، برداشت رمزارز و ادامه فعالیت حساب امکان‌پذیر نیست.',case:c??null};
+  }
+  const window=await verifyFirstTomanDepositWindow(pool,customerId);
+  if(!window.allowed)return {allowed:false,reason:'first_toman_deposit_24h',message:'برداشت رمزارز تا ۲۴ ساعت پس از اولین واریز تومان برای امنیت حساب فعال نمی‌شود.',remainingSeconds:window.remainingSeconds,firstTomanDepositAt:window.firstTomanDepositAt};
+  return {allowed:true,reason:null,message:null,remainingSeconds:0,firstTomanDepositAt:window.firstTomanDepositAt};
+}
+
+export async function requireCryptoWithdrawalSecurity(pool:Pool,customerId:string){
+  const status=await getCryptoWithdrawalSecurity(pool,customerId);
+  if(!status.allowed){const e=new Error(status.reason);(e as any).security=status;throw e;}
+  return status;
+}
