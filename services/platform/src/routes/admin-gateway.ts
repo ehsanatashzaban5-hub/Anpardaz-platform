@@ -214,6 +214,32 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
+  // Browser-facing admin proxy for An Sarraf funding security cases.
+  app.get('/api/v1/admin/ecosystem/ansarraf/security/cases', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
+    const token = process.env.ANSARRAF_INTERNAL_TOKEN;
+    if (!token) return reply.code(503).send({ error: 'ansarraf_internal_token_not_configured' });
+    const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/security/cases' + q, {
+      headers: { authorization: 'Bearer ' + token }
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
+  app.post('/api/v1/admin/ecosystem/ansarraf/security/cases/:id/release', { preHandler: requireAuth }, async (request, reply) => {
+    const req = reqAuth(request);
+    if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
+    const token = process.env.ANSARRAF_INTERNAL_TOKEN;
+    if (!token) return reply.code(503).send({ error: 'ansarraf_internal_token_not_configured' });
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/security/cases/' + encodeURIComponent((request.params as any).id) + '/release', {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + token, 'x-admin-identity': req.auth.sub, 'content-type': 'application/json' },
+      body: JSON.stringify(request.body ?? {}),
+    });
+    return reply.code(result.status).send(result.body);
+  });
+
   // Browser-facing admin proxy for An Sarraf manual Toman funding.
   app.get('/api/v1/admin/ecosystem/ansarraf/deposits/manual', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
