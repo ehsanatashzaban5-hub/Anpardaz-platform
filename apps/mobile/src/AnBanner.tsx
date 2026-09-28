@@ -1380,7 +1380,7 @@ async function abUpdateUser(u: ABUser) {
 
 // --- Favs ---
 function abGetFavs(): string[] { return _myFavs; }
-function abToggleFav(id: string) { _myFavs = _myFavs.includes(id) ? _myFavs.filter(x => x !== id) : [..._myFavs, id]; storeFavs(); }
+async function abToggleFav(id: string) { try { await bannerApi.favorite(id); const favorites = await bannerApi.favorites(); _myFavs = (favorites.listings ?? []).map((x:any)=>String(x.id)); storeFavs(); _notifyAds(); } catch (e) { console.error("favorite_update_failed", e); } }
 
 // Hook to subscribe to ad changes
 function useAdsVersion() {
