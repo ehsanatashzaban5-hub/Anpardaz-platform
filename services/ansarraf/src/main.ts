@@ -20,6 +20,7 @@ import { registerProviderFundingRoutes } from './routes/provider-funding.js';
 import { registerForexBotRoutes } from './routes/forex-bot.js';
 import { ProviderDepositWorker } from './provider-deposit-worker.js';
 import { registerFeeRoutes } from './routes/fees.js';
+import { registerSecurityAdminRoutes } from './routes/security-admin.js';
 
 const isProduction=process.env.NODE_ENV==='production';
 validateAnSarrafProductionConfig(process.env);
@@ -84,6 +85,7 @@ if(pool){
   registerForexBotRoutes(app,pool);
   registerKycRoutes(app,pool);
   registerFeeRoutes(app,pool);
+  registerSecurityAdminRoutes(app,pool);
   app.get('/api/v1/auth/me',{preHandler:requireAuth},async(request)=>{
     const auth=(request as typeof request&{auth:any}).auth;
     const id=await ensureCustomer(pool,auth);
