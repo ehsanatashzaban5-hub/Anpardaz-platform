@@ -66,23 +66,28 @@ export function registerProviderFundingRoutes(app:FastifyInstance,pool:Pool){
   });
 
   app.post('/api/v1/admin/crypto-deposits/:id/approve',{preHandler:requireAuth},async(req,reply)=>{
-    const a=await admin(req,reply);if(!a)return;const id=Number((req.params as any).id);const customerId=Number((req.body as any)?.customerId);
+    const a=await admin(req,reply);if(!a)return;
+    const id=Number((req.params as any).id),customerId=Number((req.body as any)?.customerId);
     if(!Number.isSafeInteger(id)||id<=0||!Number.isSafeInteger(customerId)||customerId<=0)return reply.code(400).send({error:'event_and_customer_required'});
-    const client=await pool.connect();try{
+    const client=await pool.connect();
+    try{
       await client.query('BEGIN');
       const e=(await client.query('SELECT e.*,a.symbol FROM provider_deposit_events e JOIN assets a ON a.id=e.asset_id WHERE e.id=$1 FOR UPDATE',[id])).rows[0];
-      if(!e)throw new Error('deposit_event_not_found');if(!['confirmed','manual_review','detected'].includes(e.status))throw new Error('deposit_event_not_approvable');
+      if(!e)throw new Error('deposit_event_not_found');
+      if(!['confirmed','manual_review','detected'].includes(e.status))throw new Error('deposit_event_not_approvable');
       if(e.customer_id&&Number(e.customer_id)!==customerId)throw new Error('deposit_customer_mismatch');
       const op='ANSARRAF-CRYPTO-DEP-'+randomUUID();
-      const wallet=(await client.query(`INSERT INTO wallets(customer_id,asset_id,available_balance,locked_balance) VALUES($1,$2,0,0) ON CONFLICT(customer_id,asset_id) DO UPDATE SET available_balance=wallets.available_balance RETURNING id`,[customerId,e.asset_id])).rows[0];
-      const accountingUrl=(process.env.ACCOUNTING_SERVICE_URL??'').replace(/\/$/,'');const accountingToken=process.env.ACCOUNTING_INTERNAL_TOKEN;if(!accountingUrl||!accountingToken)throw new Error('accounting_service_not_configured');
-      const providerAccount=await ledgerAccount(accountingUrl,accountingToken,'ansarraf.provider.'+(process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX')+'.asset.'+e.symbol,'An Sarraf provider '+e.symbol,'asset',e.symbol);
-      const customerAccount=await ledgerAccount(accountingUrl,accountingToken,'ansarraf.customer.'+customerId+'.asset.'+e.symbol,'An Sarraf customer '+customerId+' '+e.symbol,'liability',e.symbol);
-      const ledger=await fetch(accountingUrl+'/internal/v1/ledger/transactions',{method:'POST',headers:{authorization:'Bearer '+accountingToken,'content-type':'application/json'},body:JSON.stringify({referenceType:'ansarraf_provider_crypto_deposit',referenceId:String(id),operationId:op,idempotencyKey:'ansarraf:crypto-deposit:'+id,description:'Wallex provider crypto deposit approved by admin',entries:[{accountId:providerAccount,direction:'debit',amount:String(e.amount),currency:e.symbol},{accountId:customerAccount,direction:'credit',amount:String(e.amount),currency:e.symbol}]}) ,signal:AbortSignal.timeout(10000)});
-      if(!ledger.ok)throw new Error('accounting_post_failed');
-      await client.query('UPDATE wallets SET available_balance=available_balance+$1 WHERE id=$2',[e.amount,wallet.id]);
-      await client.query(`UPDATE provider_deposit_events SET customer_id=$2,status='credited',credited_at=NOW(),confirmed_at=COALESCE(confirmed_at,NOW()) WHERE id=$1`,[id,customerId]);
-      await client.query('COMMIT');return{approved:true,eventId:id,customerId,operationId:op};
-    }catch(error){await client.query('ROLLBACK');return reply.code(400).send({error:error instanceof Error?error.message:'crypto_deposit_approval_failed'});}finally{client.release();}
+      await client.query('INSERT INTO wallets(customer_id,asset_id,available_balance,locked_balance) VALUES($1,$2,0,0) ON CONFLICT(customer_id,asset_id) DO NOTHING',[customerId,e.asset_id]);
+      await client.query(`UPDATE provider_deposit_events SET customer_id=$2,status='accounting_pending',confirmed_at=COALESCE(confirmed_at,NOW()) WHERE id=$1`,[id,customerId]);
+      await client.query(`INSERT INTO accounting_outbox(event_type,aggregate_type,aggregate_id,idempotency_key,payload)
+        VALUES('exchange.crypto_deposit.settled','provider_deposit', $1, $2, $3::jsonb)
+        ON CONFLICT(idempotency_key) DO NOTHING`,
+        [String(id),'ansarraf:crypto-deposit:'+id,JSON.stringify({eventId:id,operationId:op,customerId,assetId:Number(e.asset_id),assetSymbol:String(e.symbol),amount:String(e.amount)})]);
+      await client.query('COMMIT');
+      return{approved:true,eventId:id,customerId,operationId:op,status:'accounting_pending'};
+    }catch(error){
+      await client.query('ROLLBACK');
+      return reply.code(400).send({error:error instanceof Error?error.message:'crypto_deposit_approval_failed'});
+    }finally{client.release();}
   });
 }
