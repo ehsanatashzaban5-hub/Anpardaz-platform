@@ -29,6 +29,7 @@ export class AccountingOutboxWorker{
   private async postTrade(row:any){
     const p=row.payload??{};
     if(row.event_type==='exchange.provider_trade.settled')return this.postProviderTrade(row,p);
+    if(row.event_type==='exchange.crypto_deposit.settled')return this.postCryptoDeposit(row,p);
     if(row.event_type==='exchange.withdrawal.settled')return this.postWithdrawal(row,p);
     if(row.event_type==='forex_bot.funding_transfer')return this.postForexBotFunding(row,p);
     if(row.event_type==='forex_bot.pnl')return this.postForexBotPnl(row,p);
@@ -53,6 +54,31 @@ export class AccountingOutboxWorker{
     if(customerFee!=='0')baseEntries.push({accountId:revenueBase,currency:base.symbol,direction:'credit',amount:customerFee,metadata:{tradeId:p.tradeId,asset:'base',type:'customer_fee'}});
     await this.postLedger({operationId:p.operationId,referenceType:'exchange_trade_base',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':base',description:'Exchange trade '+p.tradeId+' base settlement',entries:baseEntries});
     await this.postLedger({operationId:p.operationId,referenceType:'exchange_trade_quote',referenceId:String(p.tradeId),idempotencyKey:row.idempotency_key+':quote',description:'Exchange trade '+p.tradeId+' quote settlement',entries:[{accountId:sellerQuote,currency:quote.symbol,direction:'credit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}},{accountId:buyerQuote,currency:quote.symbol,direction:'debit',amount:String(p.quoteAmount),metadata:{tradeId:p.tradeId,asset:'quote'}}]});
+  }
+  private async postCryptoDeposit(row:any,p:any){
+    const required=['eventId','operationId','customerId','assetId','assetSymbol','amount'];
+    for(const key of required)if(p[key]===undefined||p[key]===null)throw new Error('missing_crypto_deposit_outbox_field:'+key);
+    const eventId=Number(p.eventId),customerId=Number(p.customerId),assetId=Number(p.assetId),amount=String(p.amount),symbol=String(p.assetSymbol).toUpperCase();
+    if(!Number.isSafeInteger(eventId)||!Number.isSafeInteger(customerId)||!Number.isSafeInteger(assetId)||!/^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/.test(amount)||Number(amount)<=0)throw new Error('invalid_crypto_deposit_outbox_payload');
+    const providerCode=String(process.env.LIQUIDITY_PROVIDER_CODE??'WALLEX').toUpperCase();
+    const provider=await this.ensureProviderAssetAccount(providerCode,symbol);
+    const customer=await this.ensureAccount(customerId,symbol);
+    await this.postLedger({operationId:String(p.operationId),referenceType:'ansarraf_provider_crypto_deposit',referenceId:String(eventId),idempotencyKey:row.idempotency_key+':ledger',description:'Provider crypto deposit credited to customer',entries:[
+      {accountId:provider,currency:symbol,direction:'debit',amount,metadata:{eventId,customerId,type:'provider_crypto_deposit'}},
+      {accountId:customer,currency:symbol,direction:'credit',amount,metadata:{eventId,customerId,type:'customer_crypto_deposit'}}
+    ]});
+    const client=await this.pool.connect();
+    try{
+      await client.query('BEGIN');
+      const e=(await client.query("SELECT id,customer_id,asset_id,amount,status FROM provider_deposit_events WHERE id=$1 FOR UPDATE",[eventId])).rows[0];
+      if(!e)throw new Error('crypto_deposit_event_not_found');
+      if(e.status==='credited'){await client.query('COMMIT');return;}
+      if(Number(e.customer_id)!==customerId||Number(e.asset_id)!==assetId||String(e.amount)!==amount)throw new Error('crypto_deposit_event_payload_mismatch');
+      await client.query('INSERT INTO wallets(customer_id,asset_id,available_balance,locked_balance) VALUES($1,$2,0,0) ON CONFLICT(customer_id,asset_id) DO NOTHING',[customerId,assetId]);
+      await client.query("UPDATE wallets SET available_balance=available_balance+$1 WHERE customer_id=$2 AND asset_id=$3",[amount,customerId,assetId]);
+      await client.query("UPDATE provider_deposit_events SET status='credited',credited_at=NOW(),confirmed_at=COALESCE(confirmed_at,NOW()) WHERE id=$1 AND status<>'credited'",[eventId]);
+      await client.query('COMMIT');
+    }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
   }
   private async postProviderTrade(row:any,p:any){
     const required=['settlementId','operationId','providerOrderId','customerId','providerCode','side','baseAssetId','quoteAssetId','quantity','quoteAmount','customerFeeAmount','providerFeeAmount'];
