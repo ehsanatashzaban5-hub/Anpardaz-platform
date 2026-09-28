@@ -15,8 +15,8 @@ async function verifyAnPardazCard(cardNumber:string){
   const base=(process.env.ANPARDAZ_SERVICE_URL??'').replace(/\/$/,'');
   const token=process.env.ANPARDAZ_INTERNAL_TOKEN;
   if(!base||!token)throw new Error('anpardaz_card_verification_not_configured');
-  const response=await fetch(base+'/internal/v1/admin/cards/lookup?cardNumber='+encodeURIComponent(cardNumber),{
-    headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(Number(process.env.ANPARDAZ_HTTP_TIMEOUT_MS??5000))
+  const response=await fetch(base+'/internal/v1/admin/cards/lookup',{
+    method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({cardNumber}),signal:AbortSignal.timeout(Number(process.env.ANPARDAZ_HTTP_TIMEOUT_MS??5000))
   });
   const body=await response.json().catch(()=>({})) as any;
   if(!response.ok)throw new Error(String(body?.error??`anpardaz_card_verification_http_${response.status}`));
