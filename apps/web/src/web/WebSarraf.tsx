@@ -317,7 +317,7 @@ function KycGate({ kycStatus }: { kycStatus:KycStatus }) {
       <div style={{ width:60, height:60, borderRadius:"50%", background:"rgba(217,119,6,0.1)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", color:"#d97706" }}><WI n="shield" s={26}/></div>
       <div style={{ fontSize:17, fontWeight:800, marginBottom:8 }}>احراز هویت الزامی</div>
       <div style={{ fontSize:13, color:"var(--w-muted)", marginBottom:24 }}>برای واریز و برداشت، ابتدا هویت خود را تأیید کنید.</div>
-      {kycStatus==="not_verified" && <button className="w-btn w-btn-primary" style={{ padding:"11px 28px" }}>شروع احراز هویت</button>}
+      {kycStatus==="not_verified" && <div style={{padding:"11px 16px",background:"rgba(217,119,6,0.1)",color:"#d97706",borderRadius:9,fontSize:12,fontWeight:700}}>احراز هویت این حساب هنوز انجام نشده است. تا اتصال فرایند رسمی KYC به وب، عملیات مالی حساس از این صفحه فعال نمی‌شود.</div>}
       {(kycStatus==="submitted"||kycStatus==="pending") && <div style={{ padding:"11px 28px", background:"rgba(217,119,6,0.1)", color:"#d97706", borderRadius:9, fontSize:13, fontWeight:700 }}>در حال بررسی...</div>}
     </div>
   );
