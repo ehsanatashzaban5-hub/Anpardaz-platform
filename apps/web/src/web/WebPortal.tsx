@@ -3,7 +3,7 @@
 // Guests see homepage immediately — NO auth on load
 // ─────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
-import { WebHeader, WebFooter, CSS_VARS } from "./WebLayout";
+import { WebHeader, CSS_VARS } from "./WebLayout";
 import WebHome       from "./WebHome";
 import WebSarraf     from "./WebSarraf";
 import WebMarket     from "./WebMarket";
@@ -342,7 +342,6 @@ export default function WebPortal() {
         )}
       </main>
 
-      <WebFooter onNavigate={handleNavigate}/>
 
       {showFirstVisit && (
         <div
