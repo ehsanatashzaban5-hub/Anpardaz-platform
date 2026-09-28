@@ -24,8 +24,8 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: apps/mobile/package.json
-      - run: pnpm install --no-frozen-lockfile
+          cache-dependency-path: apps/mobile/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
       - run: pnpm run build
 
   web:
@@ -42,8 +42,8 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: apps/web/package.json
-      - run: pnpm install --no-frozen-lockfile
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
       - run: pnpm run build
 
   ansarraf-service:
@@ -60,7 +60,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: services/ansarraf/package.json
-      - run: pnpm install --no-frozen-lockfile
+          cache-dependency-path: services/ansarraf/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: pnpm test
