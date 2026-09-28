@@ -260,6 +260,21 @@ function ArticleCard({ article: a, onClick }: { article: Article; onClick: ()=>v
 
 // ── Article Detail ────────────────────────────────
 function ArticleDetail({ article: a, onBack }: { article: Article; onBack: ()=>void }) {
+  const API=(import.meta.env.VITE_PLATFORM_API_URL??"").replace(/\/$/,"");
+  const [full,setFull]=useState<Article>(a);
+  const [loading,setLoading]=useState(!a.body);
+  useEffect(()=>{
+    let active=true;
+    if(a.body){setFull(a);setLoading(false);return()=>{active=false};}
+    setLoading(true);
+    fetch(API+"/api/v1/news/"+encodeURIComponent(a.seo?.slug||a.id),{cache:"no-store"})
+      .then(r=>r.ok?r.json():Promise.reject(new Error("news_detail_unavailable")))
+      .then(d=>{if(active&&d?.article)setFull({...a,body:String(d.article.body??""),summary:String(d.article.summary??a.summary),seo:{...a.seo,canonicalUrl:d.article.canonical_url??a.seo?.canonicalUrl}});})
+      .catch(()=>{})
+      .finally(()=>{if(active)setLoading(false)});
+    return()=>{active=false};
+  },[API,a.id,a.seo?.slug]);
+  const article=full;
   return (
     <div className="w-fade" dir="rtl" style={{ maxWidth:780, margin:"0 auto", padding:"24px" }}>
       <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, fontWeight:600, marginBottom:20 }}>
@@ -280,8 +295,7 @@ function ArticleDetail({ article: a, onBack }: { article: Article; onBack: ()=>v
       </div>
       <div style={{ fontSize:15, lineHeight:2, color:"var(--w-text)" }}>
         <p style={{ marginBottom:16 }}>{a.summary}</p>
-        <div style={{ marginBottom:16, whiteSpace:"pre-wrap" }}>{a.body || "متن کامل این مطلب در حال بارگذاری است."}</div>
-        <p style={{ marginBottom:16 }}>آن پرداز با ارائه محتوای تخصصی در حوزه ارزهای دیجیتال، هوش مصنوعی و فناوری مالی، به کاربران خود کمک می‌کند تا تصمیمات آگاهانه‌تری بگیرند.</p>
+        <div style={{ marginBottom:16, whiteSpace:"pre-wrap" }}>{loading ? "در حال دریافت متن کامل مطلب…" : (article.body || "متن کامل این مطلب در پایگاه محتوا ثبت نشده است.")}</div>
       </div>
       <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:20 }}>
         {a.tags.map(t => <span key={t} style={{ fontSize:11, padding:"3px 10px", borderRadius:20, background:"var(--w-card2)", border:"1px solid var(--w-border)", color:"var(--w-muted)" }}>#{t}</span>)}
@@ -300,14 +314,8 @@ function VideoDetail({ video: v, onBack }: { video: Video; onBack: ()=>void }) {
       <div style={{ display:"grid", gridTemplateColumns:"1fr 320px", gap:24, alignItems:"start" }}>
         <div>
           {/* Video player placeholder */}
-          <div style={{ aspectRatio:"16/9", background:"#09090f", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:16, position:"relative", overflow:"hidden" }}>{v.videoUrl ? <video controls playsInline src={v.videoUrl} style={{width:"100%",height:"100%",objectFit:"contain"}} /> : null}
-            <div style={{ width:64, height:64, borderRadius:"50%", background:"rgba(232,53,78,0.85)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
-              <WI n="play" s={28} style={{ color:"#fff", marginRight:-4 }}/>
-            </div>
-            <div style={{ position:"absolute", bottom:12, left:12, right:12, display:"flex", alignItems:"center", gap:8 }}>
-              <div style={{ flex:1, height:3, background:"rgba(255,255,255,0.2)", borderRadius:4 }}><div style={{ width:"30%", height:"100%", background:"#e8354e", borderRadius:4 }}/></div>
-              <span style={{ fontSize:11, color:"rgba(255,255,255,0.7)" }}>{fmtDur(v.duration)}</span>
-            </div>
+          <div style={{ aspectRatio:"16/9", background:"#09090f", borderRadius:16, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:16, overflow:"hidden" }}>
+            {v.videoUrl ? <video controls playsInline preload="metadata" src={v.videoUrl} style={{width:"100%",height:"100%",objectFit:"contain"}} /> : <div style={{color:"rgba(255,255,255,0.65)",fontSize:13}}>فایل ویدیو در دسترس نیست.</div>}
           </div>
           <h1 style={{ fontSize:20, fontWeight:900, marginBottom:10 }}>{v.title}</h1>
           <div style={{ display:"flex", gap:16, fontSize:12, color:"var(--w-muted)", marginBottom:14, flexWrap:"wrap" }}>
