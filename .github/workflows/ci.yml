@@ -107,7 +107,9 @@ jobs:
       - name: Install dependencies
         working-directory: ${{ matrix.path }}
         run: |
-          if [ "${{ matrix.name }}" = "mobile" ] || [ "${{ matrix.name }}" = "web" ]; then
+          if [ "${{ matrix.name }}" = "mobile" ]; then
+            pnpm install --no-frozen-lockfile --ignore-workspace
+          elif [ "${{ matrix.name }}" = "web" ]; then
             pnpm install --frozen-lockfile --ignore-workspace
           elif [ -f pnpm-lock.yaml ]; then
             pnpm install --frozen-lockfile
