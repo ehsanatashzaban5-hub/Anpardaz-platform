@@ -234,7 +234,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     if (!token) return reply.code(503).send({ error: 'ansarraf_internal_token_not_configured' });
     const result = await fetchJson(sarrafBase() + '/internal/v1/admin/security/cases/' + encodeURIComponent((request.params as any).id) + '/release', {
       method: 'POST',
-      headers: { authorization: 'Bearer ' + token, 'x-admin-identity': req.auth.sub, 'content-type': 'application/json' },
+      headers: { authorization: 'Bearer ' + token, 'x-admin-identity': req.auth.sub, 'x-admin-role': req.auth.role, 'content-type': 'application/json' },
       body: JSON.stringify(request.body ?? {}),
     });
     return reply.code(result.status).send(result.body);
