@@ -56,6 +56,6 @@ export async function getCryptoWithdrawalSecurity(pool:Pool,customerId:string){
 
 export async function requireCryptoWithdrawalSecurity(pool:Pool,customerId:string){
   const status=await getCryptoWithdrawalSecurity(pool,customerId);
-  if(!status.allowed){const e=new Error(status.reason);(e as any).security=status;throw e;}
+  if(!status.allowed){const e=new Error(String(status.reason??'withdrawal_security_blocked'));(e as any).security=status;throw e;}
   return status;
 }
