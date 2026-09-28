@@ -111,8 +111,19 @@ export class BankingProviderWorker{
         // already completed, retries must reconcile the ledger only and MUST NOT execute the provider again.
         if(String(x.provider_status).toLowerCase()==='completed'){
           await postLedger('anpardaz_transfer',String(x.id),x.operation_id,Number(x.customer_id),String(x.provider_code??'FINTECH'),String(x.currency),String(x.amount),'debit');
+          try{
+            await accountingHoldAction(x.operation_id,'capture');
+          }catch(e){
+            await this.pool.query("UPDATE banking_provider_outbox SET status='processing',next_attempt_at=NOW()+INTERVAL '30 seconds',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,e instanceof Error?e.message:'accounting_hold_capture_failed']);
+            return true;
+          }
           await this.pool.query("UPDATE transfer_requests SET status='completed',updated_at=NOW() WHERE operation_id=$1",[x.operation_id]);
           await this.pool.query("UPDATE banking_provider_outbox SET status='completed',last_error=NULL,updated_at=NOW() WHERE id=$1",[row.id]);
+          return true;
+        }
+        if(String(x.provider_status).toLowerCase()==='processing' && x.provider_operation_id){
+          await this.pool.query("UPDATE transfer_requests SET status='manual_review',updated_at=NOW() WHERE operation_id=$1 AND status='processing'",[x.operation_id]);
+          await this.pool.query("UPDATE banking_provider_outbox SET status='manual_review',last_error='provider_operation_requires_reconciliation_without_safe_status_poll',updated_at=NOW() WHERE id=$1",[row.id]);
           return true;
         }
         await accountingHold(Number(x.customer_id),x.operation_id,String(x.amount),String(x.currency));
