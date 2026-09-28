@@ -4,12 +4,18 @@ import {createHash,randomUUID} from 'node:crypto';
 import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
 import {provisionProviderExecution} from '../provider-execution.js';
 import {ensureKycRequired} from '../kyc.js';
-import {requireTomanWithdrawalSecurity} from '../funding-security.js';
+import {getCryptoWithdrawalSecurity,requireTomanWithdrawalSecurity} from '../funding-security.js';
 import {calculateOperationalFee} from '../fee-engine.js';
 type R=FastifyRequest&{auth:AuthClaims};const r=(x:FastifyRequest)=>x as R;
 const dec=/^(?:0|[1-9]\d{0,27})(?:\.\d{1,18})?$/;const amount=(v:unknown)=>typeof v==='string'&&dec.test(v)&&v!=='0'&&!/^0\.0+$/.test(v);const id=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;const idem=(v:unknown)=>typeof v==='string'&&v.length>=8&&v.length<=200;const fp=(v:unknown)=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 
 export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
+ app.get('/api/v1/security/crypto-withdrawal-status',{preHandler:requireAuth},async(req,reply)=>{
+   const auth=r(req).auth;
+   const customer=(await pool.query('SELECT id FROM customers WHERE identity_id=$1 LIMIT 1',[auth.sub])).rows[0];
+   if(!customer)return {allowed:false,reason:'customer_not_found',message:'حساب کاربری هنوز در آن صراف ایجاد نشده است.'};
+   return getCryptoWithdrawalSecurity(pool,String(customer.id));
+ });
  app.get('/api/v1/wallets',{preHandler:requireAuth},async(req)=>{
    const customer=await ensureCustomer(pool,r(req).auth);
    const q=await pool.query('SELECT w.id,w.asset_id,a.symbol,a.name,a.asset_type,a.decimals,w.available_balance::text,w.locked_balance::text,(w.available_balance+w.locked_balance)::text AS total_balance FROM wallets w JOIN assets a ON a.id=w.asset_id WHERE w.customer_id=$1 AND a.status=\'active\' ORDER BY a.symbol',[customer]);
@@ -167,14 +173,18 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
  });
  app.get('/api/v1/withdrawals',{preHandler:requireAuth},async(req)=>{const customer=await ensureCustomer(pool,r(req).auth);return{withdrawals:(await pool.query('SELECT w.*,a.symbol,a.name FROM withdrawals w JOIN assets a ON a.id=w.asset_id WHERE w.customer_id=$1 ORDER BY w.created_at DESC LIMIT 200',[customer])).rows};});
  app.post('/api/v1/withdrawals',{preHandler:requireAuth},async(req,reply)=>{
-   const customer=await ensureCustomer(pool,r(req).auth),b=(req.body??{}) as any;
+   const auth=r(req).auth;
+   const securityCustomer=(await pool.query('SELECT status,security_hold_reason FROM customers WHERE identity_id=$1 LIMIT 1',[auth.sub])).rows[0];
+   if(securityCustomer?.status==='blocked'&&securityCustomer.security_hold_reason==='RAPID_TOMAN_CRYPTO_CONVERSION')
+     return reply.code(423).send({error:'security_hold',message:'به‌دلیل رفتار مشکوک در واریز تومان و تبدیل سریع به رمزارز، حساب شما موقتاً در حال بررسی مدیر است. تا تأیید مدیر، برداشت رمزارز و ادامه فعالیت حساب امکان‌پذیر نیست.'});
+   const customer=await ensureCustomer(pool,auth),b=(req.body??{}) as any;
    const kyc=await ensureKycRequired(pool,customer);if(!kyc.allowed)return reply.code(403).send({error:'kyc_required',kycStatus:kyc.status});
    if(!id(b.assetId)||!amount(b.amount)||typeof b.network!=='string'||!b.network.trim()||b.network.length>50||typeof b.destination!=='string'||b.destination.length<10||b.destination.length>500||(b.memo!=null&&(typeof b.memo!=='string'||b.memo.length>200))||!idem(b.idempotencyKey))
      return reply.code(400).send({error:'invalid_withdrawal'});
    const destinationCardId=Number.isSafeInteger(Number(b.destinationCardId))?Number(b.destinationCardId):0;
    let fundingSecurity:{asset:any;card:any}=null as any;
    try{fundingSecurity=await requireTomanWithdrawalSecurity(pool,req,customer,Number(b.assetId),destinationCardId);}
-   catch(e){const code=e instanceof Error?e.message:'withdrawal_security_failed';return reply.code(code==='crypto_withdrawal_locked_24h'?423:400).send({error:code});}
+   catch(e){const code=e instanceof Error?e.message:'withdrawal_security_failed';const security=(e as any)?.security;return reply.code(['crypto_withdrawal_locked_24h','security_hold','first_toman_deposit_24h'].includes(code)?423:400).send({error:code,message:security?.message});}
    const requestFingerprint=fp({assetId:b.assetId,amount:b.amount,network:b.network.trim(),destination:b.destination.trim(),memo:b.memo??null,destinationCardId:destinationCardId||null});
    const client=await pool.connect();
    try{
