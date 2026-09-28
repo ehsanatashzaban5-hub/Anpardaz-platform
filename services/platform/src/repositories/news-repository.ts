@@ -25,6 +25,7 @@ export class NewsRepository {
       ),
       this.pool.query<{ total: string }>(
         `SELECT COUNT(*)::text AS total FROM news_articles WHERE status='published' AND ($1::text IS NULL OR category_slug=$1)`,
+        [category ?? null],
       ),
     ]);
     return { items: items.rows, total: Number(count.rows[0]?.total ?? 0) };
