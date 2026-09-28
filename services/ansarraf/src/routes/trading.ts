@@ -238,8 +238,11 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
      const netAmount=String(w.net_amount??w.amount);
      const feeAmount=String(w.fee_amount??'0');
      const ledger=await fetch(base+'/internal/v1/ledger/transactions',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({referenceType:'ansarraf_toman_withdrawal',referenceId:String(wid),operationId:String(w.operation_id),idempotencyKey:'ansarraf:toman-withdrawal:'+wid,description:'Admin-approved Toman withdrawal payout',entries:[{accountId:customerAccount,direction:'debit',amount:String(w.amount),currency:w.symbol},{accountId:cashAccount,direction:'credit',amount:netAmount,currency:w.symbol},...(Number(feeAmount)>0?[{accountId:revenueAccount,direction:'credit',amount:feeAmount,currency:w.symbol}]:[])]})});if(!ledger.ok)throw new Error('accounting_post_failed');
-     await client.query('UPDATE wallets SET locked_balance=locked_balance-$1 WHERE id=$2 AND locked_balance >= $1',[reservation.amount,reservation.wallet_id]);
-     await client.query("UPDATE withdrawal_reservations SET status='captured',resolved_at=NOW() WHERE id=$1",[reservation.id]);
+     const walletRelease=await client.query('UPDATE wallets SET locked_balance=locked_balance-$1 WHERE id=$2 AND locked_balance >= $1 RETURNING id',[reservation.amount,reservation.wallet_id]);
+     if(!walletRelease.rows[0])throw new Error('withdrawal_wallet_reservation_invariant_failed');
+     await client.query("UPDATE withdrawal_reservations SET status='captured',resolved_at=NOW() WHERE id=$1 AND status='active'",[reservation.id]);
+     const reservationState=await client.query("SELECT status FROM withdrawal_reservations WHERE id=$1",[reservation.id]);
+     if(reservationState.rows[0]?.status!=='captured')throw new Error('withdrawal_reservation_capture_failed');
      const out=(await client.query("UPDATE withdrawals SET status='completed',completed_at=NOW(),external_reference=$2 WHERE id=$1 RETURNING *",[wid,reference])).rows[0];
      await client.query('COMMIT');return{withdrawal:out};
    }catch(e){await client.query('ROLLBACK');return reply.code(400).send({error:e instanceof Error?e.message:'toman_withdrawal_completion_failed'});}finally{client.release();}
