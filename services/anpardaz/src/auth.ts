@@ -14,8 +14,10 @@ export async function requireAuth(req: FastifyRequest, reply: FastifyReply) {
   const c = token ? verifyIdentityToken(token) : null;
   if (!c) return reply.code(401).send({ error: 'unauthorized' });
   try {
-    const upstream = await fetch(identityUrl() + '/api/v1/auth/me', {
-      headers: { authorization: 'Bearer ' + token, accept: 'application/json' },
+    const internalToken = process.env.ANPARDAZ_INTERNAL_TOKEN?.trim();
+    if (!internalToken) return reply.code(503).send({ error: 'internal_identity_token_not_configured' });
+    const upstream = await fetch(identityUrl() + '/internal/v1/identity/introspect', {
+      headers: { authorization: 'Bearer ' + internalToken, 'x-identity-token': token, accept: 'application/json' },
       signal: AbortSignal.timeout(4000),
       cache: 'no-store',
     });
