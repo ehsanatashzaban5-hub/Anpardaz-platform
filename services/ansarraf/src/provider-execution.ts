@@ -28,7 +28,11 @@ export async function provisionProviderExecution(pool:Pool,orderId:number){
   );
   const order=orderResult.rows[0];
   if(!order)return {enabled:true,created:false,reason:'order_not_found'};
-  if(!['open','partially_filled'].includes(order.status))return {enabled:true,created:false,reason:'order_not_open'};
+  if(order.status!=='open'&&order.status!=='partially_filled')return {enabled:true,created:false,reason:'order_not_open'};
+  if(order.status==='open'||order.status==='partially_filled'){
+    const customerStatus=await pool.query('SELECT status,security_hold_reason FROM customers WHERE id=$1 LIMIT 1',[order.customer_id]);
+    if(customerStatus.rows[0]?.status==='blocked')return {enabled:true,created:false,reason:'customer_security_hold'};
+  }
 
   const existing=await pool.query(
     `SELECT po.* FROM provider_orders po
