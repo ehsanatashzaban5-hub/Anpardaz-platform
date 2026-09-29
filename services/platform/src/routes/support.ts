@@ -109,7 +109,7 @@ export function registerSupportRoutes(app: FastifyInstance, pool: Pool) {
     }
   });
 
-  app.get('/api/v1/admin/support/tickets', { preHandler: requireAuth }, async (req, reply) => {
+  app.get('/internal/v1/admin/support/tickets', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await adminOnly(pool, req, reply, 'support.read'))) return;
     const result = await pool.query(
       'SELECT t.id,t.subject,t.status,t.priority,t.created_at,t.updated_at,t.closed_at,u.email,u.display_name FROM support_tickets t JOIN platform_users u ON u.id=t.user_id ORDER BY t.updated_at DESC LIMIT 500',
@@ -117,7 +117,7 @@ export function registerSupportRoutes(app: FastifyInstance, pool: Pool) {
     return { tickets: result.rows };
   });
 
-  app.get('/api/v1/admin/support/tickets/:id', { preHandler: requireAuth }, async (req, reply) => {
+  app.get('/internal/v1/admin/support/tickets/:id', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await adminOnly(pool, req, reply, 'support.read'))) return;
     const id = Number((req.params as { id: string }).id);
     if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'invalid_ticket_id' });
@@ -133,7 +133,7 @@ export function registerSupportRoutes(app: FastifyInstance, pool: Pool) {
     return { ticket, messages: messages.rows };
   });
 
-  app.post('/api/v1/admin/support/tickets/:id/reply', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/internal/v1/admin/support/tickets/:id/reply', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await adminOnly(pool, req, reply, 'support.write'))) return;
     const id = Number((req.params as { id: string }).id);
     const body = (req.body ?? {}) as { message?: unknown };
@@ -171,7 +171,7 @@ export function registerSupportRoutes(app: FastifyInstance, pool: Pool) {
     }
   });
 
-  app.post('/api/v1/admin/support/tickets/:id/close', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/internal/v1/admin/support/tickets/:id/close', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await adminOnly(pool, req, reply, 'support.write'))) return;
     const id = Number((req.params as { id: string }).id);
     if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'invalid_ticket_id' });
