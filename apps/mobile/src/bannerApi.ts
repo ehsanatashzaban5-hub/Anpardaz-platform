@@ -1,4 +1,4 @@
-const BASE=((import.meta as any).env?.VITE_BANNER_API_URL as string|undefined)?.replace(/\/$/,"")??"/banner";
+const BASE=((import.meta as any).env?.VITE_BANNER_API_URL as string|undefined)?.replace(/\/$/,"")??"";
 function token(){return localStorage.getItem("anpardaz:accessToken")??localStorage.getItem("accessToken")??"";}
 async function call(path:string,init:RequestInit={}){const t=token();if(!t)throw new Error("banner_auth_required");const r=await fetch(BASE+path,{...init,headers:{"content-type":"application/json",authorization:"Bearer "+t,...(init.headers??{})},cache:"no-store"});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(body?.error??"banner_request_failed"));return body;}
 export type BannerApiListing={id:number;identity_id:string;category_id:number;category_name:string;title:string;description:string;price:number|null;currency:string;condition:string;city:string;status:string;views:number;created_at:string;updated_at:string;media_ids:number[];attributes?:Record<string,unknown>;category_slug?:string;seller_display_name?:string};
