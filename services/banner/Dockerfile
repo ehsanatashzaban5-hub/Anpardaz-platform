@@ -9,7 +9,7 @@ COPY services/banner/tsconfig.json services/banner/tsconfig.json
 RUN pnpm install --no-frozen-lockfile --ignore-scripts --filter @anpardaz/banner-service...
 COPY services/banner/src services/banner/src
 RUN pnpm --filter @anpardaz/banner-service build
-RUN pnpm --filter @anpardaz/banner-service deploy --prod /out
+RUN pnpm --filter @anpardaz/banner-service deploy --prod --legacy /out
 FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
