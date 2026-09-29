@@ -9,7 +9,7 @@ COPY services/accounting/tsconfig.json services/accounting/tsconfig.json
 RUN pnpm install --no-frozen-lockfile --ignore-scripts --filter @anpardaz/accounting-service...
 COPY services/accounting/src services/accounting/src
 RUN pnpm --filter @anpardaz/accounting-service build
-RUN pnpm --filter @anpardaz/accounting-service deploy --prod /out
+RUN pnpm --filter @anpardaz/accounting-service deploy --prod --legacy /out
 
 FROM node:24-alpine
 WORKDIR /app
