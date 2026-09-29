@@ -9,7 +9,7 @@ COPY services/ansarraf/tsconfig.json services/ansarraf/tsconfig.json
 RUN pnpm install --no-frozen-lockfile --ignore-scripts --filter @anpardaz/ansarraf-service...
 COPY services/ansarraf/src services/ansarraf/src
 RUN pnpm --filter @anpardaz/ansarraf-service build
-RUN pnpm --filter @anpardaz/ansarraf-service deploy --prod /out
+RUN pnpm --filter @anpardaz/ansarraf-service deploy --prod --legacy /out
 FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
