@@ -6,7 +6,7 @@ on:
   pull_request:
 
 concurrency:
-  group: anpardaz-docker-${github.ref}
+  group: anpardaz-docker-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -41,13 +41,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: docker build --pull -f "${matrix.dockerfile}" -t "${matrix.tag}" "${matrix.context}"
+        run: docker build --pull -f "${{ matrix.dockerfile }}" -t "${{ matrix.tag }}" "${{ matrix.context }}"
 
   compose-validation:
     name: Validate production Compose
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare CI env files
+        run: |
+          touch infrastructure/production/platform.env infrastructure/production/anpardaz.env infrastructure/production/ansarraf.env infrastructure/production/banner.env infrastructure/production/accounting.env
       - name: Validate Compose files
         env:
           ANPARDAZ_DB_PASSWORD: ci
