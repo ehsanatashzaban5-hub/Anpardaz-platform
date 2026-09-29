@@ -18,7 +18,7 @@ app.post('/internal/v1/identity/introspect',async(request,reply)=>{
   if(!u?.rows[0]||u.rows[0].status!=='active')return reply.code(401).send({error:'unauthorized'});
   return {user:u.rows[0]};
 });app.addHook('onRequest',async(request,reply)=>{
- if(request.url.startsWith('/api/v1/admin/')){
+ if(request.url.startsWith('/internal/v1/admin/')){
    const gatewayToken=String(request.headers['x-admin-gateway-token']??'');
    if(!gatewayToken||gatewayToken!==process.env.ADMIN_INTERNAL_TOKEN)return reply.code(404).send({error:'not_found'});
  }
