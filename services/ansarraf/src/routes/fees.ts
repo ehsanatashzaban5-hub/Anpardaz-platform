@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 import { ensureCustomer, requireAuth, type AuthClaims } from '../auth.js';
+import { requireAdminInternal } from './admin-internal-auth.js';
 
 const adminRoles=new Set(['admin','super_admin']);
 const actor=(request:any)=>request.auth as AuthClaims;
@@ -24,8 +25,8 @@ export function registerFeeRoutes(app: FastifyInstance, pool: Pool) {
     return { customerId, rules: rules.rows, customerRules: rules.rows, providerRules: provider.rows, source:'database' };
   });
 
-  app.get('/api/v1/admin/fees', { preHandler: requireAuth }, async (request,reply) => {
-    if(!adminRoles.has(actor(request).role))return reply.code(403).send({error:'forbidden'});
+  app.get('/internal/v1/admin/fees', async (request,reply) => {
+    if(!requireAdminInternal(request,reply,['admin','super_admin']))return;
     const q=await pool.query(
       `SELECT id,service,operation_type,asset_symbol,market_symbol,percentage,fixed_amount,min_amount,max_amount,fee_asset_symbol,effective_from,effective_to,metadata
        FROM customer_fee_rules WHERE service='ansarraf' ORDER BY operation_type,effective_from DESC,id DESC`
@@ -33,9 +34,10 @@ export function registerFeeRoutes(app: FastifyInstance, pool: Pool) {
     return {rules:q.rows};
   });
 
-  app.post('/api/v1/admin/fees', { preHandler: requireAuth }, async (request,reply) => {
-    const auth=actor(request);
-    if(!adminRoles.has(auth.role))return reply.code(403).send({error:'forbidden'});
+  app.post('/internal/v1/admin/fees', async (request,reply) => {
+    const admin=requireAdminInternal(request,reply,['admin','super_admin']);
+    if(!admin)return;
+    const auth={sub:admin.identityId} as AuthClaims;
     const b=(request.body??{}) as any;
     const operationType=String(b.operationType??'').trim();
     const assetSymbol=b.assetSymbol==null?null:String(b.assetSymbol).trim().toUpperCase()||null;
@@ -78,9 +80,10 @@ export function registerFeeRoutes(app: FastifyInstance, pool: Pool) {
     }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
   });
 
-  app.post('/api/v1/admin/fees/:id/close', { preHandler: requireAuth }, async (request,reply) => {
-    const auth=actor(request);
-    if(!adminRoles.has(auth.role))return reply.code(403).send({error:'forbidden'});
+  app.post('/internal/v1/admin/fees/:id/close', async (request,reply) => {
+    const admin=requireAdminInternal(request,reply,['admin','super_admin']);
+    if(!admin)return;
+    const auth={sub:admin.identityId} as AuthClaims;
     const id=Number((request.params as any).id);
     if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_fee_rule_id'});
     const client=await pool.connect();
