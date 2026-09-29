@@ -76,6 +76,8 @@ jobs:
             path: services/ansarraf
           - name: platform-service
             path: services/platform
+          - name: admin-service
+            path: services/admin
           - name: banner-service
             path: services/banner
           - name: accounting-service
