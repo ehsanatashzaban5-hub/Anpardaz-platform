@@ -65,7 +65,12 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install
         working-directory: ${{ matrix.path }}
-        run: pnpm install --frozen-lockfile
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          else
+            pnpm install --no-frozen-lockfile
+          fi
       - name: Audit high and critical vulnerabilities
         working-directory: ${{ matrix.path }}
         run: pnpm audit --audit-level high
