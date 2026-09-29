@@ -6,6 +6,25 @@ const iranOnlyPath=(url:string)=>/^\/api\/v1\/(?:cards(?:\/|$)|services(?:\/|$)|
 const deviceSecurityExempt=(url:string)=>/^\/api\/v1\/(?:cards\/registration\/callback|device-security(?:\/|$))/.test(url);
 const providerCallbackPath=(url:string)=>/^\/api\/v1\/cards\/registration\/callback(?:\?|$)/.test(url);
 const deviceTokenHash=(token:string)=>createHash('sha256').update(token).digest('hex');
+const securityKey=(scope:string,ip:string,identity:string)=>createHash('sha256').update(`${scope}|${ip}|${identity}`).digest('hex');
+async function allowSecurityRate(pool:Pool,scope:string,request:FastifyRequest,identity:string,limit:number){
+  const minute=new Date(Math.floor(Date.now()/60000)*60000);
+  const key=securityKey(scope,request.ip,identity);
+  const r=await pool.query<{request_count:number}>(`INSERT INTO security_rate_limits(scope,key_hash,window_start,request_count)
+    VALUES($1,$2,$3,1)
+    ON CONFLICT(scope,key_hash,window_start) DO UPDATE SET request_count=security_rate_limits.request_count+1
+    RETURNING request_count`,[scope,key,minute]);
+  return Number(r.rows[0]?.request_count??0)<=limit;
+}
+const protectedRateLimit=(method:string,url:string)=>{
+  if(method!=='POST')return null;
+  if(/^\/api\/v1\/transfers(?:\/|$)/.test(url))return ['transfer',10] as const;
+  if(/^\/api\/v1\/topups(?:\/|$)/.test(url))return ['topup',10] as const;
+  if(url==='/api/v1/cards/balance')return ['card_balance',10] as const;
+  if(/^\/api\/v1\/cards\/registration\/(?:start|cancel)$/.test(url))return ['card_registration',10] as const;
+  if(/^\/api\/v1\/device-security\/(?:registration|authentication)\/(?:options|verify)$/.test(url))return ['device_security',10] as const;
+  return ['protected_api',120] as const;
+};
 app.addHook('onRequest',async(request,reply)=>{
   if(!iranOnlyPath(request.url)||providerCallbackPath(request.url))return;
   const allowed=await requireIranIpInProduction(request,reply);
@@ -20,6 +39,11 @@ app.addHook('onRequest',async(request,reply)=>{
   if(!customerId){await reply.code(403).send({error:'device_security_required'});return reply;}
   const session=await pool!.query('SELECT 1 FROM device_security_sessions WHERE token_hash=$1 AND customer_id=$2 AND expires_at>NOW() AND revoked_at IS NULL LIMIT 1',[deviceTokenHash(deviceToken),customerId]);
   if(!session.rows[0]){await reply.code(403).send({error:'device_security_required',message:'برای ادامه، قفل امن گوشی را تأیید کنید.'});return reply;}
+  const rate=protectedRateLimit(request.method,request.url.split('?')[0]);
+  if(rate){
+    const ok=await allowSecurityRate(pool,rate[0],request,String(claims.sub),rate[1]);
+    if(!ok){await reply.code(429).send({error:'security_rate_limited',message:'تعداد درخواست‌های این خدمت در مدت کوتاه بیش از حد مجاز است. لطفاً کمی بعد دوباره تلاش کنید.'});return reply;}
+  }
 });
 app.get('/api/v1/access/region',async(request)=>{const d=await iranIpDecision(request);return{allowed:d.allowed,countryCode:d.countryCode,source:d.source};});
 const webauthnRpName=process.env.WEBAUTHN_RP_NAME??'An Pardaz';
