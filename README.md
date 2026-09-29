@@ -134,3 +134,13 @@ The repository now contains the core service, database, identity, moderation, ma
 ## © An Pardaz
 
 **An Pardaz — همه‌چیز در یک اپلیکیشن**
+
+
+## Independent Admin boundary
+
+The Admin Frontend is intentionally separate from the user Web/Mobile applications. Its only backend is `services/admin` (port 4006). The Admin Backend authenticates administrators through the Platform identity/control-plane API and exposes the browser-facing `/api/v1/admin/*` boundary. Platform admin routes are gateway-protected and are not a public browser API.
+
+Flow:
+`Admin Frontend -> Admin Backend -> authenticated domain/control-plane APIs -> owning databases -> Accounting where financial -> audit/trace`.
+
+The Admin Backend does not connect directly to PostgreSQL and does not duplicate domain business logic.

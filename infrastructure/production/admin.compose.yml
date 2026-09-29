@@ -1,0 +1,13 @@
+services:
+  admin:
+    build:
+      context: ../..
+      dockerfile: services/admin/Dockerfile
+    env_file:
+      - admin.env
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4006:4006"
+    read_only: true
+    tmpfs:
+      - /tmp
