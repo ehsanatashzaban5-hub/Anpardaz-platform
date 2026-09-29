@@ -102,14 +102,11 @@ jobs:
       - name: Install dependencies
         working-directory: ${{ matrix.path }}
         run: |
-          if [ "${{ matrix.name }}" = "mobile" ]; then
-            pnpm install --no-frozen-lockfile --ignore-workspace
-          elif [ "${{ matrix.name }}" = "web" ]; then
-            pnpm install --no-frozen-lockfile --ignore-workspace
-          elif [ -f pnpm-lock.yaml ]; then
-            pnpm install --frozen-lockfile --ignore-scripts
+          set -euo pipefail
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --ignore-workspace --frozen-lockfile --ignore-scripts
           else
-            pnpm install --no-frozen-lockfile
+            pnpm install --no-frozen-lockfile --ignore-scripts
           fi
       - name: Build
         working-directory: ${{ matrix.path }}
