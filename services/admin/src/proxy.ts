@@ -63,7 +63,7 @@ export async function proxyAdminMultipart(request:AdminRequest,reply:FastifyRepl
 }
 
 
-function adminPermissionForPath(wildcard:string,method:string):string{
+export function adminPermissionForPath(wildcard:string,method:string):string{
   const p=wildcard.replace(/^\/+/, '');
   const write=!['GET','HEAD'].includes(method);
   if(p==='overview') return 'users.read';
@@ -87,7 +87,6 @@ function adminPermissionForPath(wildcard:string,method:string):string{
 
 export async function proxyAdminRequest(request:AdminRequest,reply:FastifyReply){
   const permission=adminPermissionForPath(String((request.params as {'*':string})['*']??''),request.method);
-  const identity=await requireAdmin(request,reply,permission); if(identity===undefined&&reply.sent)return;
   const wildcard=String((request.params as {'*':string})['*']??'').replace(/^\//,'');
   if(!wildcard||wildcard.includes('..')||wildcard.includes('\\')) return reply.code(400).send({error:'invalid_admin_path'});
   const target=platformUrl()+'/internal/v1/admin/'+wildcard;
