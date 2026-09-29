@@ -53,7 +53,7 @@ export async function adminLogin(body: unknown, reply: FastifyReply) {
 }
 
 export async function proxyAdminMultipart(request:AdminRequest,reply:FastifyReply){
-  const wildcard=String((request.params as {'*':string})['*']??'').replace(/^\\//,'');
+  const wildcard=String((request.params as {'*':string})['*']??'').replace(/^\//,'');
   if(wildcard!=='content/videos') return reply.code(404).send({error:'unsupported_multipart_admin_path'});
   const parts=request.parts();
   const form=new FormData();
@@ -78,15 +78,14 @@ export async function proxyAdminRequest(request:AdminRequest,reply:FastifyReply)
   const wildcard=String((request.params as {'*':string})['*']??'').replace(/^\//,'');
   if(!wildcard||wildcard.includes('..')||wildcard.includes('\\')) return reply.code(400).send({error:'invalid_admin_path'});
   const target=platformUrl()+'/internal/v1/admin/'+wildcard;
-  const headers:Record<string,string>={};
-  headers.authorization=String(request.headers.authorization??'');
-  headers['x-admin-gateway-token']=internalToken();
-  headers.accept='application/json';
-  const contentType=request.headers['content-type'];
-  if(typeof contentType==='string') headers['content-type']=contentType;
+  const headers:Record<string,string>={
+    authorization:String(request.headers.authorization??''),
+    'x-admin-gateway-token':internalToken(),
+    accept:'application/json'
+  };
   const contentType=String(request.headers['content-type']??'');
-  const isMultipart=contentType.toLowerCase().startsWith('multipart/form-data');
-  if(isMultipart) return reply.code(415).send({error:'multipart_not_supported_for_admin_path'});
+  if(contentType) headers['content-type']=contentType;
+  if(contentType.toLowerCase().startsWith('multipart/form-data')) return reply.code(415).send({error:'multipart_not_supported_for_admin_path'});
   const body=request.body===undefined||request.body===null?undefined:JSON.stringify(request.body);
   const r=await fetch(target,{
     method:request.method,
