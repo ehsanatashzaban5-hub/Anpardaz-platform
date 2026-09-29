@@ -48,6 +48,18 @@ jobs:
             df="${{ matrix.context }}/${{ matrix.dockerfile }}"
           fi
           docker build --pull -f "$df" -t "${{ matrix.tag }}" "${{ matrix.context }}"
+          if [ "${{ matrix.context }}" = "apps/mobile" ]; then
+            docker run -d --name anpardaz-mobile-health "${{ matrix.tag }}"
+            trap 'docker rm -f anpardaz-mobile-health >/dev/null 2>&1 || true' EXIT
+            for attempt in $(seq 1 12); do
+              status="$(docker inspect --format '{{.State.Health.Status}}' anpardaz-mobile-health)"
+              if [ "$status" = "healthy" ]; then exit 0; fi
+              if [ "$status" = "unhealthy" ]; then docker logs anpardaz-mobile-health; exit 1; fi
+              sleep 5
+            done
+            docker logs anpardaz-mobile-health
+            exit 1
+          fi
 
   compose-validation:
     name: Validate production Compose
