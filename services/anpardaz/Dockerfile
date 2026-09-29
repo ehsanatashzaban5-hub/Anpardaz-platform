@@ -9,7 +9,7 @@ COPY services/anpardaz/tsconfig.json services/anpardaz/tsconfig.json
 RUN pnpm install --no-frozen-lockfile --ignore-scripts --filter @anpardaz/anpardaz-service...
 COPY services/anpardaz/src services/anpardaz/src
 RUN pnpm --filter @anpardaz/anpardaz-service build
-RUN pnpm --filter @anpardaz/anpardaz-service deploy --prod /out
+RUN pnpm --filter @anpardaz/anpardaz-service deploy --prod --legacy /out
 FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
