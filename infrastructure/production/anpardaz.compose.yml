@@ -1,8 +1,8 @@
 services:
   anpardaz:
     build:
-      context: ../../services/anpardaz
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/anpardaz/Dockerfile
     restart: unless-stopped
     env_file:
       - ./anpardaz.env
