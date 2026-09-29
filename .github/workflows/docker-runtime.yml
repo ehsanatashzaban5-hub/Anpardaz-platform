@@ -39,7 +39,7 @@ jobs:
             dockerfile: Dockerfile
             tag: anpardaz-mobile:ci
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Build
         run: |
           if [ "${{ matrix.context }}" = "." ]; then
@@ -48,12 +48,24 @@ jobs:
             df="${{ matrix.context }}/${{ matrix.dockerfile }}"
           fi
           docker build --pull -f "$df" -t "${{ matrix.tag }}" "${{ matrix.context }}"
+          if [ "${{ matrix.context }}" = "apps/mobile" ]; then
+            docker run -d --name anpardaz-mobile-health "${{ matrix.tag }}"
+            trap 'docker rm -f anpardaz-mobile-health >/dev/null 2>&1 || true' EXIT
+            for attempt in $(seq 1 12); do
+              status="$(docker inspect --format '{{.State.Health.Status}}' anpardaz-mobile-health)"
+              if [ "$status" = "healthy" ]; then exit 0; fi
+              if [ "$status" = "unhealthy" ]; then docker logs anpardaz-mobile-health; exit 1; fi
+              sleep 5
+            done
+            docker logs anpardaz-mobile-health
+            exit 1
+          fi
 
   compose-validation:
     name: Validate production Compose
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Prepare CI env files
         run: |
           touch infrastructure/production/platform.env infrastructure/production/anpardaz.env infrastructure/production/ansarraf.env infrastructure/production/banner.env infrastructure/production/accounting.env
