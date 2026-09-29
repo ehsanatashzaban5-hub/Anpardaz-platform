@@ -84,6 +84,9 @@ export async function proxyAdminRequest(request:AdminRequest,reply:FastifyReply)
   headers.accept='application/json';
   const contentType=request.headers['content-type'];
   if(typeof contentType==='string') headers['content-type']=contentType;
+  const contentType=String(request.headers['content-type']??'');
+  const isMultipart=contentType.toLowerCase().startsWith('multipart/form-data');
+  if(isMultipart) return reply.code(415).send({error:'multipart_not_supported_for_admin_path'});
   const body=request.body===undefined||request.body===null?undefined:JSON.stringify(request.body);
   const r=await fetch(target,{
     method:request.method,
