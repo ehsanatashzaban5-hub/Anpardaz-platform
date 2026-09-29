@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import { requireAdmin, proxyAdminRequest, adminLogin } from './proxy.js';
 import { requireIranIpInProduction } from '@anpardaz/ip-region-policy';
 
@@ -19,6 +20,7 @@ if (production && origins.some(v=>v==='*' || v.startsWith('http://localhost') ||
   throw new Error('Production CORS_ORIGIN must not allow localhost or wildcard origins');
 }
 await app.register(cors,{origin:origins});
+await app.register(multipart,{limits:{fileSize:Number(process.env.ADMIN_MAX_UPLOAD_BYTES??50*1024*1024),files:1,fields:10}});
 app.addHook('onRequest',async(request,reply)=>{
   if(request.url.startsWith('/api/v1/admin/')) await requireIranIpInProduction(request,reply);
 });
