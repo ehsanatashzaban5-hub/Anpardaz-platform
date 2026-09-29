@@ -52,7 +52,7 @@ app.post('/internal/v1/admin/audit-event',async(request,reply)=>{
  const identityId=String(b.identityId??request.headers['x-admin-identity']??'').trim();
  const action=String(b.action??'').trim(),resourceType=String(b.resourceType??'').trim();
  if(!identityId||!action||!resourceType||action.length>200||resourceType.length>100)return reply.code(400).send({error:'invalid_audit_event'});
- await pool?.query('INSERT INTO audit_logs(identity_id,actor_type,actor_identity_id,action,resource_type,resource_id,reason,metadata) VALUES($1,\'admin\',$1,$2,$3,$4,$5,$6)',[identityId,action,resourceType,b.resourceId??null,String(b.reason??'Admin action'),b.metadata??{}]);
+ await pool?.query(`INSERT INTO admin_action_requests(actor_user_id,action,resource_type,resource_id,reason,status,metadata,completed_at) SELECT id,$2,$3,$4,$5,'completed',$6,NOW() FROM platform_users WHERE identity_id=$1`,[identityId,action,resourceType,b.resourceId??null,String(b.reason??'Admin action'),b.metadata??{}]);
  return {recorded:true};
 });
 
