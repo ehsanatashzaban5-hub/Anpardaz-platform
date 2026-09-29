@@ -48,11 +48,11 @@ import logoPostBank from "@/imports/postbank.png";
 import logoMellat from "@/imports/bank-mellat.png";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
+const ANSARRAF_API_BASE = ((import.meta as any).env?.VITE_ANSARRAF_API_URL as string | undefined)?.replace(/\/$/,"") ?? "/ansarraf";
 const ANPARDAZ_API_BASE = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
-const AUTH_API_BASE = ((import.meta as any).env?.VITE_PLATFORM_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
+const AUTH_API_BASE = ((import.meta as any).env?.VITE_PLATFORM_API_URL as string | undefined)?.replace(/\/$/,"") ?? "/platform";
 
-const ANMARKET_PLATFORM_API_BASE=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")??"";
+const ANMARKET_PLATFORM_API_BASE=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")??"/platform";
 
 async function fetchLiveServiceCatalog(serviceCode:string,operator:string,simType:string){
   if(!ANPARDAZ_API_BASE)throw new Error("anpardaz_api_unconfigured");
