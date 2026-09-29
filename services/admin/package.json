@@ -2,7 +2,19 @@
   "name": "@anpardaz/admin-service",
   "private": true,
   "type": "module",
-  "scripts": {"dev":"node --watch src/main.ts","build":"tsc -p tsconfig.json","start":"node dist/main.js"},
-  "dependencies": {"@fastify/cors":"11.3.0","fastify":"5.12.5","@anpardaz/ip-region-policy":"workspace:*"},
-  "devDependencies": {"@types/node":"24.13.5","typescript":"7.0.2"}
+  "scripts": {
+    "dev": "node --watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "11.3.0",
+    "fastify": "5.12.5",
+    "@anpardaz/ip-region-policy": "workspace:*",
+    "@fastify/multipart": "9.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.5",
+    "typescript": "7.0.2"
+  }
 }
