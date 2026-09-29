@@ -60,13 +60,13 @@ export function registerProviderFundingRoutes(app:FastifyInstance,pool:Pool){
     return{provider:providerCode,address:row.address,memo:row.memo,network,safeForAutomaticAttribution:safe,requiresAdminReview:!safe,message:safe?'این آدرس در حال حاضر برای این کاربر قابل تطبیق است؛ اعتباردهی فقط پس از تأیید شبکه انجام می‌شود.':'این آدرس بین چند کاربر مشترک است؛ تا زمانی که شناسه اختصاصی و قابل‌اعتماد (آدرس اختصاصی یا memo/tag یکتا) نداشته باشیم، تراکنش به‌صورت خودکار به موجودی هیچ کاربری اضافه نمی‌شود و باید مدیر آن را تطبیق دهد.'};
   });
 
-  app.get('/api/v1/admin/crypto-deposits',{preHandler:requireAuth},async(req,reply)=>{
-    const a=await admin(req,reply);if(!a)return;
+  app.get('/internal/v1/admin/crypto-deposits',async(req,reply)=>{
+    const a=requireAdminInternal(req,reply,['admin','super_admin','operator']);if(!a)return;
     return{deposits:(await pool.query(`SELECT e.*,c.identity_id,c.email,a.symbol FROM provider_deposit_events e LEFT JOIN customers c ON c.id=e.customer_id LEFT JOIN assets a ON a.id=e.asset_id ORDER BY e.detected_at DESC LIMIT 500`)).rows};
   });
 
-  app.post('/api/v1/admin/crypto-deposits/:id/approve',{preHandler:requireAuth},async(req,reply)=>{
-    const a=await admin(req,reply);if(!a)return;
+  app.post('/internal/v1/admin/crypto-deposits/:id/approve',async(req,reply)=>{
+    const a=requireAdminInternal(req,reply,['admin','super_admin','operator']);if(!a)return;
     const id=Number((req.params as any).id),customerId=Number((req.body as any)?.customerId);
     if(!Number.isSafeInteger(id)||id<=0||!Number.isSafeInteger(customerId)||customerId<=0)return reply.code(400).send({error:'event_and_customer_required'});
     const client=await pool.connect();
