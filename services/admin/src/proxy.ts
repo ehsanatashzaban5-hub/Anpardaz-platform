@@ -27,12 +27,38 @@ export async function requireAdmin(request:AdminRequest,reply:FastifyReply){
   request.adminIdentity=await r.json() as Identity;
 }
 
+export async function adminLogin(body: unknown, reply: FastifyReply) {
+  const r = await fetch(platformUrl()+'/api/v1/auth/login',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify(body),
+    signal:AbortSignal.timeout(5000)
+  });
+  const data=await r.json().catch(()=>({error:'authentication_failed'}));
+  if(!r.ok) return reply.code(r.status).send(data);
+  const token=String((data as {accessToken?:string}).accessToken??'');
+  if(!token) return reply.code(502).send({error:'authentication_failed'});
+  const check=await fetch(platformUrl()+'/internal/v1/admin/authorize',{
+    method:'POST',
+    headers:{
+      authorization:'Bearer '+internalToken(),
+      'content-type':'application/json',
+      'x-identity-token':token,
+      'x-admin-permission':'admin.read'
+    },
+    signal:AbortSignal.timeout(5000)
+  });
+  if(!check.ok) return reply.code(403).send({error:'admin_access_required'});
+  return reply.send(data);
+}
+
 export async function proxyAdminRequest(request:AdminRequest,reply:FastifyReply){
   const wildcard=String((request.params as {'*':string})['*']??'').replace(/^\//,'');
   if(!wildcard||wildcard.includes('..')||wildcard.includes('\\')) return reply.code(400).send({error:'invalid_admin_path'});
   const target=platformUrl()+'/api/v1/admin/'+wildcard;
   const headers:Record<string,string>={};
   headers.authorization=String(request.headers.authorization??'');
+  headers['x-admin-gateway-token']=internalToken();
   headers.accept='application/json';
   const contentType=request.headers['content-type'];
   if(typeof contentType==='string') headers['content-type']=contentType;
