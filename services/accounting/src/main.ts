@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import { createHash } from 'node:crypto';
 import { Pool } from 'pg';
 
-const isProduction=process.env.NODE_ENV==='production';const app=Fastify({logger:true,trustProxy:process.env.TRUST_PROXY==='true'});if(isProduction&&process.env.TRUST_PROXY!=='true')throw new Error('Production accounting service must trust the configured HTTPS reverse proxy');
+const isProduction=process.env.NODE_ENV==='production';const app=Fastify({logger:true,trustProxy:process.env.TRUST_PROXY==='true'});
 const port=Number(process.env.PORT??4004);
 const databaseUrl=process.env.DATABASE_URL;
 if(!databaseUrl)throw new Error('DATABASE_URL must be configured');
