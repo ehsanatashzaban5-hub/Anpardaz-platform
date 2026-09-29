@@ -17,7 +17,13 @@ app.post('/internal/v1/identity/introspect',async(request,reply)=>{
   const u=await pool?.query('SELECT identity_id,email,display_name,role,status,phone FROM platform_users WHERE identity_id=$1 LIMIT 1',[claims.sub]);
   if(!u?.rows[0]||u.rows[0].status!=='active')return reply.code(401).send({error:'unauthorized'});
   return {user:u.rows[0]};
-});app.addHook('onRequest',async(request,reply)=>{if(request.url.startsWith('/api/v1/')&&!request.url.startsWith('/api/v1/access/region'))await requireIranIpInProduction(request,reply);});app.get('/api/v1/access/region',async(request)=>{const d=await iranIpDecision(request);return{allowed:d.allowed,countryCode:d.countryCode,source:d.source};});app.post('/internal/v1/admin/authorize',async(request,reply)=>{
+});app.addHook('onRequest',async(request,reply)=>{
+ if(request.url.startsWith('/api/v1/admin/')){
+   const gatewayToken=String(request.headers['x-admin-gateway-token']??'');
+   if(!gatewayToken||gatewayToken!==process.env.ADMIN_INTERNAL_TOKEN)return reply.code(404).send({error:'not_found'});
+ }
+});
+app.addHook('onRequest',async(request,reply)=>{if(request.url.startsWith('/api/v1/')&&!request.url.startsWith('/api/v1/access/region'))await requireIranIpInProduction(request,reply);});app.get('/api/v1/access/region',async(request)=>{const d=await iranIpDecision(request);return{allowed:d.allowed,countryCode:d.countryCode,source:d.source};});app.post('/internal/v1/admin/authorize',async(request,reply)=>{
  const token=String(request.headers.authorization??'').startsWith('Bearer ')?String(request.headers.authorization).slice(7):'';
  if(!token||token!==process.env.ADMIN_INTERNAL_TOKEN)return reply.code(401).send({error:'unauthorized'});
  const identityToken=String(request.headers['x-identity-token']??'');
