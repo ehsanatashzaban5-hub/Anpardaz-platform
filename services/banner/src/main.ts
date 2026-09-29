@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import {requireAuth,requireAdminInternal,type AuthClaims} from './auth.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
-const app=Fastify({logger:true});
+const app=Fastify({logger:true,trustProxy:process.env.TRUST_PROXY==='true'});
 const isProduction=process.env.NODE_ENV==='production';
 if(isProduction){for(const name of ['DATABASE_URL','CORS_ORIGIN','IDENTITY_ISSUER','IDENTITY_PUBLIC_KEY_B64','BANNER_INTERNAL_TOKEN']){const value=process.env[name];if(!value||value.includes('CHANGE_ME')||value.includes('your-web-domain.example')||value.includes('BASE64-DER-ED25519-PUBLIC-KEY'))throw new Error('Production environment variable '+name+' must be configured with a real value');}}
 const pool=new Pool({connectionString:process.env.DATABASE_URL,max:10,connectionTimeoutMillis:5000,idleTimeoutMillis:30000});
@@ -362,7 +362,7 @@ async function registerInternal(app:FastifyInstance){
 
 app.get('/health',async()=>({service:'banner',status:'ok'}));
 app.get('/health/db',async(_r,reply)=>{try{const r=await pool.query<{version:string}>('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1');return{service:'banner',database:'ok',migration:r.rows[0]?.version??null};}catch{return reply.code(503).send({service:'banner',database:'unavailable'});}});
-const origins=process.env.CORS_ORIGIN?.split(',').map(x=>x.trim()).filter(Boolean)??['http://localhost:5173'];await app.register(cors,{origin:origins});
+const origins=process.env.CORS_ORIGIN?.split(',').map(x=>x.trim()).filter(Boolean)??['http://localhost:5173'];if(isProduction&&origins.some(x=>x==='*'||x.startsWith('http://localhost')||x.startsWith('http://127.0.0.1')))throw new Error('Production CORS_ORIGIN must not allow localhost or wildcard origins');await app.register(cors,{origin:origins});app.addHook('onSend',async(_request,reply)=>{reply.header('X-Content-Type-Options','nosniff');reply.header('X-Frame-Options','DENY');reply.header('Referrer-Policy','strict-origin-when-cross-origin');reply.header('X-DNS-Prefetch-Control','off');reply.header('Permissions-Policy','camera=(),microphone=(),geolocation=()');reply.header('Cache-Control','no-store');if(isProduction)reply.header('Strict-Transport-Security','max-age=31536000; includeSubDomains');});
 await registerPublic(app);await registerPrivate(app);await registerInternal(app);
 const shutdown=async()=>{await app.close();await pool.end()};process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
 await app.listen({host:'0.0.0.0',port:Number(process.env.PORT??4005)});
