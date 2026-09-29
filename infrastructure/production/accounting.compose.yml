@@ -1,8 +1,8 @@
 services:
   accounting:
     build:
-      context: ../../services/accounting
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/accounting/Dockerfile
     restart: unless-stopped
     env_file:
       - ./accounting.env

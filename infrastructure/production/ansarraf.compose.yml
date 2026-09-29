@@ -1,8 +1,8 @@
 services:
   ansarraf:
     build:
-      context: ../../services/ansarraf
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/ansarraf/Dockerfile
     restart: unless-stopped
     env_file:
       - ./ansarraf.env

@@ -1,8 +1,8 @@
 services:
   banner:
     build:
-      context: ../../services/banner
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/banner/Dockerfile
     restart: unless-stopped
     env_file:
       - ./banner.env
@@ -24,8 +24,8 @@ services:
 
   platform:
     build:
-      context: ../../services/platform
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/platform/Dockerfile
     restart: unless-stopped
     env_file:
       - ./platform.env
@@ -47,8 +47,8 @@ services:
 
   platform-market-data-worker:
     build:
-      context: ../../services/platform
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/platform/Dockerfile
     command: ["node", "dist/workers/market-data.js"]
     restart: unless-stopped
     env_file:
@@ -63,8 +63,8 @@ services:
 
   platform-hoosh-worker:
     build:
-      context: ../../services/platform
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/platform/Dockerfile
     command: ["node", "dist/workers/hoosh.js"]
     restart: unless-stopped
     env_file:
@@ -79,8 +79,8 @@ services:
 
   platform-hoosh-media-worker:
     build:
-      context: ../../services/platform
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/platform/Dockerfile
     command: ["node", "dist/workers/hoosh-media.js"]
     restart: unless-stopped
     env_file:
@@ -95,8 +95,8 @@ services:
 
   platform-market-ingestion-worker:
     build:
-      context: ../../services/platform
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/platform/Dockerfile
     command: ["node", "dist/workers/market-ingestion.js"]
     restart: unless-stopped
     env_file:
@@ -111,8 +111,8 @@ services:
 
   platform-market-discovery-worker:
     build:
-      context: ../../services/platform
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: services/platform/Dockerfile
     command: ["node", "dist/workers/market-store-discovery.js"]
     restart: unless-stopped
     env_file:

@@ -1,0 +1,73 @@
+name: Docker Runtime Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: anpardaz-docker-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  container-builds:
+    name: Build production containers
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - context: .
+            dockerfile: services/platform/Dockerfile
+            tag: anpardaz-platform:ci
+          - context: .
+            dockerfile: services/anpardaz/Dockerfile
+            tag: anpardaz-anpardaz:ci
+          - context: .
+            dockerfile: services/ansarraf/Dockerfile
+            tag: anpardaz-ansarraf:ci
+          - context: .
+            dockerfile: services/banner/Dockerfile
+            tag: anpardaz-banner:ci
+          - context: .
+            dockerfile: services/accounting/Dockerfile
+            tag: anpardaz-accounting:ci
+          - context: apps/mobile
+            dockerfile: Dockerfile
+            tag: anpardaz-mobile:ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          if [ "${{ matrix.context }}" = "." ]; then
+            df="${{ matrix.dockerfile }}"
+          else
+            df="${{ matrix.context }}/${{ matrix.dockerfile }}"
+          fi
+          docker build --pull -f "$df" -t "${{ matrix.tag }}" "${{ matrix.context }}"
+
+  compose-validation:
+    name: Validate production Compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare CI env files
+        run: |
+          touch infrastructure/production/platform.env infrastructure/production/anpardaz.env infrastructure/production/ansarraf.env infrastructure/production/banner.env infrastructure/production/accounting.env
+      - name: Validate Compose files
+        env:
+          ANPARDAZ_DB_PASSWORD: ci
+          ANSARRAF_DB_PASSWORD: ci
+          PLATFORM_DB_PASSWORD: ci
+          BANNER_DB_PASSWORD: ci
+          ACCOUNTING_DB_PASSWORD: ci
+        run: |
+          docker compose -f infrastructure/production/platform.compose.yml config -q
+          docker compose -f infrastructure/production/anpardaz.compose.yml config -q
+          docker compose -f infrastructure/production/ansarraf.compose.yml config -q
+          docker compose -f infrastructure/production/accounting.compose.yml config -q
+          docker compose -f databases/docker-compose.yml config -q
+          docker compose -f apps/mobile/docker-compose.yml config -q
