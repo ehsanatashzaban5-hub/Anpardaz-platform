@@ -18,7 +18,7 @@ export function registerPlatformAdminAdapters(app:FastifyInstance){
   const identityId=String((request.params as {identityId:string}).identityId??'').trim(); if(!identityId||identityId.length>200)return reply.code(400).send({error:'invalid_identity_id'});
   const platform=env('PLATFORM_SERVICE_URL','http://127.0.0.1:4003');
   const [user,ansarraf,anpardaz,accounting,banner]=await Promise.all([
-   json(platform+'/api/v1/auth/me',String(request.headers.authorization??'').replace(/^Bearer /,'')),
+   json(platform+'/internal/v1/admin/users/'+encodeURIComponent(identityId),process.env.ADMIN_INTERNAL_TOKEN??''),
    json(env('ANSARRAF_SERVICE_URL','http://127.0.0.1:4002')+'/internal/v1/admin/users/'+encodeURIComponent(identityId)+'/summary',process.env.ANSARRAF_INTERNAL_TOKEN??''),
    json(env('ANPARDAZ_SERVICE_URL','http://127.0.0.1:4001')+'/internal/v1/admin/users/'+encodeURIComponent(identityId)+'/summary',process.env.ANPARDAZ_INTERNAL_TOKEN??''),
    json(env('ACCOUNTING_SERVICE_URL','http://127.0.0.1:4004')+'/internal/v1/ledger/accounts?ownerIdentityId='+encodeURIComponent(identityId)+'&limit=500',process.env.ACCOUNTING_INTERNAL_TOKEN??''),
