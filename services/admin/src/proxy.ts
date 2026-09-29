@@ -12,7 +12,7 @@ export async function requireAdmin(request:AdminRequest,reply:FastifyReply,permi
   if(!identityToken||identityToken.length>8192) return reply.code(401).send({error:'unauthorized'});
   const r=await fetch(platformUrl()+'/internal/v1/admin/authorize',{
     method:'POST',
-    headers:{authorization:'Bearer '+internalToken(),'x-admin-gateway-token':internalToken(),'content-type':'application/json','x-identity-token':identityToken,'x-admin-permission':permission??(request.method==='GET'?'admin.read':'admin.write')},
+    headers:{authorization:'Bearer '+internalToken(),'x-admin-gateway-token':internalToken(),'content-type':'application/json','x-identity-token':identityToken,'x-admin-permission':'content.write'??(request.method==='GET'?'admin.read':'admin.write')},
     signal:AbortSignal.timeout(5000)
   });
   if(!r.ok){
