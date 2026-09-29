@@ -3,11 +3,6 @@ services:
     build:
       context: ../..
       dockerfile: apps/web/Dockerfile
-      args:
-        VITE_PLATFORM_API_URL: ${VITE_PLATFORM_API_URL:-}
-        VITE_ANPARDAZ_API_URL: ${VITE_ANPARDAZ_API_URL:-/anpardaz}
-        VITE_ANSARRAF_API_URL: ${VITE_ANSARRAF_API_URL:-/ansarraf}
-        VITE_BANNER_API_URL: ${VITE_BANNER_API_URL:-/banner}
     restart: unless-stopped
     env_file:
       - ./web.env
