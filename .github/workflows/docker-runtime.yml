@@ -41,7 +41,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: if [ "${{ matrix.context }}" = "." ]; then df="${{ matrix.dockerfile }}"; else df="${{ matrix.context }}/${{ matrix.dockerfile }}"; fi
+        run: |
+          if [ "${{ matrix.context }}" = "." ]; then
+            df="${{ matrix.dockerfile }}"
+          else
+            df="${{ matrix.context }}/${{ matrix.dockerfile }}"
+          fi
           docker build --pull -f "$df" -t "${{ matrix.tag }}" "${{ matrix.context }}"
 
   compose-validation:
