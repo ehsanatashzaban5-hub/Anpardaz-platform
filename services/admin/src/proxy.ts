@@ -52,6 +52,28 @@ export async function adminLogin(body: unknown, reply: FastifyReply) {
   return reply.send(data);
 }
 
+export async function proxyAdminMultipart(request:AdminRequest,reply:FastifyReply){
+  const wildcard=String((request.params as {'*':string})['*']??'').replace(/^\\//,'');
+  if(wildcard!=='content/videos') return reply.code(404).send({error:'unsupported_multipart_admin_path'});
+  const parts=request.parts();
+  const form=new FormData();
+  for await (const part of parts){
+    if(part.type==='file'){
+      const bytes=await part.toBuffer();
+      form.append(part.fieldname,new Blob([bytes],{type:part.mimetype}),part.filename);
+    }else form.append(part.fieldname,part.value);
+  }
+  const r=await fetch(platformUrl()+'/internal/v1/admin/content/videos',{
+    method:'POST',
+    headers:{authorization:String(request.headers.authorization??''),'x-admin-gateway-token':internalToken(),accept:'application/json'},
+    body:form,
+    signal:AbortSignal.timeout(30000)
+  });
+  const text=await r.text(); const type=r.headers.get('content-type')??'';
+  if(type.includes('application/json')){try{return reply.code(r.status).send(JSON.parse(text));}catch{}}
+  return reply.code(r.status).type(type||'text/plain').send(text);
+}
+
 export async function proxyAdminRequest(request:AdminRequest,reply:FastifyReply){
   const wildcard=String((request.params as {'*':string})['*']??'').replace(/^\//,'');
   if(!wildcard||wildcard.includes('..')||wildcard.includes('\\')) return reply.code(400).send({error:'invalid_admin_path'});
