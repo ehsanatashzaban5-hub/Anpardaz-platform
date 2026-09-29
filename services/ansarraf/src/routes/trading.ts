@@ -1,4 +1,4 @@
-import type {FastifyInstance,FastifyRequest} from 'fastify';
+import type {FastifyInstance,FastifyRequest,FastifyReply} from 'fastify';
 import type {Pool} from 'pg';
 import {createHash,randomUUID} from 'node:crypto';
 import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
