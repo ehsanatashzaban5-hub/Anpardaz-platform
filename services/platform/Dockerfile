@@ -9,7 +9,7 @@ COPY services/platform/tsconfig.json services/platform/tsconfig.json
 RUN pnpm install --no-frozen-lockfile --ignore-scripts --filter @anpardaz/platform-service...
 COPY services/platform/src services/platform/src
 RUN pnpm --filter @anpardaz/platform-service build
-RUN pnpm --filter @anpardaz/platform-service deploy --prod /out
+RUN pnpm --filter @anpardaz/platform-service deploy --prod --legacy /out
 FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production
