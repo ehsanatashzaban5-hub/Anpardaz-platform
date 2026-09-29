@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import { createHash } from 'node:crypto';
 import { Pool } from 'pg';
 
-const app=Fastify({logger:true});
+const isProduction=process.env.NODE_ENV==='production';const app=Fastify({logger:true,trustProxy:process.env.TRUST_PROXY==='true'});if(isProduction&&process.env.TRUST_PROXY!=='true')throw new Error('Production accounting service must trust the configured HTTPS reverse proxy');
 const port=Number(process.env.PORT??4004);
 const databaseUrl=process.env.DATABASE_URL;
 if(!databaseUrl)throw new Error('DATABASE_URL must be configured');
@@ -16,7 +16,7 @@ const validCurrency=(v:unknown)=>typeof v==='string'&&/^[A-Z0-9_]{2,16}$/.test(v
 const decimal18=(v:unknown)=>{const s=String(v??'').trim();if(!/^-?(?:0|[1-9]\d*)(?:\.\d{1,18})?$/.test(s))throw new Error('invalid_ledger_decimal');const neg=s.startsWith('-'),x=neg?s.slice(1):s,[a,b='']=x.split('.');const scaled=BigInt(a)*1000000000000000000n+BigInt((b+'000000000000000000').slice(0,18));return neg?-scaled:scaled;};
 const validId=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;
 
-app.get('/health',async()=>({service:'accounting',status:'ok'}));
+app.addHook('onSend',async(_request,reply)=>{reply.header('X-Content-Type-Options','nosniff');reply.header('X-Frame-Options','DENY');reply.header('Referrer-Policy','no-referrer');reply.header('X-DNS-Prefetch-Control','off');reply.header('Permissions-Policy','camera=(),microphone=(),geolocation=()');reply.header('Cache-Control','no-store');if(isProduction)reply.header('Strict-Transport-Security','max-age=31536000; includeSubDomains');});app.get('/health',async()=>({service:'accounting',status:'ok'}));
 app.get('/health/db',async(_request,reply)=>{try{const r=await pool.query<{version:string}>('SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1');return{service:'accounting',database:'ok',migration:r.rows[0]?.version??null};}catch{return reply.code(503).send({service:'accounting',database:'unavailable'});}});
 const guard={preHandler:async(req:any,reply:any)=>{if(!authorized(req))return reply.code(401).send({error:'unauthorized'});}};
 app.get('/internal/v1/ledger/accounts/by-code/:code',guard,async(request,reply)=>{const code=decodeURIComponent((request.params as {code:string}).code);if(!code||code.length>200)return reply.code(400).send({error:'invalid_account_code'});const r=await pool.query('SELECT id,account_code,account_name,account_type,owner_identity_id,currency,status,created_at FROM ledger_accounts WHERE account_code=$1',[code]);if(!r.rows[0])return reply.code(404).send({error:'account_not_found'});return{account:r.rows[0]};});
