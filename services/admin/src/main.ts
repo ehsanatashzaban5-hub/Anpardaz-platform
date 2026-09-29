@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { requireAdmin, proxyAdminRequest, adminLogin } from './proxy.js';
+import multipart from '@fastify/multipart';
+import { requireAdmin, proxyAdminRequest, proxyAdminMultipart, adminLogin } from './proxy.js';
 import { requireIranIpInProduction } from '@anpardaz/ip-region-policy';
 
 const production = process.env.NODE_ENV === 'production';
@@ -19,6 +20,7 @@ if (production && origins.some(v=>v==='*' || v.startsWith('http://localhost') ||
   throw new Error('Production CORS_ORIGIN must not allow localhost or wildcard origins');
 }
 await app.register(cors,{origin:origins});
+await app.register(multipart,{limits:{fileSize:Number(process.env.ADMIN_MAX_UPLOAD_BYTES??50*1024*1024),files:1,fields:10}});
 app.addHook('onRequest',async(request,reply)=>{
   if(request.url.startsWith('/api/v1/admin/')) await requireIranIpInProduction(request,reply);
 });
@@ -34,6 +36,10 @@ app.get('/health',async()=>({service:'admin',status:'ok'}));
 app.get('/api/v1/status',async()=>({service:'admin',apiVersion:'v1',status:'ready'}));
 app.post('/api/v1/admin/auth/login',async(request,reply)=>adminLogin(request.body,reply));
 app.get('/api/v1/admin/auth/me',{preHandler:async(request,reply)=>requireAdmin(request,reply)},async(request)=>({user:(request as typeof request & {adminIdentity?:unknown}).adminIdentity}));
+
+app.post('/api/v1/admin/content/videos',{
+  preHandler:async(request,reply)=>requireAdmin(request,reply)
+},async(request,reply)=>proxyAdminMultipart(request as any,reply));
 
 app.route({
   method:['GET','POST','PUT','PATCH','DELETE'],
