@@ -7,13 +7,21 @@ import { registerOwningServiceAdminRoutes } from './adapters/routes.js';
 import { registerPlatformAdminAdapters } from './adapters/platform.js';
 
 const production = process.env.NODE_ENV === 'production';
-const required = ['PLATFORM_SERVICE_URL','ADMIN_INTERNAL_TOKEN','IP_GEOLOCATION_URL_TEMPLATE'];
+const required = [
+  'PLATFORM_SERVICE_URL','ADMIN_INTERNAL_TOKEN','IP_GEOLOCATION_URL_TEMPLATE',
+  'ANSARRAF_SERVICE_URL','ANSARRAF_INTERNAL_TOKEN',
+  'ANPARDAZ_SERVICE_URL','ANPARDAZ_INTERNAL_TOKEN',
+  'BANNER_SERVICE_URL','BANNER_INTERNAL_TOKEN',
+  'ACCOUNTING_SERVICE_URL','ACCOUNTING_INTERNAL_TOKEN'
+];
 if (production) {
   if (process.env.TRUST_PROXY !== 'true') throw new Error('Production admin service must trust the configured HTTPS reverse proxy');
   if (process.env.IP_POLICY_ALLOW_PRIVATE_NETWORKS === 'true') throw new Error('Production admin service must not allow private-network bypasses');
   for (const name of required) {
     const value = process.env[name];
     if (!value || value.includes('CHANGE_ME')) throw new Error('Production environment variable '+name+' must be configured with a real value');
+    if (name.endsWith('_INTERNAL_TOKEN') && value.length < 32) throw new Error('Production internal service token '+name+' is too short');
+    if (name.endsWith('_SERVICE_URL')) { const u=new URL(value); if (!['http:','https:'].includes(u.protocol)) throw new Error('Production service URL '+name+' must use HTTP(S)'); }
   }
 }
 const app = Fastify({ logger: true, trustProxy: process.env.TRUST_PROXY === 'true' });

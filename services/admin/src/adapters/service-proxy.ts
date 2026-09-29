@@ -66,7 +66,7 @@ export async function proxyOwningService(request:AdminRequest,reply:FastifyReply
   const contentType=String(request.headers['content-type']??'');
   if(contentType&&!contentType.toLowerCase().startsWith('multipart/form-data')) headers['content-type']=contentType;
   const body=methodHasBody(request.method)?(request.body===undefined||request.body===null?undefined:JSON.stringify(request.body)):undefined;
-  const response=await fetch(target.base+target.path+query(request),{method:request.method,headers,body,signal:AbortSignal.timeout(15000)});
+  const response=await fetch(target.base+target.path+query(request),{method:request.method,headers,body,redirect:'error',signal:AbortSignal.timeout(15000)});
   const text=await response.text();
   const responseType=response.headers.get('content-type')??'';
   if(responseType.includes('application/json')){try{if(response.ok)await recordAudit(request,target);return reply.code(response.status).send(JSON.parse(text));}catch{}}
