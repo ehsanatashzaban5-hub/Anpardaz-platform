@@ -69,10 +69,10 @@ export function adminPermissionForPath(wildcard:string,method:string):string{
   if(p==='overview') return 'users.read';
   if(p.startsWith('content/')) return p==='content/policies'&&write?'content.write':p.startsWith('content/policies/')&&write?'content.write':p==='content/pipeline'||p==='content/videos'?'content.read':p.startsWith('content/videos/')?'content.write':'content.read';
   if(p.startsWith('hoosh/tickets')) return write?'hoosh.support.manage':'hoosh.support.read';
-  if(p.startsWith('hoosh/requests')) return write?'ai.runs.write':'ai.runs.read';
-  if(p.startsWith('hoosh/providers')) return 'ai.providers.write';
+  if(p.startsWith('hoosh/requests')) return write?'hoosh.manage':'hoosh.read';
+  if(p.startsWith('hoosh/providers')) return 'hoosh.manage';
   if(p.startsWith('market/')) return write?'content.write':'content.read';
-  if(p.startsWith('support/tickets')) return write?'support.manage':'support.read';
+  if(p.startsWith('support/tickets')) return write?'support.write':'support.read';
   if(p.startsWith('moderation/')) return write?'content.moderate':'content.read';
   if(p.startsWith('settings')) return 'settings.write';
   if(p.startsWith('maintenance')) return 'maintenance.write';
