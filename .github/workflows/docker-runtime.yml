@@ -24,6 +24,9 @@ jobs:
             dockerfile: services/platform/Dockerfile
             tag: anpardaz-platform:ci
           - context: .
+            dockerfile: services/admin/Dockerfile
+            tag: anpardaz-admin:ci
+          - context: .
             dockerfile: services/anpardaz/Dockerfile
             tag: anpardaz-anpardaz:ci
           - context: .
@@ -68,7 +71,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Prepare CI env files
         run: |
-          touch infrastructure/production/platform.env infrastructure/production/anpardaz.env infrastructure/production/ansarraf.env infrastructure/production/banner.env infrastructure/production/accounting.env
+          touch infrastructure/production/platform.env infrastructure/production/admin.env infrastructure/production/anpardaz.env infrastructure/production/ansarraf.env infrastructure/production/banner.env infrastructure/production/accounting.env
       - name: Validate Compose files
         env:
           ANPARDAZ_DB_PASSWORD: ci
@@ -78,6 +81,7 @@ jobs:
           ACCOUNTING_DB_PASSWORD: ci
         run: |
           docker compose -f infrastructure/production/platform.compose.yml config -q
+          docker compose -f infrastructure/production/admin.compose.yml config -q
           docker compose -f infrastructure/production/anpardaz.compose.yml config -q
           docker compose -f infrastructure/production/ansarraf.compose.yml config -q
           docker compose -f infrastructure/production/accounting.compose.yml config -q
