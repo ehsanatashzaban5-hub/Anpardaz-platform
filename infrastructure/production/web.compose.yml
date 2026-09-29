@@ -3,6 +3,10 @@ services:
     build:
       context: ../..
       dockerfile: apps/web/Dockerfile
+      args:
+        VITE_PLATFORM_API_URL: /platform
+        VITE_ANSARRAF_API_URL: /ansarraf
+        VITE_BANNER_API_URL: /banner
     restart: unless-stopped
     env_file:
       - ./web.env
