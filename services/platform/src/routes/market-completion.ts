@@ -83,7 +83,7 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return reply.type('text/plain; charset=utf-8').send(`User-agent: *\\nAllow: /market\\nSitemap: ${base.replace(/\/$/,'')}/api/v1/market/sitemap.xml\\n`);
   });
 
-  app.get('/api/v1/admin/market/activity',{preHandler:requireAuth},async(req,reply)=>{
+  app.get('/internal/v1/admin/market/activity',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     const q=req.query as any,limit=Math.min(5000,Math.max(1,Number(q.limit)||500));
     const params:any[]=[];const where:string[]=[];
@@ -96,13 +96,13 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return{activities:(await pool.query(`SELECT a.*,u.email,p.title product_title,s.name store_name FROM market_activity_log a LEFT JOIN platform_users u ON u.id=a.user_id LEFT JOIN market_products p ON p.id=a.product_id LEFT JOIN market_stores s ON s.id=a.store_id ${w} ORDER BY a.created_at DESC LIMIT $${params.length}`,params)).rows};
   });
 
-  app.get('/api/v1/admin/market/search-history',{preHandler:requireAuth},async(req,reply)=>{
+  app.get('/internal/v1/admin/market/search-history',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     const limit=Math.min(5000,Math.max(1,Number((req.query as any).limit)||500));
     return{searches:(await pool.query(`SELECT s.*,u.email FROM market_user_searches s LEFT JOIN platform_users u ON u.id=s.user_id ORDER BY s.created_at DESC LIMIT $1`,[limit])).rows};
   });
 
-  app.get('/api/v1/admin/market/readiness',{preHandler:requireAuth},async(req,reply)=>{
+  app.get('/internal/v1/admin/market/readiness',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     const [stores,products,offers,lastSync,ai]=await Promise.all([
       pool.query(`SELECT COUNT(*)::int total,COUNT(*) FILTER(WHERE verification_status='verified')::int verified,COUNT(*) FILTER(WHERE discovery_status='connected')::int connected,COUNT(*) FILTER(WHERE active=true)::int active FROM market_stores`),
@@ -114,13 +114,13 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return {stores:stores.rows[0],products:products.rows[0],offers:offers.rows[0],lastSync:lastSync.rows[0]?.last_completed_at??null,ai:ai.rows.map((x:any)=>({...x,keyConfigured:Boolean(x.secret_ref&&process.env[x.secret_ref])}))};
   });
 
-  app.get('/api/v1/admin/market/ai-history',{preHandler:requireAuth},async(req,reply)=>{
+  app.get('/internal/v1/admin/market/ai-history',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     const limit=Math.min(2000,Math.max(1,Number((req.query as any).limit)||300));
     return{conversations:(await pool.query(`SELECT c.*,u.email,COUNT(m.id)::int message_count FROM market_ai_conversations c LEFT JOIN platform_users u ON u.id=c.user_id LEFT JOIN market_ai_messages m ON m.conversation_id=c.id GROUP BY c.id,u.email ORDER BY c.updated_at DESC LIMIT $1`,[limit])).rows};
   });
 
-  app.post('/api/v1/admin/market/categories',{preHandler:requireAuth},async(req,reply)=>{
+  app.post('/internal/v1/admin/market/categories',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req,'approvals.write')))return reply.code(403).send({error:'forbidden'});
     const b=(req.body??{}) as any; const name=String(b.name??'').trim(),nameFa=String(b.nameFa??'').trim(),slug=String(b.slug??'').trim();
     if(!name||!nameFa||!slug)return reply.code(400).send({error:'invalid_category'});
@@ -129,7 +129,7 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return reply.code(201).send({category:q.rows[0]});
   });
 
-  app.patch('/api/v1/admin/market/categories/:id',{preHandler:requireAuth},async(req,reply)=>{
+  app.patch('/internal/v1/admin/market/categories/:id',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req,'approvals.write')))return reply.code(403).send({error:'forbidden'});
     const id=Number((req.params as any).id),b=(req.body??{}) as any;
     if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_category'});
@@ -138,17 +138,17 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return{category:q.rows[0]};
   });
 
-  app.get('/api/v1/admin/market/product-types',{preHandler:requireAuth},async(req,reply)=>{
+  app.get('/internal/v1/admin/market/product-types',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     return{types:(await pool.query('SELECT t.*,c.name_fa category_name FROM market_product_types t LEFT JOIN market_categories c ON c.id=t.category_id ORDER BY t.sort_order,t.id')).rows};
   });
 
-  app.get('/api/v1/admin/market/categories',{preHandler:requireAuth},async(req,reply)=>{
+  app.get('/internal/v1/admin/market/categories',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     return{categories:(await pool.query(`SELECT c.*,COUNT(p.id)::int product_count FROM market_categories c LEFT JOIN market_products p ON p.category_id=c.id GROUP BY c.id ORDER BY c.parent_id NULLS FIRST,c.sort_order,c.id`)).rows};
   });
 
-  app.get('/api/v1/admin/market/export/activity.csv',{preHandler:requireAuth},async(req,reply)=>{
+  app.get('/internal/v1/admin/market/export/activity.csv',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     const rows=(await pool.query(`SELECT a.id,a.user_id,u.email,a.event_type,a.surface,a.product_id,p.title product_title,a.store_id,s.name store_name,a.operation_id,a.metadata,a.created_at
       FROM market_activity_log a LEFT JOIN platform_users u ON u.id=a.user_id LEFT JOIN market_products p ON p.id=a.product_id LEFT JOIN market_stores s ON s.id=a.store_id ORDER BY a.created_at DESC LIMIT 50000`)).rows;

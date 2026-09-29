@@ -371,7 +371,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.get('/internal/v1/admin/ecosystem/anpardaz/cards/lookup', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/anpardaz/cards/lookup', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
     const internalToken = process.env.ANPARDAZ_INTERNAL_TOKEN;
