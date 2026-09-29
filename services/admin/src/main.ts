@@ -43,7 +43,7 @@ registerPlatformAdminAdapters(app);
 registerOwningServiceAdminRoutes(app);
 
 app.post('/api/v1/admin/content/videos',{
-  preHandler:async(request,reply)=>requireAdmin(request,reply)
+  preHandler:async(request,reply)=>requireAdmin(request,reply,'content.write')
 },async(request,reply)=>proxyAdminMultipart(request as any,reply));
 
 app.route({
