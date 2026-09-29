@@ -3,7 +3,9 @@ import type {Pool} from 'pg';
 
 function authorized(request:FastifyRequest){
   const token=process.env.ANPARDAZ_INTERNAL_TOKEN;
-  return Boolean(token&&request.headers.authorization===`Bearer ${token}`);
+  const identity=String(request.headers['x-admin-identity']??'').trim();
+  const role=String(request.headers['x-admin-role']??'').trim();
+  return Boolean(token&&request.headers.authorization===`Bearer ${token}`&&identity&&identity.length<=200&&['admin','super_admin','operator','support'].includes(role));
 }
 
 export function registerInternalAdminRoutes(app:FastifyInstance,pool:Pool){

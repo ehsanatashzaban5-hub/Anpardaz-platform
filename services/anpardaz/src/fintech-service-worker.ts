@@ -158,7 +158,18 @@ export class FintechServiceWorker{
          accountingStatus='failed';
          if(held)await accountingHoldAction(op.operation_id,'release');
        }else if(status==='manual_review')accountingStatus='failed';
-       else accountingStatus='pending';
+       else {
+         // A non-terminal provider result without a provider reference cannot be safely retried:
+         // the remote side may already have accepted the operation. Route it to reconciliation.
+         if(!result.providerOperationId&&!result.externalReference){
+           status='manual_review';
+           accountingStatus='pending';
+           await this.pool.query(
+             "UPDATE fintech_service_operations SET failure_code='PROVIDER_OPERATION_UNCERTAIN',failure_message='Non-terminal provider result has no reconciliation reference',updated_at=NOW() WHERE operation_id=$1",
+             [op.operation_id],
+           );
+         } else accountingStatus='pending';
+       }
        await this.pool.query(`UPDATE fintech_service_operations SET status=$1,provider_operation_id=COALESCE($2,provider_operation_id),external_reference=COALESCE($3,external_reference),failure_code=$4,failure_message=$5,response_metadata=$6,accounting_status=$7,updated_at=NOW(),completed_at=CASE WHEN $1='completed' THEN NOW() ELSE completed_at END WHERE operation_id=$8`,
         [status,result.providerOperationId??null,result.externalReference??null,result.errorCode??null,status==='manual_review'&&accountingStatus==='failed'?'ACCOUNTING_REQUIRED':result.errorMessage??null,JSON.stringify(result.data??{}),accountingStatus,op.operation_id]);
       if(status==='completed')await this.pool.query("UPDATE fintech_provider_outbox SET status='completed',last_error=NULL,updated_at=NOW() WHERE id=$1",[row.id]);
