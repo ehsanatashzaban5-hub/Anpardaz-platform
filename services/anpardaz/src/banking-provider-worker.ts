@@ -140,7 +140,10 @@ export class BankingProviderWorker{
           await this.pool.query("UPDATE banking_provider_outbox SET status='failed',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,result.errorMessage??result.errorCode??null]);
         }else if(status==='manual_review'){
           await this.pool.query("UPDATE banking_provider_outbox SET status='manual_review',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,result.errorMessage??result.errorCode??null]);
-        }else await this.pool.query("UPDATE banking_provider_outbox SET status='processing',next_attempt_at=NOW()+INTERVAL '30 seconds',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,result.errorMessage??null]);
+        }else {
+          await this.pool.query("UPDATE transfer_requests SET status='manual_review',provider_status='manual_review',provider_error_code='PROVIDER_OPERATION_UNCERTAIN',provider_error_message=$1,updated_at=NOW() WHERE operation_id=$2",[result.errorMessage??'Provider returned a non-terminal result without a reconciliation reference',x.operation_id]);
+          await this.pool.query("UPDATE banking_provider_outbox SET status='manual_review',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,result.errorMessage??'provider_operation_uncertain']);
+        }
         return true;
       }
       if(row.operation_type==='topup'){
