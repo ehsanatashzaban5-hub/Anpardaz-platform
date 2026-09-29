@@ -4,6 +4,7 @@ import multipart from '@fastify/multipart';
 import { requireAdmin, proxyAdminRequest, proxyAdminMultipart, adminLogin } from './proxy.js';
 import { requireIranIpInProduction } from '@anpardaz/ip-region-policy';
 import { registerOwningServiceAdminRoutes } from './adapters/routes.js';
+import { registerPlatformAdminAdapters } from './adapters/platform.js';
 
 const production = process.env.NODE_ENV === 'production';
 const required = ['PLATFORM_SERVICE_URL','ADMIN_INTERNAL_TOKEN','IP_GEOLOCATION_URL_TEMPLATE'];
@@ -38,6 +39,7 @@ app.get('/api/v1/status',async()=>({service:'admin',apiVersion:'v1',status:'read
 app.post('/api/v1/admin/auth/login',async(request,reply)=>adminLogin(request.body,reply));
 app.get('/api/v1/admin/auth/me',{preHandler:async(request,reply)=>requireAdmin(request,reply)},async(request)=>({user:(request as typeof request & {adminIdentity?:unknown}).adminIdentity}));
 
+registerPlatformAdminAdapters(app);
 registerOwningServiceAdminRoutes(app);
 
 app.post('/api/v1/admin/content/videos',{
