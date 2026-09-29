@@ -103,9 +103,9 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: |
           if [ "${{ matrix.name }}" = "mobile" ]; then
-            pnpm install --no-frozen-lockfile --ignore-scripts --ignore-scripts --ignore-workspace
+            pnpm install --no-frozen-lockfile --ignore-scripts --ignore-workspace
           elif [ "${{ matrix.name }}" = "web" ]; then
-            pnpm install --no-frozen-lockfile --ignore-workspace
+            pnpm install --no-frozen-lockfile --ignore-scripts --ignore-workspace
           elif [ -f pnpm-lock.yaml ]; then
             pnpm install --frozen-lockfile --ignore-scripts
           else
