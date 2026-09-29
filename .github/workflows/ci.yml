@@ -104,7 +104,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -f pnpm-lock.yaml ]; then
-            pnpm install --frozen-lockfile --ignore-scripts
+            pnpm install --frozen-lockfile --ignore-scripts --config.shared-workspace-lockfile=false
           else
             pnpm install --no-frozen-lockfile --ignore-scripts
           fi
