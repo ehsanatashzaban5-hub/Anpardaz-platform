@@ -3,7 +3,7 @@ import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8');
 const checks=[
   ['An Pardaz Finnotech transfer route must not execute the provider directly',
-    !read('services/anpardaz/src/routes/finnotech-banking.ts').includes("client.call(endpoint,access")],
+    (()=>{const source=read('services/anpardaz/src/routes/finnotech-banking.ts');const start=source.indexOf("app.post('/api/v1/banking/transfers'");const route=start>=0?source.slice(start):'';return start>=0&&!route.includes('client.call(')})()],
   ['An Pardaz internal admin requires trusted identity and role',
     /x-admin-identity/.test(read('services/anpardaz/src/routes/internal-admin.ts')) &&
     /x-admin-role/.test(read('services/anpardaz/src/routes/internal-admin.ts'))],
