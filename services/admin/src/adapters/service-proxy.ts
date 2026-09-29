@@ -54,7 +54,7 @@ async function recordAudit(request:AdminRequest,target:Target){
   const raw=String((request.params as {'*':string})['*']??'').replace(/^\//,'');
   const resource=raw.replace(/^ecosystem\//,'');
   try{
-    await fetch(platform+'/internal/v1/admin/audit-event',{method:'POST',headers:{authorization:'Bearer '+(process.env.ADMIN_INTERNAL_TOKEN??''),'content-type':'application/json','x-admin-identity':request.adminIdentity.identity_id},body:JSON.stringify({identityId:request.adminIdentity.identity_id,action:request.method+' '+resource,resourceType:resource.split('/')[0]??'admin',resourceId:null,reason:'Admin Backend service adapter action',metadata:{service:target.base,route:resource}}),signal:AbortSignal.timeout(3000)});
+    await fetch(platform+'/internal/v1/admin/audit-event',{method:'POST',headers:{authorization:'Bearer '+(process.env.ADMIN_INTERNAL_TOKEN??''),'x-admin-gateway-token':process.env.ADMIN_INTERNAL_TOKEN??'','content-type':'application/json','x-admin-identity':request.adminIdentity.identity_id},body:JSON.stringify({identityId:request.adminIdentity.identity_id,action:request.method+' '+resource,resourceType:resource.split('/')[0]??'admin',resourceId:null,reason:'Admin Backend service adapter action',metadata:{service:target.base,route:resource}}),signal:AbortSignal.timeout(3000)});
   }catch{console.error('admin_audit_event_failed',resource);}
 }
 
