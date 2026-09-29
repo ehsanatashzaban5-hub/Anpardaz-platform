@@ -5,14 +5,14 @@ type AdminRequest=FastifyRequest&{adminIdentity?:Identity};
 const platformUrl=()=> (process.env.PLATFORM_SERVICE_URL??'http://127.0.0.1:4003').replace(/\/$/,'');
 const internalToken=()=>process.env.ADMIN_INTERNAL_TOKEN??'';
 
-export async function requireAdmin(request:AdminRequest,reply:FastifyReply){
+export async function requireAdmin(request:AdminRequest,reply:FastifyReply,permission?:string){
   const authorization=String(request.headers.authorization??'');
   if(!authorization.startsWith('Bearer ')) return reply.code(401).send({error:'unauthorized'});
   const identityToken=authorization.slice(7).trim();
   if(!identityToken||identityToken.length>8192) return reply.code(401).send({error:'unauthorized'});
   const r=await fetch(platformUrl()+'/internal/v1/admin/authorize',{
     method:'POST',
-    headers:{authorization:'Bearer '+internalToken(),'content-type':'application/json','x-identity-token':identityToken,'x-admin-permission':request.method==='GET'?'admin.read':'admin.write'},
+    headers:{authorization:'Bearer '+internalToken(),'content-type':'application/json','x-identity-token':identityToken,'x-admin-permission':permission??(request.method==='GET'?'admin.read':'admin.write')},
     signal:AbortSignal.timeout(5000)
   });
   if(!r.ok){
