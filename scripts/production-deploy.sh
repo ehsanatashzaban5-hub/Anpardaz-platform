@@ -56,14 +56,28 @@ docker compose -f apps/mobile/docker-compose.yml up -d --build
 echo "Starting public gateway..."
 docker compose -f infrastructure/production/public-gateway.compose.yml up -d
 
-echo "Waiting for public health endpoint..."
-for attempt in $(seq 1 30); do
-  if curl -fsS http://127.0.0.1/health >/dev/null; then
-    echo "Public gateway is healthy."
-    exit 0
+echo "Waiting for public health endpoints..."
+checks=(
+  "/health"
+  "/platform/health"
+  "/ansarraf/health"
+  "/banner/health"
+  "/anpardaz/health"
+  "/admin-api/health"
+)
+for path in "${checks[@]}"; do
+  ok=0
+  for attempt in $(seq 1 30); do
+    if curl -fsS "http://127.0.0.1$path" >/dev/null; then
+      ok=1
+      break
+    fi
+    sleep 2
+  done
+  if [[ "$ok" -ne 1 ]]; then
+    echo "Health check failed: $path" >&2
+    exit 1
   fi
-  sleep 2
 done
 
-echo "Public gateway health check failed." >&2
-exit 1
+echo "Public gateway and routed services are healthy."
