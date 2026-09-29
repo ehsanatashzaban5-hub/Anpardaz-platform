@@ -25,9 +25,10 @@ export function resolveServiceTarget(request:AdminRequest):Target|null{
   if(p==='ansarraf/kyc' || p.startsWith('ansarraf/kyc/')) return {base:ansarraf,token:at,path:'/internal/v1/admin/'+p.slice('ansarraf/'.length),forwardIdentity:identityHeaders};
   if(p==='ansarraf/withdrawals' || p.startsWith('ansarraf/withdrawals/')){
     const tail=p.slice('ansarraf/withdrawals'.length);
-    const internal=['/complete-toman','/reconcile'];
-    const isInternal=internal.some(x=>tail.startsWith(x));
-    return {base:ansarraf,token:isInternal?at:originalAuth,path:(isInternal?'/internal/v1/admin/withdrawals':'/api/v1/withdrawals')+tail,forwardIdentity:!isInternal};
+    const adminPaths=['/complete-toman','/reconcile','/approve','/reject'];
+    const isAdmin=tail==='' || adminPaths.some(x=>tail.startsWith(x));
+    if(isAdmin) return {base:ansarraf,token:at,path:'/api/v1/admin/withdrawals'+tail,forwardIdentity:identityHeaders};
+    return {base:ansarraf,token:originalAuth,path:'/api/v1/withdrawals'+tail,forwardIdentity:true};
   }
   if(p==='ansarraf/forex-bot/requests' || p.startsWith('ansarraf/forex-bot/requests/')) return {base:ansarraf,token:at,path:'/internal/v1/admin/'+p.slice('ansarraf/'.length),forwardIdentity:identityHeaders};
   if(p==='ansarraf/security/cases' || p.startsWith('ansarraf/security/cases/')) return {base:ansarraf,token:at,path:'/internal/v1/admin/'+p.slice('ansarraf/'.length),forwardIdentity:identityHeaders};
