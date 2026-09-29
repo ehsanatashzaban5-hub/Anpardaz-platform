@@ -9,7 +9,7 @@ function permissionFor(request:AdminRequest):string{
   const raw=String((request.params as {'*':string})['*']??'').replace(/^\//,'');
   const p=raw.slice('ecosystem/'.length);
   const write=request.method!=='GET'&&request.method!=='HEAD';
-  if(p.startsWith('ansarraf/fees')) return 'ansarraf_fees.write';
+  if(p.startsWith('ansarraf/fees')) return request.method==='GET'?'operations.read':'ansarraf_fees.write';
   if(p.startsWith('ansarraf/kyc/')) return 'approvals.write';
   if(p==='ansarraf/kyc') return 'users.read';
   if(p.startsWith('ansarraf/withdrawals/')) return p.endsWith('/reconcile')?'reconciliation.write':'approvals.write';
