@@ -1,5 +1,5 @@
 import Fastify from 'fastify';import cors from '@fastify/cors';import {Pool} from 'pg';import {registerAuthRoutes,requireAuth,ensurePlatformUser,verifyIdentityToken,type AuthClaims} from './auth.js';import {NewsRepository} from './repositories/news-repository.js';import {NewsService} from './services/news-service.js';import {registerContentRoutes} from './routes/content.js';import {registerForumRoutes} from './routes/forum.js';import {registerAdminRoutes} from './routes/admin.js';import {registerAdminSettingsRoutes} from './routes/admin-settings.js';import {registerControlPlaneRoutes} from './routes/control-plane.js';import {registerModerationRoutes} from './routes/moderation.js';import {registerEcosystemRoutes} from './routes/ecosystem.js';import {registerAdminEcosystemRoutes} from './routes/admin-ecosystem.js';import {registerOperationsRoutes} from './routes/operations.js';import {registerMarketDataRoutes} from './routes/market-data.js';import {registerAiRoutes} from './routes/ai.js';import {registerAdminGatewayRoutes} from './routes/admin-gateway.js';import {registerHooshRoutes} from './routes/hoosh.js';import {registerAdminHooshRoutes} from './routes/admin-hoosh.js';import {registerHooshMediaRoutes} from './routes/hoosh-media.js';import {registerAdminHooshSupportRoutes} from './routes/admin-hoosh-support.js';import {registerMarketAggregatorRoutes} from './routes/market-aggregator.js';import {registerAdminMarketRoutes} from './routes/admin-market.js';import {registerMarketCommunityRoutes} from './routes/market-community.js';import {registerMarketCompletionRoutes} from './routes/market-completion.js';import {registerUserSettingsRoutes} from './routes/user-settings.js';import {registerSupportRoutes} from './routes/support.js';
-import {registerContentManagementRoutes} from './routes/content-management.js';
+import {hasPermission} from './permissions.js';import {registerContentManagementRoutes} from './routes/content-management.js';
 import {AiGateway} from './services/ai-gateway.js';
 import {ContentPipeline} from './services/content-pipeline.js';import {iranIpDecision,requireIranIpInProduction} from '@anpardaz/ip-region-policy';
 const isProduction=process.env.NODE_ENV==='production';let contentPipeline:ContentPipeline|undefined;const requiredProduction=['DATABASE_URL','CORS_ORIGIN','IDENTITY_ISSUER','IDENTITY_PRIVATE_KEY_B64','GUEST_INTERACTION_SECRET','ADMIN_INTERNAL_TOKEN','ANSARRAF_SERVICE_URL','ANPARDAZ_SERVICE_URL','ACCOUNTING_SERVICE_URL','ANSARRAF_INTERNAL_TOKEN','ACCOUNTING_INTERNAL_TOKEN','ANPARDAZ_INTERNAL_TOKEN','BANNER_SERVICE_URL','BANNER_INTERNAL_TOKEN','IP_GEOLOCATION_URL_TEMPLATE'];if(isProduction&&process.env.TRUST_PROXY!=='true')throw new Error('Production service must trust the configured HTTPS reverse proxy for client IP extraction');if(isProduction&&process.env.IP_POLICY_ALLOW_PRIVATE_NETWORKS==='true')throw new Error('Production IP policy must not allow private-network bypasses');if(isProduction){for(const name of requiredProduction){const value=process.env[name];if(!value||value.includes('CHANGE_ME')||value.includes('your-web-domain.example')||value.includes('BASE64-DER-ED25519-PRIVATE-KEY')||value.includes('GENERATE_A_LONG_RANDOM_SECRET')||value.includes('generate-a-long-random-secret'))throw new Error(`Production environment variable ${name} must be configured with a real value`);}}
@@ -30,13 +30,17 @@ app.addHook('onRequest',async(request,reply)=>{if(request.url.startsWith('/api/v
  const claims=verifyIdentityToken(identityToken);
  if(!claims)return reply.code(401).send({error:'unauthorized'});
  const permission=String(request.headers['x-admin-permission']??'admin.read');
- if(permission!=='admin.read'&&permission!=='admin.write')return reply.code(400).send({error:'invalid_permission'});
+ if(!/^[a-z][a-z0-9_.-]{1,127}$/.test(permission))return reply.code(400).send({error:'invalid_permission'});
  const u=await pool?.query('SELECT identity_id,email,display_name,role,status FROM platform_users WHERE identity_id=$1 LIMIT 1',[claims.sub]);
  const user=u?.rows[0];
  if(!user||user.status!=='active')return reply.code(401).send({error:'unauthorized'});
  const roles=new Set(['admin','super_admin','operator','editor','moderator','support']);
  if(!roles.has(String(user.role)))return reply.code(403).send({error:'forbidden'});
  if(permission==='admin.write'&&String(user.role)==='support')return reply.code(403).send({error:'forbidden'});
+ if(permission!=='admin.read'&&permission!=='admin.write'){
+   const allowed=await hasPermission(pool!,{sub:claims.sub} as AuthClaims,permission);
+   if(!allowed)return reply.code(403).send({error:'forbidden'});
+ }
  return {identity_id:user.identity_id,email:user.email,display_name:user.display_name,role:user.role,status:user.status};
 });
 
