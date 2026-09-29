@@ -33,6 +33,7 @@ export function resolveServiceTarget(request:AdminRequest):Target|null{
   if(p==='ansarraf/forex-bot/requests' || p.startsWith('ansarraf/forex-bot/requests/')) return {base:ansarraf,token:at,path:'/internal/v1/admin/'+p.slice('ansarraf/'.length),forwardIdentity:identityHeaders};
   if(p==='ansarraf/security/cases' || p.startsWith('ansarraf/security/cases/')) return {base:ansarraf,token:at,path:'/internal/v1/admin/'+p.slice('ansarraf/'.length),forwardIdentity:identityHeaders};
   if(p==='ansarraf/deposits/manual' || p.startsWith('ansarraf/deposits/manual/')) return {base:ansarraf,token:at,path:'/internal/v1/admin/'+p.slice('ansarraf/'.length),forwardIdentity:identityHeaders};
+  if(p==='ansarraf/crypto-deposits' || p.startsWith('ansarraf/crypto-deposits/')) return {base:ansarraf,token:at,path:'/internal/v1/admin/'+p.slice('ansarraf/'.length),forwardIdentity:identityHeaders};
   if(p==='ansarraf/fees' || p.startsWith('ansarraf/fees/')) return {base:ansarraf,token:at,path:'/internal/v1/admin/'+p.slice('ansarraf/'.length),forwardIdentity:identityHeaders};
   if(p==='anpardaz/cashback/policies' || p.startsWith('anpardaz/cashback/policies/')) return {base:anpardaz,token:apt,path:'/internal/v1/admin/'+p.slice('anpardaz/'.length),forwardIdentity:identityHeaders};
   if(p==='anpardaz/sayad-operations') return {base:anpardaz,token:apt,path:'/internal/v1/admin/sayad/operations',forwardIdentity:identityHeaders};
