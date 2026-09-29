@@ -23,7 +23,7 @@ async function fetchJson(url: string, init: RequestInit = {}, timeoutMs = 5000) 
 }
 
 export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
-  app.get('/api/v1/admin/ecosystem/health', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/health', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'service_health.read'))) return reply.code(403).send({ error: 'forbidden' });
 
@@ -42,7 +42,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   });
 
   app.get<{ Params: { identityId: string } }>(
-    '/api/v1/admin/ecosystem/users/:identityId',
+    '/internal/v1/admin/ecosystem/users/:identityId',
     { preHandler: requireAuth },
     async (request, reply) => {
       const req = reqAuth(request);
@@ -92,7 +92,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   );
 
   app.get<{ Params: { operationId: string } }>(
-    '/api/v1/admin/ecosystem/operations/:operationId/trace',
+    '/internal/v1/admin/ecosystem/operations/:operationId/trace',
     { preHandler: requireAuth },
     async (request, reply) => {
       const req = reqAuth(request);
@@ -131,18 +131,18 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   };
   const sarrafBase = () => (process.env.ANSARRAF_SERVICE_URL ?? 'http://localhost:4002').replace(/\/$/, '');
 
-  app.get('/api/v1/admin/ecosystem/ansarraf/kyc', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/ansarraf/kyc', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
     const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
-    const result = await fetchJson(sarrafBase() + '/api/v1/admin/kyc' + q, { headers: forwardUser(request) });
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/kyc' + q, { headers: forwardUser(request) });
     return reply.code(result.status).send(result.body);
   });
 
-  app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/kyc/:id/decision', { preHandler: requireAuth }, async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/internal/v1/admin/ecosystem/ansarraf/kyc/:id/decision', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
-    const result = await fetchJson(sarrafBase() + '/api/v1/admin/kyc/' + encodeURIComponent(request.params.id) + '/decision', {
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/kyc/' + encodeURIComponent(request.params.id) + '/decision', {
       method: 'POST',
       headers: forwardUser(request),
       body: JSON.stringify(request.body ?? {}),
@@ -150,15 +150,15 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.get('/api/v1/admin/ecosystem/ansarraf/withdrawals', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/ansarraf/withdrawals', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
-    const result = await fetchJson(sarrafBase() + '/api/v1/admin/withdrawals' + q, { headers: forwardUser(request) });
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/withdrawals' + q, { headers: forwardUser(request) });
     return reply.code(result.status).send(result.body);
   });
 
-  app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/withdrawals/:id/approve', { preHandler: requireAuth }, async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/internal/v1/admin/ecosystem/ansarraf/withdrawals/:id/approve', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(sarrafBase() + '/api/v1/withdrawals/' + encodeURIComponent(request.params.id) + '/approve', {
@@ -169,7 +169,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/withdrawals/:id/reject', { preHandler: requireAuth }, async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/internal/v1/admin/ecosystem/ansarraf/withdrawals/:id/reject', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(sarrafBase() + '/api/v1/withdrawals/' + encodeURIComponent(request.params.id) + '/reject', {
@@ -180,19 +180,19 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/withdrawals/:id/complete-toman', { preHandler: requireAuth }, async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/internal/v1/admin/ecosystem/ansarraf/withdrawals/:id/complete-toman', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
-    const result = await fetchJson(sarrafBase() + '/api/v1/admin/withdrawals/' + encodeURIComponent(request.params.id) + '/complete-toman', {
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/withdrawals/' + encodeURIComponent(request.params.id) + '/complete-toman', {
       method: 'POST', headers: forwardUser(request), body: JSON.stringify(request.body ?? {}),
     });
     return reply.code(result.status).send(result.body);
   });
 
-  app.post<{ Params: { id: string } }>('/api/v1/admin/ecosystem/ansarraf/withdrawals/:id/reconcile', { preHandler: requireAuth }, async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/internal/v1/admin/ecosystem/ansarraf/withdrawals/:id/reconcile', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'reconciliation.write'))) return reply.code(403).send({ error: 'forbidden' });
-    const result = await fetchJson(sarrafBase() + '/api/v1/admin/withdrawals/' + encodeURIComponent(request.params.id) + '/reconcile', {
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/withdrawals/' + encodeURIComponent(request.params.id) + '/reconcile', {
       method: 'POST',
       headers: forwardUser(request),
       body: JSON.stringify(request.body ?? {}),
@@ -200,22 +200,22 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
   // Browser-facing admin proxy for An Sarraf Forex Bot.
-  app.get('/api/v1/admin/ecosystem/ansarraf/forex-bot/requests', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/ansarraf/forex-bot/requests', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
-    const result = await fetchJson(sarrafBase() + '/api/v1/admin/forex-bot/requests' + q, { headers: forwardUser(request) });
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/forex-bot/requests' + q, { headers: forwardUser(request) });
     return reply.code(result.status).send(result.body);
   });
-  app.post('/api/v1/admin/ecosystem/ansarraf/forex-bot/requests/:id/decision', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/ansarraf/forex-bot/requests/:id/decision', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
-    const result = await fetchJson(sarrafBase() + '/api/v1/admin/forex-bot/requests/' + encodeURIComponent((request.params as any).id) + '/decision', { method:'POST', headers:forwardUser(request), body:JSON.stringify(request.body??{}) });
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/forex-bot/requests/' + encodeURIComponent((request.params as any).id) + '/decision', { method:'POST', headers:forwardUser(request), body:JSON.stringify(request.body??{}) });
     return reply.code(result.status).send(result.body);
   });
 
   // Browser-facing admin proxy for An Sarraf funding security cases.
-  app.get('/api/v1/admin/ecosystem/ansarraf/security/cases', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/ansarraf/security/cases', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const token = process.env.ANSARRAF_INTERNAL_TOKEN;
@@ -227,7 +227,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.post('/api/v1/admin/ecosystem/ansarraf/security/cases/:id/release', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/ansarraf/security/cases/:id/release', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
     const token = process.env.ANSARRAF_INTERNAL_TOKEN;
@@ -241,7 +241,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   });
 
   // Browser-facing admin proxy for An Sarraf manual Toman funding.
-  app.get('/api/v1/admin/ecosystem/ansarraf/deposits/manual', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/ansarraf/deposits/manual', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const token = process.env.ANSARRAF_INTERNAL_TOKEN;
@@ -252,7 +252,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.post('/api/v1/admin/ecosystem/ansarraf/deposits/manual/credit', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/ansarraf/deposits/manual/credit', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'approvals.write'))) return reply.code(403).send({ error: 'forbidden' });
     const token = process.env.ANSARRAF_INTERNAL_TOKEN;
@@ -266,37 +266,37 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   });
 
   // Browser-facing admin proxy for An Sarraf fee configuration.
-  app.get('/api/v1/admin/ecosystem/ansarraf/fees', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/ansarraf/fees', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
-    const result = await fetchJson(sarrafBase() + '/api/v1/admin/fees', { headers: forwardUser(request) });
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/fees', { headers: forwardUser(request) });
     return reply.code(result.status).send(result.body);
   });
-  app.post('/api/v1/admin/ecosystem/ansarraf/fees', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/ansarraf/fees', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'ansarraf_fees.write'))) return reply.code(403).send({ error: 'forbidden' });
-    const result = await fetchJson(sarrafBase() + '/api/v1/admin/fees', {
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/fees', {
       method: 'POST', headers: { ...forwardUser(request), 'content-type': 'application/json' }, body: JSON.stringify(request.body ?? {}),
     });
     return reply.code(result.status).send(result.body);
   });
-  app.post('/api/v1/admin/ecosystem/ansarraf/fees/:id/close', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/ansarraf/fees/:id/close', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'ansarraf_fees.write'))) return reply.code(403).send({ error: 'forbidden' });
-    const result = await fetchJson(sarrafBase() + '/api/v1/admin/fees/' + encodeURIComponent((request.params as any).id) + '/close', {
+    const result = await fetchJson(sarrafBase() + '/internal/v1/admin/fees/' + encodeURIComponent((request.params as any).id) + '/close', {
       method: 'POST', headers: forwardUser(request),
     });
     return reply.code(result.status).send(result.body);
   });
 
-  app.get('/api/v1/admin/ecosystem/anpardaz/cashback/policies', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/anpardaz/cashback/policies', { preHandler: requireAuth }, async (request, reply) => {
     const req=request as any;
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const internalToken=process.env.ANPARDAZ_INTERNAL_TOKEN;
     if(!internalToken)return reply.code(503).send({error:'anpardaz_internal_token_not_configured'});
     return reply.send(await fetchJson(anpardazBase() + '/internal/v1/admin/cashback/policies', { headers:{authorization:'Bearer '+internalToken} }));
   });
-  app.post('/api/v1/admin/ecosystem/anpardaz/cashback/policies', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/anpardaz/cashback/policies', { preHandler: requireAuth }, async (request, reply) => {
     const req=request as any;
     if (!(await hasPermission(pool, req.auth, 'operations.write'))) return reply.code(403).send({ error: 'forbidden' });
     const internalToken=process.env.ANPARDAZ_INTERNAL_TOKEN;
@@ -308,7 +308,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   // Browser-facing admin proxy for An Pardaz banking/service operations.
   const anpardazBase = () => (process.env.ANPARDAZ_SERVICE_URL ?? 'http://localhost:4001').replace(/\/$/, '');
 
-  app.get('/api/v1/admin/ecosystem/anpardaz/sayad-operations', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/anpardaz/sayad-operations', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
@@ -318,7 +318,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.get('/api/v1/admin/ecosystem/anpardaz/banking-operations', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/anpardaz/banking-operations', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
@@ -326,7 +326,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.get('/api/v1/admin/ecosystem/anpardaz/operations', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/anpardaz/operations', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const q = request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : '';
@@ -336,7 +336,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.get('/api/v1/admin/ecosystem/anpardaz/operations/:operationId', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/anpardaz/operations/:operationId', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'operations.read'))) return reply.code(403).send({ error: 'forbidden' });
     const operationId = (request.params as { operationId: string }).operationId?.trim();
@@ -347,7 +347,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.get('/api/v1/admin/ecosystem/anpardaz/financial-center/:identityId', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/anpardaz/financial-center/:identityId', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
     const identityId = (request.params as { identityId: string }).identityId?.trim();
@@ -358,7 +358,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.get('/api/v1/admin/ecosystem/anpardaz/cards/lifecycle/:identityId', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/anpardaz/cards/lifecycle/:identityId', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
     const identityId = (request.params as { identityId: string }).identityId?.trim();
@@ -371,7 +371,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.get('/api/v1/admin/ecosystem/anpardaz/cards/lookup', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/anpardaz/cards/lookup', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
     const internalToken = process.env.ANPARDAZ_INTERNAL_TOKEN;
@@ -384,7 +384,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(result.status).send(result.body);
   });
 
-  app.get('/api/v1/admin/ecosystem/anpardaz/users/:identityId', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/anpardaz/users/:identityId', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
     const identityId = (request.params as { identityId: string }).identityId?.trim();
@@ -399,7 +399,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
   const bannerBase = () => (process.env.BANNER_SERVICE_URL ?? 'http://localhost:4005').replace(/\/$/, '');
   const bannerHeaders = (): Record<string,string> => ({ authorization: 'Bearer ' + (process.env.BANNER_INTERNAL_TOKEN ?? '') });
 
-  app.get('/api/v1/admin/ecosystem/banner/overview', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/banner/overview', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
     const token = process.env.BANNER_INTERNAL_TOKEN;
@@ -407,13 +407,13 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     const result = await fetchJson(bannerBase() + '/internal/v1/admin/overview', { headers: bannerHeaders() });
     return reply.code(result.status).send(result.body);
   });
-  app.get('/api/v1/admin/ecosystem/banner/listings', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/banner/listings', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(bannerBase() + '/internal/v1/admin/listings' + (request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), { headers: bannerHeaders() });
     return reply.code(result.status).send(result.body);
   });
-  app.patch('/api/v1/admin/ecosystem/banner/listings/:id/status', { preHandler: requireAuth }, async (request, reply) => {
+  app.patch('/internal/v1/admin/ecosystem/banner/listings/:id/status', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.write'))) return reply.code(403).send({ error: 'forbidden' });
     const body = { ...(request.body as Record<string, unknown> ?? {}), actorIdentityId: req.auth.sub };
@@ -422,19 +422,19 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     });
     return reply.code(result.status).send(result.body);
   });
-  app.get('/api/v1/admin/ecosystem/banner/tickets', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/banner/tickets', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(bannerBase() + '/internal/v1/admin/tickets' + (request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), { headers: bannerHeaders() });
     return reply.code(result.status).send(result.body);
   });
-  app.get('/api/v1/admin/ecosystem/banner/tickets/:id', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/banner/tickets/:id', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(bannerBase() + '/internal/v1/admin/tickets/' + encodeURIComponent((request.params as { id: string }).id), { headers: bannerHeaders() });
     return reply.code(result.status).send(result.body);
   });
-  app.post('/api/v1/admin/ecosystem/banner/tickets/:id/reply', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/banner/tickets/:id/reply', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.write'))) return reply.code(403).send({ error: 'forbidden' });
     const body = { ...(request.body as Record<string, unknown> ?? {}), adminIdentityId: req.auth.sub };
@@ -443,7 +443,7 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     });
     return reply.code(result.status).send(result.body);
   });
-  app.patch('/api/v1/admin/ecosystem/banner/tickets/:id', { preHandler: requireAuth }, async (request, reply) => {
+  app.patch('/internal/v1/admin/ecosystem/banner/tickets/:id', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.write'))) return reply.code(403).send({ error: 'forbidden' });
     const body = { ...(request.body as Record<string, unknown> ?? {}), adminIdentityId: req.auth.sub };
@@ -452,13 +452,13 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     });
     return reply.code(result.status).send(result.body);
   });
-  app.get('/api/v1/admin/ecosystem/banner/reports', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/banner/reports', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(bannerBase() + '/internal/v1/admin/reports' + (request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), { headers: bannerHeaders() });
     return reply.code(result.status).send(result.body);
   });
-  app.patch('/api/v1/admin/ecosystem/banner/reports/:id', { preHandler: requireAuth }, async (request, reply) => {
+  app.patch('/internal/v1/admin/ecosystem/banner/reports/:id', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.write'))) return reply.code(403).send({ error: 'forbidden' });
     const body = { ...(request.body as Record<string, unknown> ?? {}), adminIdentityId: req.auth.sub };
@@ -467,55 +467,55 @@ export function registerAdminGatewayRoutes(app: FastifyInstance, pool: Pool) {
     });
     return reply.code(result.status).send(result.body);
   });
-  app.get('/api/v1/admin/ecosystem/banner/alerts', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/banner/alerts', { preHandler: requireAuth }, async (request, reply) => {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.read')))return reply.code(403).send({error:'forbidden'});
     const result=await fetchJson(bannerBase()+'/internal/v1/admin/alerts'+(request.url.includes('?')?request.url.slice(request.url.indexOf('?')):''),{headers:bannerHeaders()});return reply.code(result.status).send(result.body);
   });
-  app.patch('/api/v1/admin/ecosystem/banner/alerts/:id', { preHandler: requireAuth }, async (request, reply) => {
+  app.patch('/internal/v1/admin/ecosystem/banner/alerts/:id', { preHandler: requireAuth }, async (request, reply) => {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.write')))return reply.code(403).send({error:'forbidden'});
     const body={...(request.body as Record<string,unknown>??{}),adminIdentityId:req.auth.sub};const result=await fetchJson(bannerBase()+'/internal/v1/admin/alerts/'+encodeURIComponent((request.params as {id:string}).id),{method:'PATCH',headers:{...bannerHeaders(),'content-type':'application/json'},body:JSON.stringify(body)});return reply.code(result.status).send(result.body);
   });
-  app.get('/api/v1/admin/ecosystem/banner/templates', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/banner/templates', { preHandler: requireAuth }, async (request, reply) => {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.read')))return reply.code(403).send({error:'forbidden'});
     const result=await fetchJson(bannerBase()+'/internal/v1/admin/templates',{headers:bannerHeaders()});return reply.code(result.status).send(result.body);
   });
-  app.post('/api/v1/admin/ecosystem/banner/templates', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/banner/templates', { preHandler: requireAuth }, async (request, reply) => {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.write')))return reply.code(403).send({error:'forbidden'});
     const body={...(request.body as Record<string,unknown>??{}),adminIdentityId:req.auth.sub};const result=await fetchJson(bannerBase()+'/internal/v1/admin/templates',{method:'POST',headers:{...bannerHeaders(),'content-type':'application/json'},body:JSON.stringify(body)});return reply.code(result.status).send(result.body);
   });
-  app.patch('/api/v1/admin/ecosystem/banner/templates/:id', { preHandler: requireAuth }, async (request, reply) => {
+  app.patch('/internal/v1/admin/ecosystem/banner/templates/:id', { preHandler: requireAuth }, async (request, reply) => {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.write')))return reply.code(403).send({error:'forbidden'});
     const body={...(request.body as Record<string,unknown>??{}),adminIdentityId:req.auth.sub};const result=await fetchJson(bannerBase()+'/internal/v1/admin/templates/'+encodeURIComponent((request.params as {id:string}).id),{method:'PATCH',headers:{...bannerHeaders(),'content-type':'application/json'},body:JSON.stringify(body)});return reply.code(result.status).send(result.body);
   });
-  app.post('/api/v1/admin/ecosystem/banner/users/:identityId/message', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/banner/users/:identityId/message', { preHandler: requireAuth }, async (request, reply) => {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.write')))return reply.code(403).send({error:'forbidden'});
     const body={...(request.body as Record<string,unknown>??{}),adminIdentityId:req.auth.sub};const result=await fetchJson(bannerBase()+'/internal/v1/admin/users/'+encodeURIComponent((request.params as {identityId:string}).identityId)+'/message',{method:'POST',headers:{...bannerHeaders(),'content-type':'application/json'},body:JSON.stringify(body)});return reply.code(result.status).send(result.body);
   });
-  app.post('/api/v1/admin/ecosystem/banner/users/:identityId/restrict', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/banner/users/:identityId/restrict', { preHandler: requireAuth }, async (request, reply) => {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.write')))return reply.code(403).send({error:'forbidden'});
     const body={...(request.body as Record<string,unknown>??{}),adminIdentityId:req.auth.sub};const result=await fetchJson(bannerBase()+'/internal/v1/admin/users/'+encodeURIComponent((request.params as {identityId:string}).identityId)+'/restrict',{method:'POST',headers:{...bannerHeaders(),'content-type':'application/json'},body:JSON.stringify(body)});return reply.code(result.status).send(result.body);
   });
-  app.post('/api/v1/admin/ecosystem/banner/users/:identityId/unrestrict', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/banner/users/:identityId/unrestrict', { preHandler: requireAuth }, async (request, reply) => {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.write')))return reply.code(403).send({error:'forbidden'});
     const body={...(request.body as Record<string,unknown>??{}),adminIdentityId:req.auth.sub};const result=await fetchJson(bannerBase()+'/internal/v1/admin/users/'+encodeURIComponent((request.params as {identityId:string}).identityId)+'/unrestrict',{method:'POST',headers:{...bannerHeaders(),'content-type':'application/json'},body:JSON.stringify(body)});return reply.code(result.status).send(result.body);
   });
-  app.post('/api/v1/admin/ecosystem/banner/users/:identityId/ban', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/internal/v1/admin/ecosystem/banner/users/:identityId/ban', { preHandler: requireAuth }, async (request, reply) => {
     const req=reqAuth(request);if(!(await hasPermission(pool,req.auth,'banner.write')))return reply.code(403).send({error:'forbidden'});
     const body={...(request.body as Record<string,unknown>??{}),adminIdentityId:req.auth.sub};const result=await fetchJson(bannerBase()+'/internal/v1/admin/users/'+encodeURIComponent((request.params as {identityId:string}).identityId)+'/ban',{method:'POST',headers:{...bannerHeaders(),'content-type':'application/json'},body:JSON.stringify(body)});return reply.code(result.status).send(result.body);
   });
-  app.get('/api/v1/admin/ecosystem/banner/activity', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/banner/activity', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(bannerBase() + '/internal/v1/admin/activity' + (request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), { headers: bannerHeaders() });
     return reply.code(result.status).send(result.body);
   });
-  app.get('/api/v1/admin/ecosystem/banner/audit', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/banner/audit', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'banner.read'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(bannerBase() + '/internal/v1/admin/audit' + (request.url.includes('?') ? request.url.slice(request.url.indexOf('?')) : ''), { headers: bannerHeaders() });
     return reply.code(result.status).send(result.body);
   });
-  app.get('/api/v1/admin/ecosystem/banner/users/:identityId', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/ecosystem/banner/users/:identityId', { preHandler: requireAuth }, async (request, reply) => {
     const req = reqAuth(request);
     if (!(await hasPermission(pool, req.auth, 'users.read'))) return reply.code(403).send({ error: 'forbidden' });
     const result = await fetchJson(bannerBase() + '/internal/v1/admin/users/' + encodeURIComponent((request.params as { identityId: string }).identityId) + '/summary', { headers: bannerHeaders() });

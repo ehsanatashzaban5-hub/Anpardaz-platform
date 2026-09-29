@@ -141,7 +141,7 @@ export function registerModerationRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(201).send({ report: r.rows[0] });
   });
 
-  app.get('/api/v1/admin/moderation/comments', { preHandler: requireAuth }, async (req, reply) => {
+  app.get('/internal/v1/admin/moderation/comments', { preHandler: requireAuth }, async (req, reply) => {
     const auth = await requirePermission(pool, req, reply, 'content.moderate'); if (!auth) return;
     const q = req.query as { status?: string; targetType?: string; targetId?: string; limit?: string };
     const parsed = Number(q.limit ?? 100); const limit = Math.min(Math.max(Number.isFinite(parsed) ? parsed : 100, 1), 200);
@@ -149,7 +149,7 @@ export function registerModerationRoutes(app: FastifyInstance, pool: Pool) {
     return { comments: rows.rows };
   });
 
-  app.patch('/api/v1/admin/moderation/comments/:id', { preHandler: requireAuth }, async (req, reply) => {
+  app.patch('/internal/v1/admin/moderation/comments/:id', { preHandler: requireAuth }, async (req, reply) => {
     const auth = await requirePermission(pool, req, reply, 'content.moderate'); if (!auth) return;
     const id = (req.params as { id: string }).id; const b = (req.body ?? {}) as { status?: string; reason?: string };
     if (!['visible','hidden','deleted','pending','blocked'].includes(b.status ?? '')) return reply.code(400).send({ error: 'invalid_status' });
@@ -161,14 +161,14 @@ export function registerModerationRoutes(app: FastifyInstance, pool: Pool) {
     return { comment: c.rows[0] };
   });
 
-  app.get('/api/v1/admin/moderation/likes', { preHandler: requireAuth }, async (req, reply) => {
+  app.get('/internal/v1/admin/moderation/likes', { preHandler: requireAuth }, async (req, reply) => {
     const auth = await requirePermission(pool, req, reply, 'content.moderate'); if (!auth) return;
     const q = req.query as { targetType?: string; targetId?: string; limit?: string }; const parsed = Number(q.limit ?? 100); const limit = Math.min(Math.max(Number.isFinite(parsed) ? parsed : 100, 1), 200);
     const rows = await pool.query(`SELECT l.*,u.email FROM community_likes l LEFT JOIN platform_users u ON u.identity_id=l.identity_id WHERE ($1::text IS NULL OR l.target_type=$1) AND ($2::text IS NULL OR l.target_id=$2) ORDER BY l.created_at DESC LIMIT $3`, [q.targetType ?? null, q.targetId ?? null, limit]);
     return { likes: rows.rows };
   });
 
-  app.delete('/api/v1/admin/moderation/likes/:id', { preHandler: requireAuth }, async (req, reply) => {
+  app.delete('/internal/v1/admin/moderation/likes/:id', { preHandler: requireAuth }, async (req, reply) => {
     const auth = await requirePermission(pool, req, reply, 'content.moderate'); if (!auth) return;
     const id = (req.params as { id: string }).id; const l = await pool.query(`UPDATE community_likes SET status='removed' WHERE id=$1 RETURNING *`, [id]);
     if (!l.rows[0]) return reply.code(404).send({ error: 'like_not_found' });
@@ -177,14 +177,14 @@ export function registerModerationRoutes(app: FastifyInstance, pool: Pool) {
     return { like: l.rows[0] };
   });
 
-  app.get('/api/v1/admin/moderation/reports', { preHandler: requireAuth }, async (req, reply) => {
+  app.get('/internal/v1/admin/moderation/reports', { preHandler: requireAuth }, async (req, reply) => {
     const auth = await requirePermission(pool, req, reply, 'content.moderate'); if (!auth) return;
     const q = req.query as { status?: string; limit?: string }; const parsed = Number(q.limit ?? 100); const limit = Math.min(Math.max(Number.isFinite(parsed) ? parsed : 100, 1), 200);
     const rows = await pool.query(`SELECT * FROM community_reports WHERE ($1::text IS NULL OR status=$1) ORDER BY created_at DESC LIMIT $2`, [q.status ?? null, limit]);
     return { reports: rows.rows };
   });
 
-  app.patch('/api/v1/admin/moderation/reports/:id', { preHandler: requireAuth }, async (req, reply) => {
+  app.patch('/internal/v1/admin/moderation/reports/:id', { preHandler: requireAuth }, async (req, reply) => {
     const auth = await requirePermission(pool, req, reply, 'content.moderate'); if (!auth) return;
     const id = (req.params as { id: string }).id; const b = (req.body ?? {}) as { status?: string; resolution?: string };
     if (!['open','reviewing','resolved','rejected'].includes(b.status ?? '')) return reply.code(400).send({ error: 'invalid_status' });
@@ -194,7 +194,7 @@ export function registerModerationRoutes(app: FastifyInstance, pool: Pool) {
     return { report: r.rows[0] };
   });
 
-  app.post('/api/v1/admin/moderation/guest-blocks', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/internal/v1/admin/moderation/guest-blocks', { preHandler: requireAuth }, async (req, reply) => {
     const auth = await requirePermission(pool, req, reply, 'content.moderate'); if (!auth) return;
     const b = (req.body ?? {}) as { guestToken?: string; reason?: string; expiresAt?: string | null };
     if (!b.guestToken || b.guestToken.length < 16) return reply.code(400).send({ error: 'invalid_guest_token' });
@@ -204,7 +204,7 @@ export function registerModerationRoutes(app: FastifyInstance, pool: Pool) {
     return reply.code(201).send({ block: r.rows[0] });
   });
 
-  app.delete('/api/v1/admin/moderation/guest-blocks/:id', { preHandler: requireAuth }, async (req, reply) => {
+  app.delete('/internal/v1/admin/moderation/guest-blocks/:id', { preHandler: requireAuth }, async (req, reply) => {
     const auth = await requirePermission(pool, req, reply, 'content.moderate'); if (!auth) return;
     const id = (req.params as { id: string }).id; const r = await pool.query(`DELETE FROM guest_interaction_blocks WHERE id=$1 RETURNING id`, [id]);
     if (!r.rows[0]) return reply.code(404).send({ error: 'guest_block_not_found' });

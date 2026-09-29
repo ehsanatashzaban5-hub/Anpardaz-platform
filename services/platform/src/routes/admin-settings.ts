@@ -25,14 +25,14 @@ async function audit(pool: Pool, request: FastifyRequest, identityId: string, ac
 }
 
 export function registerAdminSettingsRoutes(app: FastifyInstance, pool: Pool) {
-  app.get('/api/v1/admin/settings', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/internal/v1/admin/settings', { preHandler: requireAuth }, async (request, reply) => {
     const r = request as Req;
     if (!(await permitted(pool, r.auth.sub, 'maintenance.write'))) return reply.code(403).send({ error: 'forbidden' });
     const rows = await pool.query('SELECT key,value,updated_at FROM platform_settings ORDER BY key');
     return { settings: rows.rows };
   });
 
-  app.put('/api/v1/admin/settings/:key', { preHandler: requireAuth }, async (request, reply) => {
+  app.put('/internal/v1/admin/settings/:key', { preHandler: requireAuth }, async (request, reply) => {
     const r = request as Req;
     if (!(await permitted(pool, r.auth.sub, 'maintenance.write'))) return reply.code(403).send({ error: 'forbidden' });
     const key = (request.params as { key: string }).key;
