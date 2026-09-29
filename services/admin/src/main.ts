@@ -4,7 +4,7 @@ import { requireAdmin, proxyAdminRequest, adminLogin } from './proxy.js';
 import { requireIranIpInProduction } from '@anpardaz/ip-region-policy';
 
 const production = process.env.NODE_ENV === 'production';
-const required = ['PLATFORM_SERVICE_URL','ADMIN_INTERNAL_TOKEN','PLATFORM_INTERNAL_TOKEN','IP_GEOLOCATION_URL_TEMPLATE'];
+const required = ['PLATFORM_SERVICE_URL','ADMIN_INTERNAL_TOKEN','ADMIN_INTERNAL_TOKEN','IP_GEOLOCATION_URL_TEMPLATE'];
 if (production) {
   if (process.env.TRUST_PROXY !== 'true') throw new Error('Production admin service must trust the configured HTTPS reverse proxy');
   if (process.env.IP_POLICY_ALLOW_PRIVATE_NETWORKS === 'true') throw new Error('Production admin service must not allow private-network bypasses');
