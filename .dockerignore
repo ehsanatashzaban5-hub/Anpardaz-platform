@@ -1,0 +1,10 @@
+# Keep secrets and host-only files out of Docker build contexts
+.git
+.github
+**/.env
+**/.env.*
+**/node_modules
+**/dist
+**/coverage
+**/.DS_Store
+*.log
