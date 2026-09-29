@@ -1,12 +1,19 @@
+FROM node:24-alpine AS build
+WORKDIR /repo
+RUN corepack enable
+COPY package.json pnpm-workspace.yaml ./
+COPY packages/ip-region-policy/package.json packages/ip-region-policy/package.json
+COPY packages/ip-region-policy packages/ip-region-policy
+COPY services/admin/package.json services/admin/package.json
+COPY services/admin/tsconfig.json services/admin/tsconfig.json
+RUN pnpm install --no-frozen-lockfile --ignore-scripts --filter @anpardaz/admin-service...
+COPY services/admin/src services/admin/src
+RUN pnpm --filter @anpardaz/admin-service build
+RUN pnpm --filter @anpardaz/admin-service deploy --prod --legacy /out
 FROM node:24-alpine
 WORKDIR /app
-RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages ./packages
-COPY services/admin ./services/admin
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @anpardaz/admin-service build
-USER node
 ENV NODE_ENV=production
-EXPOSE 4005
-CMD ["node","services/admin/dist/main.js"]
+COPY --from=build /out ./
+USER node
+EXPOSE 4006
+CMD ["node","dist/main.js"]
