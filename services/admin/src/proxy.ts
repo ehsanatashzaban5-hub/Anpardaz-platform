@@ -55,7 +55,7 @@ export async function adminLogin(body: unknown, reply: FastifyReply) {
 export async function proxyAdminRequest(request:AdminRequest,reply:FastifyReply){
   const wildcard=String((request.params as {'*':string})['*']??'').replace(/^\//,'');
   if(!wildcard||wildcard.includes('..')||wildcard.includes('\\')) return reply.code(400).send({error:'invalid_admin_path'});
-  const target=platformUrl()+'/api/v1/admin/'+wildcard;
+  const target=platformUrl()+'/internal/v1/admin/'+wildcard;
   const headers:Record<string,string>={};
   headers.authorization=String(request.headers.authorization??'');
   headers['x-admin-gateway-token']=internalToken();
