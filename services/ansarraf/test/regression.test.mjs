@@ -77,7 +77,7 @@ test('deposit and withdrawal E2E entry points are both KYC-gated before financia
 
 test('withdrawal approval path preserves separation of duties and dual approval controls', () => {
   const source = fs.readFileSync(path.join(process.cwd(), 'src/routes/trading.ts'), 'utf8');
-  const i = source.indexOf("app.post('/api/v1/withdrawals/:id/approve");
+  const i = source.indexOf("app.post('/internal/v1/admin/withdrawals/:id/approve");
   assert.ok(i >= 0);
   const block = source.slice(i, i + 12000);
   assert.match(block, /approval_status/);
