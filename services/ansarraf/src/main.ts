@@ -34,7 +34,8 @@ if(isProduction&&process.env.TRUST_PROXY!=='true')throw new Error('Production se
 
 const trustProxy=process.env.TRUST_PROXY==='true';
 const app=Fastify({logger:true,trustProxy});
-app.setErrorHandler((error,_request,reply)=>{
+
+app.addHook('onSend',async(_request,reply)=>{reply.header('X-Content-Type-Options','nosniff');reply.header('X-Frame-Options','DENY');reply.header('Referrer-Policy','no-referrer');reply.header('Permissions-Policy','camera=(),microphone=(),geolocation=()');if(process.env.NODE_ENV==='production')reply.header('Strict-Transport-Security','max-age=31536000; includeSubDomains');});app.setErrorHandler((error,_request,reply)=>{
   if(error instanceof Error&&error.message==='customer_inactive')return reply.code(403).send({error:'customer_inactive'});
   app.log.error(error);
   return reply.code(500).send({error:'internal_server_error'});

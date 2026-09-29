@@ -99,11 +99,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
-          cache-dependency-path: |
-            pnpm-lock.yaml
-            apps/mobile/pnpm-lock.yaml
-            apps/web/pnpm-lock.yaml
       - name: Install dependencies
         working-directory: ${{ matrix.path }}
         run: |
@@ -112,7 +107,7 @@ jobs:
           elif [ "${{ matrix.name }}" = "web" ]; then
             pnpm install --no-frozen-lockfile --ignore-workspace
           elif [ -f pnpm-lock.yaml ]; then
-            pnpm install --frozen-lockfile
+            pnpm install --frozen-lockfile --ignore-scripts
           else
             pnpm install --no-frozen-lockfile
           fi
