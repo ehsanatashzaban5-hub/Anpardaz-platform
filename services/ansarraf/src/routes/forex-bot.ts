@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { ensureCustomer, requireAuth } from '../auth.js';
+import { requireAdminInternal } from './admin-internal-auth.js';
 
 type AuthRequest = FastifyRequest & { auth: { sub: string; role: string } };
 const auth = (r: FastifyRequest) => r as AuthRequest;
@@ -169,9 +170,10 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
     } finally { client.release(); }
   });
 
-  app.get('/api/v1/admin/forex-bot/requests', { preHandler: requireAuth }, async (request, reply) => {
-    const a = auth(request).auth;
-    if (!VIEW_ROLES.includes(a.role)) return reply.code(403).send({ error:'forbidden' });
+  app.get('/internal/v1/admin/forex-bot/requests', async (request, reply) => {
+    const admin = requireAdminInternal(request, reply, VIEW_ROLES);
+    if (!admin) return;
+    const a = { sub: admin.identityId, role: admin.role };
     const q = request.query as { status?: string };
     const status = q.status?.trim();
     const rows = await pool.query(
@@ -185,9 +187,10 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
     return { requests: rows.rows };
   });
 
-  app.post('/api/v1/admin/forex-bot/requests/:id/decision', { preHandler: requireAuth }, async (request, reply) => {
-    const a = auth(request).auth;
-    if (!REVIEW_ROLES.includes(a.role)) return reply.code(403).send({ error:'forbidden' });
+  app.post('/internal/v1/admin/forex-bot/requests/:id/decision', async (request, reply) => {
+    const admin = requireAdminInternal(request, reply, REVIEW_ROLES);
+    if (!admin) return;
+    const a = { sub: admin.identityId, role: admin.role };
     const id = Number((request.params as any).id);
     const body = (request.body ?? {}) as { approve?: boolean; reason?: string };
     if (!Number.isSafeInteger(id) || typeof body.approve !== 'boolean') return reply.code(400).send({ error:'invalid_decision' });
@@ -272,9 +275,10 @@ export function registerForexBotRoutes(app: FastifyInstance, pool: Pool) {
     } finally { client.release(); }
   });
 
-  app.post('/api/v1/admin/forex-bot/accounts/:id/pnl', { preHandler: requireAuth }, async (request, reply) => {
-    const a=auth(request).auth;
-    if(!REVIEW_ROLES.includes(a.role))return reply.code(403).send({error:'forbidden'});
+  app.post('/internal/v1/admin/forex-bot/accounts/:id/pnl', async (request, reply) => {
+    const admin=requireAdminInternal(request,reply,REVIEW_ROLES);
+    if(!admin)return;
+    const a={sub:admin.identityId,role:admin.role};
     if(process.env.FOREX_BOT_MANUAL_PNL_ENABLED!=='true')return reply.code(503).send({error:'forex_bot_manual_pnl_disabled'});
     const accountId=Number((request.params as any).id);
     const body=(request.body??{}) as {amount?:string;sourceReference?:string;reason?:string;idempotencyKey?:string};
