@@ -163,8 +163,10 @@ export class BankingProviderWorker{
           await postLedger('anpardaz_topup',String(x.id),x.operation_id,Number(x.customer_id),String(x.provider??'FINTECH'),String(x.currency),String(x.amount),'credit');
           await this.pool.query("UPDATE topup_requests SET status='completed',updated_at=NOW() WHERE operation_id=$1",[x.operation_id]);
           await this.pool.query("UPDATE banking_provider_outbox SET status='completed',updated_at=NOW() WHERE id=$1",[row.id]);
-        }else if(status==='failed'||status==='manual_review')await this.pool.query("UPDATE banking_provider_outbox SET status=$2,last_error=$3,updated_at=NOW() WHERE id=$1",[row.id,status,result.errorMessage??result.errorCode??null]);
-        else await this.pool.query("UPDATE banking_provider_outbox SET status='processing',next_attempt_at=NOW()+INTERVAL '30 seconds',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,result.errorMessage??null]);
+        }else {
+          await this.pool.query("UPDATE topup_requests SET status='manual_review',provider_status='manual_review',provider_error_code='PROVIDER_OPERATION_UNCERTAIN',provider_error_message=$1,updated_at=NOW() WHERE operation_id=$2",[result.errorMessage??'Provider returned a non-terminal result without a reconciliation reference',x.operation_id]);
+          await this.pool.query("UPDATE banking_provider_outbox SET status='manual_review',last_error=$2,updated_at=NOW() WHERE id=$1",[row.id,result.errorMessage??'provider_operation_uncertain']);
+        }
         return true;
       }
       return false;
