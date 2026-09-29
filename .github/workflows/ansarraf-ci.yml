@@ -27,7 +27,7 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: apps/mobile/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile --ignore-scripts --config.shared-workspace-lockfile=false
+      - run: pnpm install --ignore-workspace --frozen-lockfile --ignore-scripts
       - run: pnpm run build
 
   web:
@@ -45,7 +45,7 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: apps/web/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile --ignore-scripts --config.shared-workspace-lockfile=false
+      - run: pnpm install --ignore-workspace --frozen-lockfile --ignore-scripts
       - run: pnpm run build
 
   ansarraf-service:
