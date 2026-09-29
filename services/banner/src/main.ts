@@ -7,7 +7,7 @@ import {requireAuth,requireAdminInternal,type AuthClaims} from './auth.js';
 type R=FastifyRequest&{auth:AuthClaims};
 const app=Fastify({logger:true,trustProxy:process.env.TRUST_PROXY==='true'});
 const isProduction=process.env.NODE_ENV==='production';
-if(isProduction){for(const name of ['DATABASE_URL','CORS_ORIGIN','IDENTITY_ISSUER','IDENTITY_PUBLIC_KEY_B64','BANNER_INTERNAL_TOKEN']){const value=process.env[name];if(!value||value.includes('CHANGE_ME')||value.includes('your-web-domain.example')||value.includes('BASE64-DER-ED25519-PUBLIC-KEY'))throw new Error('Production environment variable '+name+' must be configured with a real value');}}
+if(isProduction){for(const name of ['DATABASE_URL','CORS_ORIGIN','IDENTITY_SERVICE_URL','IDENTITY_ISSUER','IDENTITY_PUBLIC_KEY_B64','BANNER_INTERNAL_TOKEN']){const value=process.env[name];if(!value||value.includes('CHANGE_ME')||value.includes('your-web-domain.example')||value.includes('BASE64-DER-ED25519-PUBLIC-KEY'))throw new Error('Production environment variable '+name+' must be configured with a real value');}}
 const pool=new Pool({connectionString:process.env.DATABASE_URL,max:10,connectionTimeoutMillis:5000,idleTimeoutMillis:30000});
 const MAX_MEDIA_BYTES=8*1024*1024;
 const allowedMime=new Set(['image/jpeg','image/png','image/webp']);
