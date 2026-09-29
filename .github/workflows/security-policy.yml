@@ -1,0 +1,80 @@
+name: Security Policy Regression Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  security-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify workflow action pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib
+          import re
+
+          bad = []
+          pattern = re.compile(r'\\buses:\\s*([^#\\s]+)')
+          sha = re.compile(r'^[0-9a-f]{40}$')
+
+          for path in pathlib.Path(".github/workflows").glob("*.yml"):
+              for line_no, line in enumerate(path.read_text().splitlines(), 1):
+                  match = pattern.search(line)
+                  if not match:
+                      continue
+                  ref = match.group(1)
+                  if ref.startswith("./"):
+                      continue
+                  if "@" not in ref:
+                      bad.append(f"{path}:{line_no}: missing immutable action SHA: {ref}")
+                      continue
+                  action_ref = ref.rsplit("@", 1)[1]
+                  if not sha.fullmatch(action_ref):
+                      bad.append(f"{path}:{line_no}: mutable action ref: {ref}")
+
+          if bad:
+              print("\n".join(bad))
+              raise SystemExit(1)
+          print("All external GitHub Actions are pinned to full commit SHAs.")
+          PY
+
+      - name: Verify repository does not track environment files
+        shell: bash
+        run: |
+          set -euo pipefail
+          tracked="$(git ls-files | grep -E '(^|/)(\\.env|\\.env\\.)' || true)"
+          if [ -n "$tracked" ]; then
+            echo "Tracked environment files detected:"
+            echo "$tracked"
+            exit 1
+          fi
+          echo "No environment files are tracked."
+
+      - name: Verify production database bindings are loopback-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE '(^|[[:space:]-])"?([0-9.]+:)?[0-9]+:5432"?' infrastructure/production databases/docker-compose.yml; then
+            echo "Potentially exposed PostgreSQL port mapping detected; review the output above."
+          fi
+          if grep -RInE '"0\\.0\\.0\\.0:[0-9]+:5432"|\b0\\.0\\.0\\.0:[0-9]+:5432\b' infrastructure/production databases/docker-compose.yml; then
+            echo "PostgreSQL must not be published on all interfaces."
+            exit 1
+          fi
+          echo "No all-interface PostgreSQL publishing found in reviewed production/database Compose files."
+
+      - name: Verify mobile healthcheck uses the runtime port
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'http://127.0.0.1:8080/health' apps/mobile/docker-compose.yml
+          grep -Fq 'listen 8080' apps/mobile/nginx.conf
+          echo "Mobile container healthcheck and Nginx runtime port are aligned."
