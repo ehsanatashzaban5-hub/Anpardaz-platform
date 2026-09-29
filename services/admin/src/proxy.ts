@@ -54,7 +54,7 @@ export async function proxyAdminMultipart(request:AdminRequest,reply:FastifyRepl
   }
   const r=await fetch(platformUrl()+'/internal/v1/admin/content/videos',{
     method:'POST',
-    headers:{authorization:String(request.headers.authorization??''),'x-admin-gateway-token':internalToken(),accept:'application/json'},
+    headers:{authorization:String(request.headers.authorization??''),'x-admin-gateway-token':internalToken(),accept:'application/json','x-admin-permission':permission},
     body:form,signal:AbortSignal.timeout(30000)
   });
   const text=await r.text(); const type=r.headers.get('content-type')??'';
@@ -62,7 +62,31 @@ export async function proxyAdminMultipart(request:AdminRequest,reply:FastifyRepl
   return reply.code(r.status).type(type||'text/plain').send(text);
 }
 
+
+export function adminPermissionForPath(wildcard:string,method:string):string{
+  const p=wildcard.replace(/^\/+/, '');
+  const write=!['GET','HEAD'].includes(method);
+  if(p==='overview') return 'users.read';
+  if(p.startsWith('content/')) return p==='content/policies'&&write?'content.write':p.startsWith('content/policies/')&&write?'content.write':p==='content/pipeline'||p==='content/videos'?'content.read':p.startsWith('content/videos/')?'content.write':'content.read';
+  if(p.startsWith('hoosh/tickets')) return write?'hoosh.support.manage':'hoosh.support.read';
+  if(p.startsWith('hoosh/requests')) return write?'hoosh.manage':'hoosh.read';
+  if(p.startsWith('hoosh/providers')) return 'hoosh.manage';
+  if(p.startsWith('market/')) return write?'content.write':'content.read';
+  if(p.startsWith('support/tickets')) return write?'support.write':'support.read';
+  if(p.startsWith('moderation/')) return write?'content.moderate':'content.read';
+  if(p.startsWith('settings')) return 'settings.write';
+  if(p.startsWith('maintenance')) return 'maintenance.write';
+  if(p.startsWith('approvals')) return write?'approvals.write':'approvals.read';
+  if(p.startsWith('reconciliation-runs')) return write?'reconciliation.write':'reconciliation.read';
+  if(p==='service-health') return 'service_health.read';
+  if(p.startsWith('news')) return write?'content.write':'content.read';
+  if(p.startsWith('banner')) return write?'content.write':'content.read';
+  if(p.startsWith('forum')) return write?'content.moderate':'content.read';
+  return write?'admin.write':'admin.read';
+}
+
 export async function proxyAdminRequest(request:AdminRequest,reply:FastifyReply){
+  const permission=adminPermissionForPath(String((request.params as {'*':string})['*']??''),request.method);
   const wildcard=String((request.params as {'*':string})['*']??'').replace(/^\//,'');
   if(!wildcard||wildcard.includes('..')||wildcard.includes('\\')) return reply.code(400).send({error:'invalid_admin_path'});
   const target=platformUrl()+'/internal/v1/admin/'+wildcard;
