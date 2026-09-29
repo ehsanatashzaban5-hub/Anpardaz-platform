@@ -124,7 +124,7 @@ export function registerFinnotechBankingRoutes(app:FastifyInstance,pool:Pool){
   app.post('/api/v1/banking/transfers',{preHandler:requireAuth},async(req,reply)=>{
     const customerId=await ensureCustomer(pool,asR(req).auth); const b=(req.body??{}) as any;
     if(!Number.isSafeInteger(Number(b.sourceAccountId))||!idem(b.idempotencyKey)||typeof b.amount!=='string'||typeof b.destination!=='string')return reply.code(400).send({error:'invalid_transfer'});
-    const source=(await pool.query('SELECT * FROM accounts WHERE id=$1 AND customer_id=$2 AND status=\\'active\\'',[Number(b.sourceAccountId),customerId])).rows[0];
+    const source=(await pool.query("SELECT * FROM accounts WHERE id=$1 AND customer_id=$2 AND status='active'",[Number(b.sourceAccountId),customerId])).rows[0];
     if(!source)return reply.code(404).send({error:'source_account_not_found'});
     const existing=(await pool.query('SELECT * FROM transfer_requests WHERE customer_id=$1 AND idempotency_key=$2',[customerId,b.idempotencyKey])).rows[0];
     if(existing){
