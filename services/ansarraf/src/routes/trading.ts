@@ -227,7 +227,8 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
    }finally{client.release();}
  });
  app.get('/api/v1/admin/withdrawals',{preHandler:requireInternalAdmin},async(req,reply)=>{
-   if(!['admin','super_admin','operator','support'].includes(r(req).auth.role))return reply.code(403).send({error:'forbidden'});
+   const role=String(req.headers['x-admin-role']??'').trim();
+   if(!['admin','super_admin','operator','support'].includes(role))return reply.code(403).send({error:'forbidden'});
    const q=req.query as any;
    const status=typeof q.status==='string'?q.status:null;
    const rows=await pool.query(
@@ -241,7 +242,9 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
    return{withdrawals:rows.rows};
  });
  app.post('/api/v1/admin/withdrawals/:id/complete-toman',{preHandler:requireInternalAdmin},async(req,reply)=>{
-   const auth=r(req).auth;if(!['admin','super_admin','operator'].includes(auth.role))return reply.code(403).send({error:'forbidden'});
+   const actor=String(req.headers['x-admin-identity']??'').trim();
+   if(!['admin','super_admin','operator'].includes(String(req.headers['x-admin-role']??'').trim()))return reply.code(403).send({error:'forbidden'});
+   const auth={sub:actor};
    const wid=Number((req.params as any).id);const reference=String((req.body as any)?.payoutReference??'').trim();
    if(!Number.isSafeInteger(wid)||wid<=0||!reference)return reply.code(400).send({error:'withdrawal_id_and_payout_reference_required'});
    const client=await pool.connect();try{
@@ -268,6 +271,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
  });
  app.post('/api/v1/admin/withdrawals/:id/reconcile',{preHandler:requireInternalAdmin},async(req,reply)=>{
    const auth={sub:String(req.headers['x-admin-identity']??'').trim()};
+   if(!['admin','super_admin','operator'].includes(String(req.headers['x-admin-role']??'').trim()))return reply.code(403).send({error:'forbidden'});
    const wid=Number((req.params as any).id);
    const supplied=typeof (req.body as any)?.providerWithdrawalId==='string'?String((req.body as any).providerWithdrawalId).trim():null;
    if(!Number.isSafeInteger(wid)||wid<=0)return reply.code(400).send({error:'invalid_withdrawal_id'});
@@ -303,6 +307,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
  });
  app.post('/api/v1/admin/withdrawals/:id/approve',{preHandler:requireInternalAdmin},async(req,reply)=>{
    const actor=String(req.headers['x-admin-identity']??'').trim();
+   if(!['admin','super_admin','operator'].includes(String(req.headers['x-admin-role']??'').trim()))return reply.code(403).send({error:'forbidden'});
    const auth={sub:actor};
    const wid=Number((req.params as any).id);
    if(!Number.isSafeInteger(wid)||wid<=0)return reply.code(400).send({error:'invalid_withdrawal_id'});
@@ -361,6 +366,7 @@ export function registerTradingRoutes(app:FastifyInstance,pool:Pool){
  });
  app.post('/api/v1/admin/withdrawals/:id/reject',{preHandler:requireInternalAdmin},async(req,reply)=>{
    const actor=String(req.headers['x-admin-identity']??'').trim();
+   if(!['admin','super_admin','operator'].includes(String(req.headers['x-admin-role']??'').trim()))return reply.code(403).send({error:'forbidden'});
    const auth={sub:actor};
    const wid=Number((req.params as any).id);
    const reason=typeof (req.body as any)?.reason==='string'?String((req.body as any).reason).trim().slice(0,1000):'rejected_by_admin';
