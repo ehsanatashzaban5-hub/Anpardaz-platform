@@ -9,7 +9,7 @@ on:
     branches:
       - main
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   mobile:
@@ -27,12 +27,7 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: apps/mobile/pnpm-lock.yaml
-      - run: pnpm install --ignore-workspace --no-frozen-lockfile --ignore-scripts
-      - run: git config user.name "github-actions[bot]"
-      - run: git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      - run: git add apps/mobile/pnpm-lock.yaml && git diff --cached --quiet || git commit -m "chore: refresh mobile pnpm lockfile"
-      - run: git push origin HEAD:${{ github.head_ref }}
-      - run: pnpm run build
+      - run: pnpm install --ignore-workspace --frozen-lockfile --ignore-scripts
 
   web:
     runs-on: ubuntu-latest
