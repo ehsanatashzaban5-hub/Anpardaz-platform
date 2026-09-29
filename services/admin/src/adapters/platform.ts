@@ -4,7 +4,7 @@ import {requireAdmin} from '../proxy.js';
 type Identity={identity_id:string;email?:string;display_name?:string;role:string;status:string;phone?:string|null};
 type AdminRequest=FastifyRequest&{adminIdentity?:Identity};
 const env=(name:string,fallback:string)=>(process.env[name]??fallback).replace(/\/$/,'');
-const json=async(url:string,token:string,timeout=7000)=>{try{const r=await fetch(url,{headers:{authorization:'Bearer '+token,accept:'application/json'},signal:AbortSignal.timeout(timeout)});const body=await r.json().catch(()=>({}));return{ok:r.ok,status:r.status,body};}catch(e){return{ok:false,status:503,body:{error:e instanceof Error?e.message:'service_unavailable'}}}};
+const json=async(url:string,token:string,timeout=7000,internal=false)=>{try{const r=await fetch(url,{headers:{authorization:'Bearer '+token,accept:'application/json',...(internal?{'x-admin-gateway-token':process.env.ADMIN_INTERNAL_TOKEN??''}:{})},signal:AbortSignal.timeout(timeout)});const body=await r.json().catch(()=>({}));return{ok:r.ok,status:r.status,body};}catch(e){return{ok:false,status:503,body:{error:e instanceof Error?e.message:'service_unavailable'}}}};
 
 export function registerPlatformAdminAdapters(app:FastifyInstance){
  app.get('/api/v1/admin/ecosystem/health',async(request,reply)=>{
@@ -18,7 +18,7 @@ export function registerPlatformAdminAdapters(app:FastifyInstance){
   const identityId=String((request.params as {identityId:string}).identityId??'').trim(); if(!identityId||identityId.length>200)return reply.code(400).send({error:'invalid_identity_id'});
   const platform=env('PLATFORM_SERVICE_URL','http://127.0.0.1:4003');
   const [user,ansarraf,anpardaz,accounting,banner]=await Promise.all([
-   json(platform+'/internal/v1/admin/users/'+encodeURIComponent(identityId),process.env.ADMIN_INTERNAL_TOKEN??''),
+   json(platform+'/internal/v1/admin/users/'+encodeURIComponent(identityId),process.env.ADMIN_INTERNAL_TOKEN??'',7000,true),
    json(env('ANSARRAF_SERVICE_URL','http://127.0.0.1:4002')+'/internal/v1/admin/users/'+encodeURIComponent(identityId)+'/summary',process.env.ANSARRAF_INTERNAL_TOKEN??''),
    json(env('ANPARDAZ_SERVICE_URL','http://127.0.0.1:4001')+'/internal/v1/admin/users/'+encodeURIComponent(identityId)+'/summary',process.env.ANPARDAZ_INTERNAL_TOKEN??''),
    json(env('ACCOUNTING_SERVICE_URL','http://127.0.0.1:4004')+'/internal/v1/ledger/accounts?ownerIdentityId='+encodeURIComponent(identityId)+'&limit=500',process.env.ACCOUNTING_INTERNAL_TOKEN??''),
