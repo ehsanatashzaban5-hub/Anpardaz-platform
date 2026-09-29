@@ -3,7 +3,7 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 type AdminUser={email:string;role:string};
 type Json=Record<string,any>;
 
-const API=(import.meta as any).env?.VITE_PLATFORM_API_URL??"";
+const API=(import.meta as any).env?.VITE_ADMIN_API_URL??"";
 const fa=(v:unknown)=>String(v??"").replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[+d]);
 const money=(v:unknown)=>{const n=Number(v);return Number.isFinite(n)?n.toLocaleString("fa-IR"):"—"};
 
@@ -35,7 +35,7 @@ export default function AdminPanel(){
   const load=async(t:string)=>{
     setBusy(true);setError("");
     try{
-      const me=await api("/api/v1/auth/me",t);const role=me?.user?.role;
+      const me=await api("/api/v1/admin/auth/me",t);const role=me?.user?.role;
       if(!["admin","super_admin","operator","support"].includes(role))throw new Error("admin_access_required");
       setUser({email:me.user.email,role});
       const [o,h]=await Promise.all([api("/api/v1/admin/overview",t),api("/api/v1/admin/ecosystem/health",t).catch((e)=>({error:e.message}))]);
@@ -48,11 +48,11 @@ export default function AdminPanel(){
   const login=async()=>{
     setBusy(true);setLoginError("");
     try{
-      const x=await api("/api/v1/auth/login","", {method:"POST",body:JSON.stringify({email,password})});sessionStorage.setItem("anpardaz_admin_token",x.accessToken);setToken(x.accessToken)
+      const x=await api("/api/v1/admin/auth/login","", {method:"POST",body:JSON.stringify({email,password})});sessionStorage.setItem("anpardaz_admin_token",x.accessToken);setToken(x.accessToken)
     }catch(e){setLoginError(e instanceof Error?e.message:"ورود ناموفق بود")}finally{setBusy(false)}
   };
   const loadContent=async()=>{setBusy(true);try{const [p,pipe,v]=await Promise.all([api("/api/v1/admin/content/policies",token),api("/api/v1/admin/content/pipeline",token),api("/api/v1/admin/content/videos",token)]);setContentPolicies(p.policies??[]);setContentPipeline(pipe);setContentVideos(v.videos??[]);}catch(e){setError(e instanceof Error?e.message:"content_admin_failed")}finally{setBusy(false)}};
-  const uploadContentVideo=async()=>{if(!contentVideoTitle.trim()||!contentVideoFile)return;setBusy(true);try{const fd=new FormData();fd.append("title",contentVideoTitle.trim());fd.append("category",contentVideoCategory);fd.append("file",contentVideoFile);const base=(import.meta.env.VITE_PLATFORM_API_URL??"").replace(/\/$/,"");const r=await fetch(base+"/api/v1/admin/content/videos",{method:"POST",headers:{authorization:"Bearer "+token},body:fd});if(!r.ok)throw new Error("video_upload_failed");setContentVideoTitle("");setContentVideoFile(null);await loadContent()}catch(e){setError(e instanceof Error?e.message:"video_upload_failed")}finally{setBusy(false)}};
+  const uploadContentVideo=async()=>{if(!contentVideoTitle.trim()||!contentVideoFile)return;setBusy(true);try{const fd=new FormData();fd.append("title",contentVideoTitle.trim());fd.append("category",contentVideoCategory);fd.append("file",contentVideoFile);const r=await fetch(API+"/api/v1/admin/content/videos",{method:"POST",headers:{authorization:"Bearer "+token},body:fd});if(!r.ok)throw new Error("video_upload_failed");setContentVideoTitle("");setContentVideoFile(null);await loadContent()}catch(e){setError(e instanceof Error?e.message:"video_upload_failed")}finally{setBusy(false)}};
   const updateContentPolicy=async(category:string)=>{setBusy(true);try{await api("/api/v1/admin/content/policies/"+encodeURIComponent(category),token,{method:"PUT",body:JSON.stringify({dailyLimit:Number(contentDaily),autoPublish:contentAutoPublish,requireReview:contentRequireReview})});await loadContent()}catch(e){setError(e instanceof Error?e.message:"content_policy_failed")}finally{setBusy(false)}};
   const loadAnsarrafFees=async()=>{setBusy(true);try{const x=await api("/api/v1/admin/ecosystem/ansarraf/fees",token);setAnsarrafFees(x.rules??[])}catch(e){setError(e instanceof Error?e.message:"ansarraf_fees_failed")}finally{setBusy(false)}};
   const saveAnsarrafFee=async()=>{setBusy(true);setError("");try{await api("/api/v1/admin/ecosystem/ansarraf/fees",token,{method:"POST",body:JSON.stringify({operationType:feeForm.operationType,assetSymbol:feeForm.assetSymbol||null,marketSymbol:feeForm.marketSymbol||null,percentage:feeForm.percentage||"0",fixedAmount:feeForm.fixedAmount||"0",minAmount:feeForm.minAmount||null,maxAmount:feeForm.maxAmount||null,feeAssetSymbol:feeForm.feeAssetSymbol||feeForm.assetSymbol||null})});await loadAnsarrafFees()}catch(e){setError(e instanceof Error?e.message:"ansarraf_fee_save_failed")}finally{setBusy(false)}};
@@ -66,7 +66,7 @@ export default function AdminPanel(){
   const creditManualToman=async()=>{if(!fundingCard||!fundingIdentity||!fundingAmount||!fundingReference)return;setBusy(true);setError("");try{await api("/api/v1/admin/ecosystem/ansarraf/deposits/manual/credit",token,{method:"POST",body:JSON.stringify({cardNumber:fundingCard,identityId:fundingIdentity,amount:fundingAmount,externalReference:fundingReference})});setFundingReference("");await loadManualDeposits()}catch(e){setError(e instanceof Error?e.message:"manual_toman_credit_failed")}finally{setBusy(false)}};
   const loadFinancial=async()=>{if(!financialUserId.trim())return;setBusy(true);setError("");try{const [financial,lifecycle]=await Promise.all([api("/api/v1/admin/ecosystem/anpardaz/financial-center/"+encodeURIComponent(financialUserId.trim()),token),api("/api/v1/admin/ecosystem/anpardaz/cards/lifecycle/"+encodeURIComponent(financialUserId.trim()),token)]);setFinancialData(financial);setCardLifecycle(lifecycle)}catch(e){setError(e instanceof Error?e.message:"financial_lookup_failed")}finally{setBusy(false)}};
   const exportFinancial=()=>{if(!financialData?.csv)return;const blob=new Blob([financialData.csv],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="anpardaz-financial-center-"+financialUserId.trim()+".csv";a.click();URL.revokeObjectURL(url)};
-  const lookupCard=async()=>{const card=cardLookupNumber.replace(/\\s/g,"");if(!/^\\d{16}$/.test(card)){setError("شماره کارت باید ۱۶ رقمی باشد.");return}setBusy(true);setError("");try{setCardLookupData(await api("/api/v1/admin/ecosystem/anpardaz/cards/lookup",{method:"POST",body:JSON.stringify({cardNumber})},token))}catch(e){setCardLookupData(null);setError(e instanceof Error?e.message:"card_lookup_failed")}finally{setBusy(false)}};
+  const lookupCard=async()=>{const card=cardLookupNumber.replace(/\\s/g,"");if(!/^\\d{16}$/.test(card)){setError("شماره کارت باید ۱۶ رقمی باشد.");return}setBusy(true);setError("");try{setCardLookupData(await api("/api/v1/admin/ecosystem/anpardaz/cards/lookup",token,{method:"POST",body:JSON.stringify({cardNumber:card})}))}catch(e){setCardLookupData(null);setError(e instanceof Error?e.message:"card_lookup_failed")}finally{setBusy(false)}};
   const loadUser=async()=>{if(!identity.trim())return;setBusy(true);try{setUserSummary(await api("/api/v1/admin/ecosystem/users/"+encodeURIComponent(identity.trim()),token))}catch(e){setError(e instanceof Error?e.message:"user_lookup_failed")}finally{setBusy(false)}};
   const loadTrace=async()=>{if(!op.trim())return;setBusy(true);setTraceError("");try{setTrace(await api("/api/v1/admin/ecosystem/operations/"+encodeURIComponent(op.trim())+"/trace",token))}catch(e){setTrace(null);setTraceError(e instanceof Error?e.message:"trace_failed")}finally{setBusy(false)}};
   const loadSupport=async()=>{setBusy(true);try{const x=await api("/api/v1/admin/support/tickets",token);setSupportTickets(x.tickets??[]);}catch(e){setError(e instanceof Error?e.message:"support_failed")}finally{setBusy(false)}};
