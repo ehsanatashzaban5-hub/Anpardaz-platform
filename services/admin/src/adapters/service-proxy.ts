@@ -47,6 +47,17 @@ export function resolveServiceTarget(request:AdminRequest):Target|null{
   return null;
 }
 
+
+async function recordAudit(request:AdminRequest,target:Target){
+  if(['GET','HEAD'].includes(request.method)||!request.adminIdentity)return;
+  const platform=base('PLATFORM_SERVICE_URL','http://127.0.0.1:4003');
+  const raw=String((request.params as {'*':string})['*']??'').replace(/^\//,'');
+  const resource=raw.replace(/^ecosystem\//,'');
+  try{
+    await fetch(platform+'/internal/v1/admin/audit-event',{method:'POST',headers:{authorization:'Bearer '+(process.env.ADMIN_INTERNAL_TOKEN??''),'content-type':'application/json','x-admin-identity':request.adminIdentity.identity_id},body:JSON.stringify({identityId:request.adminIdentity.identity_id,action:request.method+' '+resource,resourceType:resource.split('/')[0]??'admin',resourceId:null,reason:'Admin Backend service adapter action',metadata:{service:target.base,route:resource}}),signal:AbortSignal.timeout(3000)});
+  }catch{console.error('admin_audit_event_failed',resource);}
+}
+
 export async function proxyOwningService(request:AdminRequest,reply:FastifyReply,target:Target){
   if(!target.token) return reply.code(503).send({error:'owning_service_credentials_not_configured'});
   const headers:Record<string,string>={authorization:'Bearer '+target.token,accept:String(request.headers.accept??'application/json')};
@@ -58,6 +69,6 @@ export async function proxyOwningService(request:AdminRequest,reply:FastifyReply
   const response=await fetch(target.base+target.path+query(request),{method:request.method,headers,body,signal:AbortSignal.timeout(15000)});
   const text=await response.text();
   const responseType=response.headers.get('content-type')??'';
-  if(responseType.includes('application/json')){try{return reply.code(response.status).send(JSON.parse(text));}catch{}}
-  return reply.code(response.status).type(responseType||'text/plain').send(text);
+  if(responseType.includes('application/json')){try{if(response.ok)await recordAudit(request,target);return reply.code(response.status).send(JSON.parse(text));}catch{}}
+  if(response.ok)await recordAudit(request,target); return reply.code(response.status).type(responseType||'text/plain').send(text);
 }
