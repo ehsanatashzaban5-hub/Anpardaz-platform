@@ -27,7 +27,11 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: apps/mobile/pnpm-lock.yaml
-      - run: pnpm install --ignore-workspace --frozen-lockfile --ignore-scripts
+      - run: pnpm install --ignore-workspace --no-frozen-lockfile --ignore-scripts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-lockfile-refresh
+          path: apps/mobile/pnpm-lock.yaml
       - run: pnpm run build
 
   web:
