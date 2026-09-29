@@ -1,0 +1,21 @@
+services:
+  mobile:
+    build:
+      context: ../..
+      dockerfile: apps/mobile/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5175:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
