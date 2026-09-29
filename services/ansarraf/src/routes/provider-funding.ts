@@ -3,6 +3,7 @@ import type {Pool} from 'pg';
 import {ensureCustomer,requireAuth,type AuthClaims} from '../auth.js';
 import {createProviderRegistry} from '../providers/index.js';
 import {randomUUID} from 'node:crypto';
+import {requireAdminInternal} from './admin-internal-auth.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
 async function ledgerAccount(base:string,token:string,code:string,name:string,type:string,currency:string){
