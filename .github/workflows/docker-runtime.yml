@@ -41,10 +41,14 @@ jobs:
           - context: apps/mobile
             dockerfile: Dockerfile
             tag: anpardaz-mobile:ci
+          - context: .
+            dockerfile: apps/web/Dockerfile
+            tag: anpardaz-web:ci
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83ddda # v6.0.2
       - name: Build
         run: |
+          set -euo pipefail
           if [ "${{ matrix.context }}" = "." ]; then
             df="${{ matrix.dockerfile }}"
           else
@@ -63,15 +67,27 @@ jobs:
             docker logs anpardaz-mobile-health
             exit 1
           fi
+          if [ "${{ matrix.context }}" = "." ] && [ "${{ matrix.dockerfile }}" = "apps/web/Dockerfile" ]; then
+            docker run -d --name anpardaz-web-health "${{ matrix.tag }}"
+            trap 'docker rm -f anpardaz-web-health >/dev/null 2>&1 || true' EXIT
+            for attempt in $(seq 1 12); do
+              status="$(docker inspect --format '{{.State.Health.Status}}' anpardaz-web-health)"
+              if [ "$status" = "healthy" ]; then exit 0; fi
+              if [ "$status" = "unhealthy" ]; then docker logs anpardaz-web-health; exit 1; fi
+              sleep 5
+            done
+            docker logs anpardaz-web-health
+            exit 1
+          fi
 
   compose-validation:
     name: Validate production Compose
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83ddda # v6.0.2
       - name: Prepare CI env files
         run: |
-          touch infrastructure/production/platform.env infrastructure/production/admin.env infrastructure/production/anpardaz.env infrastructure/production/ansarraf.env infrastructure/production/banner.env infrastructure/production/accounting.env
+          touch infrastructure/production/platform.env infrastructure/production/admin.env infrastructure/production/anpardaz.env infrastructure/production/ansarraf.env infrastructure/production/banner.env infrastructure/production/accounting.env infrastructure/production/web.env
       - name: Validate Compose files
         env:
           ANPARDAZ_DB_PASSWORD: ci
@@ -80,10 +96,13 @@ jobs:
           BANNER_DB_PASSWORD: ci
           ACCOUNTING_DB_PASSWORD: ci
         run: |
+          set -euo pipefail
           docker compose -f infrastructure/production/platform.compose.yml config -q
           docker compose -f infrastructure/production/admin.compose.yml config -q
           docker compose -f infrastructure/production/anpardaz.compose.yml config -q
           docker compose -f infrastructure/production/ansarraf.compose.yml config -q
           docker compose -f infrastructure/production/accounting.compose.yml config -q
+          docker compose -f infrastructure/production/web.compose.yml config -q
+          docker compose -f infrastructure/production/public-gateway.compose.yml config -q
           docker compose -f databases/docker-compose.yml config -q
           docker compose -f apps/mobile/docker-compose.yml config -q
