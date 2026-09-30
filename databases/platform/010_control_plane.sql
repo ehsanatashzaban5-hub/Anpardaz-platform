@@ -20,50 +20,6 @@ CREATE TABLE IF NOT EXISTS notification_templates (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS market_data_sources (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
-  base_url TEXT NOT NULL,
-  enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  priority INTEGER NOT NULL DEFAULT 100,
-  timeout_ms INTEGER NOT NULL DEFAULT 5000 CHECK(timeout_ms BETWEEN 500 AND 30000),
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS market_data_symbols (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  symbol TEXT NOT NULL UNIQUE,
-  base_asset TEXT NOT NULL,
-  quote_asset TEXT NOT NULL,
-  enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS market_data_observations (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  source_id BIGINT NOT NULL REFERENCES market_data_sources(id),
-  symbol_id BIGINT NOT NULL REFERENCES market_data_symbols(id),
-  bid NUMERIC(38,18),
-  ask NUMERIC(38,18),
-  last_price NUMERIC(38,18),
-  volume_24h NUMERIC(38,18),
-  source_timestamp TIMESTAMPTZ,
-  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb
-);
-
-CREATE TABLE IF NOT EXISTS market_data_health (
-  source_id BIGINT PRIMARY KEY REFERENCES market_data_sources(id) ON DELETE CASCADE,
-  status TEXT NOT NULL DEFAULT 'unknown' CHECK(status IN ('unknown','healthy','degraded','down')),
-  last_success_at TIMESTAMPTZ,
-  last_failure_at TIMESTAMPTZ,
-  consecutive_failures INTEGER NOT NULL DEFAULT 0,
-  last_error TEXT,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS ai_providers (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
@@ -102,8 +58,6 @@ CREATE TABLE IF NOT EXISTS reconciliation_runs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ticket_events_ticket_created ON support_ticket_events(ticket_id,created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_market_observations_symbol_received ON market_data_observations(symbol_id,received_at DESC);
-CREATE INDEX IF NOT EXISTS idx_market_observations_source_received ON market_data_observations(source_id,received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reconciliation_service_started ON reconciliation_runs(service,started_at DESC);
 
 INSERT INTO notification_templates(code,channel,title_template,body_template) VALUES
