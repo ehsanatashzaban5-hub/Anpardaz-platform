@@ -3,7 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 type Identity={identity_id:string;email?:string;display_name?:string;role:string;status:string;phone?:string|null};
 type AdminRequest=FastifyRequest&{adminIdentity?:Identity};
 
-type Target={base:string;token:string;path:string;forwardIdentity?:boolean};
+type Target={base:string;token:string;path:string;forwardIdentity?:boolean;useForwardedAuthorization?:boolean};
 const base=(name:string, fallback:string)=>(process.env[name]??fallback).replace(/\/$/,'');
 const methodHasBody=(m:string)=>!['GET','HEAD'].includes(m);
 const query=(request:FastifyRequest)=>request.url.includes('?')?request.url.slice(request.url.indexOf('?')):'';
@@ -50,9 +50,9 @@ export function resolveServiceTarget(request:AdminRequest):Target|null{
   if(p.startsWith('anpardaz/cards/lifecycle/')) return {base:anpardaz,token:apt,path:'/internal/v1/admin/cards/lifecycle/'+encodeURIComponent(p.slice('anpardaz/cards/lifecycle/'.length)),forwardIdentity:identityHeaders};
   if(p==='anpardaz/cards/lookup') return {base:anpardaz,token:apt,path:'/internal/v1/admin/cards/lookup',forwardIdentity:identityHeaders};
   if(p.startsWith('anpardaz/users/')) return {base:anpardaz,token:apt,path:'/internal/v1/admin/users/'+encodeURIComponent(p.slice('anpardaz/users/'.length))+'/summary',forwardIdentity:identityHeaders};
-  if(p==='hoosh/overview' || p.startsWith('hoosh/')) return {base:hoosh,token:ht,path:'/internal/v1/admin/'+p.slice('hoosh/'.length),forwardIdentity:identityHeaders};
-  if(p==='market/overview' || p.startsWith('market/')) return {base:market,token:mt,path:'/internal/v1/admin/'+p.slice('market/'.length),forwardIdentity:identityHeaders};
-  if(p.startsWith('financial/')) return {base:financial,token:ft,path:'/internal/v1/admin/'+p.slice('financial/'.length),forwardIdentity:identityHeaders};
+  if(p==='hoosh/overview' || p.startsWith('hoosh/')) return {base:hoosh,token:ht,path:'/internal/v1/admin/'+p.slice('hoosh/'.length),forwardIdentity:identityHeaders,useForwardedAuthorization:true};
+  if(p==='market/overview' || p.startsWith('market/')) return {base:market,token:mt,path:'/internal/v1/admin/'+p.slice('market/'.length),forwardIdentity:identityHeaders,useForwardedAuthorization:true};
+  if(p.startsWith('financial/')) return {base:financial,token:ft,path:'/internal/v1/admin/'+p.slice('financial/'.length),forwardIdentity:identityHeaders,useForwardedAuthorization:true};
   if(p==='banner/overview') return {base:banner,token:bt,path:'/internal/v1/admin/overview',forwardIdentity:identityHeaders};
   if(p.startsWith('banner/')) return {base:banner,token:bt,path:'/internal/v1/admin/'+p.slice('banner/'.length),forwardIdentity:identityHeaders};
   return null;
@@ -71,7 +71,8 @@ async function recordAudit(request:AdminRequest,target:Target){
 
 export async function proxyOwningService(request:AdminRequest,reply:FastifyReply,target:Target){
   if(!target.token) return reply.code(503).send({error:'owning_service_credentials_not_configured'});
-  const headers:Record<string,string>={authorization:'Bearer '+target.token,accept:String(request.headers.accept??'application/json')};
+  const headers:Record<string,string>={authorization:target.useForwardedAuthorization&&request.headers.authorization?String(request.headers.authorization):'Bearer '+target.token,accept:String(request.headers.accept??'application/json')};
+  if(target.useForwardedAuthorization) headers['x-admin-service-token']=target.token;
   if(target.forwardIdentity&&request.headers.authorization) headers['x-admin-user-authorization']=String(request.headers.authorization);
   if(request.adminIdentity){headers['x-admin-identity']=request.adminIdentity.identity_id;headers['x-admin-role']=request.adminIdentity.role;}
   const contentType=String(request.headers['content-type']??'');
