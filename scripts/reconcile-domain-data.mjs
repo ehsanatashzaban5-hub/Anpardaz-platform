@@ -37,7 +37,9 @@ try {
     const targetExists = await exists(target, table);
     if (!sourceExists && !targetExists) { results[table] = { status: "absent-both" }; continue; }
     if (sourceExists !== targetExists) { results[table] = { status: "schema-mismatch", sourceExists, targetExists }; continue; }
-    const common = (await columns(source, table)).filter(x => targetExists && (await columns(target, table)).includes(x));
+    const sourceColumns = await columns(source, table);
+    const targetColumns = await columns(target, table);
+    const common = sourceColumns.filter(x => targetColumns.includes(x));
     const sourceCount = Number((await source.query("SELECT COUNT(*)::bigint AS count FROM " + quote(table))).rows[0].count);
     const targetCount = Number((await target.query("SELECT COUNT(*)::bigint AS count FROM " + quote(table))).rows[0].count);
     const result = { status: sourceCount === targetCount ? "count-match" : "count-mismatch", sourceCount, targetCount, commonColumnCount: common.length };
