@@ -46,31 +46,44 @@ async function tableExists(pool: Pool, table: string) {
 }
 
 async function copyTable(table: string, tx: any) {
-  if (!(await tableExists(source, table)) || !(await tableExists(target, table))) {
-    return { sourceRows: 0, copiedRows: 0, skipped: true };
+  const sourceExists = await tableExists(source, table);
+  const targetExists = await tableExists(target, table);
+
+  if (!sourceExists) {
+    return { sourceRows: 0, insertedRows: 0, targetRowsBefore: 0, targetRowsAfter: 0, skipped: true, reason: "source_table_missing" };
+  }
+  if (!targetExists) {
+    throw new Error(`target table is missing: ${table}`);
   }
 
   const sourceColumns = await columns(source, table);
   const targetColumns = await columns(target, table);
   const common = sourceColumns.map(x => x.column_name).filter(x => targetColumns.some(y => y.column_name === x));
-  if (!common.length) return { sourceRows: 0, copiedRows: 0, skipped: true };
+  if (!common.length) {
+    throw new Error(`no common columns between source and target table: ${table}`);
+  }
 
   const quoted = common.map(x => '"' + x.replace(/"/g, '""') + '"').join(",");
+  const before = Number((await tx.query('SELECT COUNT(*)::bigint AS count FROM "' + table + '"')).rows[0].count);
   const rows = (await source.query('SELECT ' + quoted + ' FROM "' + table + '"')).rows;
 
-  if (!apply) return { sourceRows: rows.length, copiedRows: 0, skipped: false };
+  if (!apply) {
+    return { sourceRows: rows.length, insertedRows: 0, targetRowsBefore: before, targetRowsAfter: before, skipped: false, dryRun: true };
+  }
 
+  let insertedRows = 0;
   for (const row of rows) {
     const placeholders = common.map((_, i) => "$" + (i + 1)).join(",");
-    await tx.query(
+    const result = await tx.query(
       'INSERT INTO "' + table + '" (' + quoted + ') OVERRIDING SYSTEM VALUE VALUES (' + placeholders + ') ON CONFLICT DO NOTHING',
       common.map(x => row[x]),
     );
+    insertedRows += result.rowCount ?? 0;
   }
 
-  return { sourceRows: rows.length, copiedRows: rows.length, skipped: false };
+  const after = Number((await tx.query('SELECT COUNT(*)::bigint AS count FROM "' + table + '"')).rows[0].count);
+  return { sourceRows: rows.length, insertedRows, targetRowsBefore: before, targetRowsAfter: after, skipped: false };
 }
-
 async function resetIdentitySequences(tx: any, table: string) {
   const ids = await tx.query(
     "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 AND is_identity='YES'",
