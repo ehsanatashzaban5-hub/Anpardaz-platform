@@ -62,4 +62,19 @@ After deployment verify:
 - A posted accounting transaction cannot be edited or deleted; a reversal creates a new balanced transaction.
 - Community moderation actions are authenticated, permission-checked and audited.
 
+
+
+## Final six-stage production gate
+
+The repository-level cleanup is considered complete only after these six gates remain green:
+
+1. **Domain/database isolation** — eight database domains have independent migrations; cross-domain database access is rejected by the migration/source audits.
+2. **Build and regression** — all backend services, Admin, Web and Mobile build successfully; An Sarraf regression tests remain green.
+3. **Container/runtime validation** — production Dockerfiles and compose definitions validate; mobile container health is checked.
+4. **Security/policy validation** — security analysis, policy regression and service release gates pass on the same commit.
+5. **Production configuration validation** — each VPS environment must pass `scripts/production-env-gate.mjs`; placeholders and short internal tokens are rejected.
+6. **Data cutover/reconciliation** — only after real source/target database credentials are supplied: run the domain migration in dry-run mode, apply it, then run `scripts/reconcile-domain-data.mjs` with checksums. Legacy tables are retired only after reconciliation succeeds.
+
+Stages 1–4 are repository/CI-verifiable. Stage 5 is deployment-environment verification. Stage 6 cannot be truthfully marked complete from Git alone because it requires the actual production databases and their data; no production data is deleted automatically by this repository.
+
 The supplied compose files are deployment templates, not a claim that a particular VPS provider, firewall or domain has already been configured.
