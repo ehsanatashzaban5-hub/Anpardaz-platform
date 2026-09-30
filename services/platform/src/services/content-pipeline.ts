@@ -17,7 +17,7 @@ export class ContentPipeline{
       ON CONFLICT(run_date) DO UPDATE SET status='running',started_at=NOW(),completed_at=NULL RETURNING id`)).rows[0];
     let fetched=0,selected=0,rewritten=0,published=0,failed=0;
     try{
-      const sources=(await this.pool.query("SELECT * FROM content_sources WHERE enabled=true AND (last_fetched_at IS NULL OR last_fetched_at+make_interval(secs=>fetch_interval_seconds)<=NOW()) ORDER BY id")).rows;
+      const sources=(await this.pool.query("SELECT * FROM content_sources WHERE enabled=true AND rights_status IN ('licensed','allowed') AND (last_fetched_at IS NULL OR last_fetched_at+make_interval(secs=>fetch_interval_seconds)<=NOW()) ORDER BY id")).rows;
       for(const source of sources){
         try{
           const response=await fetch(source.source_url,{headers:{accept:'application/rss+xml, application/atom+xml, application/xml, text/xml', 'user-agent':'AnPardaz-ContentBot/1.0'},signal:AbortSignal.timeout(15000)});
