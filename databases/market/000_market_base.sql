@@ -1,5 +1,66 @@
-CREATE TABLE IF NOT EXISTS market_products(id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,title TEXT NOT NULL,description TEXT,category_id BIGINT,status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','published','out_of_stock','archived')),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS market_media(id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,url TEXT NOT NULL,sort_order INTEGER NOT NULL DEFAULT 0,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS market_offers(id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,seller_name TEXT NOT NULL,seller_url TEXT,price NUMERIC(24,8) NOT NULL CHECK(price>=0),currency CHAR(3) NOT NULL,availability TEXT NOT NULL DEFAULT 'in_stock',shipping_cost NUMERIC(24,8),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS market_favorites(user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,product_id));
-CREATE TABLE IF NOT EXISTS market_orders(id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,user_id BIGINT NOT NULL REFERENCES market_users(id),product_id BIGINT NOT NULL REFERENCES market_products(id),offer_id BIGINT REFERENCES market_offers(id),quantity NUMERIC(18,6) NOT NULL CHECK(quantity>0),unit_price NUMERIC(24,8) NOT NULL CHECK(unit_price>=0),currency CHAR(3) NOT NULL,status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','paid','processing','shipped','completed','cancelled','refunded')),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS schema_migrations(version TEXT PRIMARY KEY,applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+
+CREATE TABLE IF NOT EXISTS market_users(
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  identity_id UUID NOT NULL UNIQUE,
+  email TEXT,
+  display_name TEXT,
+  role TEXT NOT NULL DEFAULT 'user',
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS market_products(
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  category_id BIGINT,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','published','out_of_stock','archived')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS market_media(
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS market_offers(
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
+  seller_name TEXT NOT NULL,
+  seller_url TEXT,
+  price NUMERIC(24,8) NOT NULL CHECK(price>=0),
+  currency CHAR(3) NOT NULL,
+  availability TEXT NOT NULL DEFAULT 'in_stock',
+  shipping_cost NUMERIC(24,8),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS market_favorites(
+  user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY(user_id,product_id)
+);
+
+CREATE TABLE IF NOT EXISTS market_orders(
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES market_users(id),
+  product_id BIGINT NOT NULL REFERENCES market_products(id),
+  offer_id BIGINT REFERENCES market_offers(id),
+  quantity NUMERIC(18,6) NOT NULL CHECK(quantity>0),
+  unit_price NUMERIC(24,8) NOT NULL CHECK(unit_price>=0),
+  currency CHAR(3) NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','paid','processing','shipped','completed','cancelled','refunded')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO schema_migrations(version)
+VALUES ('000_market_base')
+ON CONFLICT(version) DO NOTHING;
