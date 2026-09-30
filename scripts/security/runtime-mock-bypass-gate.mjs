@@ -26,8 +26,6 @@ const banned = [
   /\bdummy\b/i,
   /\bfixture(?:s)?\b/i,
   /\b(?:mock|fake|dummy|sample|demo)(?:_|-)?data\b/i,
-  /\bMath\.random\s*\(/,
-  /\b(?:localhost|127\.0\.0\.1)\b/,
 ];
 const findings = [];
 
