@@ -23,6 +23,9 @@ make_service_env anpardaz 4001 anpardaz 5433 anpardaz local-anpardaz-password
 make_service_env ansarraf 4002 ansarraf 5434 ansarraf local-ansarraf-password
 make_service_env platform 4003 platform 5435 platform local-platform-password
 make_service_env accounting 4004 accounting 5436 accounting local-accounting-password
+make_service_env hoosh 4008 hoosh 5438 hoosh local-hoosh-password
+make_service_env market 4007 market 5439 market local-market-password
+make_service_env financial 4009 financial 5440 financial local-financial-password
 
 if ! grep -q '^IDENTITY_PRIVATE_KEY_B64=' services/platform/.env 2>/dev/null || grep -q 'generated-by-bootstrap-local' services/platform/.env; then
   tmpdir="$(mktemp -d)"
@@ -33,7 +36,7 @@ if ! grep -q '^IDENTITY_PRIVATE_KEY_B64=' services/platform/.env 2>/dev/null || 
   public_b64="$(base64 -w0 "$tmpdir/public.der")"
   sed -i '/^IDENTITY_PRIVATE_KEY_B64=/d;/^IDENTITY_ISSUER=/d' services/platform/.env
   printf '\nIDENTITY_ISSUER=anpardaz-platform\nIDENTITY_PRIVATE_KEY_B64=%s\n' "$private_b64" >> services/platform/.env
-  for service in anpardaz ansarraf; do
+  for service in anpardaz ansarraf hoosh market financial; do
     sed -i '/^IDENTITY_SERVICE_URL=/d;/^IDENTITY_ISSUER=/d;/^IDENTITY_PUBLIC_KEY_B64=/d' "services/${service}/.env"
     printf '\nIDENTITY_SERVICE_URL=http://localhost:4003\nIDENTITY_ISSUER=anpardaz-platform\nIDENTITY_PUBLIC_KEY_B64=%s\n' "$public_b64" >> "services/${service}/.env"
   done
@@ -56,7 +59,7 @@ fi
 
 docker compose --env-file databases/.env -f databases/docker-compose.yml up -d
 bash databases/migrate.sh
-for service in anpardaz ansarraf platform accounting; do
+for service in anpardaz ansarraf platform accounting hoosh market financial; do
   pnpm --dir "services/${service}" install
   pnpm --dir "services/${service}" build
 done
@@ -64,4 +67,4 @@ pnpm --dir apps/mobile install
 pnpm --dir apps/mobile run build
 pnpm --dir apps/web install
 pnpm --dir apps/web run build
-echo "Local An Pardaz platform bootstrap completed successfully across all four services and databases."
+echo "Local An Pardaz platform bootstrap completed successfully across all domain services and databases."
