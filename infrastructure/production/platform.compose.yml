@@ -158,3 +158,15 @@ services:
     cap_drop: [ALL]
     healthcheck:
       test: ["CMD","node","-e","fetch('http://127.0.0.1:4009/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+  platform-content-worker:
+    build:
+      context: ../..
+      dockerfile: services/platform/Dockerfile
+    command: ["node","dist/workers/content-pipeline.js"]
+    restart: unless-stopped
+    env_file: [./platform.env]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
