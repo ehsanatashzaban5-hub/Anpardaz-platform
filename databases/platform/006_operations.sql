@@ -98,18 +98,6 @@ CREATE TABLE IF NOT EXISTS notifications (
   read_at TIMESTAMPTZ
 );
 
-CREATE TABLE IF NOT EXISTS market_quotes (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  symbol TEXT NOT NULL,
-  source TEXT NOT NULL,
-  bid NUMERIC(36,18),
-  ask NUMERIC(36,18),
-  last_price NUMERIC(36,18),
-  volume NUMERIC(36,18),
-  observed_at TIMESTAMPTZ NOT NULL,
-  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE INDEX IF NOT EXISTS idx_audit_logs_identity_created ON audit_logs(identity_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_resource_created ON audit_logs(resource_type, resource_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_support_tickets_user_status ON support_tickets(user_id, status, updated_at DESC);
@@ -118,7 +106,6 @@ CREATE INDEX IF NOT EXISTS idx_support_messages_ticket_created ON support_messag
 CREATE INDEX IF NOT EXISTS idx_activity_identity_occurred ON user_activity_events(identity_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ai_jobs_status_created ON ai_jobs(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_identity_status ON notifications(identity_id, status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_market_quotes_symbol_observed ON market_quotes(symbol, observed_at DESC);
 
 INSERT INTO schema_migrations (version)
 VALUES ('006_operations')
