@@ -1,4 +1,9 @@
+networks:
+  anpardaz-internal:
+    external: true
+
 services:
+    networks: [anpardaz-internal]
   anpardaz:
     build:
       context: ../..
@@ -21,3 +26,5 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+    networks: [anpardaz-internal]
