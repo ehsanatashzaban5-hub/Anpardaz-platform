@@ -68,6 +68,8 @@ export async function requireAuth(req:FastifyRequest,reply:FastifyReply): Promis
 
 export async function requireAdminInternal(req:FastifyRequest,reply:FastifyReply): Promise<void> {
   const expected=process.env.BANNER_INTERNAL_TOKEN?.trim();
-  if(!expected){reply.code(503).send({error:'internal_credentials_not_configured'});return;}
-  if(req.headers.authorization!==`Bearer ${expected}`){reply.code(401).send({error:'unauthorized'});return;}
+  if(!expected||expected.length<32){reply.code(503).send({error:'internal_credentials_not_configured'});return;}
+  const supplied=req.headers.authorization?.startsWith('Bearer ')?req.headers.authorization.slice(7):'';
+  const a=Buffer.from(supplied); const b=Buffer.from(expected);
+  if(a.length!==b.length||!timingSafeEqual(a,b)){reply.code(401).send({error:'unauthorized'});return;}
 }
