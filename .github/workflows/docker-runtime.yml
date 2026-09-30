@@ -38,6 +38,15 @@ jobs:
           - context: .
             dockerfile: services/accounting/Dockerfile
             tag: anpardaz-accounting:ci
+          - context: .
+            dockerfile: services/hoosh/Dockerfile
+            tag: anpardaz-hoosh:ci
+          - context: .
+            dockerfile: services/market/Dockerfile
+            tag: anpardaz-market:ci
+          - context: .
+            dockerfile: services/financial/Dockerfile
+            tag: anpardaz-financial:ci
           - context: apps/mobile
             dockerfile: Dockerfile
             tag: anpardaz-mobile:ci
@@ -71,13 +80,16 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Prepare CI env files
         run: |
-          touch infrastructure/production/platform.env infrastructure/production/admin.env infrastructure/production/anpardaz.env infrastructure/production/ansarraf.env infrastructure/production/banner.env infrastructure/production/accounting.env
+          touch infrastructure/production/platform.env infrastructure/production/admin.env infrastructure/production/anpardaz.env infrastructure/production/ansarraf.env infrastructure/production/banner.env infrastructure/production/accounting.env infrastructure/production/hoosh.env infrastructure/production/market.env infrastructure/production/financial.env
       - name: Validate Compose files
         env:
           ANPARDAZ_DB_PASSWORD: ci
           ANSARRAF_DB_PASSWORD: ci
           PLATFORM_DB_PASSWORD: ci
           BANNER_DB_PASSWORD: ci
+          HOOSH_DB_PASSWORD: ci
+          MARKET_DB_PASSWORD: ci
+          FINANCIAL_DB_PASSWORD: ci
           ACCOUNTING_DB_PASSWORD: ci
         run: |
           docker compose -f infrastructure/production/platform.compose.yml config -q
