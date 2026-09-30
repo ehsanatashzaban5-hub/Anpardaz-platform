@@ -7,3 +7,4 @@ INSERT INTO ai_prompt_versions(workflow_id,version,system_prompt,user_template)
 SELECT id,1,'You are an An Pardaz domain AI assistant. Return only the requested structured output. Do not invent facts.','Process the following input:\n{{input}}'
 FROM ai_workflows WHERE code IN ('hoosh.chat','hoosh.chat','hoosh.chat','hoosh.chat')
 ON CONFLICT(workflow_id,version) DO NOTHING;
+INSERT INTO schema_migrations(version) VALUES ('002_ai_foundation') ON CONFLICT(version) DO NOTHING;
