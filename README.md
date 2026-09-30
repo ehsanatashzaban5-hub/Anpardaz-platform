@@ -4,7 +4,7 @@
 
 > **An Pardaz — یک پلتفرم یکپارچه برای خدمات مالی، بازار، محتوا و ابزارهای هوشمند**
 
-Central monorepo for the An Pardaz ecosystem. Mobile/Web and backend services evolve together while banking, exchange and accounting workloads remain isolated.
+Central monorepo for the An Pardaz ecosystem. Mobile/Web are the approved user frontends; backend services and databases are isolated by domain.
 
 ## Ecosystem
 
@@ -24,11 +24,16 @@ Central monorepo for the An Pardaz ecosystem. Mobile/Web and backend services ev
 anpardaz-platform/
 ├── apps/                 # Approved Mobile + Web frontends
 ├── packages/             # Shared clients/modules
-├── services/
+├── services/             # Independently deployable domain/gateway services
 │   ├── anpardaz/         # Banking API
 │   ├── ansarraf/         # Exchange API
-│   ├── platform/         # Identity, content, community and control plane
-│   └── accounting/       # Double-entry accounting API
+│   ├── banner/           # Classifieds API
+│   ├── market/           # Market API + market-data ingestion
+│   ├── hoosh/            # AI API
+│   ├── financial/        # Financial Center API
+│   ├── platform/         # Identity/content/community/control plane
+│   ├── accounting/       # Double-entry accounting API
+│   └── admin/             # Admin gateway/orchestration
 ├── databases/
 │   ├── anpardaz/         # Banking DB migrations
 │   ├── ansarraf/         # Exchange DB migrations
@@ -41,22 +46,17 @@ anpardaz-platform/
 
 ## Current backend foundation
 
-- [x] Four independently deployable Fastify services on ports 4001–4004
-- [x] Four isolated PostgreSQL 17 databases
-- [x] Central Platform identity with Ed25519-signed short-lived tokens
-- [x] Password hashing and authenticated service APIs
-- [x] Granular role/permission model
-- [x] Admin/control-plane settings, maintenance, support and notifications
-- [x] Community comments and likes for members and guests
-- [x] Guest rate limiting, guest blocking and abuse reports
-- [x] Admin moderation with audit trail
-- [x] Content ingestion/AI workflow data model
-- [x] Market-data source/observation model and exchange adapters
-- [x] Accounting double-entry ledger with idempotency and decimal-safe validation
-- [x] Posted-ledger immutability, holds, statements and reversal transactions
-- [x] Shared accounting client package
-- [x] Local four-database bootstrap and migrations
-- [x] GitHub Actions builds for services, shared accounting package, Mobile and Web
+- [x] Independent domain services for An Pardaz, An Sarraf, Banner, Market, Hoosh, Financial, Platform and Accounting.
+- [x] Separate Admin gateway with no direct PostgreSQL access.
+- [x] Eight isolated PostgreSQL 17 databases with one migration set per owner.
+- [x] Central Platform identity with Ed25519-signed short-lived tokens.
+- [x] Authenticated service-to-service credentials at internal admin boundaries.
+- [x] Granular permissions and audited administrative actions.
+- [x] Market-data ingestion isolated in Market and never used to mutate balances.
+- [x] Accounting double-entry ledger with idempotency, decimal-safe validation, holds and reversals.
+- [x] Fresh-install migration validation and migration dependency/boundary auditing.
+- [x] Production Docker/runtime validation and security regression gates.
+- [x] Mobile, Web and Admin builds in CI.
 
 ## Database boundaries
 
@@ -64,7 +64,7 @@ anpardaz-platform/
 
 **An Sarraf DB** is the source of exchange-domain data.
 
-**Platform DB** contains identity, Banner, Market, forum, news/content, support, community and operational control-plane data.
+**Platform DB** owns identity, forum, news/content, support, community and operational control-plane data. Banner, Market, Hoosh and Financial application data belongs to their own databases.
 
 **Accounting DB** contains the financial double-entry ledger. Posted ledger history is immutable; corrections are represented by new reversal/adjustment transactions.
 
@@ -82,14 +82,9 @@ There are no cross-database foreign keys. Frontends never connect directly to Po
 
 ## Production topology
 
-```text
-VPS 1 → An Pardaz / Banking → An Pardaz DB
-VPS 2 → An Sarraf / Exchange → An Sarraf DB
-VPS 3 → Platform / Control Plane → Platform DB
-VPS 4 → Accounting → Accounting DB
-```
+Each domain may be deployed independently. The deployment template can place services on the same host, but database credentials and network access must remain isolated by owner.
 
-See `docs/production-deployment.md` for isolation and deployment rules.
+See `docs/production-deployment.md` and `docs/architecture/legacy-table-ownership.md` for isolation and deployment rules.
 
 ## Local development
 
@@ -99,7 +94,7 @@ The complete local environment can be initialized with:
 bash scripts/bootstrap-local.sh
 ```
 
-The bootstrap starts all four PostgreSQL containers, applies all migrations, generates local identity/guest/accounting secrets, installs dependencies and builds every service plus both approved frontends.
+The bootstrap starts all eight PostgreSQL containers, applies every domain migration, creates local identity/service secrets where needed, and builds the backend services plus Mobile, Web and Admin frontends.
 
 Backend builds can also be run individually with:
 
@@ -125,9 +120,9 @@ pnpm --dir packages/accounting-client build
 
 ## Phase
 
-**Current phase: Backend + Database + Control Plane completion.**
+**Current phase: Production hardening and controlled cutover.**
 
-The repository now contains the core service, database, identity, moderation, market-data and accounting foundations needed before the final frontend integration phase.
+Automated gates now cover migration boundaries, builds, Docker runtime configuration and dependency/security checks. The remaining production-only work is live database cutover/reconciliation on the actual VPS environment; source control alone cannot truthfully perform that operation.
 
 ---
 
