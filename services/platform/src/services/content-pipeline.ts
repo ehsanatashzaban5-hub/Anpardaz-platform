@@ -55,7 +55,15 @@ export class ContentPipeline{
         selected++;
         await this.pool.query("UPDATE content_ingestion_items SET status='processing',processed_at=NOW() WHERE id=$1",[item.id]);
         try{
-          const input=JSON.stringify({source:item.source_name,category:item.category,title:item.source_title,summary:item.raw_content,sourceUrl:item.source_url,instruction:'Create an original Persian article based only on the supplied facts. If the source is not Persian, first perform a faithful translation step internally, then rewrite naturally in Persian. Do not copy sentences. Return JSON: {title,summary,body,metaTitle,metaDescription,keywords,hashtags,score,language,originalLanguage}. Preserve attribution and uncertainty.'});
+          let translated=String(item.raw_content??'');
+          const looksPersian=/[\u0600-\u06FF]/.test(String(item.source_title??'')+' '+translated);
+          if(!looksPersian){
+            const tr=await this.ai.execute({workflowCode:'news.translate',input:JSON.stringify({title:item.source_title,summary:translated,sourceUrl:item.source_url}),sourceType:'content_translation',sourceId:String(item.id),idempotencyKey:'content-translation:'+item.id});
+            let td:any;try{td=JSON.parse(tr.text)}catch{throw new Error('AI_TRANSLATION_NOT_JSON')}
+            if(!td?.translatedText)throw new Error('AI_TRANSLATION_INVALID');
+            translated=String(td.translatedText);
+          }
+          const input=JSON.stringify({source:item.source_name,category:item.category,title:item.source_title,summary:translated,sourceUrl:item.source_url,instruction:'Create an original Persian article based only on the supplied facts. Do not copy sentences. Preserve attribution, names, numbers and uncertainty. Return JSON: {title,summary,body,metaTitle,metaDescription,keywords,hashtags,score,language,originalLanguage}.'});
           const aiResult=await this.ai.execute({workflowCode:'news.rewrite',input,sourceType:'content_ingestion',sourceId:String(item.id),idempotencyKey:'content-rewrite:'+item.id});
           let out:any;try{out=JSON.parse(aiResult.text)}catch{throw new Error('AI_OUTPUT_NOT_JSON')}
           if(!out?.title||!out?.body||!Array.isArray(out.keywords)||!Array.isArray(out.hashtags))throw new Error('AI_OUTPUT_INVALID');
