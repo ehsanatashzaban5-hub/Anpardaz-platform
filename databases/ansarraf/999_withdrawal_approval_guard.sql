@@ -45,3 +45,6 @@ CREATE TRIGGER trg_guard_provider_withdrawal_submit
 BEFORE INSERT ON provider_withdrawal_outbox
 FOR EACH ROW
 EXECUTE FUNCTION ansarraf_guard_provider_withdrawal_submit();
+
+
+INSERT INTO schema_migrations(version) VALUES ('999_withdrawal_approval_guard') ON CONFLICT(version) DO NOTHING;
