@@ -1,4 +1,9 @@
+networks:
+  anpardaz-internal:
+    external: true
+
 services:
+    networks: [anpardaz-internal]
   banner:
     build:
       context: ../..
@@ -22,6 +27,7 @@ services:
       retries: 5
       start_period: 10s
 
+    networks: [anpardaz-internal]
   platform:
     build:
       context: ../..
@@ -45,6 +51,7 @@ services:
       retries: 5
       start_period: 10s
 
+    networks: [anpardaz-internal]
   hoosh:
     build: {context: ../.., dockerfile: services/hoosh/Dockerfile}
     restart: unless-stopped
@@ -56,6 +63,7 @@ services:
     cap_drop: [ALL]
     healthcheck:
       test: ["CMD","node","-e","fetch('http://127.0.0.1:4008/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+    networks: [anpardaz-internal]
   market:
     build: {context: ../.., dockerfile: services/market/Dockerfile}
     restart: unless-stopped
@@ -67,6 +75,7 @@ services:
     cap_drop: [ALL]
     healthcheck:
       test: ["CMD","node","-e","fetch('http://127.0.0.1:4007/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+    networks: [anpardaz-internal]
   financial:
     build: {context: ../.., dockerfile: services/financial/Dockerfile}
     restart: unless-stopped
@@ -79,6 +88,7 @@ services:
     healthcheck:
       test: ["CMD","node","-e","fetch('http://127.0.0.1:4009/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
+    networks: [anpardaz-internal]
   market-ingestion-worker:
     build: {context: ../.., dockerfile: services/market/Dockerfile}
     command: ["node","dist/workers/market-ingestion.js"]
@@ -88,6 +98,7 @@ services:
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+    networks: [anpardaz-internal]
   market-discovery-worker:
     build: {context: ../.., dockerfile: services/market/Dockerfile}
     command: ["node","dist/workers/market-store-discovery.js"]
@@ -97,6 +108,7 @@ services:
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+    networks: [anpardaz-internal]
   hoosh-worker:
     build: {context: ../.., dockerfile: services/hoosh/Dockerfile}
     command: ["node","dist/workers/hoosh.js"]
@@ -106,6 +118,7 @@ services:
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+    networks: [anpardaz-internal]
   hoosh-media-worker:
     build: {context: ../.., dockerfile: services/hoosh/Dockerfile}
     command: ["node","dist/workers/hoosh-media.js"]
@@ -115,3 +128,5 @@ services:
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+
+    networks: [anpardaz-internal]
