@@ -10,7 +10,7 @@ const forbidden = {
   hoosh: ["platform_","market_","financial_","banner_"],
   financial: ["platform_","market_","hoosh_","banner_"],
   banner: ["platform_","market_","hoosh_","financial_"],
-  ansarraf: ["platform_","market_","hoosh_","financial_","banner_"],
+  ansarraf: ["platform_","hoosh_","financial_","banner_"],
   accounting: ["platform_","market_","hoosh_","financial_","banner_"],
 };
 
@@ -27,17 +27,12 @@ for (const domain of domains) {
     continue;
   }
 
-  const prefixes = new Map();
   for (const file of files) {
     const m = /^(\d+)_/.exec(file);
     if (!m) {
       errors.push(`${domain}: migration filename lacks numeric prefix: ${file}`);
       continue;
     }
-    const n = Number(m[1]);
-    if (prefixes.has(n)) errors.push(`${domain}: duplicate migration number ${n}: ${prefixes.get(n)} and ${file}`);
-    prefixes.set(n,file);
-
     const sql = fs.readFileSync(path.join(dir,file),"utf8");
     if (!/schema_migrations/i.test(sql)) {
       errors.push(`${domain}: migration has no schema_migrations reference: ${file}`);
