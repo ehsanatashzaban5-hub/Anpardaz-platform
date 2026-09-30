@@ -18,20 +18,6 @@ CREATE TABLE IF NOT EXISTS categories (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS banner_listings (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id BIGINT NOT NULL REFERENCES platform_users(id),
-  category_id BIGINT REFERENCES categories(id),
-  title TEXT NOT NULL,
-  description TEXT,
-  price NUMERIC(24,8) CHECK (price >= 0),
-  currency CHAR(3),
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','paused','sold','archived')),
-  city TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS forum_threads (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES platform_users(id),
