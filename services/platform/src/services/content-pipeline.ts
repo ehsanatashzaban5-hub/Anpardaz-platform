@@ -45,7 +45,7 @@ export class ContentPipeline{
         const ranking=await this.ai.execute({workflowCode:'news.select',input:JSON.stringify(rankingInput),sourceType:'content_selection',idempotencyKey:'content-selection:'+createHash('sha256').update(JSON.stringify(rankingInput.map((x:any)=>x.id))).digest('hex')});
         let parsed:any;try{parsed=JSON.parse(ranking.text)}catch{throw new Error('AI_SELECTION_NOT_JSON')}
         if(!Array.isArray(parsed?.items))throw new Error('AI_SELECTION_INVALID');
-        const score=new Map(parsed.items.map((x:any)=>[String(x.id),Number(x.score)||0]));
+        const score=new Map<string,number>(parsed.items.map((x:any):[string,number]=>[String(x.id),Number(x.score)||0]));
         ranked=candidates.filter((x:any)=>score.has(String(x.id))).sort((a:any,b:any)=>(score.get(String(b.id))??0)-(score.get(String(a.id))??0)).slice(0,Number(process.env.CONTENT_PIPELINE_SELECTION_LIMIT??30));
       }
       for(const item of ranked){
