@@ -6,7 +6,7 @@ type Tab="home"|"assistant"|"categories"|"me";
 type Product={id:string;title:string;brand:string;description:string;specs:Record<string,unknown>;categorySlug:string;categoryName:string;images:string[];priceMin:number;priceMax:number;storeCount:number;offerCount:number;offers:any[]};
 type Category={id:number;slug:string;name:string;name_fa:string;parent_id:number|null};
 
-const API=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")||"";
+const API=(((import.meta as any).env?.VITE_MARKET_API_URL as string|undefined)||(import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")||"");
 const token=()=>localStorage.getItem("anpardaz:accessToken")||"";
 const auth=()=>token()?{authorization:"Bearer "+token()}:{};
 const fa=(v:unknown)=>String(v??"").replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[+d]);
