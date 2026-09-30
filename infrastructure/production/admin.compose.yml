@@ -1,4 +1,9 @@
+networks:
+  anpardaz-internal:
+    external: true
+
 services:
+    networks: [anpardaz-internal]
   admin:
     build:
       context: ../..
@@ -11,3 +16,5 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+
+    networks: [anpardaz-internal]
