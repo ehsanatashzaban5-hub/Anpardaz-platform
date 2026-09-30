@@ -82,7 +82,7 @@ async function resetIdentitySequences(tx: any, table: string) {
     const seq = sequence.rows[0]?.sequence;
     if (!seq) continue;
     await tx.query(
-      'SELECT setval($1, COALESCE((SELECT MAX("' + column.replace(/"/g, '""') + '") FROM "' + table + '"),0), true)',
+      'SELECT setval($1, COALESCE((SELECT MAX("' + column.replace(/"/g, '""') + '") FROM "' + table + '"),1), (SELECT COUNT(*) > 0 FROM "' + table + '"))',
       [seq],
     );
   }
