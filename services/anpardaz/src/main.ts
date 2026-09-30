@@ -150,7 +150,7 @@ app.post('/api/v1/device-security/authentication/verify',{preHandler:requireAuth
 });
 
 
-let financialSyncTimer:NodeJS.Timeout|undefined;let securityRateCleanupTimer:NodeJS.Timeout|undefined;let bankingProviderWorker:BankingProviderWorker|undefined;let fintechServiceWorker:FintechServiceWorker|undefined;
+let securityRateCleanupTimer:NodeJS.Timeout|undefined;let bankingProviderWorker:BankingProviderWorker|undefined;let fintechServiceWorker:FintechServiceWorker|undefined;
 if(pool){securityRateCleanupTimer=setInterval(()=>{void pool.query("DELETE FROM security_rate_limits WHERE window_start < NOW() - INTERVAL '2 hours'").catch(error=>app.log.warn({error},'security rate-limit cleanup failed'));},10*60_000);securityRateCleanupTimer.unref();registerAuthRoutes(app,pool);bankingProviderWorker=new BankingProviderWorker(pool);bankingProviderWorker.start();fintechServiceWorker=new FintechServiceWorker(pool);fintechServiceWorker.start();registerAccountRoutes(app,pool);registerBankingRoutes(app,pool);registerServiceRoutes(app,pool);registerFinnotechBankingRoutes(app,pool);registerFinnotechSayadRoutes(app,pool);registerCardRegistrationRoutes(app,pool);
 registerInternalAdminRoutes(app,pool);registerCashbackRoutes(app,pool);registerCustomerProfileRoutes(app,pool);
 const financialSyncMinutes=Math.max(0,Number(process.env.FINANCIAL_CENTER_SYNC_INTERVAL_MINUTES??60));
@@ -159,4 +159,4 @@ if(financialSyncMinutes>0){
   financialSyncTimer.unref();
 }
 app.get('/api/v1/auth/me',{preHandler:requireAuth},async(request)=>{const a=(request as typeof request&{auth:any}).auth,c=await ensureCustomer(pool,a),x=await pool.query('SELECT id,identity_id,external_user_id,email,status FROM customers WHERE id=$1',[c]);return x.rows[0]?{user:x.rows[0]}:{error:'user_not_found'};});}
-const shutdown=async()=>{if(financialSyncTimer)clearInterval(financialSyncTimer);if(securityRateCleanupTimer)clearInterval(securityRateCleanupTimer);bankingProviderWorker?.stop();fintechServiceWorker?.stop();await app.close();await pool?.end()};process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);await app.listen({host:'0.0.0.0',port});
+const shutdown=async()=>{if(securityRateCleanupTimer)clearInterval(securityRateCleanupTimer);bankingProviderWorker?.stop();fintechServiceWorker?.stop();await app.close();await pool?.end()};process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);await app.listen({host:'0.0.0.0',port});
