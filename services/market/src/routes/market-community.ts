@@ -1,6 +1,6 @@
 import type {FastifyInstance,FastifyRequest} from 'fastify';
 import type {Pool} from 'pg';
-import {ensurePlatformUser,requireAuth,type AuthClaims} from '../auth.js';
+import {ensureMarketUser,requireAuth,type AuthClaims} from '../auth.js';
 import {hasPermission} from '../permissions.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
@@ -27,7 +27,7 @@ export function registerMarketCommunityRoutes(app:FastifyInstance,pool:Pool){
   // Product review read/write routes live in market-aggregator.ts to avoid duplicate Fastify routes.
 
   app.post('/api/v1/market/reviews/:id/like',{preHandler:requireAuth},async(req,reply)=>{
-    const uid=await ensurePlatformUser(pool,a(req).auth),id=Number((req.params as any).id);
+    const uid=await ensureMarketUser(pool,a(req).auth),id=Number((req.params as any).id);
     if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_review'});
     const r=await pool.query("SELECT id FROM market_reviews WHERE id=$1 AND status='published'",[id]);
     if(!r.rows[0])return reply.code(404).send({error:'review_not_found'});
