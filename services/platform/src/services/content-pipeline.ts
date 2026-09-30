@@ -42,7 +42,7 @@ export class ContentPipeline{
       let ranked:any[]=[];
       if(candidates.length){
         const rankingInput=candidates.map((x:any)=>({id:String(x.id),category:x.category,source:x.source_name,title:x.source_title,summary:String(x.raw_content??'').slice(0,700)}));
-        const ranking=await this.ai.execute({workflowCode:'news.select',input:JSON.stringify(rankingInput),sourceType:'content_selection',idempotencyKey:'content-selection:'+new Date().toISOString().slice(0,10)});
+        const ranking=await this.ai.execute({workflowCode:'news.select',input:JSON.stringify(rankingInput),sourceType:'content_selection',idempotencyKey:'content-selection:'+createHash('sha256').update(JSON.stringify(rankingInput.map((x:any)=>x.id))).digest('hex')});
         let parsed:any;try{parsed=JSON.parse(ranking.text)}catch{throw new Error('AI_SELECTION_NOT_JSON')}
         if(!Array.isArray(parsed?.items))throw new Error('AI_SELECTION_INVALID');
         const score=new Map(parsed.items.map((x:any)=>[String(x.id),Number(x.score)||0]));
