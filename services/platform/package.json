@@ -10,8 +10,7 @@
     "worker:hoosh": "node dist/workers/hoosh.js",
     "worker:hoosh-media": "node dist/workers/hoosh-media.js",
     "worker:market": "node dist/workers/market-ingestion.js",
-    "worker:market-discovery": "node dist/workers/market-store-discovery.js",
-    "worker:content": "node dist/workers/content-pipeline.js"
+    "worker:market-discovery": "node dist/workers/market-store-discovery.js"
   },
   "dependencies": {
     "@fastify/cors": "11.3.0",
