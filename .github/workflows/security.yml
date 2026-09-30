@@ -50,7 +50,13 @@ jobs:
           - services/platform
           - services/banner
           - services/accounting
+          - services/hoosh
+          - services/market
+          - services/financial
+          - services/admin
           - apps/admin
+          - apps/web
+          - apps/mobile
           - packages/accounting-client
     steps:
       - name: Checkout
