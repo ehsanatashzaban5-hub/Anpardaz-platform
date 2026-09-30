@@ -441,3 +441,6 @@ SELECT id,1,
 FROM ai_workflows WHERE code='market.audit'
 ON CONFLICT(workflow_id,version) DO NOTHING;
 
+
+
+INSERT INTO schema_migrations(version) VALUES ('003_market_schema_wave3') ON CONFLICT(version) DO NOTHING;
