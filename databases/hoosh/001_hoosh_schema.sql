@@ -50,14 +50,6 @@ CREATE TABLE IF NOT EXISTS hoosh_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO admin_permissions(role,permission) VALUES
-('admin','hoosh.read'),('admin','hoosh.manage'),
-('super_admin','hoosh.read'),('super_admin','hoosh.manage'),
-('operator','hoosh.read'),('operator','hoosh.manage'),
-('support','hoosh.read')
-ON CONFLICT(role,permission) DO NOTHING;
-
-
 -- SOURCE 058_hoosh_chat_prompt.sql
 -- Hoosh is a conversational product: do not force JSON output on normal chat.
 INSERT INTO ai_prompt_versions(workflow_id,version,system_prompt,user_template)
