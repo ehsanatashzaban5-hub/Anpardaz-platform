@@ -1,21 +1,18 @@
 # Production Deployment Blueprint
 
-Production is split into four independently deployable service groups:
+Production is organized by domain ownership. Services may share a VPS only when the network and database credential boundaries remain equivalent to this model.
 
-1. **VPS 1 — An Pardaz / Banking**
-   - `services/anpardaz`
-   - An Pardaz PostgreSQL database on the banking network
-2. **VPS 2 — An Sarraf / Exchange**
-   - `services/ansarraf`
-   - An Sarraf PostgreSQL database on the exchange network
-3. **VPS 3 — Platform / Control Plane**
-   - `services/platform`
-   - Platform PostgreSQL database
-   - identity, content, community, support, moderation and operational control plane
-4. **VPS 4 — Accounting**
-   - `services/accounting`
-   - Accounting PostgreSQL database
-   - append-only double-entry ledger, holds, statements and reversals
+## Service groups
+
+1. **An Pardaz / Banking** — `services/anpardaz` → `anpardaz` DB
+2. **An Sarraf / Exchange** — `services/ansarraf` → `ansarraf` DB
+3. **An Banner** — `services/banner` → `banner` DB
+4. **An Market** — `services/market` → `market` DB
+5. **An Hoosh** — `services/hoosh` → `hoosh` DB
+6. **Financial Center** — `services/financial` → `financial` DB
+7. **Platform / Control Plane** — `services/platform` → `platform` DB
+8. **Accounting** — `services/accounting` → `accounting` DB
+9. **Admin Gateway** — `services/admin` → no PostgreSQL; API orchestration only
 
 ## Isolation rules
 
