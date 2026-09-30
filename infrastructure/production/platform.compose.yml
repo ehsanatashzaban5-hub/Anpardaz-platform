@@ -124,3 +124,37 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+
+  hoosh:
+    build: {context: ../.., dockerfile: services/hoosh/Dockerfile}
+    restart: unless-stopped
+    env_file: [./hoosh.env]
+    ports: ["127.0.0.1:4008:4008"]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:4008/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+  market:
+    build: {context: ../.., dockerfile: services/market/Dockerfile}
+    restart: unless-stopped
+    env_file: [./market.env]
+    ports: ["127.0.0.1:4007:4007"]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:4007/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+  financial:
+    build: {context: ../.., dockerfile: services/financial/Dockerfile}
+    restart: unless-stopped
+    env_file: [./financial.env]
+    ports: ["127.0.0.1:4009:4009"]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:4009/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
