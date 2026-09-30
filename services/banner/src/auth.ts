@@ -1,4 +1,4 @@
-import { createPublicKey, verify as verifyData } from 'node:crypto';
+import { createPublicKey, timingSafeEqual, verify as verifyData } from 'node:crypto';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 
 export type AuthClaims = {
@@ -67,7 +67,7 @@ export async function requireAuth(req:FastifyRequest,reply:FastifyReply): Promis
 }
 
 export async function requireAdminInternal(req:FastifyRequest,reply:FastifyReply): Promise<void> {
-  const expected=process.env.BANNER_INTERNAL_TOKEN;
+  const expected=process.env.BANNER_INTERNAL_TOKEN?.trim();
   if(!expected){reply.code(503).send({error:'internal_credentials_not_configured'});return;}
   if(req.headers.authorization!==`Bearer ${expected}`){reply.code(401).send({error:'unauthorized'});return;}
 }
