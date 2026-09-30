@@ -97,14 +97,14 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
 
   app.get('/api/v1/market/me/profile',{preHandler:requireAuth},async(req)=>{
     const uid=await ensurePlatformUser(pool,auth(req).auth);
-    const u=(await pool.query('SELECT id,identity_id,email,display_name,status,profile_photo_id,created_at,updated_at FROM platform_users WHERE id=$1',[uid])).rows[0];
+    const u=(await pool.query('SELECT id,identity_id,email,display_name,status,profile_photo_id,created_at,updated_at FROM market_users WHERE id=$1',[uid])).rows[0];
     return{user:u,avatarUrl:u?.profile_photo_id?`/api/v1/market/me/profile/avatar`:null};
   });
 
   app.put('/api/v1/market/me/profile',{preHandler:requireAuth},async(req,reply)=>{
     const uid=await ensurePlatformUser(pool,auth(req).auth),b=(req.body??{}) as any;
     const displayName=typeof b.displayName==='string'?b.displayName.trim().slice(0,120):null;
-    const q=await pool.query('UPDATE platform_users SET display_name=COALESCE($1,display_name),updated_at=NOW() WHERE id=$2 RETURNING id,identity_id,email,display_name,status,profile_photo_id,updated_at',[displayName,uid]);
+    const q=await pool.query('UPDATE market_users SET display_name=COALESCE($1,display_name),updated_at=NOW() WHERE id=$2 RETURNING id,identity_id,email,display_name,status,profile_photo_id,updated_at',[displayName,uid]);
     if(!q.rows[0])return reply.code(404).send({error:'user_not_found'});
     return{user:q.rows[0]};
   });
@@ -119,7 +119,7 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     const q=await pool.query(`INSERT INTO market_profile_avatars(user_id,mime_type,data,sha256,byte_size) VALUES($1,$2,$3,$4,$5)
       ON CONFLICT(user_id) DO UPDATE SET mime_type=EXCLUDED.mime_type,data=EXCLUDED.data,sha256=EXCLUDED.sha256,byte_size=EXCLUDED.byte_size,updated_at=NOW()
       RETURNING id`,[uid,mime,data,crypto,data.length]);
-    await pool.query('UPDATE platform_users SET profile_photo_id=$1,updated_at=NOW() WHERE id=$2',[q.rows[0].id,uid]);
+    await pool.query('UPDATE market_users SET profile_photo_id=$1,updated_at=NOW() WHERE id=$2',[q.rows[0].id,uid]);
     await pool.query(`INSERT INTO market_activity_log(user_id,event_type,metadata) VALUES($1,'profile_photo_updated',$2)`,[uid,JSON.stringify({bytes:data.length,mimeType:mime})]);
     return{avatarUrl:'/api/v1/market/me/profile/avatar'};
   });
@@ -134,7 +134,7 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
   app.delete('/api/v1/market/me/profile/avatar',{preHandler:requireAuth},async(req)=>{
     const uid=await ensurePlatformUser(pool,auth(req).auth);
     await pool.query('DELETE FROM market_profile_avatars WHERE user_id=$1',[uid]);
-    await pool.query('UPDATE platform_users SET profile_photo_id=NULL,updated_at=NOW() WHERE id=$1',[uid]);
+    await pool.query('UPDATE market_users SET profile_photo_id=NULL,updated_at=NOW() WHERE id=$1',[uid]);
     await pool.query(`INSERT INTO market_activity_log(user_id,event_type) VALUES($1,'profile_photo_removed')`,[uid]);
     return{deleted:true};
   });
@@ -323,7 +323,7 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     if(!product.rows[0])return reply.code(404).send({error:'product_not_found'});
     const reviews=await pool.query(`SELECT r.id,r.rating,r.title,r.body,r.helpful_count,r.verified_purchase,r.created_at,
       u.id user_id
-      FROM market_reviews r JOIN platform_users u ON u.id=r.user_id
+      FROM market_reviews r JOIN market_users u ON u.id=r.user_id
       WHERE r.product_id=$1 AND r.status='published'
       ORDER BY r.created_at DESC LIMIT 100`,[id]);
     return {reviews:reviews.rows};
