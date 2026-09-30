@@ -1,5 +1,19 @@
 BEGIN;
 
+CREATE TABLE IF NOT EXISTS market_quotes (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  source TEXT NOT NULL,
+  bid NUMERIC(36,18),
+  ask NUMERIC(36,18),
+  last_price NUMERIC(36,18),
+  volume NUMERIC(36,18),
+  observed_at TIMESTAMPTZ NOT NULL,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_market_quotes_symbol_observed ON market_quotes(symbol, observed_at DESC);
+
 CREATE TABLE IF NOT EXISTS market_data_sources (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
