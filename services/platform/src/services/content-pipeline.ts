@@ -37,15 +37,25 @@ export class ContentPipeline{
       }
       const limitRows=await this.pool.query(`SELECT i.*,s.name AS source_name,s.category
         FROM content_ingestion_items i JOIN content_sources s ON s.id=i.source_id
-        WHERE i.status='received' ORDER BY i.received_at DESC LIMIT 100`);
-      for(const item of limitRows.rows){
+        WHERE i.status='received' ORDER BY i.received_at DESC LIMIT 60`);
+      const candidates=limitRows.rows;
+      let ranked:any[]=[];
+      if(candidates.length){
+        const rankingInput=candidates.map((x:any)=>({id:String(x.id),category:x.category,source:x.source_name,title:x.source_title,summary:String(x.raw_content??'').slice(0,700)}));
+        const ranking=await this.ai.execute({workflowCode:'news.select',input:JSON.stringify(rankingInput),sourceType:'content_selection',idempotencyKey:'content-selection:'+new Date().toISOString().slice(0,10)});
+        let parsed:any;try{parsed=JSON.parse(ranking.text)}catch{throw new Error('AI_SELECTION_NOT_JSON')}
+        if(!Array.isArray(parsed?.items))throw new Error('AI_SELECTION_INVALID');
+        const score=new Map(parsed.items.map((x:any)=>[String(x.id),Number(x.score)||0]));
+        ranked=candidates.filter((x:any)=>score.has(String(x.id))).sort((a:any,b:any)=>(score.get(String(b.id))??0)-(score.get(String(a.id))??0)).slice(0,Number(process.env.CONTENT_PIPELINE_SELECTION_LIMIT??30));
+      }
+      for(const item of ranked){
         const policy=(await this.pool.query('SELECT * FROM content_publication_policies WHERE category_slug=$1',[item.category])).rows[0];
         const today=Number((await this.pool.query("SELECT COUNT(*)::int AS n FROM news_articles WHERE category_slug=$1 AND published_at>=CURRENT_DATE",[item.category])).rows[0].n);
         if(policy&&today>=policy.daily_limit){await this.pool.query("UPDATE content_ingestion_items SET status='rejected',error='daily_publication_limit' WHERE id=$1",[item.id]);continue;}
         selected++;
         await this.pool.query("UPDATE content_ingestion_items SET status='processing',processed_at=NOW() WHERE id=$1",[item.id]);
         try{
-          const input=JSON.stringify({source:item.source_name,category:item.category,title:item.source_title,summary:item.raw_content,sourceUrl:item.source_url,instruction:'Create an original Persian article based only on the supplied facts. If the source is not Persian, translate the facts first, then rewrite naturally in Persian. Do not copy sentences. Return JSON: {title,summary,body,metaTitle,metaDescription,keywords,hashtags,score,language,originalLanguage}. Preserve attribution and uncertainty.'});
+          const input=JSON.stringify({source:item.source_name,category:item.category,title:item.source_title,summary:item.raw_content,sourceUrl:item.source_url,instruction:'Create an original Persian article based only on the supplied facts. If the source is not Persian, first perform a faithful translation step internally, then rewrite naturally in Persian. Do not copy sentences. Return JSON: {title,summary,body,metaTitle,metaDescription,keywords,hashtags,score,language,originalLanguage}. Preserve attribution and uncertainty.'});
           const aiResult=await this.ai.execute({workflowCode:'news.rewrite',input,sourceType:'content_ingestion',sourceId:String(item.id),idempotencyKey:'content-rewrite:'+item.id});
           let out:any;try{out=JSON.parse(aiResult.text)}catch{throw new Error('AI_OUTPUT_NOT_JSON')}
           if(!out?.title||!out?.body||!Array.isArray(out.keywords)||!Array.isArray(out.hashtags))throw new Error('AI_OUTPUT_INVALID');
