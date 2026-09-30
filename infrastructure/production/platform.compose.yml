@@ -78,3 +78,40 @@ services:
     cap_drop: [ALL]
     healthcheck:
       test: ["CMD","node","-e","fetch('http://127.0.0.1:4009/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+
+  market-ingestion-worker:
+    build: {context: ../.., dockerfile: services/market/Dockerfile}
+    command: ["node","dist/workers/market-ingestion.js"]
+    restart: unless-stopped
+    env_file: [./market.env]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  market-discovery-worker:
+    build: {context: ../.., dockerfile: services/market/Dockerfile}
+    command: ["node","dist/workers/market-store-discovery.js"]
+    restart: unless-stopped
+    env_file: [./market.env]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  hoosh-worker:
+    build: {context: ../.., dockerfile: services/hoosh/Dockerfile}
+    command: ["node","dist/workers/hoosh.js"]
+    restart: unless-stopped
+    env_file: [./hoosh.env]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  hoosh-media-worker:
+    build: {context: ../.., dockerfile: services/hoosh/Dockerfile}
+    command: ["node","dist/workers/hoosh-media.js"]
+    restart: unless-stopped
+    env_file: [./hoosh.env]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
