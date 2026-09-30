@@ -439,3 +439,6 @@ SET provider_policy=jsonb_set(COALESCE(provider_policy,'{}'::jsonb),'{providers}
   COALESCE(provider_policy->'providers','["gemini","openai"]'::jsonb) || '["openai_compatible"]'::jsonb)
 WHERE code IN ('market.assist','market.compare');
 
+
+
+INSERT INTO schema_migrations(version) VALUES ('002_market_schema_wave2') ON CONFLICT(version) DO NOTHING;
