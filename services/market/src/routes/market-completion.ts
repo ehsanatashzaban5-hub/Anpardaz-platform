@@ -93,13 +93,13 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     if(typeof q.to==='string'){params.push(q.to);where.push('a.created_at<$'+params.length);}
     params.push(limit);
     const w=where.length?'WHERE '+where.join(' AND '):'';
-    return{activities:(await pool.query(`SELECT a.*,u.email,p.title product_title,s.name store_name FROM market_activity_log a LEFT JOIN platform_users u ON u.id=a.user_id LEFT JOIN market_products p ON p.id=a.product_id LEFT JOIN market_stores s ON s.id=a.store_id ${w} ORDER BY a.created_at DESC LIMIT $${params.length}`,params)).rows};
+    return{activities:(await pool.query(`SELECT a.*,u.email,p.title product_title,s.name store_name FROM market_activity_log a LEFT JOIN market_users u ON u.id=a.user_id LEFT JOIN market_products p ON p.id=a.product_id LEFT JOIN market_stores s ON s.id=a.store_id ${w} ORDER BY a.created_at DESC LIMIT $${params.length}`,params)).rows};
   });
 
   app.get('/internal/v1/admin/market/search-history',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     const limit=Math.min(5000,Math.max(1,Number((req.query as any).limit)||500));
-    return{searches:(await pool.query(`SELECT s.*,u.email FROM market_user_searches s LEFT JOIN platform_users u ON u.id=s.user_id ORDER BY s.created_at DESC LIMIT $1`,[limit])).rows};
+    return{searches:(await pool.query(`SELECT s.*,u.email FROM market_user_searches s LEFT JOIN market_users u ON u.id=s.user_id ORDER BY s.created_at DESC LIMIT $1`,[limit])).rows};
   });
 
   app.get('/internal/v1/admin/market/readiness',{preHandler:requireAuth},async(req,reply)=>{
@@ -117,7 +117,7 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
   app.get('/internal/v1/admin/market/ai-history',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     const limit=Math.min(2000,Math.max(1,Number((req.query as any).limit)||300));
-    return{conversations:(await pool.query(`SELECT c.*,u.email,COUNT(m.id)::int message_count FROM market_ai_conversations c LEFT JOIN platform_users u ON u.id=c.user_id LEFT JOIN market_ai_messages m ON m.conversation_id=c.id GROUP BY c.id,u.email ORDER BY c.updated_at DESC LIMIT $1`,[limit])).rows};
+    return{conversations:(await pool.query(`SELECT c.*,u.email,COUNT(m.id)::int message_count FROM market_ai_conversations c LEFT JOIN market_users u ON u.id=c.user_id LEFT JOIN market_ai_messages m ON m.conversation_id=c.id GROUP BY c.id,u.email ORDER BY c.updated_at DESC LIMIT $1`,[limit])).rows};
   });
 
   app.post('/internal/v1/admin/market/categories',{preHandler:requireAuth},async(req,reply)=>{
@@ -151,7 +151,7 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
   app.get('/internal/v1/admin/market/export/activity.csv',{preHandler:requireAuth},async(req,reply)=>{
     if(!(await admin(pool,req)))return reply.code(403).send({error:'forbidden'});
     const rows=(await pool.query(`SELECT a.id,a.user_id,u.email,a.event_type,a.surface,a.product_id,p.title product_title,a.store_id,s.name store_name,a.operation_id,a.metadata,a.created_at
-      FROM market_activity_log a LEFT JOIN platform_users u ON u.id=a.user_id LEFT JOIN market_products p ON p.id=a.product_id LEFT JOIN market_stores s ON s.id=a.store_id ORDER BY a.created_at DESC LIMIT 50000`)).rows;
+      FROM market_activity_log a LEFT JOIN market_users u ON u.id=a.user_id LEFT JOIN market_products p ON p.id=a.product_id LEFT JOIN market_stores s ON s.id=a.store_id ORDER BY a.created_at DESC LIMIT 50000`)).rows;
     const esc=(v:any)=>'"'+String(v??'').replace(/"/g,'""')+'"';
     const csv=['id,user_id,email,event_type,surface,product_id,product_title,store_id,store_name,operation_id,metadata,created_at',...rows.map((r:any)=>[r.id,r.user_id,r.email,r.event_type,r.surface,r.product_id,r.product_title,r.store_id,r.store_name,r.operation_id,JSON.stringify(r.metadata),r.created_at].map(esc).join(','))].join('\n');
     return reply.type('text/csv; charset=utf-8').send(csv);
