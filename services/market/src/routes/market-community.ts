@@ -80,7 +80,7 @@ export function registerMarketCommunityRoutes(app:FastifyInstance,pool:Pool){
       ['store','domain','clickouts','unique_users','unique_products','mobile_clickouts','web_clickouts','commission_type','commission_value','estimated_commission'].join(','),
       ...r.rows.map((x:any)=>[x.store_name,x.domain,x.clickouts,x.unique_users,x.unique_products,x.mobile_clickouts,x.web_clickouts,x.commission_type??'',x.commission_value??'',x.estimated_commission??0].map(esc).join(','))
     ];
-    await pool.query("INSERT INTO market_merchant_report_exports(store_id,from_at,to_at,format,requested_by) VALUES(NULL,$1,$2,'csv',(SELECT id FROM platform_users WHERE identity_id=$3 LIMIT 1))",[from,to,a(req).auth.sub]);
+    await pool.query("INSERT INTO market_merchant_report_exports(store_id,from_at,to_at,format,requested_by) VALUES(NULL,$1,$2,'csv',(SELECT id FROM market_users WHERE identity_id=$3 LIMIT 1))",[from,to,a(req).auth.sub]);
     return reply.header('content-type','text/csv; charset=utf-8').header('content-disposition','attachment; filename="an-market-merchant-report.csv"').send("\uFEFF"+lines.join("\n"));
   });
 
@@ -88,7 +88,7 @@ export function registerMarketCommunityRoutes(app:FastifyInstance,pool:Pool){
     if(!(await hasPermission(pool,a(req).auth,'operations.read')))return reply.code(403).send({error:'forbidden'});
     const status=String((req.query as any)?.status||'pending');
     const allowed=['pending','published','rejected','hidden'];if(!allowed.includes(status))return reply.code(400).send({error:'invalid_status'});
-    return {reviews:(await pool.query(`SELECT r.*,p.title product_title,u.email FROM market_reviews r JOIN market_products p ON p.id=r.product_id JOIN platform_users u ON u.id=r.user_id WHERE r.status=$1 ORDER BY r.created_at DESC LIMIT 500`,[status])).rows};
+    return {reviews:(await pool.query(`SELECT r.*,p.title product_title,u.email FROM market_reviews r JOIN market_products p ON p.id=r.product_id JOIN market_users u ON u.id=r.user_id WHERE r.status=$1 ORDER BY r.created_at DESC LIMIT 500`,[status])).rows};
   });
 
   app.patch('/api/v1/admin/market/reviews/:id',{preHandler:requireAuth},async(req,reply)=>{
