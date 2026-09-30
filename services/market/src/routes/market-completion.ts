@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
-import { ensurePlatformUser, requireAuth, type AuthClaims } from '../auth.js';
+import { ensureMarketUser, requireAuth, type AuthClaims } from '../auth.js';
 import { hasPermission } from '../permissions.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
@@ -9,7 +9,7 @@ const admin=async(pool:Pool,r:FastifyRequest,permission='operations.read')=>hasP
 
 export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
   app.get('/api/v1/market/me/ai-history',{preHandler:requireAuth},async(req)=>{
-    const uid=await ensurePlatformUser(pool,auth(req).auth);
+    const uid=await ensureMarketUser(pool,auth(req).auth);
     const cs=(await pool.query('SELECT id,workflow_code,title,created_at,updated_at FROM market_ai_conversations WHERE user_id=$1 ORDER BY updated_at DESC LIMIT 50',[uid])).rows;
     const ids=cs.map((x:any)=>Number(x.id));
     const ms=ids.length?(await pool.query('SELECT conversation_id,role,content,product_ids,created_at FROM market_ai_messages WHERE conversation_id=ANY($1::bigint[]) ORDER BY created_at DESC LIMIT 300',[ids])).rows:[];
@@ -17,7 +17,7 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
   });
 
   app.post('/api/v1/market/ai/audit',{preHandler:requireAuth},async(req,reply)=>{
-    const a=auth(req),uid=await ensurePlatformUser(pool,a.auth),b=(req.body??{}) as any;
+    const a=auth(req),uid=await ensureMarketUser(pool,a.auth),b=(req.body??{}) as any;
     const productId=Number(b.productId); const storeId=Number(b.storeId);
     if(!Number.isSafeInteger(productId)||productId<=0)return reply.code(400).send({error:'invalid_product'});
     const q=await pool.query(`SELECT p.id,p.title,p.description,p.brand,p.product_type,p.specs,p.source_url,
