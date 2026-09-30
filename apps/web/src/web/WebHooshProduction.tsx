@@ -5,7 +5,7 @@ import WI from "./WebIcons";
 type Props={onNavigate:(p:WebPage)=>void};
 type Model={id:string;providerId:string;name:string};
 type Conv={id:string;title:string;model?:string;mode?:string;updated_at?:string};
-const apiBase=()=>((import.meta.env.VITE_PLATFORM_API_URL||"/api") as string).replace(/\/$/,"");
+const apiBase=()=>((import.meta.env.VITE_HOOSH_API_URL||import.meta.env.VITE_PLATFORM_API_URL||"/api") as string).replace(/\/$/,"");
 const token=()=>localStorage.getItem("anpardaz:accessToken")||"";
 async function api(path:string,init:RequestInit={}){const t=token();if(!t)throw new Error("AUTH_REQUIRED");const h=new Headers(init.headers);h.set("Authorization",`Bearer ${t}`);h.set("Content-Type","application/json");const r=await fetch(apiBase()+path,{...init,headers:h,cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||`HTTP_${r.status}`);return d;}
 
