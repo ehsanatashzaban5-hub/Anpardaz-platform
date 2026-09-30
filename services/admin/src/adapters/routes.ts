@@ -23,6 +23,9 @@ function permissionFor(request:AdminRequest):string{
   if(p.startsWith('anpardaz/cashback/policies')) return write?'operations.write':'operations.read';
   if(p==='anpardaz/sayad-operations'||p==='anpardaz/banking-operations'||p==='anpardaz/operations'||p.startsWith('anpardaz/operations/')) return 'operations.read';
   if(p.startsWith('anpardaz/financial-center/')||p.startsWith('anpardaz/cards/lifecycle/')||p==='anpardaz/cards/lookup'||p.startsWith('anpardaz/users/')) return 'users.read';
+  if(p==='hoosh/overview'||p.startsWith('hoosh/')&&request.method==='GET') return 'ai.runs.read';
+  if(p==='market/overview'||p.startsWith('market/')&&request.method==='GET') return 'content.read';
+  if(p.startsWith('financial/')) return request.method==='GET'?'users.read':'operations.write';
   if(p==='banner/overview'||p.startsWith('banner/')&&request.method==='GET') return 'banner.read';
   if(p.startsWith('banner/')) return 'banner.write';
   return write?'admin.write':'admin.read';
