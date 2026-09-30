@@ -86,7 +86,7 @@ CREATE INDEX IF NOT EXISTS idx_market_offer_snapshots_offer_time
 CREATE TABLE IF NOT EXISTS market_clickouts (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   identity_id UUID,
-  user_id BIGINT REFERENCES platform_users(id) ON DELETE SET NULL,
+  user_id BIGINT REFERENCES market_users(id) ON DELETE SET NULL,
   product_id BIGINT REFERENCES market_products(id) ON DELETE SET NULL,
   offer_id BIGINT REFERENCES market_offers(id) ON DELETE SET NULL,
   store_id BIGINT REFERENCES market_stores(id) ON DELETE SET NULL,
@@ -105,7 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_market_clickouts_user_time
 CREATE TABLE IF NOT EXISTS market_user_events (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   identity_id UUID,
-  user_id BIGINT REFERENCES platform_users(id) ON DELETE SET NULL,
+  user_id BIGINT REFERENCES market_users(id) ON DELETE SET NULL,
   event_type TEXT NOT NULL,
   surface TEXT NOT NULL CHECK(surface IN ('web','mobile','admin')),
   product_id BIGINT REFERENCES market_products(id) ON DELETE SET NULL,
@@ -121,7 +121,7 @@ CREATE INDEX IF NOT EXISTS idx_market_user_events_identity_time
 
 CREATE TABLE IF NOT EXISTS market_tickets (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,
   subject TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'open'
     CHECK(status IN ('open','pending','answered','closed')),
@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS market_ticket_messages (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   ticket_id BIGINT NOT NULL REFERENCES market_tickets(id) ON DELETE CASCADE,
   author_identity_id UUID,
-  author_user_id BIGINT REFERENCES platform_users(id) ON DELETE SET NULL,
+  author_user_id BIGINT REFERENCES market_users(id) ON DELETE SET NULL,
   author_type TEXT NOT NULL CHECK(author_type IN ('user','admin','system')),
   message TEXT NOT NULL,
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -158,7 +158,7 @@ CREATE INDEX IF NOT EXISTS idx_market_ticket_messages_ticket_time
 CREATE TABLE IF NOT EXISTS market_purchase_events (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   identity_id UUID,
-  user_id BIGINT REFERENCES platform_users(id) ON DELETE SET NULL,
+  user_id BIGINT REFERENCES market_users(id) ON DELETE SET NULL,
   product_id BIGINT REFERENCES market_products(id) ON DELETE SET NULL,
   offer_id BIGINT REFERENCES market_offers(id) ON DELETE SET NULL,
   store_id BIGINT REFERENCES market_stores(id) ON DELETE SET NULL,
@@ -265,7 +265,7 @@ CREATE TABLE IF NOT EXISTS market_category_mappings (
 CREATE TABLE IF NOT EXISTS market_reviews (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
-  user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,
   rating SMALLINT NOT NULL CHECK(rating BETWEEN 1 AND 5),
   title TEXT,
   body TEXT NOT NULL,
@@ -282,7 +282,7 @@ CREATE INDEX IF NOT EXISTS idx_market_reviews_product_status ON market_reviews(p
 CREATE TABLE IF NOT EXISTS market_review_votes (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   review_id BIGINT NOT NULL REFERENCES market_reviews(id) ON DELETE CASCADE,
-  user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,
   helpful BOOLEAN NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -325,7 +325,7 @@ CREATE TABLE IF NOT EXISTS market_merchant_report_exports (
   from_at TIMESTAMPTZ NOT NULL,
   to_at TIMESTAMPTZ NOT NULL,
   format TEXT NOT NULL CHECK(format IN ('csv')),
-  requested_by BIGINT REFERENCES platform_users(id) ON DELETE SET NULL,
+  requested_by BIGINT REFERENCES market_users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -355,7 +355,7 @@ CREATE INDEX IF NOT EXISTS idx_market_user_events_store_time ON market_user_even
 CREATE TABLE IF NOT EXISTS market_reviews (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
-  user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,
   rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
   title TEXT,
   body TEXT NOT NULL,
@@ -374,7 +374,7 @@ CREATE INDEX IF NOT EXISTS idx_market_reviews_product_status
 
 CREATE TABLE IF NOT EXISTS market_review_votes (
   review_id BIGINT NOT NULL REFERENCES market_reviews(id) ON DELETE CASCADE,
-  user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,
   helpful BOOLEAN NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (review_id,user_id)
@@ -549,7 +549,7 @@ CREATE INDEX IF NOT EXISTS idx_market_store_sync_runs_store_time
 CREATE TABLE IF NOT EXISTS market_recent_views (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   identity_id UUID NOT NULL,
-  user_id BIGINT REFERENCES platform_users(id) ON DELETE CASCADE,
+  user_id BIGINT REFERENCES market_users(id) ON DELETE CASCADE,
   product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
   viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -560,7 +560,7 @@ CREATE INDEX IF NOT EXISTS idx_market_recent_views_user_time
 CREATE TABLE IF NOT EXISTS market_price_alerts (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   identity_id UUID NOT NULL,
-  user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,
   product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
   target_price NUMERIC(24,8) NOT NULL CHECK(target_price > 0),
   currency CHAR(3) NOT NULL DEFAULT 'IRR',
@@ -577,7 +577,7 @@ CREATE INDEX IF NOT EXISTS idx_market_price_alerts_active
 CREATE TABLE IF NOT EXISTS market_saved_comparisons (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   identity_id UUID NOT NULL,
-  user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,
   title TEXT NOT NULL DEFAULT 'مقایسه ذخیره‌شده',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -598,7 +598,7 @@ CREATE TABLE IF NOT EXISTS market_order_attributions (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   clickout_id BIGINT REFERENCES market_clickouts(id) ON DELETE SET NULL,
   identity_id UUID,
-  user_id BIGINT REFERENCES platform_users(id) ON DELETE SET NULL,
+  user_id BIGINT REFERENCES market_users(id) ON DELETE SET NULL,
   store_id BIGINT REFERENCES market_stores(id) ON DELETE SET NULL,
   external_order_reference TEXT,
   status TEXT NOT NULL DEFAULT 'pending'
