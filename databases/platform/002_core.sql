@@ -49,7 +49,6 @@ CREATE TABLE IF NOT EXISTS news_articles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_banner_listings_category_status ON banner_listings(category_id, status);
 CREATE INDEX IF NOT EXISTS idx_forum_threads_category_created ON forum_threads(category_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_forum_posts_thread_created ON forum_posts(thread_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_news_articles_status_published ON news_articles(status, published_at DESC);
