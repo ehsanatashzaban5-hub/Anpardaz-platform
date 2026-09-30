@@ -19,9 +19,15 @@ export function resolveServiceTarget(request:AdminRequest):Target|null{
   const ansarraf=base('ANSARRAF_SERVICE_URL','http://127.0.0.1:4002');
   const anpardaz=base('ANPARDAZ_SERVICE_URL','http://127.0.0.1:4001');
   const banner=base('BANNER_SERVICE_URL','http://127.0.0.1:4005');
+  const hoosh=base('HOOSH_SERVICE_URL','http://127.0.0.1:4008');
+  const market=base('MARKET_SERVICE_URL','http://127.0.0.1:4007');
+  const financial=base('FINANCIAL_SERVICE_URL','http://127.0.0.1:4009');
   const at=process.env.ANSARRAF_INTERNAL_TOKEN??'';
   const apt=process.env.ANPARDAZ_INTERNAL_TOKEN??'';
   const bt=process.env.BANNER_INTERNAL_TOKEN??'';
+  const ht=process.env.HOOSH_INTERNAL_TOKEN??'';
+  const mt=process.env.MARKET_INTERNAL_TOKEN??'';
+  const ft=process.env.FINANCIAL_INTERNAL_TOKEN??'';
   if(p==='ansarraf/kyc' || p.startsWith('ansarraf/kyc/')) return {base:ansarraf,token:at,path:'/internal/v1/admin/'+p.slice('ansarraf/'.length),forwardIdentity:identityHeaders};
   if(p==='ansarraf/withdrawals' || p.startsWith('ansarraf/withdrawals/')){
     const tail=p.slice('ansarraf/withdrawals'.length);
@@ -44,6 +50,9 @@ export function resolveServiceTarget(request:AdminRequest):Target|null{
   if(p.startsWith('anpardaz/cards/lifecycle/')) return {base:anpardaz,token:apt,path:'/internal/v1/admin/cards/lifecycle/'+encodeURIComponent(p.slice('anpardaz/cards/lifecycle/'.length)),forwardIdentity:identityHeaders};
   if(p==='anpardaz/cards/lookup') return {base:anpardaz,token:apt,path:'/internal/v1/admin/cards/lookup',forwardIdentity:identityHeaders};
   if(p.startsWith('anpardaz/users/')) return {base:anpardaz,token:apt,path:'/internal/v1/admin/users/'+encodeURIComponent(p.slice('anpardaz/users/'.length))+'/summary',forwardIdentity:identityHeaders};
+  if(p==='hoosh/overview' || p.startsWith('hoosh/')) return {base:hoosh,token:ht,path:'/internal/v1/admin/'+p.slice('hoosh/'.length),forwardIdentity:identityHeaders};
+  if(p==='market/overview' || p.startsWith('market/')) return {base:market,token:mt,path:'/internal/v1/admin/'+p.slice('market/'.length),forwardIdentity:identityHeaders};
+  if(p.startsWith('financial/')) return {base:financial,token:ft,path:'/internal/v1/admin/'+p.slice('financial/'.length),forwardIdentity:identityHeaders};
   if(p==='banner/overview') return {base:banner,token:bt,path:'/internal/v1/admin/overview',forwardIdentity:identityHeaders};
   if(p.startsWith('banner/')) return {base:banner,token:bt,path:'/internal/v1/admin/'+p.slice('banner/'.length),forwardIdentity:identityHeaders};
   return null;
