@@ -283,7 +283,7 @@ CREATE INDEX IF NOT EXISTS idx_market_category_aliases_category ON market_catego
 CREATE TABLE IF NOT EXISTS market_reviews (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   product_id BIGINT NOT NULL REFERENCES market_products(id) ON DELETE CASCADE,
-  user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,
   rating SMALLINT NOT NULL CHECK(rating BETWEEN 1 AND 5),
   title TEXT,
   body TEXT NOT NULL CHECK(length(trim(body)) BETWEEN 2 AND 10000),
@@ -296,7 +296,7 @@ CREATE TABLE IF NOT EXISTS market_reviews (
 
 CREATE TABLE IF NOT EXISTS market_review_likes (
   review_id BIGINT NOT NULL REFERENCES market_reviews(id) ON DELETE CASCADE,
-  user_id BIGINT NOT NULL REFERENCES platform_users(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES market_users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY(review_id,user_id)
 );
@@ -369,7 +369,7 @@ CREATE TABLE IF NOT EXISTS market_merchant_report_exports (
   from_at TIMESTAMPTZ NOT NULL,
   to_at TIMESTAMPTZ NOT NULL,
   format TEXT NOT NULL CHECK(format IN ('json','csv')),
-  requested_by BIGINT REFERENCES platform_users(id) ON DELETE SET NULL,
+  requested_by BIGINT REFERENCES market_users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
