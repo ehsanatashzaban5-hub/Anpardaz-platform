@@ -5,12 +5,7 @@
   "scripts": {
     "dev": "node --watch src/main.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/main.js",
-    "worker:market-data": "node dist/workers/market-data.js",
-    "worker:hoosh": "node dist/workers/hoosh.js",
-    "worker:hoosh-media": "node dist/workers/hoosh-media.js",
-    "worker:market": "node dist/workers/market-ingestion.js",
-    "worker:market-discovery": "node dist/workers/market-store-discovery.js"
+    "start": "node dist/main.js"
   },
   "dependencies": {
     "@fastify/cors": "11.3.0",
