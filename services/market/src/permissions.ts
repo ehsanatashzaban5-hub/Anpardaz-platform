@@ -1,0 +1,1 @@
+export const requireRole=(roles:string[])=>async(req:any,reply:any)=>{const a=req.auth;if(!a||!roles.includes(a.role))return reply.code(403).send({error:"forbidden"});};
