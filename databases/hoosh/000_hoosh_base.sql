@@ -1,3 +1,5 @@
+CREATE TABLE IF NOT EXISTS schema_migrations(version TEXT PRIMARY KEY,applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+
 CREATE TABLE IF NOT EXISTS hoosh_conversations(id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,identity_id UUID NOT NULL,title TEXT,model TEXT,status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived','blocked')),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS hoosh_messages(id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,conversation_id BIGINT NOT NULL REFERENCES hoosh_conversations(id) ON DELETE CASCADE,role TEXT NOT NULL CHECK(role IN ('user','assistant','system','tool')),content TEXT NOT NULL,metadata JSONB NOT NULL DEFAULT '{}',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS hoosh_usage(id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,identity_id UUID NOT NULL,conversation_id BIGINT REFERENCES hoosh_conversations(id),provider TEXT,model TEXT,input_tokens BIGINT NOT NULL DEFAULT 0,output_tokens BIGINT NOT NULL DEFAULT 0,cost NUMERIC(24,12) NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'completed' CHECK(status IN ('completed','failed')),created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
@@ -5,3 +7,7 @@ CREATE TABLE IF NOT EXISTS hoosh_requests(id BIGINT GENERATED ALWAYS AS IDENTITY
 CREATE INDEX IF NOT EXISTS idx_hoosh_conversations_identity ON hoosh_conversations(identity_id,updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_hoosh_messages_conversation ON hoosh_messages(conversation_id,created_at);
 CREATE INDEX IF NOT EXISTS idx_hoosh_usage_identity ON hoosh_usage(identity_id,created_at DESC);
+
+INSERT INTO schema_migrations(version)
+VALUES ('000_hoosh_base')
+ON CONFLICT(version) DO NOTHING;
