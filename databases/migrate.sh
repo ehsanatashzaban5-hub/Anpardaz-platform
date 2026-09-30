@@ -44,5 +44,8 @@ run_migrations ansarraf-db "${ANSARRAF_DB_NAME}" "${ANSARRAF_DB_USER}" "${ANSARR
 run_migrations platform-db "${PLATFORM_DB_NAME}" "${PLATFORM_DB_USER}" "${PLATFORM_DB_PASSWORD}" platform
 run_migrations accounting-db "${ACCOUNTING_DB_NAME}" "${ACCOUNTING_DB_USER}" "${ACCOUNTING_DB_PASSWORD}" accounting
 run_migrations banner-db "${BANNER_DB_NAME}" "${BANNER_DB_USER}" "${BANNER_DB_PASSWORD}" banner
+run_migrations hoosh-db "${HOOSH_DB_NAME}" "${HOOSH_DB_USER}" "${HOOSH_DB_PASSWORD}" hoosh
+run_migrations market-db "${MARKET_DB_NAME}" "${MARKET_DB_USER}" "${MARKET_DB_PASSWORD}" market
+run_migrations financial-db "${FINANCIAL_DB_NAME}" "${FINANCIAL_DB_USER}" "${FINANCIAL_DB_PASSWORD}" financial
 
 echo "All database migrations completed."
