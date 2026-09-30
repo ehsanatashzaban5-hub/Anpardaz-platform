@@ -58,13 +58,13 @@ export function registerHooshMediaRoutes(app:FastifyInstance,pool:Pool){
   });
 
   app.get('/api/v1/hoosh/profile',{preHandler:requireAuth},async(request)=>{
-    const a=req(request); const q=await pool.query('SELECT id,identity_id,email,display_name,avatar_url,role,status FROM platform_users WHERE identity_id=$1',[a.auth.sub]); return {profile:q.rows[0]??null};
+    const a=req(request); const q=await pool.query('SELECT id,identity_id,email,display_name,avatar_url,role,status FROM hoosh_users WHERE identity_id=$1',[a.auth.sub]); return {profile:q.rows[0]??null};
   });
   app.put('/api/v1/hoosh/profile',{preHandler:requireAuth},async(request,reply)=>{
     const a=req(request); const b=(request.body??{}) as any;
     const displayName=typeof b.displayName==='string'?b.displayName.trim().slice(0,120):null;
     const avatarUrl=typeof b.avatarUrl==='string'?b.avatarUrl.trim().slice(0,1000):null;
-    const q=await pool.query('UPDATE platform_users SET display_name=COALESCE($1,display_name),avatar_url=COALESCE($2,avatar_url) WHERE identity_id=$3 RETURNING id,identity_id,email,display_name,avatar_url,role,status',[displayName,avatarUrl,a.auth.sub]);
+    const q=await pool.query('UPDATE hoosh_users SET display_name=COALESCE($1,display_name),avatar_url=COALESCE($2,avatar_url) WHERE identity_id=$3 RETURNING id,identity_id,email,display_name,avatar_url,role,status',[displayName,avatarUrl,a.auth.sub]);
     if(!q.rows[0])return reply.code(404).send({error:'profile_not_found'}); return {profile:q.rows[0]};
   });
 
