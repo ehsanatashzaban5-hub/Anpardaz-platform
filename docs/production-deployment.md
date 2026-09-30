@@ -27,7 +27,7 @@ Production is organized by domain ownership. Services may share a VPS only when 
 
 ## First deployment
 
-For each VPS, copy its matching `*.env.example` to an environment-only file, replace all placeholders, build the service image and start its compose file.
+Create the shared Docker network before starting any production compose stack: `docker network create --driver bridge --internal anpardaz-internal`. Copy each matching `*.env.example` to an environment-only file, replace all placeholders, build the service image and start its compose file. Production PostgreSQL containers do not publish host ports; service-to-database traffic uses the shared Docker network and Docker DNS.
 
 Run database migrations from the corresponding database host/network before enabling authenticated traffic. Ensure the platform migration `073_phone_otp_auth` is applied before enabling phone login. The migration runner is idempotent and applies migrations in filename order.
 
