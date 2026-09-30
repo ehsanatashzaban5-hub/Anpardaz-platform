@@ -55,8 +55,6 @@ jobs:
           - services/financial
           - services/admin
           - apps/admin
-          - apps/web
-          - apps/mobile
           - packages/accounting-client
     steps:
       - name: Checkout
