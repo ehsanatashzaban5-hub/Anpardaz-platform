@@ -65,7 +65,7 @@ for (const name of required[service]) {
 
 if (value("NODE_ENV") !== "production") errors.push("NODE_ENV: must be production");
 
-const placeholder = /(?:CHANGE_ME|GENERATE_|configure-at-deploy-time|generated-by-bootstrap|local-|replace-in-local-bootstrap|your-domain\.example|DB_(?:USER|PASSWORD)|[A-Z]+_DB_(?:USER|PASSWORD)|USER:PASSWORD|<trusted-|BASE64-32-BYTE-KEY|example\\.com)/i;
+const placeholder = /(?:CHANGE_ME|GENERATE_|configure-at-deploy-time|generated-by-bootstrap|local-|replace-in-local-bootstrap|your-domain\.example|DB_(?:USER|PASSWORD)|[A-Z]+_DB_(?:USER|PASSWORD)|USER:PASSWORD|<trusted-|BASE64-32-BYTE-KEY|example\.com)/i;
 for (const [name, v] of Object.entries(env)) {
   if (v && placeholder.test(v)) errors.push(name + ": placeholder/example value");
 }
@@ -79,7 +79,7 @@ for (const [name, v] of Object.entries(env)) {
 
 for (const name of ["PLATFORM_SERVICE_URL","ANSARRAF_SERVICE_URL","ANPARDAZ_SERVICE_URL","ACCOUNTING_SERVICE_URL","BANNER_SERVICE_URL","HOOSH_SERVICE_URL","MARKET_SERVICE_URL","FINANCIAL_SERVICE_URL","IDENTITY_SERVICE_URL"]) {
   const v = value(name);
-  if (v && !/^https?:\/\/([a-z0-9-]+|127\.0\.0\.1|localhost)(?::\\d+)?(?:\/.*)?$/i.test(v)) {
+  if (v && !/^https?:\/\/([a-z0-9-]+|127\.0\.0\.1|localhost)(?::\d+)?(?:\/.*)?$/i.test(v)) {
     errors.push(name + ": invalid internal service URL");
   }
   if (v && /localhost|127\.0\.0\.1/i.test(v)) errors.push(name + ": localhost is forbidden in production");
