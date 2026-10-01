@@ -5,8 +5,8 @@ networks:
 services:
   web:
     build:
-      context: ../..
-      dockerfile: apps/web/Dockerfile
+      context: ../../apps/web
+      dockerfile: Dockerfile
       args:
         VITE_PLATFORM_API_URL: /platform
         VITE_ANSARRAF_API_URL: /ansarraf
