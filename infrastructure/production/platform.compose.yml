@@ -3,31 +3,6 @@ networks:
     external: true
 
 services:
-    networks: [anpardaz-internal]
-  banner:
-    build:
-      context: ../..
-      dockerfile: services/banner/Dockerfile
-    restart: unless-stopped
-    env_file:
-      - ./banner.env
-    ports:
-      - "127.0.0.1:4005:4005"
-    read_only: true
-    tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-    networks: [anpardaz-internal]
   platform:
     build:
       context: ../..
@@ -50,83 +25,177 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - anpardaz-internal
 
-    networks: [anpardaz-internal]
+  banner:
+    build:
+      context: ../..
+      dockerfile: services/banner/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./banner.env
+    ports:
+      - "127.0.0.1:4005:4005"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - anpardaz-internal
+
   hoosh:
-    build: {context: ../.., dockerfile: services/hoosh/Dockerfile}
+    build:
+      context: ../..
+      dockerfile: services/hoosh/Dockerfile
     restart: unless-stopped
-    env_file: [./hoosh.env]
-    ports: ["127.0.0.1:4008:4008"]
+    env_file:
+      - ./hoosh.env
+    ports:
+      - "127.0.0.1:4008:4008"
     read_only: true
-    tmpfs: [/tmp]
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
-      test: ["CMD","node","-e","fetch('http://127.0.0.1:4008/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-    networks: [anpardaz-internal]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4008/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - anpardaz-internal
+
   market:
-    build: {context: ../.., dockerfile: services/market/Dockerfile}
+    build:
+      context: ../..
+      dockerfile: services/market/Dockerfile
     restart: unless-stopped
-    env_file: [./market.env]
-    ports: ["127.0.0.1:4007:4007"]
+    env_file:
+      - ./market.env
+    ports:
+      - "127.0.0.1:4007:4007"
     read_only: true
-    tmpfs: [/tmp]
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
-      test: ["CMD","node","-e","fetch('http://127.0.0.1:4007/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-    networks: [anpardaz-internal]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4007/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - anpardaz-internal
+
   financial:
-    build: {context: ../.., dockerfile: services/financial/Dockerfile}
+    build:
+      context: ../..
+      dockerfile: services/financial/Dockerfile
     restart: unless-stopped
-    env_file: [./financial.env]
-    ports: ["127.0.0.1:4009:4009"]
+    env_file:
+      - ./financial.env
+    ports:
+      - "127.0.0.1:4009:4009"
     read_only: true
-    tmpfs: [/tmp]
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
-      test: ["CMD","node","-e","fetch('http://127.0.0.1:4009/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4009/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - anpardaz-internal
 
-    networks: [anpardaz-internal]
   market-ingestion-worker:
-    build: {context: ../.., dockerfile: services/market/Dockerfile}
-    command: ["node","dist/workers/market-ingestion.js"]
+    build:
+      context: ../..
+      dockerfile: services/market/Dockerfile
+    command: ["node", "dist/workers/market-ingestion.js"]
     restart: unless-stopped
-    env_file: [./market.env]
+    env_file:
+      - ./market.env
     read_only: true
-    tmpfs: [/tmp]
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
-    networks: [anpardaz-internal]
-  market-discovery-worker:
-    build: {context: ../.., dockerfile: services/market/Dockerfile}
-    command: ["node","dist/workers/market-store-discovery.js"]
-    restart: unless-stopped
-    env_file: [./market.env]
-    read_only: true
-    tmpfs: [/tmp]
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
-    networks: [anpardaz-internal]
-  hoosh-worker:
-    build: {context: ../.., dockerfile: services/hoosh/Dockerfile}
-    command: ["node","dist/workers/hoosh.js"]
-    restart: unless-stopped
-    env_file: [./hoosh.env]
-    read_only: true
-    tmpfs: [/tmp]
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
-    networks: [anpardaz-internal]
-  hoosh-media-worker:
-    build: {context: ../.., dockerfile: services/hoosh/Dockerfile}
-    command: ["node","dist/workers/hoosh-media.js"]
-    restart: unless-stopped
-    env_file: [./hoosh.env]
-    read_only: true
-    tmpfs: [/tmp]
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - anpardaz-internal
 
-    networks: [anpardaz-internal]
+  market-discovery-worker:
+    build:
+      context: ../..
+      dockerfile: services/market/Dockerfile
+    command: ["node", "dist/workers/market-store-discovery.js"]
+    restart: unless-stopped
+    env_file:
+      - ./market.env
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - anpardaz-internal
+
+  hoosh-worker:
+    build:
+      context: ../..
+      dockerfile: services/hoosh/Dockerfile
+    command: ["node", "dist/workers/hoosh.js"]
+    restart: unless-stopped
+    env_file:
+      - ./hoosh.env
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - anpardaz-internal
+
+  hoosh-media-worker:
+    build:
+      context: ../..
+      dockerfile: services/hoosh/Dockerfile
+    command: ["node", "dist/workers/hoosh-media.js"]
+    restart: unless-stopped
+    env_file:
+      - ./hoosh.env
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - anpardaz-internal
