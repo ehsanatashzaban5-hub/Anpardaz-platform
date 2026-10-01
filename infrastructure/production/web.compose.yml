@@ -32,6 +32,5 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 10s
     networks:
       - anpardaz-internal
