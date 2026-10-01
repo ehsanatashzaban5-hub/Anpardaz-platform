@@ -10,7 +10,7 @@ services:
       dockerfile: services/accounting/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./accounting.env
+      - /opt/anpardaz/secrets/accounting.env
     ports:
       - "127.0.0.1:4004:4004"
     read_only: true
