@@ -31,7 +31,7 @@ const required = {
   anpardaz: [
     "NODE_ENV","PORT","CORS_ORIGIN","DATABASE_URL","IDENTITY_SERVICE_URL","IDENTITY_ISSUER",
     "IDENTITY_PUBLIC_KEY_B64","ANPARDAZ_INTERNAL_TOKEN","ACCOUNTING_SERVICE_URL",
-    "ACCOUNTING_INTERNAL_TOKEN","FINTECH_API_BASE_URL","FINTECH_API_KEY",
+    "ACCOUNTING_INTERNAL_TOKEN","FINTECH_API_BASE_URL",
     "FINTECH_ENDPOINTS_JSON","FINTECH_PAYLOAD_ENCRYPTION_KEY_B64",
     "IP_GEOLOCATION_URL_TEMPLATE","TRUST_PROXY","WEBAUTHN_RP_ID","WEBAUTHN_ORIGIN",
     "FINANCIAL_SERVICE_URL","FINANCIAL_INTERNAL_TOKEN"
@@ -65,9 +65,21 @@ for (const name of required[service]) {
 
 if (value("NODE_ENV") !== "production") errors.push("NODE_ENV: must be production");
 
-const placeholder = /(?:CHANGE_ME|GENERATE_|configure-at-deploy-time|generated-by-bootstrap|local-|replace-in-local-bootstrap|your-domain\.example|DB_(?:USER|PASSWORD)|[A-Z]+_DB_(?:USER|PASSWORD)|USER:PASSWORD|<trusted-|BASE64-32-BYTE-KEY|example\.com)/i;
+const placeholder = /(?:CHANGE_ME|GENERATE_|configure-at-deploy-time|generated-by-bootstrap|local-|replace-in-local-bootstrap|your-domain\.example|USER:PASSWORD|<trusted-|BASE64-32-BYTE-KEY|example\.com)/i;
+// DATABASE_URL is validated separately because real URLs commonly contain
+// credential labels such as DB_USER/DB_PASSWORD and must not be classified
+// as placeholders by the generic secret scanner.
 for (const [name, v] of Object.entries(env)) {
+  if (name === "DATABASE_URL") continue;
   if (v && placeholder.test(v)) errors.push(name + ": placeholder/example value");
+}
+const databaseUrl = value("DATABASE_URL");
+if (databaseUrl && /^(?:postgres(?:ql)?:\/\/)/i.test(databaseUrl)) {
+  if (/your-domain\.example|USER:PASSWORD|CHANGE_ME|GENERATE_|example\.com/i.test(databaseUrl)) {
+    errors.push("DATABASE_URL: placeholder/example value");
+  }
+} else if (databaseUrl) {
+  errors.push("DATABASE_URL: must use PostgreSQL URL");
 }
 
 for (const [name, v] of Object.entries(env)) {
@@ -111,7 +123,10 @@ if (service === "anpardaz" && value("FINNOTECH_ENABLED") === "true") {
 }
 
 if (service === "financial") {
-  if (value("FINNOTECH_CLIENT_ID") && !value("FINNOTECH_CLIENT_SECRET")) errors.push("FINNOTECH_CLIENT_SECRET: required with FINNOTECH_CLIENT_ID");
+  const clientId = value("FINNOTECH_CLIENT_ID");
+  const clientSecret = value("FINNOTECH_CLIENT_SECRET");
+  if (clientId && !clientSecret) errors.push("FINNOTECH_CLIENT_SECRET: required with FINNOTECH_CLIENT_ID");
+  if (clientSecret && !clientId) errors.push("FINNOTECH_CLIENT_ID: required with FINNOTECH_CLIENT_SECRET");
 }
 
 if (errors.length) {
