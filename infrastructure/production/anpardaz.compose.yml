@@ -10,7 +10,7 @@ services:
       dockerfile: services/anpardaz/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./anpardaz.env
+      - /opt/anpardaz/secrets/anpardaz.env
     ports:
       - "127.0.0.1:4001:4001"
     read_only: true
