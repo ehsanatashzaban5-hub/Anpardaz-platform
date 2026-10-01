@@ -31,7 +31,7 @@ const required = {
   anpardaz: [
     "NODE_ENV","PORT","CORS_ORIGIN","DATABASE_URL","IDENTITY_SERVICE_URL","IDENTITY_ISSUER",
     "IDENTITY_PUBLIC_KEY_B64","ANPARDAZ_INTERNAL_TOKEN","ACCOUNTING_SERVICE_URL",
-    "ACCOUNTING_INTERNAL_TOKEN","FINTECH_API_BASE_URL",
+    "ACCOUNTING_INTERNAL_TOKEN","FINTECH_API_BASE_URL","FINTECH_API_KEY",
     "FINTECH_ENDPOINTS_JSON","FINTECH_PAYLOAD_ENCRYPTION_KEY_B64",
     "IP_GEOLOCATION_URL_TEMPLATE","TRUST_PROXY","WEBAUTHN_RP_ID","WEBAUTHN_ORIGIN",
     "FINANCIAL_SERVICE_URL","FINANCIAL_INTERNAL_TOKEN"
@@ -95,7 +95,7 @@ if (databaseUrl && /^(?:postgres(?:ql)?:\/\/)/i.test(databaseUrl)) {
 }
 
 for (const [name, v] of Object.entries(env)) {
-  if (name.includes("TOKEN") && v && v.length < 32) errors.push(name + ": must be at least 32 characters");
+  if (name.includes("TOKEN") && !/(?:_URL|_PATH)$/i.test(name) && v && v.length < 32) errors.push(name + ": must be at least 32 characters");
   if (/^(?:.*_SECRET|.*_PRIVATE_KEY_B64|.*_ENCRYPTION_KEY_B64|.*_API_KEY)$/.test(name) && v && /^(?:test|demo|dummy|sample|local|secret)$/i.test(v)) {
     errors.push(name + ": test/demo value");
   }
@@ -122,6 +122,12 @@ if (service === "platform" && value("PHONE_OTP_ENABLED") === "true") {
   }
 }
 
+if (service === "anpardaz") {
+  const key = value("FINTECH_API_KEY");
+  if (!key) errors.push("FINTECH_API_KEY: required because the fintech provider is runtime-enabled");
+  else if (placeholder.test(key)) errors.push("FINTECH_API_KEY: placeholder/example value");
+}
+
 if (service === "ansarraf" && value("LIQUIDITY_PROVIDER_EXECUTION_ENABLED") === "true") {
   const key = value("WALLEX_API_KEY");
   if (!key) errors.push("WALLEX_API_KEY: required when live liquidity execution is enabled");
@@ -141,6 +147,8 @@ if (service === "anpardaz" && value("FINNOTECH_ENABLED") === "true") {
 if (service === "financial") {
   const clientId = value("FINNOTECH_CLIENT_ID");
   const clientSecret = value("FINNOTECH_CLIENT_SECRET");
+  if (clientId && placeholder.test(clientId)) errors.push("FINNOTECH_CLIENT_ID: placeholder/example value");
+  if (clientSecret && placeholder.test(clientSecret)) errors.push("FINNOTECH_CLIENT_SECRET: placeholder/example value");
   if (clientId && !clientSecret) errors.push("FINNOTECH_CLIENT_SECRET: required with FINNOTECH_CLIENT_ID");
   if (clientSecret && !clientId) errors.push("FINNOTECH_CLIENT_ID: required with FINNOTECH_CLIENT_SECRET");
 }
