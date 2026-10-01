@@ -10,7 +10,7 @@ services:
       dockerfile: services/platform/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./platform.env
+      - /opt/anpardaz/secrets/platform.env
     ports:
       - "127.0.0.1:4003:4003"
     read_only: true
@@ -34,7 +34,7 @@ services:
       dockerfile: services/banner/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./banner.env
+      - /opt/anpardaz/secrets/banner.env
     ports:
       - "127.0.0.1:4005:4005"
     read_only: true
@@ -58,7 +58,7 @@ services:
       dockerfile: services/hoosh/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./hoosh.env
+      - /opt/anpardaz/secrets/hoosh.env
     ports:
       - "127.0.0.1:4008:4008"
     read_only: true
@@ -82,7 +82,7 @@ services:
       dockerfile: services/market/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./market.env
+      - /opt/anpardaz/secrets/market.env
     ports:
       - "127.0.0.1:4007:4007"
     read_only: true
@@ -106,7 +106,7 @@ services:
       dockerfile: services/financial/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./financial.env
+      - /opt/anpardaz/secrets/financial.env
     ports:
       - "127.0.0.1:4009:4009"
     read_only: true
