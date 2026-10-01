@@ -131,7 +131,7 @@ services:
     command: ["node", "dist/workers/market-ingestion.js"]
     restart: unless-stopped
     env_file:
-      - ./market.env
+      - /opt/anpardaz/secrets/market.env
     read_only: true
     tmpfs:
       - /tmp
@@ -149,7 +149,7 @@ services:
     command: ["node", "dist/workers/market-store-discovery.js"]
     restart: unless-stopped
     env_file:
-      - ./market.env
+      - /opt/anpardaz/secrets/market.env
     read_only: true
     tmpfs:
       - /tmp
@@ -167,7 +167,7 @@ services:
     command: ["node", "dist/workers/hoosh.js"]
     restart: unless-stopped
     env_file:
-      - ./hoosh.env
+      - /opt/anpardaz/secrets/hoosh.env
     read_only: true
     tmpfs:
       - /tmp
@@ -185,7 +185,7 @@ services:
     command: ["node", "dist/workers/hoosh-media.js"]
     restart: unless-stopped
     env_file:
-      - ./hoosh.env
+      - /opt/anpardaz/secrets/hoosh.env
     read_only: true
     tmpfs:
       - /tmp
