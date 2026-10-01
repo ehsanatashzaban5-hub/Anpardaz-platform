@@ -10,7 +10,7 @@ services:
       dockerfile: services/ansarraf/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./ansarraf.env
+      - /opt/anpardaz/secrets/ansarraf.env
     ports:
       - "127.0.0.1:4002:4002"
     read_only: true
