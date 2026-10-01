@@ -1,6 +1,6 @@
 FROM node:24-alpine AS build
 WORKDIR /repo
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@11.24.0 --activate
 COPY package.json pnpm-workspace.yaml ./
 COPY services/market/package.json services/market/package.json
 COPY services/market/tsconfig.json services/market/tsconfig.json
