@@ -69,8 +69,20 @@ const placeholder = /(?:CHANGE_ME|GENERATE_|configure-at-deploy-time|generated-b
 // DATABASE_URL is validated separately because real URLs commonly contain
 // credential labels such as DB_USER/DB_PASSWORD and must not be classified
 // as placeholders by the generic secret scanner.
+const conditionalProviderKeys = new Set([
+  "FINTECH_API_KEY",
+  "WALLEX_API_KEY",
+  "KAVENEGAR_API_KEY",
+  "KAVENEGAR_SENDER",
+  "FINNOTECH_CLIENT_ID",
+  "FINNOTECH_CLIENT_SECRET",
+  "FINNOTECH_AUTHORIZE_URL",
+  "FINNOTECH_TOKEN_URL",
+  "FINNOTECH_STATEMENT_PATH",
+  "FINNOTECH_TOKEN_ENCRYPTION_KEY_B64",
+]);
 for (const [name, v] of Object.entries(env)) {
-  if (name === "DATABASE_URL") continue;
+  if (name === "DATABASE_URL" || conditionalProviderKeys.has(name)) continue;
   if (v && placeholder.test(v)) errors.push(name + ": placeholder/example value");
 }
 const databaseUrl = value("DATABASE_URL");
@@ -104,12 +116,16 @@ for (const name of ["CORS_ORIGIN","WEBAUTHN_ORIGIN"]) {
 
 if (service === "platform" && value("PHONE_OTP_ENABLED") === "true") {
   for (const name of ["OTP_HASH_SECRET","KAVENEGAR_API_KEY","KAVENEGAR_SENDER"]) {
-    if (!value(name)) errors.push(name + ": required when PHONE_OTP_ENABLED=true");
+    const v = value(name);
+    if (!v) errors.push(name + ": required when PHONE_OTP_ENABLED=true");
+    else if (placeholder.test(v)) errors.push(name + ": placeholder/example value");
   }
 }
 
-if (service === "ansarraf" && value("LIQUIDITY_PROVIDER_EXECUTION_ENABLED") === "true" && !value("WALLEX_API_KEY")) {
-  errors.push("WALLEX_API_KEY: required when live liquidity execution is enabled");
+if (service === "ansarraf" && value("LIQUIDITY_PROVIDER_EXECUTION_ENABLED") === "true") {
+  const key = value("WALLEX_API_KEY");
+  if (!key) errors.push("WALLEX_API_KEY: required when live liquidity execution is enabled");
+  else if (placeholder.test(key)) errors.push("WALLEX_API_KEY: placeholder/example value");
 }
 
 if (service === "ansarraf" && value("KYC_MANUAL_REVIEW_ENABLED") !== "true" && !value("KYC_PROVIDER_API_KEY")) {
