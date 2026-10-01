@@ -9,9 +9,11 @@ services:
     environment:
       POSTGRES_DB: ${ANPARDAZ_DB_NAME:-anpardaz}
       POSTGRES_USER: ${ANPARDAZ_DB_USER:-anpardaz}
-      POSTGRES_PASSWORD: ${ANPARDAZ_DB_PASSWORD:?Set ANPARDAZ_DB_PASSWORD}
+      POSTGRES_PASSWORD: ${ANPARDAZ_DB_PASSWORD}
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
     volumes: [anpardaz-db-data:/var/lib/postgresql/data]
+    networks:
+      - anpardaz-internal
   ansarraf-db:
     image: postgres:17
     container_name: ansarraf-db
@@ -22,9 +24,11 @@ services:
     environment:
       POSTGRES_DB: ${ANSARRAF_DB_NAME:-ansarraf}
       POSTGRES_USER: ${ANSARRAF_DB_USER:-ansarraf}
-      POSTGRES_PASSWORD: ${ANSARRAF_DB_PASSWORD:?Set ANSARRAF_DB_PASSWORD}
+      POSTGRES_PASSWORD: ${ANSARRAF_DB_PASSWORD}
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
     volumes: [ansarraf-db-data:/var/lib/postgresql/data]
+    networks:
+      - anpardaz-internal
   platform-db:
     image: postgres:17
     container_name: platform-db
@@ -35,9 +39,11 @@ services:
     environment:
       POSTGRES_DB: ${PLATFORM_DB_NAME:-platform}
       POSTGRES_USER: ${PLATFORM_DB_USER:-platform}
-      POSTGRES_PASSWORD: ${PLATFORM_DB_PASSWORD:?Set PLATFORM_DB_PASSWORD}
+      POSTGRES_PASSWORD: ${PLATFORM_DB_PASSWORD}
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
     volumes: [platform-db-data:/var/lib/postgresql/data]
+    networks:
+      - anpardaz-internal
   banner-db:
     image: postgres:17
     container_name: banner-db
@@ -48,9 +54,11 @@ services:
     environment:
       POSTGRES_DB: ${BANNER_DB_NAME:-banner}
       POSTGRES_USER: ${BANNER_DB_USER:-banner}
-      POSTGRES_PASSWORD: ${BANNER_DB_PASSWORD:?Set BANNER_DB_PASSWORD}
+      POSTGRES_PASSWORD: ${BANNER_DB_PASSWORD}
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
     volumes: [banner-db-data:/var/lib/postgresql/data]
+    networks:
+      - anpardaz-internal
   hoosh-db:
     image: postgres:17
     container_name: hoosh-db
@@ -60,9 +68,11 @@ services:
     environment:
       POSTGRES_DB: ${HOOSH_DB_NAME:-hoosh}
       POSTGRES_USER: ${HOOSH_DB_USER:-hoosh}
-      POSTGRES_PASSWORD: ${HOOSH_DB_PASSWORD:?Set HOOSH_DB_PASSWORD}
+      POSTGRES_PASSWORD: ${HOOSH_DB_PASSWORD}
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
     volumes: [hoosh-db-data:/var/lib/postgresql/data]
+    networks:
+      - anpardaz-internal
   market-db:
     image: postgres:17
     container_name: market-db
@@ -72,9 +82,11 @@ services:
     environment:
       POSTGRES_DB: ${MARKET_DB_NAME:-market}
       POSTGRES_USER: ${MARKET_DB_USER:-market}
-      POSTGRES_PASSWORD: ${MARKET_DB_PASSWORD:?Set MARKET_DB_PASSWORD}
+      POSTGRES_PASSWORD: ${MARKET_DB_PASSWORD}
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
     volumes: [market-db-data:/var/lib/postgresql/data]
+    networks:
+      - anpardaz-internal
   financial-db:
     image: postgres:17
     container_name: financial-db
@@ -84,9 +96,11 @@ services:
     environment:
       POSTGRES_DB: ${FINANCIAL_DB_NAME:-financial}
       POSTGRES_USER: ${FINANCIAL_DB_USER:-financial}
-      POSTGRES_PASSWORD: ${FINANCIAL_DB_PASSWORD:?Set FINANCIAL_DB_PASSWORD}
+      POSTGRES_PASSWORD: ${FINANCIAL_DB_PASSWORD}
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
     volumes: [financial-db-data:/var/lib/postgresql/data]
+    networks:
+      - anpardaz-internal
   accounting-db:
     image: postgres:17
     container_name: accounting-db
@@ -97,9 +111,11 @@ services:
     environment:
       POSTGRES_DB: ${ACCOUNTING_DB_NAME:-accounting}
       POSTGRES_USER: ${ACCOUNTING_DB_USER:-accounting}
-      POSTGRES_PASSWORD: ${ACCOUNTING_DB_PASSWORD:?Set ACCOUNTING_DB_PASSWORD}
+      POSTGRES_PASSWORD: ${ACCOUNTING_DB_PASSWORD}
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"], interval: 5s, timeout: 5s, retries: 10}
     volumes: [accounting-db-data:/var/lib/postgresql/data]
+    networks:
+      - anpardaz-internal
 networks:
   anpardaz-internal:
     external: true
