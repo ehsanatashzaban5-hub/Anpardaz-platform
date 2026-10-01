@@ -10,7 +10,7 @@ services:
       dockerfile: services/admin/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./admin.env
+      - /opt/anpardaz/secrets/admin.env
     ports:
       - "127.0.0.1:4006:4006"
     read_only: true
