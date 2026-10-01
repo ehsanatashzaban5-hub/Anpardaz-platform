@@ -1,6 +1,6 @@
 FROM node:24-alpine AS build
 WORKDIR /repo
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@11.24.0 --activate
 COPY package.json pnpm-workspace.yaml ./
 COPY packages/ip-region-policy/package.json packages/ip-region-policy/package.json
 COPY packages/ip-region-policy packages/ip-region-policy
