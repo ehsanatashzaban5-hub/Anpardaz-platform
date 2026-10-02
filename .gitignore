@@ -24,3 +24,7 @@ Thumbs.db
 
 # Local database state
 databases/*.env
+
+# Local package stores and production deployment backups
+.pnpm-store/
+infrastructure/production/*.bak-*
