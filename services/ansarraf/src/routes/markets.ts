@@ -6,16 +6,6 @@ import type { MarketDataService } from '../market-data.js';
 type AuthenticatedRequest = FastifyRequest & { auth: AuthClaims };
 
 export function registerMarketRoutes(app: FastifyInstance, pool: Pool, marketData?: MarketDataService | null) {
-  app.get('/api/v1/fees', async (request) => {
-    const q=request.query as {operationType?:string};
-    const operationType=String(q.operationType??'trade').trim()||'trade';
-    if(!/^[a-z_]{1,50}$/.test(operationType)) return {rules:[]};
-    const r=await pool.query(`SELECT id,service,asset_symbol,market_symbol,operation_type,percentage::text,fixed_amount::text,min_amount::text,max_amount::text,fee_asset_symbol,effective_from,effective_to,metadata
-      FROM customer_fee_rules
-      WHERE service='ansarraf' AND operation_type=$1 AND effective_from<=NOW() AND (effective_to IS NULL OR effective_to>NOW())
-      ORDER BY (market_symbol IS NOT NULL) DESC,(asset_symbol IS NOT NULL) DESC,effective_from DESC,id DESC`,[operationType]);
-    return {rules:r.rows};
-  });
   app.get('/api/v1/transactions/export', { preHandler: requireAuth }, async (request, reply) => {
     const customerId = await ensureCustomer(pool, (request as AuthenticatedRequest).auth);
     const [orders, deposits, withdrawals] = await Promise.all([
