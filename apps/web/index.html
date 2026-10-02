@@ -17,21 +17,18 @@
         overflow-x: hidden;
       }
 
-      /* Keep the fixed desktop canvas centered; RTL belongs to the app itself. */
       body { direction: ltr; }
 
+      /*
+       * The web portal is a single desktop canvas. 1480px is the largest
+       * layout width used by the platform pages, so the canvas must be at
+       * least that wide. It is centered on desktop displays and scaled down
+       * as one piece on phones, including Chrome "Desktop site" mode.
+       */
       #root {
-        width: 1280px;
-        min-width: 1280px;
-      }
-
-      /* Scale the unchanged desktop canvas on narrow devices. This is visual
-         scaling, not responsive/mobile re-layout: the desktop proportions,
-         columns and navigation remain exactly the same. */
-      @media (max-width: 1279px) {
-        #root {
-          zoom: calc(100vw / 1280);
-        }
+        width: 1480px;
+        min-width: 1480px;
+        margin: 0 auto;
       }
     </style>
     <title><!-- figma:title --></title>
@@ -40,6 +37,21 @@
   <body>
     <!-- figma:body-start -->
     <div id="root"></div>
+    <script>
+      (() => {
+        const BASE = 1480;
+        const fit = () => {
+          const root = document.getElementById("root");
+          if (!root) return;
+          const screenWidth = Number(window.screen?.width) || window.innerWidth;
+          const viewportWidth = Math.min(window.innerWidth, screenWidth);
+          root.style.zoom = String(Math.min(1, Math.max(0.2, viewportWidth / BASE)));
+        };
+        fit();
+        window.addEventListener("resize", fit, { passive: true });
+        window.screen?.orientation?.addEventListener?.("change", fit);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

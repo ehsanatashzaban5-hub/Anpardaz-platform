@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { WebPage } from "./types";
 
-interface Props { onNavigate: (p: WebPage) => void; }
+interface Props { onNavigate: (p: WebPage) => void; onAuthRequired: () => void; }
 type Tab="home"|"assistant"|"categories"|"me";
 type Product={id:string;title:string;brand:string;description:string;specs:Record<string,unknown>;categorySlug:string;categoryName:string;images:string[];priceMin:number;priceMax:number;storeCount:number;offerCount:number;offers:any[]};
 type Category={id:number;slug:string;name:string;name_fa:string;parent_id:number|null};
@@ -51,7 +51,7 @@ function ProductDetail({p,onBack,fav,onFav}:{p:Product;onBack:()=>void;fav:boole
  </div>{frame&&<div onClick={()=>setFrame("")} style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(2,6,23,.72)",padding:"4vh 4vw"}}><div onClick={e=>e.stopPropagation()} style={{height:"92vh",background:"#fff",borderRadius:18,overflow:"hidden"}}><div style={{height:50,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 14px"}}><b>فروشگاه</b><Btn onClick={()=>setFrame("")}>بستن</Btn></div><iframe src={frame} title="فروشگاه" style={{width:"100%",height:"calc(100% - 50px)",border:0}}/></div></div>}</div>
 }
 
-export default function WebMarket({onNavigate:_onNavigate}:Props){
+export default function WebMarket({onNavigate:_onNavigate,onAuthRequired}:Props){
  const [tab,setTab]=useState<Tab>("home");
  const [products,setProducts]=useState<Product[]>([]);
  const [cats,setCats]=useState<Category[]>([]);
@@ -154,6 +154,6 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
   </div>}
   {tab==="assistant"&&<div style={{padding:16,maxWidth:980,margin:"auto"}}><Card><div className="am-search-head"><div className="am-ai-avatar">✦</div><div><b>دستیار هوشمند آن مارکت</b><div style={{fontSize:11,color:"var(--am-muted)"}}>بر پایه داده‌های واقعی آن مارکت</div></div></div><div style={{padding:18}}>{compare.length>1&&<div style={{color:"var(--am-accent)",fontSize:12,fontWeight:800,marginBottom:10}}>{fa(compare.length)} محصول برای مقایسه انتخاب شده است.</div>}<textarea value={aiInput} onChange={e=>setAiInput(e.target.value)} placeholder={compare.length>1?"تفاوت این محصولات را بر اساس داده‌های واقعی مقایسه کن…":"درباره محصولات آن مارکت سؤال بپرس…"} style={{width:"100%",boxSizing:"border-box",minHeight:150,padding:14,borderRadius:14,border:"1.5px solid var(--am-border)",fontFamily:"Vazirmatn"}}/><Btn primary disabled={aiBusy||!token()} onClick={()=>void runAi()} style={{marginTop:10}}>{aiBusy?"در حال بررسی…":"ارسال به دستیار"}</Btn>{aiAnswer&&<div className="am-bubble-ai" style={{marginTop:16}}>{aiAnswer}</div>}</div></Card></div>}
   {tab==="categories"&&<div style={{padding:16,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:10}}>{roots.map(c=><button key={c.id} className="am-cat-row" onClick={()=>setCat(c.slug)}><span className="am-cat-row-icon">⌂</span><span style={{flex:1}}><b>{c.name_fa}</b><small style={{display:"block",color:"var(--am-muted)",marginTop:5}}>مشاهده محصولات واقعی این دسته</small></span><span>‹</span></button>)}</div>}
-  {tab==="me"&&<div style={{padding:16,maxWidth:980,margin:"auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10}}><Card style={{padding:18}}><b>آن مارکت من</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>حساب کاربری از احراز هویت آن پرداز استفاده می‌کند.</div></Card><Card style={{padding:18}}><b>نشان‌گذاری‌ها</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>{fa(favorites.size)} محصول</div></Card><Card style={{padding:18}}><b>مقایسه فعلی</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>{fa(compare.length)} محصول</div></Card><Card style={{padding:18}}><b>تاریخچه</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>بازدیدها، جستجوها و اجرای AI در سرور ثبت می‌شوند.</div></Card></div>}
+  {tab==="me"&&<div style={{padding:16,maxWidth:980,margin:"auto"}}>{!token()?<Card style={{padding:32,textAlign:"center"}}><b style={{fontSize:18}}>آن مارکت من</b><div style={{fontSize:13,color:"var(--am-muted)",marginTop:10,lineHeight:1.9}}>مشاهده علاقه‌مندی‌ها، مقایسه‌ها و سابقه شخصی بعد از ورود به حساب کاربری امکان‌پذیر است.</div><Btn primary onClick={onAuthRequired} style={{marginTop:16}}>ورود / ثبت‌نام</Btn></Card>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10}}><Card style={{padding:18}}><b>آن مارکت من</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>حساب کاربری از احراز هویت آن پرداز استفاده می‌کند.</div></Card><Card style={{padding:18}}><b>نشان‌گذاری‌ها</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>{fa(favorites.size)} محصول</div></Card><Card style={{padding:18}}><b>مقایسه فعلی</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>{fa(compare.length)} محصول</div></Card><Card style={{padding:18}}><b>تاریخچه</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>بازدیدها، جستجوها و اجرای AI در سرور ثبت می‌شوند.</div></Card></div>}</div>}
  </div>;
 }
