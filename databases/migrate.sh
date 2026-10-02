@@ -5,28 +5,60 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ROOT_DIR}/.env"
 COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
 
-[[ -f "${ENV_FILE}" ]] || { echo "Missing ${ENV_FILE}. Copy .env.example to .env first."; exit 1; }
+[[ -f "${ENV_FILE}" ]] || {
+  echo "ERROR: Missing ${ENV_FILE}"
+  exit 1
+}
+
 set -a
 source "${ENV_FILE}"
 set +a
 
 run_migrations() {
-  local service="$1" database="$2" user="$3" password="$4" dir="$5"
-  local migration_file migration version applied
+  local service="$1"
+  local database="$2"
+  local user="$3"
+  local password="$4"
+  local dir="$5"
 
-  echo "Migrating ${service}..."
+  echo
+  echo "========================================"
+  echo "Migrating ${service} -> ${database}"
+  echo "========================================"
+
   shopt -s nullglob
   local migrations=("${ROOT_DIR}/${dir}"/*.sql)
   shopt -u nullglob
-  (( ${#migrations[@]} )) || { echo "No SQL migrations found for ${service}."; return 0; }
 
-  IFS=
+  if (( ${#migrations[@]} == 0 )); then
+    echo "No SQL migrations found for ${service}."
+    return 0
+  fi
+
+  mapfile -t migrations < <(
+    printf '%s\n' "${migrations[@]}" | sort -V
+  )
 
   for migration_file in "${migrations[@]}"; do
+    local migration
     migration="$(basename "${migration_file}" .sql)"
-    applied="$(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T "${service}" \
-      env PGPASSWORD="${password}" psql -X -Atq -U "${user}" -d "${database}" \
-      -c "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = '${migration}');" 2>/dev/null || true)"
+
+    local applied
+    applied="$(
+      docker-compose \
+        --env-file "${ENV_FILE}" \
+        -f "${COMPOSE_FILE}" \
+        exec -T "${service}" \
+        env PGPASSWORD="${password}" \
+        psql -X -Atq \
+          -U "${user}" \
+          -d "${database}" \
+          -c "SELECT EXISTS (
+                 SELECT 1
+                 FROM schema_migrations
+                 WHERE version = '${migration}'
+               );" 2>/dev/null || true
+    )"
 
     if [[ "${applied}" == "t" ]]; then
       echo "  -> ${migration} (already applied)"
@@ -34,47 +66,76 @@ run_migrations() {
     fi
 
     echo "  -> ${migration}"
-    docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T "${service}" \
-      env PGPASSWORD="${password}" psql -X -v ON_ERROR_STOP=1 -U "${user}" -d "${database}" < "${migration_file}"
+
+    docker-compose \
+      --env-file "${ENV_FILE}" \
+      -f "${COMPOSE_FILE}" \
+      exec -T "${service}" \
+      env PGPASSWORD="${password}" \
+      psql -X -v ON_ERROR_STOP=1 \
+        -U "${user}" \
+        -d "${database}" \
+      < "${migration_file}"
   done
 }
 
-run_migrations anpardaz-db "${ANPARDAZ_DB_NAME}" "${ANPARDAZ_DB_USER}" "${ANPARDAZ_DB_PASSWORD}" anpardaz
-run_migrations ansarraf-db "${ANSARRAF_DB_NAME}" "${ANSARRAF_DB_USER}" "${ANSARRAF_DB_PASSWORD}" ansarraf
-run_migrations platform-db "${PLATFORM_DB_NAME}" "${PLATFORM_DB_USER}" "${PLATFORM_DB_PASSWORD}" platform
-run_migrations accounting-db "${ACCOUNTING_DB_NAME}" "${ACCOUNTING_DB_USER}" "${ACCOUNTING_DB_PASSWORD}" accounting
-run_migrations banner-db "${BANNER_DB_NAME}" "${BANNER_DB_USER}" "${BANNER_DB_PASSWORD}" banner
-run_migrations hoosh-db "${HOOSH_DB_NAME}" "${HOOSH_DB_USER}" "${HOOSH_DB_PASSWORD}" hoosh
-run_migrations market-db "${MARKET_DB_NAME}" "${MARKET_DB_USER}" "${MARKET_DB_PASSWORD}" market
-run_migrations financial-db "${FINANCIAL_DB_NAME}" "${FINANCIAL_DB_USER}" "${FINANCIAL_DB_PASSWORD}" financial
+run_migrations \
+  anpardaz-db \
+  "${ANPARDAZ_DB_NAME}" \
+  "${ANPARDAZ_DB_USER}" \
+  "${ANPARDAZ_DB_PASSWORD}" \
+  anpardaz
 
-echo "All database migrations completed."
-\n' migrations=( $(printf '%s\n' "${migrations[@]}" | sort -V) )
+run_migrations \
+  ansarraf-db \
+  "${ANSARRAF_DB_NAME}" \
+  "${ANSARRAF_DB_USER}" \
+  "${ANSARRAF_DB_PASSWORD}" \
+  ansarraf
 
-  for migration_file in "${migrations[@]}"; do
-    migration="$(basename "${migration_file}" .sql)"
-    applied="$(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T "${service}" \
-      env PGPASSWORD="${password}" psql -X -Atq -U "${user}" -d "${database}" \
-      -c "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = '${migration}');" 2>/dev/null || true)"
+run_migrations \
+  platform-db \
+  "${PLATFORM_DB_NAME}" \
+  "${PLATFORM_DB_USER}" \
+  "${PLATFORM_DB_PASSWORD}" \
+  platform
 
-    if [[ "${applied}" == "t" ]]; then
-      echo "  -> ${migration} (already applied)"
-      continue
-    fi
+run_migrations \
+  accounting-db \
+  "${ACCOUNTING_DB_NAME}" \
+  "${ACCOUNTING_DB_USER}" \
+  "${ACCOUNTING_DB_PASSWORD}" \
+  accounting
 
-    echo "  -> ${migration}"
-    docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T "${service}" \
-      env PGPASSWORD="${password}" psql -X -v ON_ERROR_STOP=1 -U "${user}" -d "${database}" < "${migration_file}"
-  done
-}
+run_migrations \
+  banner-db \
+  "${BANNER_DB_NAME}" \
+  "${BANNER_DB_USER}" \
+  "${BANNER_DB_PASSWORD}" \
+  banner
 
-run_migrations anpardaz-db "${ANPARDAZ_DB_NAME}" "${ANPARDAZ_DB_USER}" "${ANPARDAZ_DB_PASSWORD}" anpardaz
-run_migrations ansarraf-db "${ANSARRAF_DB_NAME}" "${ANSARRAF_DB_USER}" "${ANSARRAF_DB_PASSWORD}" ansarraf
-run_migrations platform-db "${PLATFORM_DB_NAME}" "${PLATFORM_DB_USER}" "${PLATFORM_DB_PASSWORD}" platform
-run_migrations accounting-db "${ACCOUNTING_DB_NAME}" "${ACCOUNTING_DB_USER}" "${ACCOUNTING_DB_PASSWORD}" accounting
-run_migrations banner-db "${BANNER_DB_NAME}" "${BANNER_DB_USER}" "${BANNER_DB_PASSWORD}" banner
-run_migrations hoosh-db "${HOOSH_DB_NAME}" "${HOOSH_DB_USER}" "${HOOSH_DB_PASSWORD}" hoosh
-run_migrations market-db "${MARKET_DB_NAME}" "${MARKET_DB_USER}" "${MARKET_DB_PASSWORD}" market
-run_migrations financial-db "${FINANCIAL_DB_NAME}" "${FINANCIAL_DB_USER}" "${FINANCIAL_DB_PASSWORD}" financial
+run_migrations \
+  hoosh-db \
+  "${HOOSH_DB_NAME}" \
+  "${HOOSH_DB_USER}" \
+  "${HOOSH_DB_PASSWORD}" \
+  hoosh
 
-echo "All database migrations completed."
+run_migrations \
+  market-db \
+  "${MARKET_DB_NAME}" \
+  "${MARKET_DB_USER}" \
+  "${MARKET_DB_PASSWORD}" \
+  market
+
+run_migrations \
+  financial-db \
+  "${FINANCIAL_DB_NAME}" \
+  "${FINANCIAL_DB_USER}" \
+  "${FINANCIAL_DB_PASSWORD}" \
+  financial
+
+echo
+echo "========================================"
+echo "ALL DATABASE MIGRATIONS COMPLETED"
+echo "========================================"

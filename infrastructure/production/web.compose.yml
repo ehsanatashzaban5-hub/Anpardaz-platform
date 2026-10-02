@@ -1,7 +1,8 @@
 version: "3.3"
+
 networks:
-  anpardaz-internal:
-    external: true
+  web-edge:
+    driver: bridge
 
 services:
   web:
@@ -15,22 +16,28 @@ services:
         VITE_MARKET_API_URL: /market
         VITE_HOOSH_API_URL: /hoosh
         VITE_FINANCIAL_API_URL: /financial
+
     restart: unless-stopped
+
     ports:
       - "127.0.0.1:8080:8080"
+
     read_only: true
+
     tmpfs:
-      - /var/cache/nginx
-      - /var/run
-      - /tmp
+      - /tmp/nginx:rw,uid=101,gid=101,mode=0755
+
     security_opt:
       - no-new-privileges:true
+
     cap_drop:
       - ALL
+
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
       interval: 15s
       timeout: 5s
       retries: 5
+
     networks:
-      - anpardaz-internal
+      - web-edge
