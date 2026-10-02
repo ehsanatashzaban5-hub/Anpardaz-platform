@@ -103,6 +103,15 @@ function MarketsTab({ assets, search, onSearch, sortBy, onSort, filterFav, onFil
         {!isMob && <div style={{ fontSize:12, color:"var(--w-muted)", marginRight:"auto" }}>{FA(assets.length)} از {FA(totalCount)} ارز</div>}
       </div>
 
+      {assets.length===0 && (
+        <div className="w-card" role="status" style={{padding:"42px 24px",textAlign:"center",marginBottom:12}}>
+          <div style={{fontSize:16,fontWeight:900}}>بازار آن صراف</div>
+          <div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9,marginTop:8}}>
+            داده زنده رمزارزها از Backend در دسترس نیست. هیچ قیمت یا موجودی ساختگی نمایش داده نمی‌شود.
+          </div>
+        </div>
+      )}
+
       {/* Desktop Table */}
       {!isMob && (
         <div style={{ background:"var(--w-card)", border:"1px solid var(--w-border)", borderRadius:12, overflow:"hidden" }}>
