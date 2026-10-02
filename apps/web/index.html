@@ -17,20 +17,38 @@
         overflow-x: hidden;
       }
 
-      /* Keep the fixed desktop canvas centered; RTL belongs to the app itself. */
       body { direction: ltr; }
 
+      /*
+       * The web portal is a single desktop canvas. 1480px is the largest
+       * layout width used by the platform pages, so the canvas must be at
+       * least that wide. It is centered on desktop displays and scaled down
+       * as one piece on phones, including Chrome "Desktop site" mode.
+       */
       #root {
-        width: 1280px;
-        min-width: 1280px;
+        width: 1480px;
+        min-width: 1480px;
+        margin: 0 auto;
+        zoom: 1;
       }
 
-      /* Scale the unchanged desktop canvas on narrow devices. This is visual
-         scaling, not responsive/mobile re-layout: the desktop proportions,
-         columns and navigation remain exactly the same. */
-      @media (max-width: 1279px) {
+      @media (max-width: 1480px) {
         #root {
-          zoom: calc(100vw / 1280);
+          margin-left: 0;
+          margin-right: 0;
+          zoom: calc(100vw / 1480);
+        }
+      }
+
+      @media (max-width: 600px) {
+        /*
+         * Chrome Android can expose a desktop-sized layout viewport when
+         * "Desktop site" is enabled. screen.width still gives the screen
+         * width in CSS pixels, so use it to keep the complete desktop canvas
+         * visible instead of showing a clipped slice.
+         */
+        #root {
+          zoom: min(1, calc(screen-width / 1480));
         }
       }
     </style>
