@@ -76,6 +76,19 @@ run_migrations() {
         -U "${user}" \
         -d "${database}" \
       < "${migration_file}"
+
+    # Register every successfully executed migration here. Individual SQL files
+    # may also self-register, but the runner must be the final source of truth
+    # so a missing marker can never cause the same migration to execute again.
+    docker-compose \
+      --env-file "${ENV_FILE}" \
+      -f "${COMPOSE_FILE}" \
+      exec -T "${service}" \
+      env PGPASSWORD="${password}" \
+      psql -X -v ON_ERROR_STOP=1 \
+        -U "${user}" \
+        -d "${database}" \
+        -c "INSERT INTO schema_migrations(version) VALUES ('${migration}') ON CONFLICT(version) DO NOTHING;"
   done
 }
 
