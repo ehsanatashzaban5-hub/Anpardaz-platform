@@ -42,9 +42,23 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
     setLoading(true);setError("");
     try{
       const q=new URLSearchParams();if(query.trim())q.set("q",query.trim());if(city.trim())q.set("city",city.trim());if(category)q.set("categoryId",category);q.set("limit","100");
-      const [l,c]=await Promise.all([api("/api/v1/banner/listings?"+q.toString()),api("/api/v1/banner/categories")]);
-      setListings(l.listings??[]);setCategories(c.categories??[]);
-      if(isLoggedIn){const f=await api("/api/v1/banner/me/favorites");setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));}
+      // Public data is loaded independently so a listings failure never hides
+      // the public category navigation.
+      const [lr,cr]=await Promise.allSettled([
+        api("/api/v1/banner/listings?"+q.toString()),
+        api("/api/v1/banner/categories"),
+      ]);
+      if(lr.status==="fulfilled")setListings(lr.value.listings??[]);
+      else setListings([]);
+      if(cr.status==="fulfilled")setCategories(cr.value.categories??[]);
+      else setCategories([]);
+      if(isLoggedIn){
+        try{
+          const f=await api("/api/v1/banner/me/favorites");
+          setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));
+        }catch{}
+      }
+      if(lr.status==="rejected"&&cr.status==="rejected")throw lr.reason;
     }catch(e){setError(e instanceof Error?e.message:"خطا در دریافت آگهی‌ها")}finally{setLoading(false)}
   };
   const loadPrivate=async()=>{
