@@ -143,9 +143,17 @@ export function registerHooshRoutes(app:FastifyInstance,pool:Pool){
     return {project:q.rows[0]};
   });
 
-  app.get('/api/v1/hoosh/models',{preHandler:requireAuth},async()=>{
-    const q=await pool.query('SELECT name,provider_type,base_url,model_policy FROM ai_providers WHERE enabled=true ORDER BY priority ASC,name ASC');
-    return {providers:q.rows.map((x:any)=>({id:x.name,type:x.provider_type,baseUrl:x.base_url,modelPolicy:x.model_policy??{}}))};
+  // Public catalog only: provider credentials and private user state are never exposed.
+  app.get('/api/v1/hoosh/models',async()=>{
+    const q=await pool.query('SELECT name,provider_type,model_policy FROM ai_providers WHERE enabled=true ORDER BY priority ASC,name ASC');
+    return {
+      providers:q.rows.map((x:any)=>{
+        const policy=x.model_policy??{};
+        const models=Array.isArray(policy?.models)?policy.models:
+          Array.isArray(policy?.allowedModels)?policy.allowedModels:[];
+        return {id:x.name,type:x.provider_type,models};
+      }),
+    };
   });
 
   app.get('/api/v1/hoosh/settings',{preHandler:requireAuth},async(request)=>{
