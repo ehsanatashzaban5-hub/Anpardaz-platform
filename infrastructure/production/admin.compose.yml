@@ -1,13 +1,29 @@
+version: "3.3"
+networks:
+  anpardaz-internal:
+    external: true
+
 services:
   admin:
     build:
       context: ../..
       dockerfile: services/admin/Dockerfile
-    env_file:
-      - admin.env
     restart: unless-stopped
+    env_file:
+      - /opt/anpardaz/secrets/admin.env
     ports:
       - "127.0.0.1:4006:4006"
     read_only: true
     tmpfs:
       - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4006/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - anpardaz-internal

@@ -1,10 +1,10 @@
 FROM node:24-alpine AS build
 WORKDIR /repo
-RUN corepack enable
-COPY package.json pnpm-workspace.yaml ./
+RUN corepack enable && corepack prepare pnpm@11.24.0 --activate
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY services/financial/package.json services/financial/package.json
 COPY services/financial/tsconfig.json services/financial/tsconfig.json
-RUN pnpm install --no-frozen-lockfile --ignore-scripts --filter @anpardaz/financial-service...
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @anpardaz/financial-service...
 COPY services/financial/src services/financial/src
 RUN pnpm --filter @anpardaz/financial-service build
 RUN pnpm --filter @anpardaz/financial-service deploy --prod --legacy /out

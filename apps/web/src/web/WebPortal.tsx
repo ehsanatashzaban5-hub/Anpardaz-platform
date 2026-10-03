@@ -312,7 +312,7 @@ export default function WebPortal() {
           />
         )}
         {(page === "market" || page === "market-product" || page === "market-category" || page === "market-orders") && (
-          <WebMarket onNavigate={handleNavigate}/>
+          <WebMarket onNavigate={handleNavigate} onAuthRequired={handleAuthRequired}/>
         )}
         {(page === "banner" || page === "banner-detail" || page === "banner-post") && (
           <WebBanner
@@ -322,7 +322,7 @@ export default function WebPortal() {
           />
         )}
         {page === "hoosh" && (
-          <WebHoosh onNavigate={handleNavigate}/>
+          <WebHoosh onNavigate={handleNavigate} onAuthRequired={handleAuthRequired}/>
         )}
         {(page === "news" || page === "news-article" || page === "education" ||
           page === "education-article" || page === "video" || page === "video-detail") && (

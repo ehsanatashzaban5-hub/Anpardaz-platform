@@ -1,8 +1,14 @@
+version: "3.3"
+
+networks:
+  web-edge:
+    driver: bridge
+
 services:
   web:
     build:
-      context: ../..
-      dockerfile: apps/web/Dockerfile
+      context: ../../apps/web
+      dockerfile: Dockerfile
       args:
         VITE_PLATFORM_API_URL: /platform
         VITE_ANSARRAF_API_URL: /ansarraf
@@ -15,9 +21,7 @@ services:
       - "127.0.0.1:8080:8080"
     read_only: true
     tmpfs:
-      - /var/cache/nginx
-      - /var/run
-      - /tmp
+      - /tmp/nginx:rw,uid=101,gid=101,mode=0755
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -27,4 +31,5 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 10s
+    networks:
+      - web-edge

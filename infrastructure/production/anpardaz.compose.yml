@@ -1,3 +1,8 @@
+version: "3.3"
+networks:
+  anpardaz-internal:
+    external: true
+
 services:
   anpardaz:
     build:
@@ -5,7 +10,7 @@ services:
       dockerfile: services/anpardaz/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./anpardaz.env
+      - /opt/anpardaz/secrets/anpardaz.env
     ports:
       - "127.0.0.1:4001:4001"
     read_only: true
@@ -20,4 +25,5 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 10s
+    networks:
+      - anpardaz-internal

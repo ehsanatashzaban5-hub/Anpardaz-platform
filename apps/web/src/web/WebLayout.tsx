@@ -304,13 +304,9 @@ export function WebHeader({ currentPage, onNavigate, userRole, onAuthClick, dark
       )}
 
       <style>{`
-        @media (max-width:900px){
-          body{min-width:0!important;overflow-x:hidden;}
-          .w-main{overflow-x:hidden!important;}
-          .w-container{max-width:100%;padding-left:12px;padding-right:12px;}
-          .w-desktop-nav{display:none!important;}
-          .w-mobile-menu-btn{display:flex!important;}
-        }
+        /* Desktop canvas is identical on every device; never switch to mobile navigation. */
+        .w-desktop-nav{display:flex!important;}
+        .w-mobile-menu-btn{display:none!important;}
       `}</style>
     </>
   );
