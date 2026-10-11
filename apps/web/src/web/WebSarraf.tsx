@@ -293,7 +293,7 @@ function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDeposi
   const walletMap=new Map(wallets.map((w:any)=>[String(w.symbol).toUpperCase(),Number(w.available_balance??0)+Number(w.locked_balance??0)]));
   const portfolioValue=assets.reduce((sum,a)=>sum+(walletMap.get(a.symbol.toUpperCase())??0)*a.price,0);
   const lockedValue=assets.reduce((sum,a)=>sum+Number(wallets.find((w:any)=>String(w.symbol).toUpperCase()===a.symbol.toUpperCase())?.locked_balance??0)*a.price,0);
-  const hasUnpricedBalance=wallets.some((w:any)=>Number(w.available_balance??0)+Number(w.locked_balance??0)>0&&(!assets.some(a=>a.symbol.toUpperCase()===String(w.symbol).toUpperCase()&&a.price>0)));
+  const hasUnpricedBalance=wallets.some((w:any)=>{const symbol=String(w.symbol).toUpperCase();if(["IRR","TMN","TOMAN"].includes(symbol))return false;return Number(w.available_balance??0)+Number(w.locked_balance??0)>0&&!assets.some(a=>a.symbol.toUpperCase()===symbol&&a.price>0)});
   const visibleAssets=assets.filter(a=>(!showOnlyBalances||(walletMap.get(a.symbol.toUpperCase())??0)>0)&&(!searchAsset.trim()||a.symbol.toLowerCase().includes(searchAsset.trim().toLowerCase())||a.name.toLowerCase().includes(searchAsset.trim().toLowerCase())||a.nameFa.toLowerCase().includes(searchAsset.trim().toLowerCase())));
   return <div style={{padding:"20px 0",minWidth:0}}>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:14,marginBottom:24}}>
@@ -891,7 +891,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
         setLiveAssets(previous => previous.map(a => {
           if (a.symbol === "USDT") {
              const q=bySymbol.get("USDT/TOMAN");
-             return { ...a, price: tomanRate, priceIrt: tomanRate, change24h:Number(q?.change24h??q?.change_percent??q?.change??0)||0, volume24h:Number(q?.volume24h??q?.volume_24h??q?.volume??0)||0, high24h:Number(q?.high24h??q?.high_24h??q?.high??0)||0, low24h:Number(q?.low24h??q?.low_24h??q?.low??0)||0 };
+             return { ...a, price: tomanRate > 0 ? 1 : 0, priceIrt: tomanRate, change24h:Number(q?.change24h??q?.change_percent??q?.change??0)||0, volume24h:Number(q?.volume24h??q?.volume_24h??q?.volume??0)||0, high24h:Number(q?.high24h??q?.high_24h??q?.high??0)||0, low24h:Number(q?.low24h??q?.low_24h??q?.low??0)||0 };
            }
           const usdt = bySymbol.get(`${a.symbol}/USDT`);
           const toman = bySymbol.get(`${a.symbol}/TOMAN`);
