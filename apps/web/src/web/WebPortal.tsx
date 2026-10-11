@@ -266,6 +266,8 @@ export default function WebPortal() {
           flex-direction: initial !important;
           gap: 0 !important;
           width: 100% !important;
+          height: auto !important;
+          min-height: 100vh !important;
           min-width: 0 !important;
           max-width: none !important;
           margin: 0 !important;
@@ -274,6 +276,8 @@ export default function WebPortal() {
         }
         body.anpardaz-web-body #root {
           width: 100% !important;
+          height: auto !important;
+          min-height: 100vh !important;
           max-width: none !important;
           min-width: 0 !important;
           margin: 0 auto !important;
