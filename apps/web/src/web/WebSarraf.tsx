@@ -75,15 +75,15 @@ function ForexBotTab({ asset }: { asset: CryptoAsset }) {
   return <div style={{padding:"24px 0",maxWidth:620}}><div className="w-card" style={{padding:22}}><div style={{fontSize:16,fontWeight:900,marginBottom:8}}>فارکس بات آن صراف</div><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9}}>سرمایه‌گذاری هر کاربر حداکثر ۳۰ دلار USDT است. فعال‌سازی و غیرفعال‌سازی فقط پس از تأیید مدیریت انجام می‌شود.</div>{error&&<div style={{marginTop:12,color:"#dc2626",fontSize:11}}>{error}</div>}{!executionAvailable&&<div style={{marginTop:12,padding:10,borderRadius:9,background:"rgba(217,119,6,.08)",color:"#b45309",fontSize:11,lineHeight:1.8}}>موتور اجرای معاملات فارکس و Broker در محیط Production متصل نشده است؛ تا اتصال Provider واقعی، فعال‌سازی ربات و قفل‌کردن سرمایه انجام نمی‌شود.</div>}<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginTop:14}}><div style={{padding:12,border:"1px solid var(--w-border)",borderRadius:10}}><div style={{fontSize:10,color:"var(--w-muted)"}}>وضعیت</div><div style={{fontWeight:900,marginTop:5}}>{status==="active"?"فعال":status==="activation_pending"?"در انتظار تأیید فعال‌سازی":status==="deactivation_pending"?"در انتظار تأیید غیرفعال‌سازی":"غیرفعال"}</div></div><div style={{padding:12,border:"1px solid var(--w-border)",borderRadius:10}}><div style={{fontSize:10,color:"var(--w-muted)"}}>سود/زیان ثبت‌شده</div><div dir="ltr" style={{fontWeight:900,marginTop:5,color:pnl>=0?"#059669":"#dc2626"}}>{pnl.toFixed(4)} USDT</div></div></div>{status==="inactive"&&executionAvailable&&<div style={{marginTop:14}}><label style={{fontSize:11,color:"var(--w-muted)"}}>سرمایه‌گذاری USDT (حداکثر ۳۰)</label><input className="w-input" value={amount} onChange={e=>setAmount(e.target.value)} inputMode="decimal" dir="ltr" style={{marginTop:6}}/><button className="w-btn w-btn-primary" disabled={busy} onClick={()=>void request("activate")} style={{marginTop:8,width:"100%"}}>{busy?"در حال ثبت…":"فعال‌سازی ربات"}</button></div>}{status==="activation_pending"&&<div style={{marginTop:14,fontSize:12,color:"#b45309"}}>درخواست فعال‌سازی ثبت شده و در انتظار تأیید مدیریت است. در صورت رد، مبلغ رزروشده آزاد می‌شود.</div>}{status==="active"&&<button className="w-btn w-btn-ghost" disabled={busy} onClick={()=>void request("deactivate")} style={{marginTop:14,width:"100%"}}>{busy?"در حال ثبت…":"درخواست غیرفعال‌سازی"}</button>}{status==="deactivation_pending"&&<div style={{marginTop:14,fontSize:12,color:"#b45309"}}>درخواست غیرفعال‌سازی در انتظار تصمیم مدیریت است؛ تا آن زمان وضعیت فعلی حفظ می‌شود.</div>}{events.length>0&&<div style={{marginTop:18}}><div style={{fontWeight:800,fontSize:13,marginBottom:8}}>نمودار سود/زیان ثبت‌شده</div><div style={{height:170,border:"1px solid var(--w-border)",borderRadius:10,padding:12,display:"flex",alignItems:"flex-end",gap:5}}>{events.map((x:any,i:number)=>{const v=Number(x.amount)||0;return <div key={x.id??i} title={String(x.reason??"")} style={{flex:1,maxWidth:22,height:Math.max(4,Math.min(100,Math.abs(v)/max*100))+"%",background:v>=0?"#10b981":"#f43f5e",borderRadius:4}}/>})}</div></div>}<div style={{marginTop:12,fontSize:11,color:"var(--w-muted)"}}>وضعیت و P&L فقط از Backend خوانده می‌شوند و عدد پیش‌فرض یا سود ساختگی نمایش داده نمی‌شود.</div></div></div>;
 }
 
-function MarketsTab({ assets, selectedAsset, search, onSearch, sortBy, onSort, filterFav, onFilterFav, favorites, onToggleFav, onSelectTrade, onSelectDetail, totalCount }: {
+totalCount, loading }: {
   assets: CryptoAsset[]; selectedAsset: CryptoAsset; search: string; onSearch:(s:string)=>void;
   sortBy: "rank"|"price"|"change"|"volume"; onSort:(s:any)=>void;
   filterFav:boolean; onFilterFav:(b:boolean)=>void;
   favorites:Set<string>; onToggleFav:(id:string)=>void;
   onSelectTrade:(a:CryptoAsset)=>void; onSelectDetail:(a:CryptoAsset)=>void;
-  totalCount: number;
+  totalCount: number; loading: boolean;
 }) {
-  const isMob = useIsMobile(900);
+  const isMob = useIsMobile(1024);
   const chartSymbol = selectedAsset.symbol || assets[0]?.symbol || "";
   const [resolution,setResolution]=useState("60"),[candles,setCandles]=useState<any[]>([]),[candleLoading,setCandleLoading]=useState(true),[candleError,setCandleError]=useState("");
   useEffect(()=>{let active=true;const load=async()=>{if(!chartSymbol){setCandles([]);setCandleLoading(false);return;}setCandleLoading(true);setCandleError("");try{const to=Math.floor(Date.now()/1000),from=to-7*24*60*60;const r=await fetch(ANSARRAF_API_BASE+"/api/v1/market-data/candles?symbol="+encodeURIComponent(chartSymbol+"/USDT")+"&resolution="+encodeURIComponent(resolution)+"&from="+from+"&to="+to,{cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"market_candles_unavailable");if(active)setCandles(Array.isArray(d?.candles)?d.candles:[]);}catch(e){if(active){setCandles([]);setCandleError(e instanceof Error?e.message:"market_candles_unavailable");}}finally{if(active)setCandleLoading(false);}};void load();const timer=window.setInterval(()=>void load(),30000);return()=>{active=false;window.clearInterval(timer)}},[chartSymbol,resolution]);
@@ -100,10 +100,10 @@ function MarketsTab({ assets, selectedAsset, search, onSearch, sortBy, onSort, f
           style={{ display:"flex", alignItems:"center", gap:5, padding:isMob?"7px 10px":"8px 14px", borderRadius:8, border:`1px solid ${filterFav?"rgba(251,191,36,0.5)":"var(--w-border)"}`, background:filterFav?"rgba(251,191,36,0.08)":"transparent", color:filterFav?"#f59e0b":"var(--w-muted)", fontSize:12, fontWeight:600, cursor:"pointer" }}>
           <WI n="star" s={13}/> {isMob?"":"علاقه‌مندی‌ها"}
         </button>
-        {(["rank","change","volume"] as const).map(s=>(
-          <button key={s} onClick={()=>onSort(s)}
-            style={{ padding:isMob?"7px 10px":"8px 14px", borderRadius:8, border:`1px solid ${sortBy===s?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:sortBy===s?"rgba(8,145,178,0.08)":"transparent", color:sortBy===s?"#0891b2":"var(--w-muted)", fontSize:12, fontWeight:600, cursor:"pointer" }}>
-            {s==="rank"?"رتبه":s==="change"?"تغییر":"حجم"}
+        {([["rank","رتبه"],["price","قیمت"],["change","تغییر"],["volume","حجم"]] as const).map(([value,label])=>( 
+          <button key={value} onClick={()=>onSort(value)} aria-pressed={sortBy===value}
+            style={{ padding:isMob?"7px 10px":"8px 14px", borderRadius:8, border:`1px solid ${sortBy===value?"rgba(8,145,178,0.4)":"var(--w-border)"}`, background:sortBy===value?"rgba(8,145,178,0.08)":"transparent", color:sortBy===value?"#0891b2":"var(--w-muted)", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+            {label}
           </button>
         ))}
         {!isMob && <div style={{ fontSize:12, color:"var(--w-muted)", marginRight:"auto" }}>{FA(assets.length)} از {FA(totalCount)} ارز</div>}
@@ -118,7 +118,12 @@ function MarketsTab({ assets, selectedAsset, search, onSearch, sortBy, onSort, f
             <div style={{textAlign:"left"}}>حجم ۲۴ه</div><div style={{textAlign:"left"}}>مارکت کپ</div><div style={{textAlign:"center"}}>عملیات</div>
           </div>
           <div style={{ maxHeight:"calc(100vh - var(--w-header) - 200px)", overflowY:"auto" }}>
-            {assets.map((a) => (
+            {assets.length === 0 ? (
+              <div role="status" style={{padding:"34px 18px",textAlign:"center",color:"var(--w-muted)",fontSize:13,lineHeight:1.9}}>
+                {loading ? "در حال دریافت فهرست بازار از سرویس آن صراف…" : search.trim() || filterFav ? "ارزی با این جستجو یا فیلتر پیدا نشد." : "فهرست بازار از سرویس آن صراف در دسترس نیست."}
+                {!loading && (search.trim() || filterFav) && <div><button type="button" className="w-btn w-btn-ghost" onClick={()=>{onSearch("");onFilterFav(false)}} style={{marginTop:12}}>پاک‌کردن جستجو و فیلتر</button></div>}
+              </div>
+            ) : assets.map((a) => (
               <div key={a.id} style={{ display:"grid", gridTemplateColumns:"40px 1fr 130px 110px 90px 110px 110px 80px", padding:"10px 14px", borderBottom:"1px solid var(--w-border)", alignItems:"center", gap:8, cursor:"pointer", transition:"background 0.1s" }}
                 onMouseEnter={e=>(e.currentTarget as HTMLDivElement).style.background="var(--w-hover)"}
                 onMouseLeave={e=>(e.currentTarget as HTMLDivElement).style.background="transparent"}
@@ -163,7 +168,12 @@ function MarketsTab({ assets, selectedAsset, search, onSearch, sortBy, onSort, f
             <div>ارز</div><div style={{textAlign:"left"}}>قیمت</div><div style={{textAlign:"center"}}>تغییر</div>
           </div>
           <div style={{ maxHeight:"calc(100vh - var(--w-header) - 160px)", overflowY:"auto" }}>
-            {assets.map((a) => (
+            {assets.length === 0 ? (
+              <div role="status" style={{padding:"30px 16px",textAlign:"center",color:"var(--w-muted)",fontSize:12,lineHeight:1.9}}>
+                {loading ? "در حال دریافت فهرست بازار از سرویس آن صراف…" : search.trim() || filterFav ? "نتیجه‌ای برای این جستجو یا فیلتر پیدا نشد." : "فهرست بازار از سرویس آن صراف در دسترس نیست."}
+                {!loading && (search.trim() || filterFav) && <div><button type="button" className="w-btn w-btn-ghost" onClick={()=>{onSearch("");onFilterFav(false)}} style={{marginTop:10}}>پاک‌کردن جستجو و فیلتر</button></div>}
+              </div>
+            ) : assets.map((a) => (
               <div key={a.id} style={{ display:"grid", gridTemplateColumns:"1fr auto auto", padding:"11px 12px", borderBottom:"1px solid var(--w-border)", alignItems:"center", gap:8, cursor:"pointer", transition:"background 0.1s" }}
                 onClick={()=>onSelectDetail(a)}
               >
@@ -194,7 +204,7 @@ function MarketsTab({ assets, selectedAsset, search, onSearch, sortBy, onSort, f
 
 // ── Coin Detail ────────────────────────────────────
 function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asset:CryptoAsset; onBack:()=>void; onTrade:()=>void; isFav:boolean; onToggleFav:()=>void; }) {
-  const isMob = useIsMobile(900);
+  const isMob = useIsMobile(1024);
   return (
     <div className="w-fade" style={{ padding:isMob?"12px":undefined }}>
       <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, fontWeight:600, marginBottom:16 }}>
@@ -746,6 +756,7 @@ function GuideTab() {
 export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onAuthRequired, onKycRequired, isLoggedIn }: SarrafProps) {
   const [tab, setTab]               = useState<SarrafTab>("home");
   const [liveAssets, setLiveAssets] = useState<CryptoAsset[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(true);
   const [selectedAsset, setAsset]   = useState<CryptoAsset>({ id:"", symbol:"", name:"", nameFa:"", logoColor:"#0891b2", price:0, priceIrt:0, change24h:0, volume24h:0, marketCap:0, high24h:0, low24h:0, rank:0 });
   const [search, setSearch]         = useState("");
   const [sortBy, setSortBy]         = useState<"rank"|"price"|"change"|"volume">("rank");
@@ -783,7 +794,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   const [backendKycStatus, setBackendKycStatus] = useState<KycStatus | null>(null);
   const [cryptoWithdrawalSecurity, setCryptoWithdrawalSecurity] = useState<{allowed:boolean;reason?:string;message?:string}>({allowed:false,reason:"loading",message:"در حال بررسی محدودیت‌های امنیتی برداشت رمزارز…"});
   const [tabNotice, setTabNotice] = useState("");
-  const isMobile = useIsMobile(900);
+  const isMobile = useIsMobile(1024);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -840,9 +851,13 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
           }));
         if (!active) return;
         setLiveAssets(mapped);
+        setAssetsLoading(false);
         setAsset(prev => prev.symbol ? (mapped.find(a=>a.symbol===prev.symbol) ?? prev) : (mapped[0] ?? prev));
       } catch {
-        if (active) setLiveAssets([]);
+        if (active) {
+          setLiveAssets([]);
+          setAssetsLoading(false);
+        }
       }
     };
     void loadAssets();
@@ -908,7 +923,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
     if (sortBy === "change")  list = [...list].sort((a,b) => b.change24h - a.change24h);
     if (sortBy === "volume")  list = [...list].sort((a,b) => b.volume24h - a.volume24h);
     return list;
-  }, [search, filterFav, favorites, sortBy]);
+  }, [liveAssets, search, filterFav, favorites, sortBy]);
 
   const toggleFav = useCallback((id: string) => {
     setFavorites(prev => {
@@ -1060,9 +1075,11 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
 
       <div style={{ flex:1, display:"flex", maxWidth:1480, margin:"0 auto", width:"100%", padding:isMobile?"0":"0 20px", gap:0, paddingBottom:isMobile?64:0 }}>
         {/* Desktop left sidebar — navigation */}
+        {!isMobile && (
         <aside style={{ width:200, flexShrink:0, borderLeft:"1px solid var(--w-border)", paddingTop:12, position:"sticky", top:"calc(var(--w-header) + 52px)", height:"calc(100vh - var(--w-header) - 52px)", overflowY:"auto", background:"var(--w-surface)" }}>
           <SidebarContent/>
         </aside>
+        )}
 
         {/* Main content */}
         <div style={{ flex:1, overflow:"hidden", minWidth:0 }}>
@@ -1073,6 +1090,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
                 <CoinDetailView asset={coinDetail} onBack={()=>setCoinDetail(null)} onTrade={()=>{setAsset(coinDetail);setCoinDetail(null);setTab("trade-select");}} isFav={favorites.has(coinDetail.id)} onToggleFav={()=>toggleFav(coinDetail.id)}/>
               ) : (
                 <MarketsTab
+                  assets={filtered} loading={assetsLoading} selectedAsset={selectedAsset} search={search} onSearch={setSearch}
                   assets={filtered} selectedAsset={selectedAsset} search={search} onSearch={setSearch}
                   sortBy={sortBy} onSort={setSortBy}
                   filterFav={filterFav} onFilterFav={setFilterFav}
