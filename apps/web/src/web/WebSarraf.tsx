@@ -83,7 +83,7 @@ function MarketsTab({ assets, selectedAsset, search, onSearch, sortBy, onSort, f
   onSelectTrade:(a:CryptoAsset)=>void; onSelectDetail:(a:CryptoAsset)=>void;
   totalCount: number; loading: boolean;
 }) {
-  const isMob = useIsMobile(1024);
+  const isMob = useIsMobile(1100);
   const chartSymbol = selectedAsset.symbol || assets[0]?.symbol || "";
   const [resolution,setResolution]=useState("60"),[candles,setCandles]=useState<any[]>([]),[candleLoading,setCandleLoading]=useState(true),[candleError,setCandleError]=useState("");
   useEffect(()=>{let active=true;const load=async()=>{if(!chartSymbol){setCandles([]);setCandleLoading(false);return;}setCandleLoading(true);setCandleError("");try{const to=Math.floor(Date.now()/1000),from=to-7*24*60*60;const r=await fetch(ANSARRAF_API_BASE+"/api/v1/market-data/candles?symbol="+encodeURIComponent(chartSymbol+"/USDT")+"&resolution="+encodeURIComponent(resolution)+"&from="+from+"&to="+to,{cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"market_candles_unavailable");if(active)setCandles(Array.isArray(d?.candles)?d.candles:[]);}catch(e){if(active){setCandles([]);setCandleError(e instanceof Error?e.message:"market_candles_unavailable");}}finally{if(active)setCandleLoading(false);}};void load();const timer=window.setInterval(()=>void load(),30000);return()=>{active=false;window.clearInterval(timer)}},[chartSymbol,resolution]);
@@ -94,7 +94,7 @@ function MarketsTab({ assets, selectedAsset, search, onSearch, sortBy, onSort, f
       <div style={{ display:"flex", alignItems:"center", gap:8, padding:isMob?"0 0 10px":"0 0 12px", flexWrap:"wrap" }}>
         <div style={{ position:"relative", flex:1, minWidth:isMob?120:200, maxWidth:isMob?undefined:320 }}>
           <WI n="search" s={14} style={{ position:"absolute", right:11, top:"50%", transform:"translateY(-50%)", color:"var(--w-muted)", pointerEvents:"none" }}/>
-          <input value={search} onChange={e=>onSearch(e.target.value)} placeholder={`جستجو در ${FA(totalCount)} ارز...`} className="w-input" style={{ paddingRight:34 }}/>
+          <input aria-label="جستجو در بازار ارزها" value={search} onChange={e=>onSearch(e.target.value)} placeholder={`جستجو در ${FA(totalCount)} ارز...`} className="w-input" style={{ paddingRight:34 }}/>
         </div>
         <button onClick={()=>onFilterFav(!filterFav)}
           style={{ display:"flex", alignItems:"center", gap:5, padding:isMob?"7px 10px":"8px 14px", borderRadius:8, border:`1px solid ${filterFav?"rgba(251,191,36,0.5)":"var(--w-border)"}`, background:filterFav?"rgba(251,191,36,0.08)":"transparent", color:filterFav?"#f59e0b":"var(--w-muted)", fontSize:12, fontWeight:600, cursor:"pointer" }}>
@@ -204,7 +204,7 @@ function MarketsTab({ assets, selectedAsset, search, onSearch, sortBy, onSort, f
 
 // ── Coin Detail ────────────────────────────────────
 function CoinDetailView({ asset:a, onBack, onTrade, isFav, onToggleFav }: { asset:CryptoAsset; onBack:()=>void; onTrade:()=>void; isFav:boolean; onToggleFav:()=>void; }) {
-  const isMob = useIsMobile(1024);
+  const isMob = useIsMobile(1100);
   return (
     <div className="w-fade" style={{ padding:isMob?"12px":undefined }}>
       <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"none", border:"none", cursor:"pointer", color:"var(--w-muted)", fontSize:13, fontWeight:600, marginBottom:16 }}>
@@ -794,7 +794,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   const [backendKycStatus, setBackendKycStatus] = useState<KycStatus | null>(null);
   const [cryptoWithdrawalSecurity, setCryptoWithdrawalSecurity] = useState<{allowed:boolean;reason?:string;message?:string}>({allowed:false,reason:"loading",message:"در حال بررسی محدودیت‌های امنیتی برداشت رمزارز…"});
   const [tabNotice, setTabNotice] = useState("");
-  const isMobile = useIsMobile(1024);
+  const isMobile = useIsMobile(1100);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -854,9 +854,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
         setAssetsLoading(false);
         setAsset(prev => prev.symbol ? (mapped.find(a=>a.symbol===prev.symbol) ?? prev) : (mapped[0] ?? prev));
       } catch {
-        if (active) {
-          setLiveAssets([]);
-          setAssetsLoading(false);
+        if (active) setAssetsLoading(false);
         }
       }
     };
@@ -912,13 +910,15 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   }, [liveAssets, selectedAsset.id]);
 
   const filtered = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase();
     let list = liveAssets.filter(a =>
       (!filterFav || favorites.has(a.id)) &&
-      (search === "" ||
-        a.symbol.toLowerCase().includes(search.toLowerCase()) ||
-        a.name.toLowerCase().includes(search.toLowerCase()) ||
-        a.nameFa.includes(search))
+      (normalizedSearch === "" ||
+        a.symbol.toLowerCase().includes(normalizedSearch) ||
+        a.name.toLowerCase().includes(normalizedSearch) ||
+        a.nameFa.toLocaleLowerCase().includes(normalizedSearch))
     );
+    if (sortBy === "rank")    list = [...list].sort((a,b) => a.rank - b.rank);
     if (sortBy === "price")   list = [...list].sort((a,b) => b.price - a.price);
     if (sortBy === "change")  list = [...list].sort((a,b) => b.change24h - a.change24h);
     if (sortBy === "volume")  list = [...list].sort((a,b) => b.volume24h - a.volume24h);
