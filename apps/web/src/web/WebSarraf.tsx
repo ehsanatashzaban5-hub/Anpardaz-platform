@@ -27,7 +27,7 @@ const fmtVol = (n: number) => {
 };
 const clr = (n: number) => n >= 0 ? "#10b981" : "#f43f5e";
 
-type SarrafTab = "markets"|"trade-select"|"instant"|"spot"|"margin"|"assets"|"deposit"|"deposit-coin"|"withdraw"|"withdraw-coin"|"orders"|"transactions"|"fees"|"security"|"support"|"guide"|"forexbot";
+type SarrafTab = "home"|"markets"|"trade-select"|"instant"|"spot"|"margin"|"assets"|"deposit"|"deposit-coin"|"withdraw"|"withdraw-coin"|"orders"|"transactions"|"fees"|"security"|"support"|"guide"|"forexbot";
 
 interface SarrafProps {
   onNavigate: (p: WebPage) => void;
@@ -37,7 +37,10 @@ interface SarrafProps {
 }
 
 const TAB_GROUPS = [
-  { label:"بازارها",   items:[{ id:"markets" as SarrafTab,        icon:"sarraf",    label:"بازارها" }] },
+  { label:"نمای کلی", items:[
+    { id:"home" as SarrafTab,    icon:"home",      label:"خانه" },
+    { id:"markets" as SarrafTab, icon:"sarraf",    label:"بازارها" },
+  ] },
   { label:"معاملات",   items:[
     { id:"forexbot" as SarrafTab, icon:"cpu", label:"فارکس بات" },
     { id:"trade-select" as SarrafTab, icon:"swap",      label:"معامله" },
@@ -496,6 +499,121 @@ function SecurityTab() {
     </div>
   );
 }
+function SarrafHomeTab({ assets, wallets, orders, onNavigate }: {
+  assets: CryptoAsset[];
+  wallets: any[];
+  orders: any[];
+  onNavigate: (tab: SarrafTab) => void;
+}) {
+  const heldSymbols = new Set(wallets
+    .filter((wallet: any) => Number(wallet.available_balance ?? 0) + Number(wallet.locked_balance ?? 0) > 0)
+    .map((wallet: any) => String(wallet.symbol ?? "").toUpperCase()));
+  const recentOrders = [...orders]
+    .sort((a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+    .slice(0, 5);
+  const shortcuts: { id: SarrafTab; label: string; icon: string; detail: string; color: string }[] = [
+    { id: "markets", label: "بازارها", icon: "sarraf", detail: "مشاهده قیمت‌های بازار", color: "#0891b2" },
+    { id: "trade-select", label: "معامله", icon: "swap", detail: "انتخاب روش معامله", color: "#059669" },
+    { id: "assets", label: "دارایی‌ها", icon: "wallet", detail: "موجودی و پورتفولیو", color: "#7c3aed" },
+    { id: "deposit", label: "واریز تومان", icon: "deposit", detail: "افزایش موجودی حساب", color: "#d97706" },
+    { id: "withdraw", label: "برداشت تومان", icon: "withdraw", detail: "درخواست برداشت", color: "#e8354e" },
+    { id: "transactions", label: "تراکنش‌ها", icon: "history", detail: "سوابق حساب", color: "#64748b" },
+  ];
+  return (
+    <div style={{ padding: "22px 0 36px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 22 }}>
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: "-.3px" }}>نمای کلی آن صراف</div>
+          <div style={{ color: "var(--w-muted)", fontSize: 12, marginTop: 7, lineHeight: 1.8 }}>
+            بازار، دارایی‌ها و عملیات حساب را از یک صفحه مدیریت کنید.
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--w-muted)", fontSize: 11, padding: "8px 11px", border: "1px solid var(--w-border)", borderRadius: 10 }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: assets.length ? "#10b981" : "#d97706" }} />
+          {assets.length ? "داده‌های بازار از سرویس آن صراف" : "در انتظار دریافت داده بازار"}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 24 }}>
+        {[
+          { label: "دارایی‌های دارای موجودی", value: String(heldSymbols.size), icon: "wallet", color: "#7c3aed" },
+          { label: "تعداد سفارش‌ها", value: String(orders.length), icon: "document", color: "#0891b2" },
+          { label: "دارایی‌های بازار", value: String(assets.length), icon: "bar-chart", color: "#059669" },
+        ].map((item) => (
+          <div key={item.label} className="w-card" style={{ padding: 17, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: item.color + "15", color: item.color, flexShrink: 0 }}>
+              <WI n={item.icon} s={20} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: "var(--w-muted)" }}>{item.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 900, marginTop: 3 }}>{FA(item.value)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <div style={{ fontSize: 16, fontWeight: 900 }}>دسترسی سریع</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 12, marginBottom: 26 }}>
+        {shortcuts.map((item) => (
+          <button key={item.id} type="button" onClick={() => onNavigate(item.id)} className="w-card"
+            style={{ display: "flex", alignItems: "center", gap: 12, textAlign: "right", padding: 15, color: "var(--w-text)", cursor: "pointer", minWidth: 0 }}>
+            <div style={{ width: 42, height: 42, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: item.color + "15", color: item.color, flexShrink: 0 }}>
+              <WI n={item.icon} s={21} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 800 }}>{item.label}</div>
+              <div style={{ fontSize: 10, color: "var(--w-muted)", marginTop: 4 }}>{item.detail}</div>
+            </div>
+            <WI n="chevron-left" s={15} style={{ marginRight: "auto", color: "var(--w-muted)", flexShrink: 0 }} />
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(280px,.8fr)", gap: 16, alignItems: "start" }}>
+        <div className="w-card" style={{ overflow: "hidden" }}>
+          <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--w-border)" }}>
+            <div style={{ fontSize: 14, fontWeight: 900 }}>بازارهای منتخب</div>
+            <button type="button" className="w-btn w-btn-ghost" onClick={() => onNavigate("markets")} style={{ padding: "6px 10px", fontSize: 11 }}>همه بازارها</button>
+          </div>
+          {assets.length === 0 ? (
+            <div style={{ padding: 28, textAlign: "center", color: "var(--w-muted)", fontSize: 12, lineHeight: 1.8 }}>قیمت بازار پس از دریافت داده معتبر از سرویس نمایش داده می‌شود؛ هیچ قیمت نمونه‌ای جایگزین نمی‌شود.</div>
+          ) : assets.slice(0, 6).map((asset) => (
+            <button key={asset.id} type="button" onClick={() => onNavigate("trade-select")}
+              style={{ width: "100%", display: "grid", gridTemplateColumns: "minmax(0,1fr) auto auto", alignItems: "center", gap: 14, padding: "12px 15px", background: "transparent", border: 0, borderBottom: "1px solid var(--w-border)", color: "var(--w-text)", textAlign: "right", cursor: "pointer" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+                <span style={{ width: 30, height: 30, borderRadius: "50%", background: asset.logoColor, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 900, flexShrink: 0 }}>{asset.symbol.slice(0, 3)}</span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 12, fontWeight: 800 }}>{asset.nameFa}</span>
+                  <span style={{ display: "block", fontSize: 10, color: "var(--w-muted)" }}>{asset.symbol}/USDT</span>
+                </span>
+              </span>
+              <span dir="ltr" style={{ fontSize: 12, fontWeight: 800 }}>{asset.price > 0 ? "$" + fmtP(asset.price) : "—"}</span>
+              <span dir="ltr" style={{ fontSize: 11, fontWeight: 800, color: clr(asset.change24h) }}>{asset.change24h > 0 ? "+" : ""}{asset.change24h.toFixed(2)}%</span>
+            </button>
+          ))}
+        </div>
+        <div className="w-card" style={{ overflow: "hidden" }}>
+          <div style={{ padding: "14px 16px", fontSize: 14, fontWeight: 900, borderBottom: "1px solid var(--w-border)" }}>آخرین سفارش‌ها</div>
+          {recentOrders.length === 0 ? (
+            <div style={{ padding: 24, textAlign: "center", color: "var(--w-muted)", fontSize: 12, lineHeight: 1.8 }}>هنوز سفارشی ثبت نشده است.</div>
+          ) : recentOrders.map((order: any) => (
+            <div key={order.id} style={{ padding: "12px 14px", borderBottom: "1px solid var(--w-border)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 800 }}>{String(order.side ?? "").toLowerCase() === "buy" ? "خرید" : "فروش"} {order.symbol ?? order.market_symbol ?? ""}</div>
+                <div style={{ fontSize: 10, color: "var(--w-muted)", marginTop: 4 }}>{order.created_at ? new Date(order.created_at).toLocaleString("fa-IR") : "—"}</div>
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--w-muted)", flexShrink: 0 }}>{String(order.status ?? "—")}</span>
+            </div>
+          ))}
+          <button type="button" className="w-btn w-btn-ghost" onClick={() => onNavigate("transactions")} style={{ margin: 12, padding: "7px 12px", fontSize: 11 }}>مشاهده تراکنش‌ها</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Trade Select Tab ───────────────────────────────
 
 function TradeSelectTab({asset,onInstant,onSpot,onMargin,isLoggedIn,onAuth}:{asset:CryptoAsset;onInstant:()=>void;onSpot:()=>void;onMargin:()=>void;isLoggedIn:boolean;onAuth:()=>void}) {
@@ -589,7 +707,7 @@ function GuideTab() {
 // ── Forex Bot Tab ──────────────────────────────────
 
 export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onAuthRequired, isLoggedIn }: SarrafProps) {
-  const [tab, setTab]               = useState<SarrafTab>("markets");
+  const [tab, setTab]               = useState<SarrafTab>("home");
   const [liveAssets, setLiveAssets] = useState<CryptoAsset[]>([]);
   const [selectedAsset, setAsset]   = useState<CryptoAsset>({ id:"", symbol:"", name:"", nameFa:"", logoColor:"#0891b2", price:0, priceIrt:0, change24h:0, volume24h:0, marketCap:0, high24h:0, low24h:0, rank:0 });
   const [search, setSearch]         = useState("");
@@ -905,6 +1023,14 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
                 />
               )}
             </div>
+          )}
+          {tab === "home" && (
+            <SarrafHomeTab
+              assets={liveAssets}
+              wallets={wallets}
+              orders={orders}
+              onNavigate={handleTabSelect}
+            />
           )}
           {/* ── Trade Type Selection ── */}
           {tab === "trade-select" && (
