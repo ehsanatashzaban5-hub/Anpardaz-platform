@@ -855,7 +855,6 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
         setAsset(prev => prev.symbol ? (mapped.find(a=>a.symbol===prev.symbol) ?? prev) : (mapped[0] ?? prev));
       } catch {
         if (active) setAssetsLoading(false);
-        }
       }
     };
     void loadAssets();
@@ -1091,7 +1090,6 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
               ) : (
                 <MarketsTab
                   assets={filtered} loading={assetsLoading} selectedAsset={selectedAsset} search={search} onSearch={setSearch}
-                  assets={filtered} selectedAsset={selectedAsset} search={search} onSearch={setSearch}
                   sortBy={sortBy} onSort={setSortBy}
                   filterFav={filterFav} onFilterFav={setFilterFav}
                   favorites={favorites} onToggleFav={toggleFav}
