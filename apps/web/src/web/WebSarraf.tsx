@@ -749,7 +749,25 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   const [search, setSearch]         = useState("");
   const [sortBy, setSortBy]         = useState<"rank"|"price"|"change"|"volume">("rank");
   const [filterFav, setFilterFav]   = useState(false);
-  const [favorites, setFavorites]   = useState<Set<string>>(new Set());
+  const favoritesStorageKey = `anpardaz:web:sarraf:favorites:${localStorage.getItem("anpardaz:web:email") ?? localStorage.getItem("anpardaz:web:phone") ?? "guest"}`;
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(favoritesStorageKey);
+      const parsed = saved ? JSON.parse(saved) : [];
+      return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+    } catch {
+      return new Set();
+    }
+  });
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(favoritesStorageKey);
+      const parsed = saved ? JSON.parse(saved) : [];
+      setFavorites(new Set(Array.isArray(parsed) ? parsed.map(String) : []));
+    } catch {
+      setFavorites(new Set());
+    }
+  }, [favoritesStorageKey]);
   const [tradeType, setTradeType]   = useState<"buy"|"sell">("buy");
   const [tradeMode, setTradeMode]   = useState<"market"|"limit"|"stop-limit">("market");
   const [price, setPrice]           = useState("");
@@ -892,8 +910,13 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
   }, [search, filterFav, favorites, sortBy]);
 
   const toggleFav = useCallback((id: string) => {
-    setFavorites(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
-  }, []);
+    setFavorites(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      try { localStorage.setItem(favoritesStorageKey, JSON.stringify([...next])); } catch { /* storage can be disabled */ }
+      return next;
+    });
+  }, [favoritesStorageKey]);
 
   const selectAndTrade = (a: CryptoAsset) => { setAsset(a); setTab("trade-select"); };
 
