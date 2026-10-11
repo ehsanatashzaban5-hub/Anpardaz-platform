@@ -12,6 +12,21 @@ const PLATFORM_API_BASE = ((import.meta as any).env?.VITE_PLATFORM_API_URL as st
 const getWebToken = () => typeof window !== "undefined" ? window.localStorage.getItem("anpardaz:accessToken") ?? "" : "";
 
 const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
+const statusLabel = (value: unknown) => {
+  const status = String(value ?? "").trim().toLowerCase();
+  const labels: Record<string,string> = {
+    open:"باز", partially_filled:"بخشی انجام‌شده", filled:"تکمیل‌شده", completed:"تکمیل‌شده",
+    cancelled:"لغوشده", canceled:"لغوشده", rejected:"ردشده", failed:"ناموفق",
+    pending:"در انتظار بررسی", processing:"در حال پردازش", approved:"تأییدشده",
+    confirmed:"تأییدشده", paid:"پرداخت‌شده", settled:"تسویه‌شده", expired:"منقضی‌شده",
+    unverified:"تأییدنشده", verified:"تأییدشده", submitted:"ارسال‌شده"
+  };
+  return labels[status] ?? (status ? String(value) : "نامشخص");
+};
+const safeDate = (value: unknown) => {
+  const date = value ? new Date(String(value)) : null;
+  return date && Number.isFinite(date.getTime()) ? date.toLocaleString("fa-IR") : "—";
+};
 const fmtP = (n: number) => !Number.isFinite(n) || n <= 0 ? "—" : n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits:2 }) : n.toPrecision(4);
 const fmtIrt = (n: number) => {
   if (n >= 1_000_000_000) return `${(n/1_000_000_000).toFixed(2)} میلیارد تومان`;
@@ -397,14 +412,14 @@ function WithdrawCoinTab({ assets, kycStatus, onKycRequired }: { assets:CryptoAs
 // ── Orders Tab// ── Orders Tab ─────────────────────────────────────
 function OrdersTab({orders}:{orders:any[]}) {
   const [activeTab,setActiveTab]=useState<"open"|"history">("open");
-  const rows=activeTab==="open"?orders.filter(o=>["open","partially_filled"].includes(String(o.status))):orders;
+  const rows=activeTab==="open"?orders.filter(o=>["open","partially_filled"].includes(String(o.status??"").toLowerCase())):orders;
   return <div style={{padding:"20px 0"}}>
     <div style={{display:"flex",gap:12,marginBottom:16}}>
       {(["open","history"] as const).map(t=><button key={t} onClick={()=>setActiveTab(t)} className={t===activeTab?"w-btn w-btn-primary":"w-btn w-btn-ghost"} style={{padding:"8px 20px"}}>{t==="open"?"سفارشات باز":"تاریخچه سفارشات"}</button>)}
     </div>
     <div className="w-card" style={{overflow:"auto"}}>
       {rows.length===0?<div style={{padding:60,textAlign:"center",color:"var(--w-muted)"}}>داده‌ای برای نمایش وجود ندارد.</div>:
-      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr style={{background:"var(--w-card2)"}}>{["شناسه","نوع","مقدار","قیمت","وضعیت","تاریخ"].map(h=><th key={h} style={{padding:10,textAlign:"right"}}>{h}</th>)}</tr></thead><tbody>{rows.map((o:any)=><tr key={o.id} style={{borderBottom:"1px solid var(--w-border)"}}><td style={{padding:10,fontFamily:"monospace"}}>{o.id}</td><td style={{padding:10}}>{o.side==="buy"?"خرید":"فروش"} {o.order_type}</td><td style={{padding:10}}>{String(o.quantity)}</td><td style={{padding:10}}>{o.price?String(o.price):"بازار"}</td><td style={{padding:10}}>{String(o.status)}</td><td style={{padding:10,color:"var(--w-muted)"}}>{new Date(o.created_at).toLocaleString("fa-IR")}</td></tr>)}</tbody></table>}
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}><thead><tr style={{background:"var(--w-card2)"}}>{["شناسه","نوع","مقدار","قیمت","وضعیت","تاریخ"].map(h=><th key={h} style={{padding:10,textAlign:"right"}}>{h}</th>)}</tr></thead><tbody>{rows.map((o:any)=><tr key={o.id} style={{borderBottom:"1px solid var(--w-border)"}}><td style={{padding:10,fontFamily:"monospace"}}>{o.id}</td><td style={{padding:10}}>{o.side==="buy"?"خرید":"فروش"} {o.order_type}</td><td style={{padding:10}}>{String(o.quantity)}</td><td style={{padding:10}}>{o.price?String(o.price):"بازار"}</td><td style={{padding:10}}>{statusLabel(o.status)}</td><td style={{padding:10,color:"var(--w-muted)"}}>{safeDate(o.created_at)}</td></tr>)}</tbody></table>}
     </div>
   </div>;
 }
@@ -413,9 +428,9 @@ function OrdersTab({orders}:{orders:any[]}) {
 function TransactionsTab({ orders, deposits, withdrawals, onSelectTx }: { orders:any[]; deposits:any[]; withdrawals:any[]; onSelectTx:(tx:any)=>void }) {
   const [txType,setTxType]=useState("all");
   const rows=[
-    ...orders.map((o:any)=>({type:o.side==="buy"?"خرید":"فروش",amount:String(o.quantity),date:o.created_at,status:String(o.status),txid:"order-"+o.id,color:o.side==="buy"?"#10b981":"#f43f5e",raw:o})),
-    ...deposits.map((d:any)=>({type:"واریز",amount:String(d.amount)+" "+String(d.symbol??""),date:d.created_at,status:String(d.status),txid:d.external_reference??("deposit-"+d.id),color:"#0891b2",raw:d})),
-    ...withdrawals.map((w:any)=>({type:"برداشت",amount:"-"+String(w.amount)+" "+String(w.symbol??""),date:w.created_at,status:String(w.status),txid:w.external_reference??("withdrawal-"+w.id),color:"#d97706",raw:w}))
+    ...orders.map((o:any)=>({type:o.side==="buy"?"خرید":"فروش",amount:String(o.quantity),date:o.created_at,status:statusLabel(o.status),txid:"order-"+o.id,color:o.side==="buy"?"#10b981":"#f43f5e",fee:o.fee??o.fee_amount,date:o.created_at,raw:o})),
+    ...deposits.map((d:any)=>({type:"واریز",amount:String(d.amount)+" "+String(d.symbol??""),date:d.created_at,status:statusLabel(d.status),txid:d.external_reference??("deposit-"+d.id),fee:d.fee??d.fee_amount,date:d.created_at,raw:d})),
+    ...withdrawals.map((w:any)=>({type:"برداشت",amount:"-"+String(w.amount)+" "+String(w.symbol??""),date:w.created_at,status:statusLabel(w.status),txid:w.external_reference??("withdrawal-"+w.id),fee:w.fee??w.fee_amount,date:w.created_at,raw:w}))
   ].sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime());
   const filtered=txType==="all"?rows:rows.filter(x=>x.type===txType);
   return <div style={{padding:"20px 0"}}>
@@ -424,7 +439,7 @@ function TransactionsTab({ orders, deposits, withdrawals, onSelectTx }: { orders
     </div>
     <div className="w-card" style={{overflow:"auto"}}>
       {filtered.length===0?<div style={{padding:60,textAlign:"center",color:"var(--w-muted)"}}>تراکنشی ثبت نشده است.</div>:
-      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"var(--w-card2)"}}>{["نوع","مقدار","تاریخ","وضعیت","شناسه","جزئیات"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"right",color:"var(--w-muted)",fontWeight:600,fontSize:11}}>{h}</th>)}</tr></thead><tbody>{filtered.map((tx:any,i:number)=><tr key={tx.txid+"-"+i} style={{borderBottom:"1px solid var(--w-border)"}}><td style={{padding:"12px 14px"}}><span style={{padding:"3px 10px",borderRadius:6,background:tx.color+"15",color:tx.color,fontSize:12,fontWeight:700}}>{tx.type}</span></td><td style={{padding:"12px 14px",fontWeight:800,color:tx.color}}>{tx.amount}</td><td style={{padding:"12px 14px",color:"var(--w-muted)",fontSize:12}}>{new Date(tx.date).toLocaleString("fa-IR")}</td><td style={{padding:"12px 14px"}}>{tx.status}</td><td style={{padding:"12px 14px",fontSize:11,color:"var(--w-muted)",fontFamily:"monospace"}}>{tx.txid}</td><td style={{padding:"12px 14px"}}><button onClick={()=>onSelectTx(tx)} className="w-btn w-btn-muted" style={{padding:"4px 12px",fontSize:11}}>مشاهده</button></td></tr>)}</tbody></table>}
+      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"var(--w-card2)"}}>{["نوع","مقدار","تاریخ","وضعیت","شناسه","جزئیات"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"right",color:"var(--w-muted)",fontWeight:600,fontSize:11}}>{h}</th>)}</tr></thead><tbody>{filtered.map((tx:any,i:number)=><tr key={tx.txid+"-"+i} style={{borderBottom:"1px solid var(--w-border)"}}><td style={{padding:"12px 14px"}}><span style={{padding:"3px 10px",borderRadius:6,background:tx.color+"15",color:tx.color,fontSize:12,fontWeight:700}}>{tx.type}</span></td><td style={{padding:"12px 14px",fontWeight:800,color:tx.color}}>{tx.amount}</td><td style={{padding:"12px 14px",color:"var(--w-muted)",fontSize:12}}>{safeDate(tx.date)}</td><td style={{padding:"12px 14px"}}>{tx.status}</td><td style={{padding:"12px 14px",fontSize:11,color:"var(--w-muted)",fontFamily:"monospace"}}>{tx.txid}</td><td style={{padding:"12px 14px"}}><button onClick={()=>onSelectTx(tx)} className="w-btn w-btn-muted" style={{padding:"4px 12px",fontSize:11}}>مشاهده</button></td></tr>)}</tbody></table>}
     </div>
   </div>;
 }
@@ -473,7 +488,7 @@ function FeesTab() {
   const [calculatedFee,setCalculatedFee]=useState<number|null>(null);
   const activeRules=customerRules.filter((rule:any)=>rule.operation_type===feeOperation);
   const genericRule=activeRules.find((rule:any)=>!rule.market_symbol&&!rule.asset_symbol)??activeRules[0];
-  const calculateFee=()=>{const amount=Number(feeAmount);if(!genericRule||!Number.isFinite(amount)||amount<0){setCalculatedFee(null);return;}const raw=amount*Number(genericRule.percentage??0)+Number(genericRule.fixed_amount??0);const min=genericRule.min_amount==null?0:Number(genericRule.min_amount);const max=genericRule.max_amount==null?Infinity:Number(genericRule.max_amount);setCalculatedFee(Math.min(Math.max(raw,min),max));};
+  const calculateFee=()=>{const amount=Number(feeAmount);const percentage=Number(genericRule?.percentage??0);const fixed=Number(genericRule?.fixed_amount??0);const min=genericRule?.min_amount==null?0:Number(genericRule.min_amount);const max=genericRule?.max_amount==null?Infinity:Number(genericRule.max_amount);if(!genericRule||!Number.isFinite(amount)||amount<=0||!Number.isFinite(percentage)||percentage<0||!Number.isFinite(fixed)||fixed<0||!Number.isFinite(min)||min<0||!(Number.isFinite(max)||max===Infinity)||max<min){setCalculatedFee(null);return;}const raw=amount*percentage+fixed;setCalculatedFee(Math.min(Math.max(raw,min),max));};
   const pct=(v:any)=>{const n=Number(v);return Number.isFinite(n)?(n*100).toLocaleString("fa-IR",{maximumFractionDigits:6})+"٪":"—";};
   const money=(v:any)=>{const n=Number(v);return Number.isFinite(n)?n.toLocaleString("fa-IR",{maximumFractionDigits:8}):"—";};
   const opLabel=(v:string)=>({trade:"معامله",deposit:"واریز",withdrawal:"برداشت",transfer:"انتقال"} as any)[v]??v;
@@ -488,7 +503,7 @@ function FeesTab() {
         {(["trade","deposit","withdrawal","transfer"] as const).map((kind)=> <button key={kind} type="button" onClick={()=>{setFeeOperation(kind);setCalculatedFee(null);}} className={feeOperation===kind?"w-btn w-btn-primary":"w-btn w-btn-ghost"} style={{padding:"7px 12px",fontSize:11}}>{({trade:"معامله",deposit:"واریز",withdrawal:"برداشت",transfer:"انتقال"} as any)[kind]}</button>)}
       </div>
       <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-        <input className="w-input" value={feeAmount} onChange={e=>{setFeeAmount(e.target.value.replace(/[^0-9.]/g,""));setCalculatedFee(null);}} inputMode="decimal" dir="ltr" placeholder="مبلغ عملیات" style={{flex:"1 1 180px"}}/>
+        <input className="w-input" value={feeAmount} onChange={e=>{const next=e.target.value.replace(/[^0-9.]/g,"");setFeeAmount(next.split(".").length>2?next.slice(0,next.lastIndexOf("." )).replace(/\./g,"")+next.slice(next.lastIndexOf(".")):next);setCalculatedFee(null);}} inputMode="decimal" dir="ltr" placeholder="مبلغ عملیات" style={{flex:"1 1 180px"}}/>
         <button type="button" className="w-btn w-btn-primary" onClick={calculateFee} disabled={loading||!genericRule||!feeAmount.trim()} style={{padding:"10px 18px"}}>محاسبه</button>
       </div>
       {!loading&&!genericRule&&<div style={{fontSize:11,color:"#b45309",marginTop:10}}>برای این نوع عملیات قانون کارمزد فعالی در Backend یافت نشد.</div>}
