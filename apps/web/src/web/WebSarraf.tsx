@@ -33,6 +33,7 @@ interface SarrafProps {
   onNavigate: (p: WebPage) => void;
   kycStatus: KycStatus;
   onAuthRequired: () => void;
+  onKycRequired: () => void;
   isLoggedIn: boolean;
 }
 
@@ -316,57 +317,57 @@ function AssetsTab({ assets, wallets, kycStatus, onDeposit, onWithdraw, onDeposi
 }
 
 // ── KYC Gate ───────────────────────────────────────
-function KycGate({ kycStatus }: { kycStatus:KycStatus }) {
+function KycGate({ kycStatus, onStart }: { kycStatus:KycStatus; onStart:()=>void }) {
   return (
     <div style={{ textAlign:"center", padding:"60px 24px" }}>
       <div style={{ width:60, height:60, borderRadius:"50%", background:"rgba(217,119,6,0.1)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px", color:"#d97706" }}><WI n="shield" s={26}/></div>
       <div style={{ fontSize:17, fontWeight:800, marginBottom:8 }}>احراز هویت الزامی</div>
       <div style={{ fontSize:13, color:"var(--w-muted)", marginBottom:24 }}>برای واریز و برداشت، ابتدا هویت خود را تأیید کنید.</div>
-      {kycStatus==="not_verified" && <div style={{padding:"11px 16px",background:"rgba(217,119,6,0.1)",color:"#d97706",borderRadius:9,fontSize:12,fontWeight:700}}>احراز هویت این حساب هنوز انجام نشده است. تا اتصال فرایند رسمی KYC به وب، عملیات مالی حساس از این صفحه فعال نمی‌شود.</div>}
+      {kycStatus==="not_verified" && <><div style={{padding:"11px 16px",background:"rgba(217,119,6,0.1)",color:"#d97706",borderRadius:9,fontSize:12,fontWeight:700,marginBottom:12}}>احراز هویت این حساب هنوز انجام نشده است. برای ادامه، اطلاعات هویتی را برای بررسی رسمی ارسال کنید.</div><button type="button" className="w-btn w-btn-primary" onClick={onStart} style={{padding:"11px 20px"}}>شروع احراز هویت</button></>}
       {(kycStatus==="submitted"||kycStatus==="pending") && <div style={{ padding:"11px 28px", background:"rgba(217,119,6,0.1)", color:"#d97706", borderRadius:9, fontSize:13, fontWeight:700 }}>در حال بررسی...</div>}
     </div>
   );
 }
 
 // ── Deposit Toman Tab ──────────────────────────────
-function DepositTomanTab({ kycStatus }: { kycStatus:KycStatus }) {
+function DepositTomanTab({ kycStatus, onKycRequired }: { kycStatus:KycStatus; onKycRequired:()=>void }) {
   const [amount,setAmount]=useState(""),[cards,setCards]=useState<any[]>([]),[cardId,setCardId]=useState(""),[assetId,setAssetId]=useState(""),[reference,setReference]=useState(""),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");
   useEffect(()=>{const token=getWebToken();if(!token)return;Promise.all([
     fetch(ANSARRAF_API_BASE+"/api/v1/funding/cards",{headers:{authorization:"Bearer "+token}}).then(r=>r.json()),
     fetch(ANSARRAF_API_BASE+"/api/v1/assets").then(r=>r.json())
   ]).then(([cardsBody,assetsBody])=>{setCards(Array.isArray(cardsBody.cards)?cardsBody.cards:[]);const a=(assetsBody.assets??[]).find((x:any)=>x.asset_type==="fiat"&&["TMN","TOMAN","IRR"].includes(String(x.symbol).toUpperCase()));if(a)setAssetId(String(a.id));}).catch(()=>setMsg("اطلاعات حساب برای واریز در دسترس نیست."));},[]);
-  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus}/>;
+  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus} onStart={onKycRequired}/>;
   const submit=async()=>{const token=getWebToken();if(!token)return;setBusy(true);setMsg("");try{const r=await fetch(ANSARRAF_API_BASE+"/api/v1/deposits",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({assetId:Number(assetId),amount:amount.replace(/,/g,""),network:"BANK_CARD",sourceCardId:Number(cardId),externalReference:reference.trim()||undefined,idempotencyKey:crypto.randomUUID()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"deposit_failed");setMsg("درخواست واریز ثبت شد و پس از بررسی مدیریت و حسابداری به موجودی اضافه می‌شود.");setAmount("");setReference("");}catch(e){setMsg(e instanceof Error?e.message:"deposit_failed");}finally{setBusy(false);}};
   return <div style={{maxWidth:560,padding:"24px 0"}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:20}}>واریز تومان</h2><div className="w-card" style={{padding:22}}><div style={{fontSize:12,color:"var(--w-muted)",lineHeight:1.9,marginBottom:14}}>واریز تومان در آن صراف به‌صورت ثبت درخواست انجام می‌شود؛ منبع باید کارت بانکی تأییدشده خود کاربر باشد و اعتباردهی نهایی با بررسی مدیریت و حسابداری انجام می‌شود.</div><label style={{fontSize:11,fontWeight:700}}>کارت مبدأ</label><select className="w-input" value={cardId} onChange={e=>setCardId(e.target.value)} style={{marginTop:6}}><option value="">انتخاب کارت تأییدشده</option>{cards.map((card:any)=><option key={card.id} value={card.id}>{card.bankName??"بانک"} · ****{card.last4}</option>)}</select><label style={{fontSize:11,fontWeight:700,display:"block",marginTop:12}}>مبلغ (تومان)</label><input className="w-input" value={amount} onChange={e=>setAmount(e.target.value.replace(/[^0-9]/g,""))} inputMode="numeric" placeholder="مبلغ واقعی واریز"/><label style={{fontSize:11,fontWeight:700,display:"block",marginTop:12}}>شناسه/مرجع بانکی (اختیاری)</label><input className="w-input" value={reference} onChange={e=>setReference(e.target.value)} placeholder="شماره پیگیری یا مرجع انتقال"/>{msg&&<div style={{marginTop:12,color:"#b45309",fontSize:12,lineHeight:1.8}}>{msg}</div>}<button disabled={busy||!cardId||!assetId||!amount} onClick={()=>void submit()} className="w-btn w-btn-primary" style={{width:"100%",marginTop:14}}>{busy?"در حال ثبت…":"ثبت درخواست واریز"}</button>{cards.length===0&&<div style={{marginTop:10,fontSize:11,color:"var(--w-muted)"}}>ابتدا کارت بانکی خود را از فرایند رسمی ثبت و تأیید کارت اضافه کنید.</div>}</div></div>;
 }
 
 // ── Deposit Coin Tab// ── Deposit Coin Tab ───────────────────────────────
-function DepositCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) {
+function DepositCoinTab({ assets, kycStatus, onKycRequired }: { assets:CryptoAsset[]; kycStatus:KycStatus; onKycRequired:()=>void }) {
   const [selAsset,setSelAsset]=useState<CryptoAsset|null>(assets[0]??null),[networks,setNetworks]=useState<string[]>([]),[network,setNetwork]=useState(""),[address,setAddress]=useState<any>(null),[searchCoin,setSearchCoin]=useState(""),[error,setError]=useState("");
   const token=getWebToken();
   useEffect(()=>{if(!selAsset||!token)return;setAddress(null);setError("");fetch(ANSARRAF_API_BASE+"/api/v1/crypto/deposit-networks?asset="+encodeURIComponent(selAsset.symbol),{headers:{authorization:"Bearer "+token}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"deposit_networks_unavailable");const ns=Array.isArray(d.networks)?d.networks:[];setNetworks(ns);setNetwork(ns[0]??"");}).catch(e=>setError(e instanceof Error?e.message:"deposit_networks_unavailable"));},[selAsset?.id,token]);
   useEffect(()=>{if(!network||!selAsset||!token)return;fetch(ANSARRAF_API_BASE+"/api/v1/crypto/deposit-address?asset="+encodeURIComponent(selAsset.symbol)+"&network="+encodeURIComponent(network),{headers:{authorization:"Bearer "+token}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"deposit_address_unavailable");setAddress(d);}).catch(e=>setError(e instanceof Error?e.message:"deposit_address_unavailable"));},[network,selAsset?.id,token]);
-  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus}/>;
+  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus} onStart={onKycRequired}/>;
   const filtered=assets.filter(a=>a.symbol.includes(searchCoin.toUpperCase())||a.nameFa.includes(searchCoin)).slice(0,30);
   if(!selAsset)return <div style={{padding:40,color:"var(--w-muted)"}}>ارزی برای نمایش وجود ندارد.</div>;
   return <div style={{display:"flex",gap:20,padding:"24px 0",alignItems:"flex-start"}}><div style={{width:220,flexShrink:0}}><div style={{fontSize:14,fontWeight:800,marginBottom:10}}>انتخاب رمزارز</div><input value={searchCoin} onChange={e=>setSearchCoin(e.target.value)} placeholder="جستجو..." className="w-input" style={{marginBottom:8,fontSize:12}}/><div style={{background:"var(--w-card)",border:"1px solid var(--w-border)",borderRadius:10,overflow:"hidden",maxHeight:360,overflowY:"auto"}}>{filtered.map(a=><div key={a.id} onClick={()=>setSelAsset(a)} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",cursor:"pointer",background:selAsset.id===a.id?"rgba(8,145,178,0.08)":"transparent",borderBottom:"1px solid var(--w-border)"}}><div style={{width:24,height:24,borderRadius:"50%",background:a.logoColor,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:8,fontWeight:900}}>{a.symbol.slice(0,3)}</div><div><div style={{fontSize:12,fontWeight:700}}>{a.symbol}</div><div style={{fontSize:10,color:"var(--w-muted)"}}>{a.nameFa}</div></div></div>)}</div></div><div style={{flex:1,maxWidth:560}}><h2 style={{fontSize:17,fontWeight:900,marginBottom:16}}>واریز {selAsset.symbol}</h2><div className="w-card" style={{padding:22}}><label style={{fontSize:12,fontWeight:700,color:"var(--w-muted)"}}>شبکه</label><div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"8px 0 16px"}}>{networks.map(n=><button key={n} onClick={()=>setNetwork(n)} className={network===n?"w-btn w-btn-primary":"w-btn w-btn-ghost"} style={{padding:"7px 14px"}}>{n}</button>)}</div>{error&&<div style={{color:"#dc2626",fontSize:12,marginBottom:10}}>{error}</div>}<div style={{padding:14,background:"var(--w-card2)",borderRadius:9,wordBreak:"break-all",fontFamily:"monospace",fontSize:12}}>{address?.address??"در حال دریافت آدرس واقعی provider…"}</div>{address?.memo&&<div style={{marginTop:8,fontFamily:"monospace"}}>Memo/Tag: {address.memo}</div>}<button disabled={!address?.address} onClick={()=>address?.address&&navigator.clipboard?.writeText(address.address)} className="w-btn w-btn-ghost" style={{marginTop:8}}>کپی آدرس</button>{address&&!address.safeForAutomaticAttribution&&<div style={{marginTop:12,padding:11,borderRadius:9,background:"rgba(217,119,6,.08)",color:"#b45309",fontSize:11,lineHeight:1.8}}>این آدرس برای اعتباردهی خودکار امن نیست و واریز پس از تطبیق دستی مدیریت انجام می‌شود.</div>}</div></div></div>;
 }
 
 // ── Withdraw Toman Tab// ── Withdraw Toman Tab ─────────────────────────────
-function WithdrawTomanTab({ kycStatus }: { kycStatus:KycStatus }) {
+function WithdrawTomanTab({ kycStatus, onKycRequired }: { kycStatus:KycStatus; onKycRequired:()=>void }) {
   const [amount,setAmount]=useState(""),[cards,setCards]=useState<any[]>([]),[assetId,setAssetId]=useState(""),[cardId,setCardId]=useState(""),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");
   useEffect(()=>{const token=getWebToken();if(!token)return;Promise.all([fetch(ANSARRAF_API_BASE+"/api/v1/funding/cards",{headers:{authorization:"Bearer "+token}}).then(r=>r.json()),fetch(ANSARRAF_API_BASE+"/api/v1/assets").then(r=>r.json())]).then(([cb,ab])=>{setCards(Array.isArray(cb.cards)?cb.cards:[]);const a=(ab.assets??[]).find((x:any)=>x.asset_type==="fiat"&&["TMN","TOMAN","IRR"].includes(String(x.symbol).toUpperCase()));if(a)setAssetId(String(a.id));}).catch(()=>setMsg("اطلاعات برداشت در دسترس نیست."));},[]);
-  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus}/>;
+  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus} onStart={onKycRequired}/>;
   const submit=async()=>{const token=getWebToken();if(!token)return;setBusy(true);setMsg("");try{const card=cards.find(x=>String(x.id)===cardId);const r=await fetch(ANSARRAF_API_BASE+"/api/v1/withdrawals",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({assetId:Number(assetId),amount:amount.replace(/,/g,""),network:"BANK_CARD",destination:"CARD:"+cardId+":"+String(card?.last4??""),destinationCardId:Number(cardId),idempotencyKey:crypto.randomUUID()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"withdrawal_failed");setMsg("درخواست برداشت ثبت شد و برای بررسی و پرداخت مدیریت ارسال شد.");setAmount("");}catch(e){setMsg(e instanceof Error?e.message:"withdrawal_failed");}finally{setBusy(false);}};
   return <div style={{maxWidth:520,padding:"24px 0"}}><h2 style={{fontSize:18,fontWeight:900,marginBottom:20}}>برداشت تومان</h2><div className="w-card" style={{padding:22}}><label style={{fontSize:11,fontWeight:700}}>کارت مقصد</label><select className="w-input" value={cardId} onChange={e=>setCardId(e.target.value)} style={{marginTop:6}}><option value="">انتخاب کارت تأییدشده</option>{cards.map((card:any)=><option key={card.id} value={card.id}>{card.bankName??"بانک"} · ****{card.last4}</option>)}</select><label style={{fontSize:11,fontWeight:700,display:"block",marginTop:12}}>مبلغ (تومان)</label><input value={amount} onChange={e=>setAmount(e.target.value.replace(/[^0-9]/g,""))} className="w-input" inputMode="numeric" placeholder="مبلغ واقعی"/>{msg&&<div style={{marginTop:12,color:"#b45309",fontSize:12,lineHeight:1.8}}>{msg}</div>}<button disabled={busy||!cardId||!assetId||!amount} onClick={()=>void submit()} className="w-btn w-btn-primary" style={{width:"100%",marginTop:14}}>{busy?"در حال ثبت…":"ثبت درخواست برداشت"}</button>{cards.length===0&&<div style={{marginTop:10,fontSize:11,color:"var(--w-muted)"}}>فقط کارت‌های ثبت‌شده و تأییدشده مالک قابل انتخاب هستند.</div>}</div></div>;
 }
 
 // ── Withdraw Coin Tab// ── Withdraw Coin Tab ──────────────────────────────
-function WithdrawCoinTab({ assets, kycStatus }: { assets:CryptoAsset[]; kycStatus:KycStatus }) {
+function WithdrawCoinTab({ assets, kycStatus, onKycRequired }: { assets:CryptoAsset[]; kycStatus:KycStatus; onKycRequired:()=>void }) {
   const [selAsset,setSelAsset]=useState<CryptoAsset|null>(assets[0]??null),[networks,setNetworks]=useState<string[]>([]),[network,setNetwork]=useState(""),[address,setAddress]=useState(""),[memo,setMemo]=useState(""),[wAmount,setWAmount]=useState(""),[balance,setBalance]=useState<Record<string,number>>({}),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");
   const token=getWebToken();
   useEffect(()=>{if(!token||!selAsset)return;void sarrafWalletMap().then(setBalance).catch(()=>{});fetch(ANSARRAF_API_BASE+"/api/v1/crypto/deposit-networks?asset="+encodeURIComponent(selAsset.symbol),{headers:{authorization:"Bearer "+token}}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"networks_unavailable");const ns=Array.isArray(d.networks)?d.networks:[];setNetworks(ns);setNetwork(ns[0]??"");}).catch(e=>setMsg(e instanceof Error?e.message:"networks_unavailable"));},[selAsset?.id,token]);
-  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus}/>;
+  if(kycStatus!=="verified")return <KycGate kycStatus={kycStatus} onStart={onKycRequired}/>;
   if(!selAsset)return <div style={{padding:40,color:"var(--w-muted)"}}>ارزی برای نمایش وجود ندارد.</div>;
   const available=Number(balance[selAsset.symbol]??0);
   const submit=async()=>{if(!token)return;setBusy(true);setMsg("");try{const r=await fetch(ANSARRAF_API_BASE+"/api/v1/withdrawals",{method:"POST",headers:{authorization:"Bearer "+token,"content-type":"application/json"},body:JSON.stringify({assetId:Number(selAsset.id),amount:wAmount,network,destination:address.trim(),memo:memo.trim()||undefined,idempotencyKey:crypto.randomUUID()})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"withdrawal_failed");setMsg("درخواست برداشت ثبت شد و پس از کنترل‌های امنیتی و تأیید مدیریت پردازش می‌شود.");setWAmount("");setAddress("");}catch(e){setMsg(e instanceof Error?e.message:"withdrawal_failed");}finally{setBusy(false);}};
@@ -742,7 +743,7 @@ function GuideTab() {
 
 // ── Forex Bot Tab ──────────────────────────────────
 
-export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onAuthRequired, isLoggedIn }: SarrafProps) {
+export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onAuthRequired, onKycRequired, isLoggedIn }: SarrafProps) {
   const [tab, setTab]               = useState<SarrafTab>("home");
   const [liveAssets, setLiveAssets] = useState<CryptoAsset[]>([]);
   const [selectedAsset, setAsset]   = useState<CryptoAsset>({ id:"", symbol:"", name:"", nameFa:"", logoColor:"#0891b2", price:0, priceIrt:0, change24h:0, volume24h:0, marketCap:0, high24h:0, low24h:0, rank:0 });
@@ -1156,16 +1157,16 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
             <AssetsTab assets={liveAssets.slice(0,12)} wallets={wallets} kycStatus={effectiveKycStatus} onDeposit={()=>setTab("deposit")} onWithdraw={()=>setTab("withdraw")} onDepositCoin={()=>setTab("deposit-coin")} onWithdrawCoin={()=>setTab("withdraw-coin")} canWithdrawCoin={cryptoWithdrawalSecurity.allowed===true} withdrawSecurityMessage={cryptoWithdrawalSecurity.message??""}/>
           )}
           {tab === "deposit" && isLoggedIn && (
-            <DepositTomanTab kycStatus={effectiveKycStatus}/>
+            <DepositTomanTab kycStatus={effectiveKycStatus} onKycRequired={onKycRequired}/>
           )}
           {tab === "deposit-coin" && isLoggedIn && (
-            <DepositCoinTab assets={liveAssets} kycStatus={effectiveKycStatus}/>
+            <DepositCoinTab assets={liveAssets} kycStatus={effectiveKycStatus} onKycRequired={onKycRequired}/>
           )}
           {tab === "withdraw" && isLoggedIn && (
-            <WithdrawTomanTab kycStatus={effectiveKycStatus}/>
+            <WithdrawTomanTab kycStatus={effectiveKycStatus} onKycRequired={onKycRequired}/>
           )}
           {tab === "withdraw-coin" && isLoggedIn && (
-            <WithdrawCoinTab assets={liveAssets} kycStatus={effectiveKycStatus}/>
+            <WithdrawCoinTab assets={liveAssets} kycStatus={effectiveKycStatus} onKycRequired={onKycRequired}/>
           )}
           {tab === "orders" && isLoggedIn && (
             <OrdersTab orders={orders}/>
