@@ -212,7 +212,13 @@ export default function WebPortal() {
     setShowFirstVisit(false);
   }, []);
 
-  // Apply dark/light to body for background continuity
+  // Keep the legacy mobile stylesheet from imposing its body layout on the web portal.
+  useEffect(() => {
+    document.body.classList.add("anpardaz-web-body");
+    return () => document.body.classList.remove("anpardaz-web-body");
+  }, []);
+
+  // Apply dark/light to body for background continuity.
   useEffect(() => {
     document.body.style.background = darkMode ? "#0d0d14" : "#f5f5fb";
   }, [darkMode]);
@@ -248,10 +254,53 @@ export default function WebPortal() {
 
   return (
     <div
-      className={darkMode ? "dark-theme" : ""}
-      style={{ minHeight:"100vh", background:"var(--w-bg)", color:"var(--w-text)", fontFamily:"Vazirmatn, sans-serif", direction:"rtl" }}
+      className={darkMode ? "dark-theme web-portal" : "web-portal"}
+      style={{ width:"100%", maxWidth:"100%", minWidth:0, minHeight:"100vh", margin:"0 auto", overflowX:"clip", background:"var(--w-bg)", color:"var(--w-text)", fontFamily:"Vazirmatn, sans-serif", direction:"rtl", boxSizing:"border-box" }}
     >
       <style>{CSS_VARS}</style>
+      <style>{`
+        /* The web app shares a stylesheet with the mobile app; neutralize mobile-only body rules here. */
+        body.anpardaz-web-body {
+          display: block !important;
+          flex: none !important;
+          flex-direction: initial !important;
+          gap: 0 !important;
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow-x: hidden !important;
+        }
+        body.anpardaz-web-body #root {
+          width: 100% !important;
+          max-width: none !important;
+          min-width: 0 !important;
+          margin: 0 auto !important;
+          padding: 0 !important;
+        }
+        .web-portal {
+          position: relative;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          margin-inline: auto;
+          overflow-x: clip;
+          isolation: isolate;
+        }
+        .web-portal main {
+          display: block;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          margin-inline: auto;
+          box-sizing: border-box;
+        }
+        .web-portal main > * { min-width: 0; }
+        @supports not (overflow: clip) {
+          .web-portal { overflow-x: hidden; }
+        }
+      `}</style>
       <style>{`
         .w-fade { animation: wFadeIn 0.22s ease; }
         @keyframes wFadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
