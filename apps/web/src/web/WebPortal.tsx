@@ -110,7 +110,7 @@ function SupportPage({ isLoggedIn, onAuthRequired }: { isLoggedIn: boolean; onAu
         <h1 style={{ fontSize:28, fontWeight:900, marginBottom:8 }}>پشتیبانی</h1>
         <p style={{ fontSize:13, color:"var(--w-muted)" }}>پاسخ سوالات خود را در اینجا بیابید یا تیکت ارسال کنید</p>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:24, alignItems:"start" }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap:24, alignItems:"start" }}>
         {/* FAQ */}
         <div>
           <div style={{ fontSize:15, fontWeight:800, marginBottom:14 }}>سوالات متداول</div>
