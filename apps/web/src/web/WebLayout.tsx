@@ -304,7 +304,7 @@ export function WebHeader({ currentPage, onNavigate, userRole, onAuthClick, dark
       )}
 
       <style>{`
-        @media (max-width:900px){
+        @media (max-width:1100px){
           body{min-width:0!important;overflow-x:hidden;}
           .w-main{overflow-x:hidden!important;}
           .w-container{max-width:100%;padding-left:12px;padding-right:12px;}
