@@ -362,6 +362,7 @@ export default function WebPortal() {
             isLoggedIn={isLoggedIn}
             kycStatus={userRole === "kyc_verified" ? "verified" : userRole === "kyc_pending" ? "pending" : "not_verified"}
             onAuthRequired={handleAuthRequired}
+            onKycRequired={() => setShowKyc(true)}
           />
         )}
         {(page === "market" || page === "market-product" || page === "market-category" || page === "market-orders") && (
