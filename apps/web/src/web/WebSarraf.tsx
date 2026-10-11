@@ -27,7 +27,7 @@ const fmtVol = (n: number) => {
 };
 const clr = (n: number) => n >= 0 ? "#10b981" : "#f43f5e";
 
-type SarrafTab = "home"|"markets"|"trade-select"|"instant"|"spot"|"margin"|"assets"|"deposit"|"deposit-coin"|"withdraw"|"withdraw-coin"|"orders"|"transactions"|"fees"|"security"|"support"|"guide"|"forexbot";
+type SarrafTab = "home"|"markets"|"trade-select"|"instant"|"spot"|"margin"|"assets"|"deposit"|"deposit-coin"|"withdraw"|"withdraw-coin"|"orders"|"transactions"|"fees"|"security"|"support"|"chat"|"guide"|"forexbot";
 
 interface SarrafProps {
   onNavigate: (p: WebPage) => void;
@@ -61,6 +61,7 @@ const TAB_GROUPS = [
   ]},
   { label:"پشتیبانی",  items:[
     { id:"support" as SarrafTab,      icon:"comment",   label:"تیکت‌ها" },
+    { id:"chat" as SarrafTab,         icon:"message-circle", label:"چت زنده" },
   ]},
 ];
 
@@ -447,6 +448,12 @@ function FeesTab() {
   const [data,setData]=useState<any>(null),[loading,setLoading]=useState(true),[error,setError]=useState("");
   useEffect(()=>{let active=true;const load=async()=>{const token=getWebToken();if(!token){if(active){setData(null);setLoading(false)}return}try{const r=await fetch(ANSARRAF_API_BASE+"/api/v1/fees",{headers:{authorization:"Bearer "+token,accept:"application/json"},cache:"no-store"});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d?.error??"fee_rules_unavailable");if(active){setData(d);setError("");}}catch(e){if(active)setError(e instanceof Error?e.message:"fee_rules_unavailable")}finally{if(active)setLoading(false)}};void load();const id=window.setInterval(()=>{if(active)void load()},15000);return()=>{active=false;clearInterval(id)}},[]);
   const customerRules=Array.isArray(data?.customerRules)?data.customerRules:[],providerRules=Array.isArray(data?.providerRules)?data.providerRules:[];
+  const [feeOperation,setFeeOperation]=useState<"trade"|"deposit"|"withdrawal"|"transfer">("trade");
+  const [feeAmount,setFeeAmount]=useState("");
+  const [calculatedFee,setCalculatedFee]=useState<number|null>(null);
+  const activeRules=customerRules.filter((rule:any)=>rule.operation_type===feeOperation);
+  const genericRule=activeRules.find((rule:any)=>!rule.market_symbol&&!rule.asset_symbol)??activeRules[0];
+  const calculateFee=()=>{const amount=Number(feeAmount);if(!genericRule||!Number.isFinite(amount)||amount<0){setCalculatedFee(null);return;}const raw=amount*Number(genericRule.percentage??0)+Number(genericRule.fixed_amount??0);const min=genericRule.min_amount==null?0:Number(genericRule.min_amount);const max=genericRule.max_amount==null?Infinity:Number(genericRule.max_amount);setCalculatedFee(Math.min(Math.max(raw,min),max));};
   const pct=(v:any)=>{const n=Number(v);return Number.isFinite(n)?(n*100).toLocaleString("fa-IR",{maximumFractionDigits:6})+"٪":"—";};
   const money=(v:any)=>{const n=Number(v);return Number.isFinite(n)?n.toLocaleString("fa-IR",{maximumFractionDigits:8}):"—";};
   const opLabel=(v:string)=>({trade:"معامله",deposit:"واریز",withdrawal:"برداشت",transfer:"انتقال"} as any)[v]??v;
@@ -454,6 +461,19 @@ function FeesTab() {
     <div style={{fontSize:18,fontWeight:900,marginBottom:8}}>کارمزدهای واقعی آن صراف</div>
     <div style={{fontSize:11,color:"var(--w-muted)",marginBottom:18,lineHeight:1.8}}>تنظیمات فعال از Backend خوانده می‌شود و هر تغییر مدیر حداکثر طی چند ثانیه در این صفحه منعکس می‌شود.</div>
     {error&&<div className="w-card" style={{padding:14,color:"#b45309",marginBottom:12}}>{error}</div>}
+    <div className="w-card" style={{padding:18,marginBottom:16}}>
+      <div style={{fontSize:14,fontWeight:900,marginBottom:6}}>محاسبه‌گر کارمزد</div>
+      <div style={{fontSize:11,color:"var(--w-muted)",lineHeight:1.8,marginBottom:12}}>محاسبه فقط با قانون فعال دریافت‌شده از Backend انجام می‌شود؛ در نبود قانون، نتیجه فرضی ساخته نمی‌شود.</div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+        {(["trade","deposit","withdrawal","transfer"] as const).map((kind)=> <button key={kind} type="button" onClick={()=>{setFeeOperation(kind);setCalculatedFee(null);}} className={feeOperation===kind?"w-btn w-btn-primary":"w-btn w-btn-ghost"} style={{padding:"7px 12px",fontSize:11}}>{({trade:"معامله",deposit:"واریز",withdrawal:"برداشت",transfer:"انتقال"} as any)[kind]}</button>)}
+      </div>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+        <input className="w-input" value={feeAmount} onChange={e=>{setFeeAmount(e.target.value.replace(/[^0-9.]/g,""));setCalculatedFee(null);}} inputMode="decimal" dir="ltr" placeholder="مبلغ عملیات" style={{flex:"1 1 180px"}}/>
+        <button type="button" className="w-btn w-btn-primary" onClick={calculateFee} disabled={loading||!genericRule||!feeAmount.trim()} style={{padding:"10px 18px"}}>محاسبه</button>
+      </div>
+      {!loading&&!genericRule&&<div style={{fontSize:11,color:"#b45309",marginTop:10}}>برای این نوع عملیات قانون کارمزد فعالی در Backend یافت نشد.</div>}
+      {calculatedFee!==null&&genericRule&&<div style={{marginTop:14,padding:12,borderRadius:10,background:"var(--w-card2)",display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><span style={{fontSize:12,color:"var(--w-muted)"}}>کارمزد محاسبه‌شده</span><strong>{calculatedFee.toLocaleString("fa-IR",{maximumFractionDigits:8})} {genericRule.fee_asset_symbol??""}</strong></div>}
+    </div>
     {loading?<div className="w-card" style={{padding:22,color:"var(--w-muted)"}}>در حال دریافت قوانین کارمزد...</div>:<>
       <div className="w-card" style={{overflow:"hidden",marginBottom:16}}>
         <div style={{padding:14,fontWeight:800,borderBottom:"1px solid var(--w-border)"}}>کارمزد کاربران</div>
@@ -644,6 +664,22 @@ function SupportTab({ isLoggedIn, onAuth }: { isLoggedIn:boolean; onAuth:()=>voi
   if(!isLoggedIn)return <div style={{textAlign:"center",padding:60}}><WI n="comment" s={40} style={{opacity:.2,marginBottom:16}}/><div style={{fontSize:16,fontWeight:800}}>ورود برای مشاهده تیکت‌ها</div><button onClick={onAuth} className="w-btn w-btn-primary" style={{marginTop:12}}>ورود / ثبت‌نام</button></div>;
   if(selected && selected.ticket?.id!==0)return <div style={{padding:"20px 0",maxWidth:700}}><button onClick={()=>setSelected(null)} className="w-btn w-btn-ghost">بازگشت</button><div className="w-card" style={{marginTop:12,padding:18}}><div style={{fontWeight:900}}>{selected.ticket.subject}</div><div style={{fontSize:11,color:"var(--w-muted)",marginTop:4}}>{selected.ticket.status}</div><div style={{marginTop:18}}>{(selected.messages??[]).map((m:any)=><div key={m.id} style={{padding:10,marginBottom:8,borderRadius:9,background:"var(--w-card2)"}}><div>{m.message}</div><div style={{fontSize:10,color:"var(--w-muted)",marginTop:4}}>{new Date(m.created_at).toLocaleString("fa-IR")} · {m.sender_role}</div></div>)}</div>{selected.ticket.status!=="closed"&&<div style={{display:"flex",gap:8,marginTop:12}}><input value={message} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void send()}} className="w-input" placeholder="پیام خود را بنویسید..."/><button disabled={busy||!message.trim()} onClick={()=>void send()} className="w-btn w-btn-primary">ارسال</button></div>}</div></div>;
   return <div style={{padding:"20px 0",maxWidth:700}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}><div style={{fontSize:16,fontWeight:900}}>تیکت‌های پشتیبانی</div><button onClick={()=>setSelected({ticket:{id:0,subject:"تیکت جدید",status:"new"},messages:[]})} className="w-btn w-btn-primary">تیکت جدید +</button></div>{error&&<div style={{color:"#dc2626",fontSize:12,marginBottom:10}}>{error}</div>}{tickets.map((t:any)=><button key={t.id} onClick={()=>void openTicket(t.id)} className="w-card" style={{width:"100%",display:"flex",justifyContent:"space-between",padding:14,marginBottom:8,textAlign:"right",border:"1px solid var(--w-border)",cursor:"pointer"}}><span><b>{t.subject}</b><div style={{fontSize:11,color:"var(--w-muted)",marginTop:4}}>{t.status} · {new Date(t.updated_at).toLocaleString("fa-IR")}</div></span><span>›</span></button>)}{tickets.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--w-muted)"}}>هنوز تیکتی ندارید.</div>}{selected?.ticket?.id===0&&<div className="w-card" style={{padding:18,marginTop:12}}><input value={subject} onChange={e=>setSubject(e.target.value)} className="w-input" placeholder="موضوع"/><textarea value={body} onChange={e=>setBody(e.target.value)} className="w-input" rows={5} style={{marginTop:8}} placeholder="شرح مشکل"/><button disabled={busy||!subject.trim()||!body.trim()} onClick={()=>void create()} className="w-btn w-btn-primary" style={{marginTop:10,width:"100%"}}>ارسال تیکت</button></div>}</div>;
+}
+
+function ChatTab() {
+  return (
+    <div style={{ padding: "28px 0", maxWidth: 760 }}>
+      <div className="w-card" style={{ padding: "28px 24px", textAlign: "center" }}>
+        <div style={{ width: 58, height: 58, borderRadius: 17, margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(8,145,178,.10)", color: "#0891b2" }}>
+          <WI n="message-circle" s={28} />
+        </div>
+        <div style={{ fontSize: 17, fontWeight: 900, marginBottom: 8 }}>چت با پشتیبانی</div>
+        <div style={{ color: "var(--w-muted)", fontSize: 12, lineHeight: 2 }}>
+          چت زنده تا زمان اتصال سرویس اختصاصی Backend فعال نشده است؛ هیچ پیام، پاسخ یا وضعیت آنلاین ساختگی نمایش داده نمی‌شود.
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Guide Tab// ── Guide Tab ──────────────────────────────────────
@@ -1125,6 +1161,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
           {tab === "support" && (
             <SupportTab isLoggedIn={isLoggedIn} onAuth={onAuthRequired}/>
           )}
+          {tab === "chat" && <ChatTab/>}
           {tab === "guide" && (
             <GuideTab/>
           )}
