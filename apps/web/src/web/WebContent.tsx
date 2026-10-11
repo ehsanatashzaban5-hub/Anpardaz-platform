@@ -52,35 +52,50 @@ export default function WebContent({ section, onNavigate }: Props) {
   const [liveNews,setLiveNews]=useState<any[]>([]);
   const [liveVideos,setLiveVideos]=useState<any[]>([]);
   const [loadingLive,setLoadingLive]=useState(true);
+  const [loadError,setLoadError]=useState(false);
   const [newsCat,  setNewsCat]  = useState("all");
   const [eduCat,   setEduCat]   = useState("all");
   const [videoCat, setVideoCat] = useState("all");
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [selectedVideo,   setSelectedVideo]   = useState<Video | null>(null);
   const [search, setSearch] = useState("");
-  useEffect(()=>{let cancelled=false;setLoadingLive(true);Promise.all([
+  useEffect(()=>{let cancelled=false;setLoadingLive(true);setLoadError(false);Promise.all([
     fetch(API+"/api/v1/news?limit=50",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(new Error("news_http"))),
     fetch(API+"/api/v1/content/videos?limit=50",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(new Error("video_http")))
-  ]).then(([n,v])=>{if(cancelled)return;setLiveNews((n.items??[]).map((a:any)=>({id:String(a.id),type:"news",title:a.title,summary:a.summary??"",body:undefined,category:a.category_slug??"crypto-news",author:{id:"platform",name:a.source_name??"آن پرداز"},publishedAt:a.published_at??"",readingTime:1,views:0,likes:0,comments:0,shares:0,tags:a.keywords??[],hashtags:a.hashtags??[],seo:{title:a.meta_title??a.title,description:a.meta_description??a.summary??"",keywords:a.keywords??[],slug:a.slug,canonicalUrl:a.canonical_url},status:"published"})));setLiveVideos((v.videos??[]).map((x:any)=>({id:String(x.id),title:x.title,description:x.description??"",duration:Number(x.duration_seconds??0),category:x.category_slug??"video-news",author:{id:String(x.created_by??"admin"),name:"آن پرداز"},publishedAt:x.published_at??"",views:0,likes:0,comments:0,shares:0,tags:[],keywords:[],hashtags:x.hashtags??[],seo:{title:x.title,description:x.description??"",keywords:[],slug:String(x.id)},status:"published",videoUrl:API+"/api/v1/content/videos/"+x.id})));}).catch(()=>{if(!cancelled){setLiveNews([]);setLiveVideos([])}}).finally(()=>{if(!cancelled)setLoadingLive(false)});return()=>{cancelled=true}},[API]);
+  ]).then(([n,v])=>{if(cancelled)return;setLiveNews((n.items??[]).map((a:any)=>({id:String(a.id),type:"news",title:a.title,summary:a.summary??"",body:undefined,category:a.category_slug??"crypto-news",author:{id:"platform",name:a.source_name??"آن پرداز"},publishedAt:a.published_at??"",readingTime:1,views:0,likes:0,comments:0,shares:0,tags:a.keywords??[],hashtags:a.hashtags??[],seo:{title:a.meta_title??a.title,description:a.meta_description??a.summary??"",keywords:a.keywords??[],slug:a.slug,canonicalUrl:a.canonical_url},status:"published"})));setLiveVideos((v.videos??[]).map((x:any)=>({id:String(x.id),title:x.title,description:x.description??"",duration:Number(x.duration_seconds??0),category:x.category_slug??"video-news",author:{id:String(x.created_by??"admin"),name:"آن پرداز"},publishedAt:x.published_at??"",views:0,likes:0,comments:0,shares:0,tags:[],keywords:[],hashtags:x.hashtags??[],seo:{title:x.title,description:x.description??"",keywords:[],slug:String(x.id)},status:"published",videoUrl:API+"/api/v1/content/videos/"+x.id})));}).catch(()=>{if(!cancelled){setLiveNews([]);setLiveVideos([]);setLoadError(true)}}).finally(()=>{if(!cancelled)setLoadingLive(false)});return()=>{cancelled=true}},[API]);
 
+  const normalizedSearch = search.trim().toLocaleLowerCase("fa-IR");
+  const matchesSearch = (title: unknown) => String(title ?? "").toLocaleLowerCase("fa-IR").includes(normalizedSearch);
   const filteredNews = liveNews.filter(a =>
     (newsCat === "all" || a.category === newsCat) &&
-    (search === "" || a.title.includes(search))
+    (normalizedSearch === "" || matchesSearch(a.title))
   );
   const filteredEdu = liveNews.filter(a =>
     (eduCat === "all" || a.category === eduCat) &&
-    (search === "" || a.title.includes(search))
+    (normalizedSearch === "" || matchesSearch(a.title))
   );
   const filteredVideo = liveVideos.filter(v =>
     (videoCat === "all" || v.category === videoCat) &&
-    (search === "" || v.title.includes(search))
+    (normalizedSearch === "" || matchesSearch(v.title))
   );
 
   if (selectedArticle) return <ArticleDetail article={selectedArticle} onBack={()=>setSelectedArticle(null)}/>;
   if (selectedVideo)   return <VideoDetail   video={selectedVideo}     onBack={()=>setSelectedVideo(null)}/>;
 
   return (
-    <div className="w-fade" dir="rtl">
+    <div className="w-fade web-content-shell" dir="rtl">
+      <style>{`
+        .web-content-shell .web-content-layout { display:flex; gap:24px; align-items:flex-start; }
+        .web-content-shell .web-content-categories { width:220px; flex:0 0 220px; }
+        .web-content-shell .web-content-main { flex:1; min-width:0; }
+        @media (max-width:760px) {
+          .web-content-shell .web-content-layout { flex-direction:column; gap:16px; padding:16px !important; }
+          .web-content-shell .web-content-categories { width:100%; flex:0 0 auto; position:static !important; display:grid !important; grid-template-columns:repeat(auto-fit,minmax(135px,1fr)); }
+          .web-content-shell .web-content-main { width:100%; }
+          .web-content-shell input { min-width:0; }
+          .web-content-shell .web-content-featured { grid-template-columns:1fr !important; }
+        }
+      `}</style>
       {/* Platform Header */}
       <div style={{ background:"var(--w-surface)", borderBottom:"1px solid var(--w-border)" }}>
         <div style={{ maxWidth:1280, margin:"0 auto", padding:"0 24px" }}>
@@ -100,9 +115,9 @@ export default function WebContent({ section, onNavigate }: Props) {
         </div>
       </div>
 
-      <div style={{ maxWidth:1280, margin:"0 auto", padding:"24px", display:"flex", gap:24, alignItems:"flex-start" }}>
+      <div className="web-content-layout" style={{ maxWidth:1280, margin:"0 auto", padding:"24px" }}>
         {/* Category sidebar */}
-        <div style={{ width:220, flexShrink:0, display:"flex", flexDirection:"column", gap:6, position:"sticky", top:"calc(var(--w-header) + 80px)" }}>
+        <div className="web-content-categories" style={{ display:"flex", flexDirection:"column", gap:6, position:"sticky", top:"calc(var(--w-header) + 80px)" }}>
           {(section === "news" ? NEWS_CATS : section === "education" ? EDU_CATS : VIDEO_CATS).map(c => {
             const active = section==="news" ? newsCat===c.id : section==="education" ? eduCat===c.id : videoCat===c.id;
             return (
@@ -115,14 +130,14 @@ export default function WebContent({ section, onNavigate }: Props) {
         </div>
 
         {/* Content grid */}
-        <div style={{ flex:1 }}>
+        <div className="web-content-main">
           {section === "news" && (
             <>
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:18 }}>
                 <div style={{ fontSize:18, fontWeight:900 }}>آخرین اخبار</div>
                 <div style={{ fontSize:12, color:"var(--w-muted)" }}>{FA(filteredNews.length)} خبر</div>
               </div>
-              {filteredNews.length === 0 && <EmptyState msg="خبری یافت نشد"/>}
+              {loadingLive ? <div role="status" aria-live="polite" style={{padding:18,color:"var(--w-muted)"}}>در حال دریافت اخبار از سرور…</div> : loadError ? <div role="alert" style={{padding:18,borderRadius:12,border:"1px solid var(--w-border)",color:"var(--w-muted)",lineHeight:1.8}}>دریافت اخبار با مشکل روبه‌رو شد. اتصال سرور را بررسی و صفحه را دوباره بارگذاری کنید.</div> : filteredNews.length === 0 && <EmptyState msg="خبری یافت نشد"/>}
               <div style={{ display:"grid", gap:16 }}>
                 {/* Featured article */}
                 {filteredNews[0] && (
@@ -162,7 +177,7 @@ export default function WebContent({ section, onNavigate }: Props) {
                 <div style={{ fontSize:18, fontWeight:900 }}>محتوای آموزشی</div>
                 <div style={{ fontSize:12, color:"var(--w-muted)" }}>{FA(filteredEdu.length)} آموزش</div>
               </div>
-              {filteredEdu.length === 0 && <EmptyState msg="آموزشی یافت نشد"/>}
+              {loadingLive ? <div role="status" aria-live="polite" style={{padding:18,color:"var(--w-muted)"}}>در حال دریافت مطالب آموزشی از سرور…</div> : loadError ? <div role="alert" style={{padding:18,color:"var(--w-muted)",lineHeight:1.8}}>دریافت مطالب آموزشی ناموفق بود. اتصال سرور را بررسی و صفحه را دوباره بارگذاری کنید.</div> : filteredEdu.length === 0 && <EmptyState msg="آموزشی یافت نشد"/>}
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:14 }}>
                 {filteredEdu.map(a => (
                   <div key={a.id} className="w-card" style={{ cursor:"pointer", overflow:"hidden", transition:"all 0.15s" }}
@@ -198,7 +213,7 @@ export default function WebContent({ section, onNavigate }: Props) {
                 <div style={{ fontSize:18, fontWeight:900 }}>مرکز ویدیو</div>
                 <div style={{ fontSize:12, color:"var(--w-muted)" }}>{FA(filteredVideo.length)} ویدیو</div>
               </div>
-              {filteredVideo.length === 0 && <EmptyState msg="ویدیویی یافت نشد"/>}
+              {loadingLive ? <div role="status" aria-live="polite" style={{padding:18,color:"var(--w-muted)"}}>در حال دریافت ویدیوها از سرور…</div> : loadError ? <div role="alert" style={{padding:18,color:"var(--w-muted)",lineHeight:1.8}}>دریافت ویدیوها ناموفق بود. اتصال سرور را بررسی و صفحه را دوباره بارگذاری کنید.</div> : filteredVideo.length === 0 && <EmptyState msg="ویدیویی یافت نشد"/>}
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:14 }}>
                 {filteredVideo.map(v => (
                   <div key={v.id} className="w-card" style={{ cursor:"pointer", overflow:"hidden", transition:"all 0.15s" }}

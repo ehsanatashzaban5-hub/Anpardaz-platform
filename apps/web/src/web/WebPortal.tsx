@@ -110,7 +110,7 @@ function SupportPage({ isLoggedIn, onAuthRequired }: { isLoggedIn: boolean; onAu
         <h1 style={{ fontSize:28, fontWeight:900, marginBottom:8 }}>پشتیبانی</h1>
         <p style={{ fontSize:13, color:"var(--w-muted)" }}>پاسخ سوالات خود را در اینجا بیابید یا تیکت ارسال کنید</p>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:24, alignItems:"start" }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap:24, alignItems:"start" }}>
         {/* FAQ */}
         <div>
           <div style={{ fontSize:15, fontWeight:800, marginBottom:14 }}>سوالات متداول</div>
@@ -212,9 +212,22 @@ export default function WebPortal() {
     setShowFirstVisit(false);
   }, []);
 
-  // Apply dark/light to body for background continuity
+  // Keep the legacy mobile stylesheet from imposing its body layout on the web portal.
   useEffect(() => {
+    document.documentElement.classList.add("anpardaz-web-html");
+    document.body.classList.add("anpardaz-web-body");
+    return () => {
+      document.body.classList.remove("anpardaz-web-body");
+      document.documentElement.classList.remove("anpardaz-web-html");
+    };
+
+  }, []);
+
+  // Keep the page background in sync with the selected theme and restore it on unmount.
+  useEffect(() => {
+    const previousBackground = document.body.style.background;
     document.body.style.background = darkMode ? "#0d0d14" : "#f5f5fb";
+    return () => { document.body.style.background = previousBackground; };
   }, [darkMode]);
 
   const handleNavigate = useCallback((p: WebPage) => {
@@ -248,10 +261,77 @@ export default function WebPortal() {
 
   return (
     <div
-      className={darkMode ? "dark-theme" : ""}
-      style={{ minHeight:"100vh", background:"var(--w-bg)", color:"var(--w-text)", fontFamily:"Vazirmatn, sans-serif", direction:"rtl" }}
+      className={darkMode ? "dark-theme web-portal" : "web-portal"}
+      style={{ width:"100%", maxWidth:"100%", minWidth:0, minHeight:"100vh", margin:"0 auto", overflowX:"clip", background:"var(--w-bg)", color:"var(--w-text)", fontFamily:"Vazirmatn, sans-serif", direction:"rtl", boxSizing:"border-box" }}
     >
       <style>{CSS_VARS}</style>
+      <style>{`
+        /* The web app shares a stylesheet with the mobile app; neutralize mobile-only body rules here. */
+        html.anpardaz-web-html,
+        html.anpardaz-web-html body.anpardaz-web-body {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: none !important;
+          min-height: 100% !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow-x: hidden !important;
+        }
+        body.anpardaz-web-body {
+          display: block !important;
+          flex: none !important;
+          flex-direction: initial !important;
+          gap: 0 !important;
+          width: 100% !important;
+          height: auto !important;
+          min-height: 100vh !important;
+          min-width: 0 !important;
+          max-width: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow-x: hidden !important;
+        }
+        body.anpardaz-web-body #root {
+          width: 100% !important;
+          height: auto !important;
+          min-height: 100vh !important;
+          max-width: none !important;
+          min-width: 0 !important;
+          margin: 0 auto !important;
+          padding: 0 !important;
+          display: block !important;
+          flex: none !important;
+          position: relative !important;
+          left: auto !important;
+          right: auto !important;
+          transform: none !important;
+          zoom: 1 !important;
+        }
+        .web-portal {
+          display: block;
+          min-height: 100vh;
+          position: relative;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          margin-inline: auto;
+          overflow-x: clip;
+          isolation: isolate;
+        }
+        .web-portal main {
+          display: block;
+          width: 100%;
+          max-width: 100%;
+          min-width: 0;
+          margin-inline: auto;
+          box-sizing: border-box;
+        }
+        .web-portal main > * { min-width: 0; }
+        @supports not (overflow: clip) {
+          .web-portal { overflow-x: hidden; }
+        }
+      `}</style>
       <style>{`
         .w-fade { animation: wFadeIn 0.22s ease; }
         @keyframes wFadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
@@ -309,6 +389,7 @@ export default function WebPortal() {
             isLoggedIn={isLoggedIn}
             kycStatus={userRole === "kyc_verified" ? "verified" : userRole === "kyc_pending" ? "pending" : "not_verified"}
             onAuthRequired={handleAuthRequired}
+            onKycRequired={() => setShowKyc(true)}
           />
         )}
         {(page === "market" || page === "market-product" || page === "market-category" || page === "market-orders") && (
