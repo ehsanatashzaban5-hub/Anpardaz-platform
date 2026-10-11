@@ -220,7 +220,7 @@ export default function WebPortal() {
       document.body.classList.remove("anpardaz-web-body");
       document.documentElement.classList.remove("anpardaz-web-html");
     };
-    return () => document.body.classList.remove("anpardaz-web-body");
+
   }, []);
 
   // Keep the page background in sync with the selected theme and restore it on unmount.
