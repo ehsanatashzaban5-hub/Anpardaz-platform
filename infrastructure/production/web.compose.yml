@@ -1,9 +1,4 @@
-version: "3.3"
-
-networks:
-  web-edge:
-    driver: bridge
-
+version: "3.7"
 services:
   web:
     build:
@@ -21,7 +16,9 @@ services:
       - "127.0.0.1:8080:8080"
     read_only: true
     tmpfs:
-      - /tmp/nginx:rw,uid=101,gid=101,mode=0755
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -31,5 +28,4 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-    networks:
-      - web-edge
+      start_period: 10s

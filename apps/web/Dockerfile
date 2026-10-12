@@ -4,11 +4,9 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@11.24.0 --activate
 
-COPY package.json pnpm-lock.yaml ./
-
-RUN pnpm install --frozen-lockfile --ignore-workspace
-
 COPY . .
+
+RUN pnpm install --frozen-lockfile
 
 ARG VITE_PLATFORM_API_URL=/platform
 ARG VITE_ANSARRAF_API_URL=/ansarraf
@@ -24,23 +22,13 @@ ENV VITE_MARKET_API_URL=$VITE_MARKET_API_URL
 ENV VITE_HOOSH_API_URL=$VITE_HOOSH_API_URL
 ENV VITE_FINANCIAL_API_URL=$VITE_FINANCIAL_API_URL
 
-RUN pnpm build
-
+RUN pnpm --filter figma-make-app build
 
 FROM nginx:1.29-alpine AS runtime
 
-COPY nginx-prod.conf /etc/nginx/nginx.conf
-COPY --from=build /app/dist /usr/share/nginx/html
-
-RUN chown -R 101:101 /usr/share/nginx/html
+COPY apps/web/nginx-prod.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
 
 EXPOSE 8080
 
-USER 101:101
-
-HEALTHCHECK \
-    --interval=15s \
-    --timeout=5s \
-    --retries=5 \
-    --start-period=10s \
-    CMD wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1
+HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=10s CMD wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1
