@@ -1,496 +1,149 @@
-// ─────────────────────────────────────────────────
-// An Pardaz Web Portal — Main Router & Shell
-// Guests see homepage immediately — NO auth on load
-// ─────────────────────────────────────────────────
-import { useState, useEffect, useCallback } from "react";
-import { WebHeader, CSS_VARS } from "./WebLayout";
-import WebHome       from "./WebHome";
-import WebSarraf     from "./WebSarraf";
-import WebMarket     from "./WebMarket";
-import WebBanner     from "./WebBanner";
-import WebHoosh      from "./WebHooshProduction";
-import WebContent, { type ContentSection } from "./WebContent";
-import WebSettings from "./WebSettings";
-import WebForum from "./WebForum";
-import WebAuthModal, { WebKycModal } from "./WebAuth";
-import type { WebPage, UserRole } from "./types";
-
-// ── Simple inline pages for download / about / support ──────────
-import WI from "./WebIcons";
+import { useEffect, useState } from "react";
 import anPardazLogo from "@/imports/ChatGPT_Image_Aug_10__2026__06_38_53_PM__3_.png";
 
-const FA = (s: string | number) => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
+type InfoPanel = "about" | "contact" | null;
 
-function DownloadPage({ onNavigate }: { onNavigate: (p: WebPage) => void }) {
-  return (
-    <div className="w-fade" dir="rtl" style={{ maxWidth:800, margin:"60px auto", padding:"0 24px", textAlign:"center" }}>
-      <img src={anPardazLogo} alt="آن پرداز" style={{ width:80, height:80, objectFit:"contain", marginBottom:24, borderRadius:18 }}/>
-      <h1 style={{ fontSize:32, fontWeight:900, marginBottom:10 }}>دانلود اپلیکیشن آن پرداز</h1>
-      <p style={{ fontSize:15, color:"var(--w-muted)", lineHeight:1.8, marginBottom:36 }}>
-        اپلیکیشن آن پرداز را بر روی گوشی هوشمند خود نصب کنید و به تمام امکانات آن صراف، آن مارکت، آن بنر و آن هوش دسترسی داشته باشید.
-      </p>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))", gap:14, maxWidth:600, margin:"0 auto 40px" }}>
-        {[
-          { icon:"smartphone", label:"بازار (Bazaar)", color:"#7c3aed", desc:"اندروید" },
-          { icon:"smartphone", label:"مایکت (Myket)",  color:"#0891b2", desc:"اندروید" },
-          { icon:"smartphone", label:"App Store",       color:"#059669", desc:"iOS" },
-        ].map(s => (
-          <button key={s.label} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, padding:"22px", borderRadius:16, border:"1.5px solid var(--w-border)", background:"var(--w-card)", cursor:"pointer", transition:"all 0.14s" }}
-            onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.borderColor=s.color;(e.currentTarget as HTMLButtonElement).style.transform="translateY(-2px)";}}
-            onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.borderColor="var(--w-border)";(e.currentTarget as HTMLButtonElement).style.transform="none";}}
-          >
-            <div style={{ width:48, height:48, borderRadius:14, background:`${s.color}15`, display:"flex", alignItems:"center", justifyContent:"center", color:s.color }}>
-              <WI n={s.icon} s={24}/>
-            </div>
-            <div style={{ fontSize:13, fontWeight:800 }}>{s.label}</div>
-            <div style={{ fontSize:11, color:"var(--w-muted)" }}>{s.desc}</div>
-          </button>
-        ))}
-      </div>
-      <div style={{ padding:"18px", background:"rgba(124,58,237,0.07)", border:"1px solid rgba(124,58,237,0.18)", borderRadius:12, fontSize:13, color:"var(--w-muted)", lineHeight:1.7 }}>
-        نسخه وب پرتال آن پرداز تمام امکانات را در مرورگر شما فراهم می‌کند. اپلیکیشن موبایل تجربه کامل‌تری ارائه می‌دهد.
-      </div>
-    </div>
-  );
-}
+const ANDROID_URL = (import.meta.env.VITE_ANDROID_DOWNLOAD_URL ?? "").trim();
+const IOS_URL = (import.meta.env.VITE_IOS_DOWNLOAD_URL ?? "").trim();
 
-function AboutPage() {
-  return (
-    <div className="w-fade" dir="rtl" style={{ maxWidth:900, margin:"40px auto", padding:"0 24px" }}>
-      <div style={{ textAlign:"center", marginBottom:48 }}>
-        <img src={anPardazLogo} alt="آن پرداز" style={{ width:72, height:72, objectFit:"contain", marginBottom:16, borderRadius:16 }}/>
-        <h1 style={{ fontSize:30, fontWeight:900, marginBottom:10 }}>درباره آن پرداز</h1>
-        <p style={{ fontSize:14, color:"var(--w-muted)", lineHeight:1.9, maxWidth:600, margin:"0 auto" }}>
-          آن پرداز یک اکوسیستم جامع مالی و فناوری است که با هدف ارائه خدمات صرافی، بازار، آگهی و هوش مصنوعی در یک پلتفرم یکپارچه فعالیت می‌کند.
-        </p>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))", gap:20, marginBottom:48 }}>
-        {[
-          { icon:"zap",        title:"آن صراف",   desc:"صرافی حرفه‌ای با نقدینگی بالا و کارمزد رقابتی برای معامله ارزهای دیجیتال",           color:"#0891b2" },
-          { icon:"shopping-bag",title:"آن مارکت", desc:"بازار آنلاین برای خرید و فروش محصولات با تضمین کیفیت و پشتیبانی کامل",               color:"#d97706" },
-          { icon:"banner",     title:"آن بنر",    desc:"سامانه آگهی و نیازمندی‌های آنلاین برای ارائه آگهی‌های خرید، فروش و خدمات",            color:"#e8354e" },
-          { icon:"cpu",        title:"آن هوش",    desc:"فضای کار هوش مصنوعی با دسترسی به مدل‌های پیشرفته از برترین ارائه‌دهندگان جهان",       color:"#7c3aed" },
-          { icon:"bar-chart",  title:"مرکز مالی", desc:"اطلاعات مالی جامع، قیمت لحظه‌ای ارزها، نرخ تبدیل و ابزارهای تحلیل سرمایه‌گذاری",    color:"#059669" },
-        ].map(p => (
-          <div key={p.title} className="w-card" style={{ padding:"22px" }}>
-            <div style={{ width:44, height:44, borderRadius:13, background:`${p.color}12`, display:"flex", alignItems:"center", justifyContent:"center", marginBottom:14, color:p.color }}>
-              <WI n={p.icon} s={22}/>
-            </div>
-            <div style={{ fontSize:15, fontWeight:800, marginBottom:6 }}>{p.title}</div>
-            <div style={{ fontSize:12, color:"var(--w-muted)", lineHeight:1.7 }}>{p.desc}</div>
-          </div>
-        ))}
-      </div>
-      <div className="w-card" style={{ padding:"24px", textAlign:"center" }}>
-        <div style={{ fontSize:13, color:"var(--w-muted)", lineHeight:1.9 }}>
-          آن پرداز با رویکرد شفافیت، امنیت و نوآوری در حال توسعه است. تیم ما متشکل از متخصصان فناوری مالی، امنیت اطلاعات و هوش مصنوعی است.
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SupportPage({ isLoggedIn, onAuthRequired }: { isLoggedIn: boolean; onAuthRequired: () => void }) {
-  const [subject, setSubject]   = useState("");
-  const [message, setMessage]   = useState("");
-  const [sent, setSent]         = useState(false);
-  const [busy, setBusy]         = useState(false);
-  const [error, setError]       = useState("");
-
-  const FAQS = [
-    { q:"چطور حساب کاربری ایجاد کنم؟", a:"از طریق دکمه «ورود / ثبت‌نام» در بالای صفحه اقدام کنید. کافی است شماره موبایل خود را وارد کنید." },
-    { q:"KYC چیست و چرا لازم است؟", a:"تأیید هویت (KYC) برای استفاده از خدمات صرافی آن صراف الزامی است و امنیت همه کاربران را تضمین می‌کند." },
-    { q:"چه روش‌های پرداختی پشتیبانی می‌شود؟", a:"در آن مارکت از کارت بانکی پشتیبانی می‌شود. در آن صراف انتقال ارز دیجیتال امکان‌پذیر است." },
-    { q:"آیا اطلاعاتم امن است؟", a:"بله. آن پرداز از رمزنگاری پیشرفته و استانداردهای امنیتی بین‌المللی برای حفاظت از داده‌های کاربران استفاده می‌کند." },
-  ];
-
-  return (
-    <div className="w-fade" dir="rtl" style={{ maxWidth:900, margin:"40px auto", padding:"0 24px" }}>
-      <div style={{ textAlign:"center", marginBottom:36 }}>
-        <h1 style={{ fontSize:28, fontWeight:900, marginBottom:8 }}>پشتیبانی</h1>
-        <p style={{ fontSize:13, color:"var(--w-muted)" }}>پاسخ سوالات خود را در اینجا بیابید یا تیکت ارسال کنید</p>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap:24, alignItems:"start" }}>
-        {/* FAQ */}
-        <div>
-          <div style={{ fontSize:15, fontWeight:800, marginBottom:14 }}>سوالات متداول</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            {FAQS.map((f, i) => (
-              <div key={i} className="w-card" style={{ padding:"16px" }}>
-                <div style={{ fontSize:13, fontWeight:700, marginBottom:6, display:"flex", alignItems:"flex-start", gap:8 }}>
-                  <WI n="help-circle" s={15} style={{ color:"#7c3aed", flexShrink:0, marginTop:1 }}/>{f.q}
-                </div>
-                <div style={{ fontSize:12, color:"var(--w-muted)", lineHeight:1.7, paddingRight:23 }}>{f.a}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        {/* Ticket form */}
-        <div className="w-card" style={{ padding:"22px" }}>
-          <div style={{ fontSize:15, fontWeight:800, marginBottom:16 }}>ارسال تیکت</div>
-          {sent ? (
-            <div style={{ textAlign:"center", padding:"30px 0" }}>
-              <div style={{ width:56, height:56, borderRadius:"50%", background:"rgba(5,150,105,0.1)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 14px", color:"#059669" }}>
-                <WI n="check" s={26}/>
-              </div>
-              <div style={{ fontSize:15, fontWeight:800, marginBottom:6 }}>تیکت ارسال شد</div>
-              <div style={{ fontSize:12, color:"var(--w-muted)" }}>تیم پشتیبانی ما تا ۲۴ ساعت پاسخ خواهند داد.</div>
-            </div>
-          ) : (
-            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-              <div>
-                <label style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>موضوع</label>
-                <input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع تیکت..." className="w-input"/>
-              </div>
-              <div>
-                <label style={{ fontSize:12, fontWeight:700, color:"var(--w-muted)", display:"block", marginBottom:5 }}>پیام</label>
-                <textarea value={message} onChange={e=>setMessage(e.target.value)} rows={5} placeholder="مشکل یا سوال خود را شرح دهید..." className="w-input" style={{ resize:"vertical" }}/>
-              </div>
-              <button onClick={async()=>{if(!isLoggedIn){onAuthRequired();return;}if(!subject||!message||busy)return;setBusy(true);setError("");try{const token=localStorage.getItem("anpardaz:accessToken")??"";const base=((import.meta as any).env?.VITE_PLATFORM_API_URL as string|undefined)?.replace(/\/$/,"")??"";const r=await fetch(base+"/api/v1/support/tickets",{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${token}`},body:JSON.stringify({subject,message})});if(!r.ok)throw new Error("ارسال تیکت ناموفق بود.");setSent(true);setSubject("");setMessage("");}catch(e){setError(e instanceof Error?e.message:"ارسال تیکت ناموفق بود.")}finally{setBusy(false)}}} disabled={!subject||!message||busy} className="w-btn w-btn-primary" style={{ padding:"11px", opacity:subject&&message&&!busy?1:0.5 }}>
-                <WI n="send" s={15}/> {busy?"در حال ارسال…":"ارسال تیکت"}
-              </button>
-              {error && <div style={{fontSize:12,color:"#e8354e"}}>{error}</div>}
-              {!isLoggedIn && <div style={{fontSize:11,color:"var(--w-muted)"}}>برای ثبت تیکت ابتدا وارد حساب کاربری شوید.</div>}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Main Portal Component ─────────────────────────
 export default function WebPortal() {
-  const [page,     setPage]     = useState<WebPage>("home");
-  const [showAuth, setShowAuth] = useState(false);
-  const [showKyc,  setShowKyc]  = useState(false);
-  const [showFirstVisit, setShowFirstVisit] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole>(() => localStorage.getItem("anpardaz:web:role") === "user" ? "user" : "guest");
-  const [darkMode, setDarkMode] = useState(true);
-
-  // Scroll to top on page change
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [page]);
+  const [panel, setPanel] = useState<InfoPanel>(null);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (userRole === "guest") return;
-    const token = localStorage.getItem("anpardaz:accessToken");
-    if (!token) { setUserRole("guest"); return; }
-    const base = ((import.meta as any).env?.VITE_ANPARDAZ_API_URL as string | undefined)?.replace(/\/$/,"") ?? "";
-    if (!base) return;
-    void fetch(`${base}/api/v1/auth/me`, { headers: { accept: "application/json", authorization: `Bearer ${token}` }, cache: "no-store" })
-      .then(async r => {
-        if (r.status === 401) {
-          localStorage.removeItem("anpardaz:accessToken");
-          localStorage.removeItem("anpardaz:web:role");
-          localStorage.removeItem("anpardaz:web:email");
-          localStorage.removeItem("anpardaz:web:phone");
-          setUserRole("guest");
-          return null;
-        }
-        return r.ok ? r.json() : null;
-      })
-      .then(d => d?.user?.status === "active"
-        ? fetch(`${base}/api/v1/user/settings`, { headers: { accept: "application/json", authorization: `Bearer ${token}` }, cache: "no-store" }).then(r => r.ok ? r.json() : null)
-        : null)
-      .then(d => { if (d?.settings?.theme) setDarkMode(d.settings.theme !== "light"); })
-      .catch(() => {});
-  }, [userRole]);
-
-  // First-visit notice: shown once per browser and never forced again after dismissal.
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem("anpardaz:web:first-visit-notice") !== "dismissed") {
-        setShowFirstVisit(true);
-      }
-    } catch {
-      setShowFirstVisit(true);
-    }
-  }, []);
-
-  const dismissFirstVisit = useCallback(() => {
-    try { window.localStorage.setItem("anpardaz:web:first-visit-notice", "dismissed"); } catch { /* storage unavailable */ }
-    setShowFirstVisit(false);
-  }, []);
-
-  // Keep the legacy mobile stylesheet from imposing its body layout on the web portal.
-  useEffect(() => {
-    document.documentElement.classList.add("anpardaz-web-html");
-    document.body.classList.add("anpardaz-web-body");
-    return () => {
-      document.body.classList.remove("anpardaz-web-body");
-      document.documentElement.classList.remove("anpardaz-web-html");
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPanel(null);
     };
-
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Keep the page background in sync with the selected theme and restore it on unmount.
-  useEffect(() => {
-    const previousBackground = document.body.style.background;
-    document.body.style.background = darkMode ? "#0d0d14" : "#f5f5fb";
-    return () => { document.body.style.background = previousBackground; };
-  }, [darkMode]);
-
-  const handleNavigate = useCallback((p: WebPage) => {
-    // These pages require login
-    const protected_: WebPage[] = ["sarraf-trade","sarraf-assets","sarraf-deposit","sarraf-withdraw","market-orders","banner-post","kyc","settings"];
-    if (protected_.includes(p) && userRole === "guest") {
-      setShowAuth(true);
+  const openDownload = (url: string) => {
+    if (!url) {
+      setNotice("لینک دانلود این نسخه هنوز تنظیم نشده است.");
+      window.setTimeout(() => setNotice(""), 3500);
       return;
     }
-    setPage(p);
-  }, [userRole]);
-
-  const handleAuthRequired = useCallback(() => {
-    setShowAuth(true);
-  }, []);
-
-  const handleAuthSuccess = useCallback((accessToken: string, email: string) => {
-    localStorage.setItem("anpardaz:accessToken", accessToken);
-    localStorage.setItem("anpardaz:web:email", email);
-    localStorage.setItem("anpardaz:web:role", "user");
-    setUserRole("user");
-    setShowAuth(false);
-  }, []);
-
-  const isLoggedIn = userRole !== "guest" && Boolean(localStorage.getItem("anpardaz:accessToken"));
-
-  // Which section for WebContent
-  const contentSection: ContentSection =
-    page === "education" ? "education" :
-    page === "video"     ? "video"     : "news";
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
   return (
-    <div
-      className={darkMode ? "dark-theme web-portal" : "web-portal"}
-      style={{ width:"100%", maxWidth:"100%", minWidth:0, minHeight:"100vh", margin:"0 auto", overflowX:"clip", background:"var(--w-bg)", color:"var(--w-text)", fontFamily:"Vazirmatn, sans-serif", direction:"rtl", boxSizing:"border-box" }}
-    >
-      <style>{CSS_VARS}</style>
-      <style>{`
-        /* The web app shares a stylesheet with the mobile app; neutralize mobile-only body rules here. */
-        html.anpardaz-web-html,
-        html.anpardaz-web-html body.anpardaz-web-body {
-          width: 100% !important;
-          min-width: 0 !important;
-          max-width: none !important;
-          min-height: 100% !important;
-          height: auto !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          overflow-x: hidden !important;
-        }
-        body.anpardaz-web-body {
-          display: block !important;
-          flex: none !important;
-          flex-direction: initial !important;
-          gap: 0 !important;
-          width: 100% !important;
-          height: auto !important;
-          min-height: 100vh !important;
-          min-width: 0 !important;
-          max-width: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          overflow-x: hidden !important;
-        }
-        body.anpardaz-web-body #root {
-          width: 100% !important;
-          height: auto !important;
-          min-height: 100vh !important;
-          max-width: none !important;
-          min-width: 0 !important;
-          margin: 0 auto !important;
-          padding: 0 !important;
-          display: block !important;
-          flex: none !important;
-          position: relative !important;
-          left: auto !important;
-          right: auto !important;
-          transform: none !important;
-          zoom: 1 !important;
-        }
-        .web-portal {
-          display: block;
-          min-height: 100vh;
-          position: relative;
-          width: 100%;
-          max-width: 100%;
-          min-width: 0;
-          margin-inline: auto;
-          overflow-x: clip;
-          isolation: isolate;
-        }
-        .web-portal main {
-          display: block;
-          width: 100%;
-          max-width: 100%;
-          min-width: 0;
-          margin-inline: auto;
-          box-sizing: border-box;
-        }
-        .web-portal main > * { min-width: 0; }
-        @supports not (overflow: clip) {
-          .web-portal { overflow-x: hidden; }
-        }
-      `}</style>
-      <style>{`
-        .w-fade { animation: wFadeIn 0.22s ease; }
-        @keyframes wFadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
-        .w-card {
-          background: var(--w-card);
-          border: 1px solid var(--w-border);
-          border-radius: 14px;
-          box-shadow: var(--w-shadow);
-          transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
-        }
-        .w-card2 { background: var(--w-card2); }
-        .w-input {
-          width: 100%; padding: 9px 12px; border: 1.5px solid var(--w-border);
-          border-radius: 9px; background: var(--w-card); color: var(--w-text);
-          font-family: Vazirmatn, sans-serif; font-size: 13px; outline: none;
-          transition: border-color 0.15s;
-          box-sizing: border-box;
-        }
-        .w-input:focus { border-color: var(--w-accent); }
-        .w-btn {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 8px 16px; border-radius: 9px; border: none;
-          font-family: Vazirmatn, sans-serif; font-size: 13px; font-weight: 700;
-          cursor: pointer; transition: all 0.14s; white-space: nowrap;
-        }
-        .w-btn-primary { background: var(--w-accent); color: #fff; }
-        .w-btn-primary:hover { filter: brightness(1.08); }
-        .w-btn-ghost { background: transparent; color: var(--w-text); border: 1.5px solid var(--w-border); }
-        .w-btn-ghost:hover { background: var(--w-hover); }
-        .w-btn-muted { background: var(--w-card2); color: var(--w-muted); }
-        .w-btn-muted:hover { background: var(--w-hover); }
-        [dir="rtl"] select { text-align: right; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--w-border2); border-radius: 4px; }
-      `}</style>
+    <div className="ap-landing" dir="rtl">
+      <style>{styles}</style>
+      <header className="ap-header">
+        <a className="ap-brand" href="#home" aria-label="صفحه اصلی آن‌پرداز">
+          <img src={anPardazLogo} alt="لوگوی آن‌پرداز" />
+          <span>آن‌پرداز</span>
+        </a>
+        <nav className="ap-nav" aria-label="منوی اصلی">
+          <button type="button" onClick={() => setPanel("about")}>درباره ما</button>
+          <button type="button" onClick={() => setPanel("contact")}>تماس با ما</button>
+        </nav>
+      </header>
 
-      <WebHeader
-        currentPage={page}
-        onNavigate={handleNavigate}
-        userRole={userRole}
-        onAuthClick={() => setShowAuth(true)}
-        darkMode={darkMode}
-        onToggleDark={() => setDarkMode(d => !d)}
-      />
-
-      <main style={{ paddingTop:"var(--w-header)" }}>
-        {page === "home" && (
-          <WebHome onNavigate={handleNavigate}/>
-        )}
-        {(page === "sarraf" || page === "sarraf-markets" || page === "sarraf-trade" ||
-          page === "sarraf-assets" || page === "sarraf-deposit" || page === "sarraf-withdraw") && (
-          <WebSarraf
-            onNavigate={handleNavigate}
-            isLoggedIn={isLoggedIn}
-            kycStatus={userRole === "kyc_verified" ? "verified" : userRole === "kyc_pending" ? "pending" : "not_verified"}
-            onAuthRequired={handleAuthRequired}
-            onKycRequired={() => setShowKyc(true)}
-          />
-        )}
-        {(page === "market" || page === "market-product" || page === "market-category" || page === "market-orders") && (
-          <WebMarket onNavigate={handleNavigate}/>
-        )}
-        {(page === "banner" || page === "banner-detail" || page === "banner-post") && (
-          <WebBanner
-            onNavigate={handleNavigate}
-            isLoggedIn={isLoggedIn}
-            onAuthRequired={handleAuthRequired}
-          />
-        )}
-        {page === "hoosh" && (
-          <WebHoosh onNavigate={handleNavigate}/>
-        )}
-        {(page === "news" || page === "news-article" || page === "education" ||
-          page === "education-article" || page === "video" || page === "video-detail") && (
-          <WebContent section={contentSection} onNavigate={handleNavigate}/>
-        )}
-        {page === "download" && (
-          <DownloadPage onNavigate={handleNavigate}/>
-        )}
-        {page === "about" && (
-          <AboutPage/>
-        )}
-        {page === "forum" && (
-          <WebForum isLoggedIn={isLoggedIn} onAuthRequired={handleAuthRequired}/>
-        )}
-        {page === "support" && (
-          <SupportPage isLoggedIn={isLoggedIn} onAuthRequired={handleAuthRequired}/>
-        )}
-      </main>
-
-
-      {showFirstVisit && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="اطلاعیه بازدید اول"
-          onClick={dismissFirstVisit}
-          style={{
-            position:"fixed", inset:0, zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center",
-            padding:"24px", background:"rgba(0,0,0,0.42)", backdropFilter:"blur(6px)",
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              position:"relative", width:"min(460px,100%)", padding:"34px 30px 28px", textAlign:"center",
-              background:"var(--w-card)", color:"var(--w-text)", border:"1px solid var(--w-border)",
-              borderRadius:22, boxShadow:"var(--w-shadow-lg)", animation:"wFirstVisitIn .22s ease both",
-            }}
-          >
-            <button
-              type="button"
-              onClick={dismissFirstVisit}
-              aria-label="بستن"
-              style={{
-                position:"absolute", top:12, left:12, width:34, height:34, borderRadius:10,
-                border:"1px solid var(--w-border)", background:"var(--w-card2)", color:"var(--w-muted)",
-                cursor:"pointer", fontSize:20, lineHeight:1,
-              }}
-            >×</button>
-            <div style={{
-              width:58, height:58, margin:"0 auto 18px", borderRadius:17,
-              display:"flex", alignItems:"center", justifyContent:"center",
-              background:"rgba(124,58,237,0.10)", border:"1px solid rgba(124,58,237,0.18)",
-            }}>
-              <WI n="sparkle" s={27} style={{ color:"var(--w-accent)" }}/>
-            </div>
-            <div style={{ fontSize:"clamp(18px,3vw,22px)", fontWeight:900, lineHeight:1.8 }}>
-              در حال تکمیل آن پرداز هستیم:
-            </div>
-            <button
-              type="button"
-              onClick={dismissFirstVisit}
-              className="w-btn w-btn-primary"
-              style={{ marginTop:24, minWidth:132, padding:"10px 22px" }}
-            >
-              متوجه شدم
+      <main id="home" className="ap-main">
+        <div className="ap-orb ap-orb-one" aria-hidden="true" />
+        <div className="ap-orb ap-orb-two" aria-hidden="true" />
+        <section className="ap-hero" aria-labelledby="ap-title">
+          <div className="ap-mark">
+            <img src={anPardazLogo} alt="" />
+          </div>
+          <div className="ap-eyebrow"><span /> دنیای خدمات، در یک اپلیکیشن</div>
+          <h1 id="ap-title">همه‌چیز، <span>یک‌جا.</span></h1>
+          <p className="ap-intro">
+            با آن‌پرداز، ساده‌تر و یکپارچه‌تر به خدمات دیجیتال خود دسترسی داشته باشید.
+          </p>
+          <div className="ap-downloads" aria-label="دانلود اپلیکیشن">
+            <button className="ap-download ap-download-primary" type="button" onClick={() => openDownload(ANDROID_URL)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5 5.4 1M17 3.5 18.6 1M4 9h16M6 5h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-1v3h-2v-3H9v3H7v-3H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /></svg>
+              <span><small>دریافت اپلیکیشن</small><strong>دانلود نسخه اندروید</strong></span>
+              <b aria-hidden="true">←</b>
+            </button>
+            <button className="ap-download ap-download-secondary" type="button" onClick={() => openDownload(IOS_URL)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.7 12.8c0-2.1 1.7-3.1 1.8-3.2a4 4 0 0 0-3.2-1.7c-1.4-.1-2.7.8-3.4.8s-1.8-.8-3-.8a4.5 4.5 0 0 0-3.8 2.3c-1.6 2.8-.4 7 1.1 9.2.7 1.1 1.6 2.3 2.7 2.2 1.1 0 1.5-.7 2.9-.7s1.8.7 3 .7 2-.9 2.7-2.1a9 9 0 0 0 1.2-2.4 3.7 3.7 0 0 1-2-4.3ZM14.5 6.5A4 4 0 0 0 15.4 3a4.2 4.2 0 0 0-2.8 1.5 3.8 3.8 0 0 0-.9 3.4 3.5 3.5 0 0 0 2.8-1.4Z" /></svg>
+              <span><small>دریافت اپلیکیشن</small><strong>نسخه iOS</strong></span>
+              <b aria-hidden="true">←</b>
             </button>
           </div>
+          <p className="ap-note">تجربه‌ای ساده، سریع و یکپارچه</p>
+        </section>
+      </main>
+
+      {notice && <div className="ap-toast" role="status">{notice}</div>}
+
+      {panel && (
+        <div className="ap-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setPanel(null); }}>
+          <section className="ap-dialog" role="dialog" aria-modal="true" aria-labelledby="ap-dialog-title">
+            <button className="ap-close" type="button" onClick={() => setPanel(null)} aria-label="بستن">×</button>
+            <img className="ap-dialog-logo" src={anPardazLogo} alt="" />
+            {panel === "about" ? (
+              <>
+                <h2 id="ap-dialog-title">درباره آن‌پرداز</h2>
+                <p>آن‌پرداز با هدف یکپارچه‌سازی خدمات دیجیتال در یک تجربه ساده و قابل‌دسترس توسعه می‌یابد؛ تا کاربران بتوانند خدمات موردنیاز خود را از یک مسیر روشن و منظم دنبال کنند.</p>
+              </>
+            ) : (
+              <>
+                <h2 id="ap-dialog-title">تماس با ما</h2>
+                <p>برای پرسش‌ها و پیشنهادهای خود با تیم آن‌پرداز در ارتباط باشید.</p>
+                <a className="ap-email" href="mailto:info@anpardaz.ir">info@anpardaz.ir</a>
+              </>
+            )}
+          </section>
         </div>
-      )}
-      <style>{`@keyframes wFirstVisitIn { from { opacity:0; transform:translateY(10px) scale(.98); } to { opacity:1; transform:none; } }`}</style>
-
-      {/* Auth modal — rendered ONLY when explicitly requested */}
-      {showAuth && (
-        <WebAuthModal
-          onClose={() => setShowAuth(false)}
-          onSuccess={handleAuthSuccess}
-        />
-      )}
-
-      {/* KYC modal — rendered ONLY when explicitly requested */}
-      {showKyc && (
-        <WebKycModal
-          onClose={() => setShowKyc(false)}
-          currentStatus="not_verified"
-        />
       )}
     </div>
   );
 }
+
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap');
+  .ap-landing{--ap-ink:#f4fbfa;--ap-muted:#9cb3b8;--ap-bg:#06171d;--ap-teal:#35dfc0;min-height:100vh;min-height:100svh;background:var(--ap-bg);color:var(--ap-ink);font-family:"Vazirmatn",system-ui,sans-serif;position:relative;overflow:hidden}
+  .ap-landing *{box-sizing:border-box}
+  .ap-header{height:84px;max-width:1240px;margin:0 auto;padding:0 32px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2;border-bottom:1px solid rgba(204,238,236,.09)}
+  .ap-brand{display:inline-flex;align-items:center;gap:11px;color:var(--ap-ink);text-decoration:none;font-size:19px;font-weight:800;letter-spacing:-.5px}
+  .ap-brand img{width:38px;height:38px;object-fit:contain;border-radius:10px}
+  .ap-nav{display:flex;align-items:center;gap:8px}
+  .ap-nav button{font:500 14px "Vazirmatn",system-ui,sans-serif;color:#c5d6d7;background:transparent;border:0;border-radius:9px;padding:10px 15px;cursor:pointer;transition:color .2s,background .2s}
+  .ap-nav button:hover{color:#fff;background:rgba(255,255,255,.06)}
+  .ap-main{min-height:calc(100svh - 84px);display:grid;place-items:center;position:relative;padding:54px 24px 76px;isolation:isolate}
+  .ap-main:before{content:"";position:absolute;inset:0;z-index:-2;opacity:.2;background-image:linear-gradient(rgba(128,194,194,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(128,194,194,.08) 1px,transparent 1px);background-size:64px 64px;mask-image:radial-gradient(ellipse at center,#000 0%,transparent 74%)}
+  .ap-main:after{content:"";position:absolute;width:min(800px,90vw);height:430px;top:15%;left:50%;transform:translateX(-50%);z-index:-1;background:radial-gradient(ellipse,rgba(17,167,145,.16),transparent 68%);pointer-events:none}
+  .ap-orb{position:absolute;border:1px solid rgba(53,223,192,.14);border-radius:50%;pointer-events:none;z-index:-1}
+  .ap-orb-one{width:420px;height:420px;left:-230px;top:17%;box-shadow:0 0 0 46px rgba(53,223,192,.018),0 0 0 92px rgba(53,223,192,.014)}
+  .ap-orb-two{width:300px;height:300px;right:-180px;bottom:5%;box-shadow:0 0 0 36px rgba(53,223,192,.018),0 0 0 72px rgba(53,223,192,.012)}
+  .ap-hero{width:min(100%,780px);text-align:center;position:relative;animation:ap-enter .65s cubic-bezier(.2,.7,.2,1) both}
+  .ap-mark{width:78px;height:78px;margin:0 auto 27px;display:grid;place-items:center;border:1px solid rgba(91,224,198,.25);border-radius:24px;background:linear-gradient(145deg,rgba(53,223,192,.14),rgba(255,255,255,.025));box-shadow:0 18px 70px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.1)}
+  .ap-mark img{width:53px;height:53px;object-fit:contain;border-radius:13px}
+  .ap-eyebrow{display:inline-flex;align-items:center;gap:9px;color:#a7c5c7;font-size:13px;font-weight:600;letter-spacing:.1px;margin-bottom:17px}
+  .ap-eyebrow span{width:7px;height:7px;background:var(--ap-teal);border-radius:50%;box-shadow:0 0 16px rgba(53,223,192,.8)}
+  .ap-hero h1{font-size:clamp(43px,7vw,78px);line-height:1.18;letter-spacing:-2.8px;font-weight:900;margin:0;color:#f5fbfa}
+  .ap-hero h1 span{color:var(--ap-teal);text-shadow:0 0 48px rgba(53,223,192,.12)}
+  .ap-intro{font-size:clamp(15px,2vw,18px);line-height:2;color:#a8bec1;max-width:510px;margin:20px auto 34px;font-weight:400}
+  .ap-downloads{display:flex;justify-content:center;gap:13px;flex-wrap:wrap}
+  .ap-download{min-width:238px;min-height:72px;display:flex;align-items:center;gap:13px;text-align:right;padding:13px 16px;border-radius:15px;cursor:pointer;font-family:"Vazirmatn",system-ui,sans-serif;transition:transform .2s,border-color .2s,background .2s,box-shadow .2s}
+  .ap-download:hover{transform:translateY(-3px)}
+  .ap-download:focus-visible,.ap-nav button:focus-visible,.ap-close:focus-visible{outline:2px solid var(--ap-teal);outline-offset:4px}
+  .ap-download svg{width:25px;height:25px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round}
+  .ap-download-secondary svg{fill:currentColor;stroke:none}
+  .ap-download span{display:flex;flex-direction:column;gap:2px;flex:1}
+  .ap-download small{font-size:11px;font-weight:500;opacity:.72}
+  .ap-download strong{font-size:14px;font-weight:800;white-space:nowrap}
+  .ap-download b{font-size:19px;font-weight:500;opacity:.65;transition:transform .2s}
+  .ap-download:hover b{transform:translateX(-3px)}
+  .ap-download-primary{background:var(--ap-teal);color:#06201e;border:1px solid var(--ap-teal);box-shadow:0 8px 30px rgba(53,223,192,.12)}
+  .ap-download-primary:hover{background:#61ecd2;box-shadow:0 12px 34px rgba(53,223,192,.2)}
+  .ap-download-secondary{background:rgba(255,255,255,.035);color:#eff9f7;border:1px solid rgba(204,238,236,.19)}
+  .ap-download-secondary:hover{background:rgba(255,255,255,.07);border-color:rgba(53,223,192,.4)}
+  .ap-note{font-size:12px;color:#718e93;margin:27px 0 0;letter-spacing:.2px}
+  .ap-toast{position:fixed;z-index:20;bottom:24px;left:50%;transform:translateX(-50%);max-width:calc(100vw - 32px);padding:12px 18px;background:#102c31;border:1px solid rgba(53,223,192,.3);border-radius:12px;color:#e7f8f5;font-size:13px;box-shadow:0 10px 40px rgba(0,0,0,.3);text-align:center}
+  .ap-overlay{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:20px;background:rgba(1,10,13,.72);backdrop-filter:blur(10px)}
+  .ap-dialog{position:relative;width:min(100%,460px);padding:36px 32px 32px;text-align:center;border:1px solid rgba(175,224,220,.15);border-radius:22px;background:#0b2027;box-shadow:0 28px 100px rgba(0,0,0,.4);animation:ap-enter .22s ease both}
+  .ap-close{position:absolute;top:13px;left:15px;width:34px;height:34px;border:0;border-radius:10px;background:rgba(255,255,255,.06);color:#d5e8e6;font-size:25px;line-height:1;cursor:pointer}
+  .ap-dialog-logo{width:52px;height:52px;object-fit:contain;border-radius:12px;margin-bottom:12px}
+  .ap-dialog h2{font-size:22px;margin:0 0 12px;font-weight:800}
+  .ap-dialog p{font-size:14px;line-height:2;color:#a8bec1;margin:0}
+  .ap-email{display:inline-block;margin-top:15px;color:var(--ap-teal);font-size:15px;font-weight:700;text-decoration:none;border-bottom:1px solid rgba(53,223,192,.35);padding-bottom:3px}
+  @keyframes ap-enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  @media(min-width:601px) and (max-width:900px){.ap-header{height:78px;padding:0 28px}.ap-main{min-height:calc(100svh - 78px);padding:58px 34px 72px}.ap-hero{width:min(100%,700px)}.ap-mark{width:74px;height:74px;margin-bottom:25px}.ap-hero h1{font-size:clamp(58px,8vw,72px)}.ap-intro{max-width:490px;font-size:17px;margin:19px auto 32px}.ap-downloads{gap:12px}.ap-download{min-width:220px;padding:12px 14px}.ap-orb-one{left:-280px}.ap-orb-two{right:-230px}}\n  @media(max-width:600px){.ap-header{height:72px;padding:0 18px}.ap-brand{font-size:17px;gap:8px}.ap-brand img{width:32px;height:32px}.ap-nav{gap:0}.ap-nav button{font-size:12px;padding:9px 8px}.ap-main{min-height:calc(100svh - 72px);padding:48px 20px 58px}.ap-mark{width:68px;height:68px;border-radius:20px;margin-bottom:24px}.ap-mark img{width:46px;height:46px}.ap-hero h1{letter-spacing:-1.7px}.ap-intro{margin:17px auto 27px}.ap-downloads{flex-direction:column;align-items:stretch;width:min(100%,340px);margin:0 auto}.ap-download{width:100%;min-width:0}.ap-dialog{padding:34px 22px 26px}.ap-orb-one{left:-330px}.ap-orb-two{right:-250px}}
+  @media(prefers-reduced-motion:reduce){.ap-hero,.ap-dialog{animation:none}.ap-download,.ap-nav button{transition:none}}
+`;

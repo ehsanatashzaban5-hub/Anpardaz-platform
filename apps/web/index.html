@@ -1,41 +1,14 @@
 <!doctype html>
-<html lang="<!-- figma:lang -->">
+<html lang="fa" dir="rtl">
   <head>
-    <!-- figma:head-start -->
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https:; media-src 'self' data: blob: https:; worker-src 'self' blob:" />
-    <!-- The web portal is desktop-only. On phones the complete 1280px desktop
-         canvas is scaled to fit the device; it must never become a mobile UI
-         or require horizontal panning. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <style>
-      html,
-      body {
-        width: 100%;
-        min-width: 0;
-        margin: 0;
-        overflow-x: hidden;
-      }
-
-      #root {
-        width: 1280px;
-        min-width: 1280px;
-      }
-
-      /* Scale the unchanged desktop canvas on narrow devices. This is visual
-         scaling, not responsive/mobile re-layout: the desktop proportions,
-         columns and navigation remain exactly the same. */
-      @media (max-width: 1279px) {
-        #root {
-          zoom: calc(100vw / 1280);
-        }
-      }
-    </style>
-    <title><!-- figma:title --></title>
-    <!-- figma:head-end -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#06171d" />
+    <meta name="description" content="آن‌پرداز؛ دسترسی ساده و یکپارچه به خدمات دیجیتال در یک اپلیکیشن." />
+    <title>آن‌پرداز | همه‌چیز، یک‌جا</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https:; media-src 'self' data: blob: https:; worker-src 'self' blob:" />
   </head>
   <body>
-    <!-- figma:body-start -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
