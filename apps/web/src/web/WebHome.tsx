@@ -57,8 +57,6 @@ export default function WebHome({ onNavigate }: HomeProps) {
         <div style={{ position:"absolute", inset:0, pointerEvents:"none", overflow:"hidden" }}>
           <div style={{ position:"absolute", top:-200, right:-100, width:800, height:800, borderRadius:"50%", background:"radial-gradient(circle,rgba(124,58,237,0.09) 0%,transparent 65%)" }}/>
           <div style={{ position:"absolute", top:100, left:-200, width:600, height:600, borderRadius:"50%", background:"radial-gradient(circle,rgba(8,145,178,0.07) 0%,transparent 65%)" }}/>
-          {/* grid pattern */}
-          <div style={{ position:"absolute", inset:0, backgroundImage:"linear-gradient(var(--w-border) 1px,transparent 1px),linear-gradient(90deg,var(--w-border) 1px,transparent 1px)", backgroundSize:"48px 48px", opacity:0.5 }}/>
         </div>
 
         <div style={{ maxWidth:1280, margin:"0 auto", padding:"clamp(40px,8vw,80px) clamp(16px,3vw,24px) 40px", position:"relative" }}>

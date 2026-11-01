@@ -1150,7 +1150,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
           )}
           {/* ── Spot Trade ── */}
           {tab === "spot" && (
-            <div style={{ display:"flex", gap:0, height:"calc(100vh - var(--w-header) - 52px)" }}>
+            <div style={{ display:"flex", gap:0, height:isMobile?"auto":"calc(100vh - var(--w-header) - 52px)", minHeight:isMobile?"min(70dvh, 720px)":undefined }}>
               <TradeView
                 asset={selectedAsset} asks={asks} bids={bids}
                 tradeType={tradeType} onTradeType={setTradeType}
@@ -1170,7 +1170,7 @@ export default function WebSarraf({ onNavigate, kycStatus: initialKycStatus, onA
           )}
           {/* ── Margin Trade ── */}
           {tab === "margin" && (
-            <div style={{ display:"flex", gap:0, height:"calc(100vh - var(--w-header) - 52px)" }}>
+            <div style={{ display:"flex", gap:0, height:isMobile?"auto":"calc(100vh - var(--w-header) - 52px)", minHeight:isMobile?"min(70dvh, 720px)":undefined }}>
               <TradeView
                 asset={selectedAsset} asks={asks} bids={bids}
                 tradeType={tradeType} onTradeType={setTradeType}
