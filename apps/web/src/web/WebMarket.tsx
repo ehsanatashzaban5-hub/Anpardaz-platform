@@ -119,8 +119,8 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
  if(selected)return <ProductDetail p={selected} onBack={()=>setSelected(null)} fav={favorites.has(selected.id)} onFav={()=>void toggleFav(selected.id)}/>;
  return <div className="an-market-root" dir="rtl" style={vars}>
   <div className="am-header">
-   <div style={{padding:"18px 16px 14px",maxWidth:1280,margin:"auto"}}>
-    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+   <div className="am-header-inner" style={{padding:"18px 16px 14px",maxWidth:1280,margin:"auto"}}>
+    <div className="am-brand-row" style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
      <div style={{width:44,height:44,borderRadius:14,background:"var(--am-accent)",display:"grid",placeItems:"center",color:"#fff",fontSize:22}}>⌂</div>
      <div style={{flex:1}}><div style={{fontSize:20,fontWeight:900}}>آن مارکت</div><div style={{fontSize:11,color:"var(--am-muted)",marginTop:3}}>مقایسه قیمت از فروشگاه‌های واقعی</div></div>
      <div style={{fontSize:11,fontWeight:800,color:"var(--am-accent)",background:"var(--am-accent-light)",padding:"9px 12px",borderRadius:12}}>{fa(roots.length)} دسته اصلی</div>
@@ -141,13 +141,13 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
    </div>
   </div>
   {tab==="home"&&<div>
-   <div style={{display:"flex",overflowX:"auto",gap:8,padding:"14px 16px 8px"}}>
+   <div className="am-category-strip" style={{display:"flex",overflowX:"auto",gap:8,padding:"14px 16px 8px"}}>
     {roots.map(c=><button key={c.id} className="am-cat-chip" onClick={()=>setCat(c.slug)}><span className="am-cat-chip-label">{c.name_fa}</span></button>)}
    </div>
    <div className="am-compare-bar" style={{margin:"6px 16px 14px",border:"1px solid var(--am-accent-border)",borderRadius:16}}>
     <button className={"am-compare-btn"+(compare.length>0?" active":"")} onClick={()=>setTab("assistant")}><span>▦</span>{compare.length>1?"مقایسه فعال است":"مقایسه کن"}{compare.length>0&&<span>{fa(compare.length)} محصول</span>}</button>
    </div>
-   <div style={{padding:"0 16px 14px"}}>
+   <div className="am-content" style={{padding:"0 16px 14px"}}>
     {(home?.sections||[]).filter((s:any)=>s.section_type==="products").slice(0,3).map((s:any)=><Card key={s.key} style={{padding:14,marginBottom:12}}><b>{s.title}</b><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:8,marginTop:10}}>{(home?.products||[]).slice(0,4).map((p:any)=><button key={p.id} onClick={()=>setSelected(mapProduct(p))} style={{border:"1px solid var(--am-border)",background:"var(--am-card)",borderRadius:12,padding:10,textAlign:"right",fontFamily:"Vazirmatn"}}><div style={{fontSize:11,fontWeight:800}}>{p.title}</div><div style={{fontSize:10,color:"var(--am-accent)",marginTop:5}}>{p.price_min>0?money(Number(p.price_min)):"قیمت اعلام نشده"}</div></button>)}</div></Card>)}
     {loading?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت محصولات واقعی…</Card>:error?<Card style={{padding:60,textAlign:"center",color:"#DC2626"}}>{error}</Card>:products.length===0?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>هنوز محصول واقعی در دیتابیس ثبت نشده است؛ بعد از اتصال فید فروشگاه‌ها این بخش خودکار پر می‌شود.</Card>:<div className="am-product-grid">{products.map(p=><ProductCard key={p.id} p={p} fav={favorites.has(p.id)} onFav={()=>void toggleFav(p.id)} onOpen={()=>setSelected(p)} selected={compare.includes(p.id)} onCompare={()=>compareToggle(p.id)}/>)}</div>}
    </div>
