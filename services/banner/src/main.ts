@@ -249,6 +249,8 @@ async function registerPrivate(app:FastifyInstance){
       bp.display_name buyer_display_name,sp.display_name seller_display_name,
       CASE WHEN bp.avatar_data IS NOT NULL THEN 'data:'||COALESCE(bp.avatar_mime,'image/jpeg')||';base64,'||encode(bp.avatar_data,'base64') END buyer_avatar_data_url,
       CASE WHEN sp.avatar_data IS NOT NULL THEN 'data:'||COALESCE(sp.avatar_mime,'image/jpeg')||';base64,'||encode(sp.avatar_data,'base64') END seller_avatar_data_url,
+      CASE WHEN i.buyer_identity_id=$1 THEN COALESCE(sp.display_name,'کاربر آن بنر') ELSE COALESCE(bp.display_name,'کاربر آن بنر') END other_display_name,
+      CASE WHEN i.buyer_identity_id=$1 THEN CASE WHEN sp.avatar_data IS NOT NULL THEN 'data:'||COALESCE(sp.avatar_mime,'image/jpeg')||';base64,'||encode(sp.avatar_data,'base64') END ELSE CASE WHEN bp.avatar_data IS NOT NULL THEN 'data:'||COALESCE(bp.avatar_mime,'image/jpeg')||';base64,'||encode(bp.avatar_data,'base64') END END other_avatar_data_url,
       i.created_at,i.updated_at AS last_message_at,
       COALESCE((SELECT m.body FROM banner_inquiry_messages m WHERE m.inquiry_id=i.id ORDER BY m.created_at DESC LIMIT 1),i.message) AS last_message,
       (SELECT COUNT(*)::int FROM banner_inquiry_messages um WHERE um.inquiry_id=i.id AND um.sender_identity_id<>$1 AND um.read_at IS NULL) AS unread_count,
@@ -261,7 +263,7 @@ async function registerPrivate(app:FastifyInstance){
   });
   app.get('/api/v1/banner/conversations/:id',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
-    const r=await pool.query('SELECT * FROM banner_inquiries WHERE id=$1 AND (buyer_identity_id=$2 OR seller_identity_id=$2)',[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'conversation_not_found'});
+    const r=await pool.query(`SELECT i.*,l.title listing_title,CASE WHEN i.buyer_identity_id=$2 THEN COALESCE(sp.display_name,'کاربر آن بنر') ELSE COALESCE(bp.display_name,'کاربر آن بنر') END other_display_name,CASE WHEN i.buyer_identity_id=$2 THEN CASE WHEN sp.avatar_data IS NOT NULL THEN 'data:'||COALESCE(sp.avatar_mime,'image/jpeg')||';base64,'||encode(sp.avatar_data,'base64') END ELSE CASE WHEN bp.avatar_data IS NOT NULL THEN 'data:'||COALESCE(bp.avatar_mime,'image/jpeg')||';base64,'||encode(bp.avatar_data,'base64') END END other_avatar_data_url FROM banner_inquiries i JOIN banner_listings l ON l.id=i.listing_id LEFT JOIN banner_profiles bp ON bp.identity_id=i.buyer_identity_id LEFT JOIN banner_profiles sp ON sp.identity_id=i.seller_identity_id WHERE i.id=$1 AND (i.buyer_identity_id=$2 OR i.seller_identity_id=$2)`,[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'conversation_not_found'});
     await pool.query('UPDATE banner_inquiry_messages SET read_at=COALESCE(read_at,NOW()) WHERE inquiry_id=$1 AND sender_identity_id<>$2 AND read_at IS NULL',[id,a.sub]);
     const m=await pool.query('SELECT id::text message_id,sender_identity_id,sender_identity_id=$2 AS is_mine,body,message_type,media_mime,offer_amount,created_at,read_at FROM banner_inquiry_messages WHERE inquiry_id=$1 ORDER BY created_at',[id]);
     return{conversation:r.rows[0],messages:m.rows};
