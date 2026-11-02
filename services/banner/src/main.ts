@@ -48,7 +48,7 @@ async function notify(identityId:string,type:string,title:string,description:str
 }
 
 const clean=(v:unknown,max=500)=>typeof v==='string'?v.trim().slice(0,max):'';
-const idParam=(v:unknown)=>/^\\d+$/.test(String(v??''))?Number(v):null;
+const idParam=(v:unknown)=>/^\d+$/.test(String(v??''))?Number(v):null;
 async function accountRestriction(identityId:string,code:string){
   const r=await pool.query(`SELECT restriction_code,ends_at FROM banner_restrictions WHERE identity_id=$1 AND revoked_at IS NULL AND starts_at<=NOW() AND (ends_at IS NULL OR ends_at>NOW()) AND restriction_code IN ('all',$2) ORDER BY created_at DESC LIMIT 1`,[identityId,code]);
   return r.rows[0]??null;
