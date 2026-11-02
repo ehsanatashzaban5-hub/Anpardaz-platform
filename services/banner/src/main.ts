@@ -87,10 +87,10 @@ async function registerPublic(app:FastifyInstance){
     const page=Math.max(1,Number(q.page??1)||1),limit=Math.min(50,Math.max(1,Number(q.limit??20)||20)),offset=(page-1)*limit;
     const where=['l.status=\'published\''],params:any[]=[];
     if(clean(q.q,120)){params.push('%'+clean(q.q,120)+'%');where.push(`(l.title ILIKE $${params.length} OR l.description ILIKE $${params.length})`);}
-    if(q.categoryId&&/^\\d+$/.test(q.categoryId)){params.push(Number(q.categoryId));where.push(`l.category_id=$${params.length}`);}
+    if(q.categoryId&&/^\d+$/.test(q.categoryId)){params.push(Number(q.categoryId));where.push(`l.category_id=$${params.length}`);}
     if(clean(q.city,80)){params.push(clean(q.city,80));where.push(`l.city=$${params.length}`);}
-    if(q.minPrice&&/^\\d+(\\.\\d+)?$/.test(q.minPrice)){params.push(q.minPrice);where.push(`l.price >= $${params.length}`);}
-    if(q.maxPrice&&/^\\d+(\\.\\d+)?$/.test(q.maxPrice)){params.push(q.maxPrice);where.push(`l.price <= $${params.length}`);}
+    if(q.minPrice&&/^\d+(\.\d+)?$/.test(q.minPrice)){params.push(q.minPrice);where.push(`l.price >= $${params.length}`);}
+    if(q.maxPrice&&/^\d+(\.\d+)?$/.test(q.maxPrice)){params.push(q.maxPrice);where.push(`l.price <= $${params.length}`);}
     const order=q.sort==='price_asc'?'l.price ASC NULLS LAST':q.sort==='price_desc'?'l.price DESC NULLS LAST':'l.created_at DESC';
     const count=await pool.query(`SELECT COUNT(*)::int count FROM banner_listings l WHERE ${where.join(' AND ')}`,params);
     params.push(limit,offset);
