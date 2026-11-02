@@ -626,8 +626,8 @@ function SarrafHomeTab({ assets, wallets, orders, onNavigate }: {
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(280px,.8fr)", gap: 16, alignItems: "start" }}>
-        <div className="w-card sarraf-recent-orders" style={{ overflow: "hidden", borderRadius:16, boxShadow:"0 4px 18px rgba(0,0,0,.06)" }}>
+      <div className="sarraf-overview-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(280px,.8fr)", gap: 16, alignItems: "start" }}>
+        <div className="w-card" style={{ overflow: "hidden" }}>
           <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--w-border)" }}>
             <div style={{ fontSize: 14, fontWeight: 900 }}>بازارهای منتخب</div>
             <button type="button" className="w-btn w-btn-ghost" onClick={() => onNavigate("markets")} style={{ padding: "6px 10px", fontSize: 11 }}>همه بازارها</button>
@@ -649,7 +649,7 @@ function SarrafHomeTab({ assets, wallets, orders, onNavigate }: {
             </button>
           ))}
         </div>
-        <div className="w-card" style={{ overflow: "hidden" }}>
+        <div className="w-card sarraf-recent-orders" style={{ overflow: "hidden", borderRadius:16, boxShadow:"0 4px 18px rgba(0,0,0,.06)" }}>
           <div style={{ padding: "14px 16px", fontSize: 14, fontWeight: 900, borderBottom: "1px solid var(--w-border)" }}>آخرین سفارش‌ها</div>
           {recentOrders.length === 0 ? (
             <div style={{ padding: 24, textAlign: "center", color: "var(--w-muted)", fontSize: 12, lineHeight: 1.8 }}>هنوز سفارشی ثبت نشده است.</div>
