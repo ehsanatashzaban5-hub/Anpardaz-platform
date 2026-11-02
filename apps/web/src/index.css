@@ -9552,3 +9552,10 @@ button { font-weight: 700; }
 .an-market-root .am-support-dialog label{font-size:11px;font-weight:800;color:var(--am-muted)}
 .an-market-root .am-support-dialog input,.an-market-root .am-support-dialog select,.an-market-root .am-support-dialog textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid var(--am-border);border-radius:10px;background:#fff;color:var(--am-text);font:12px Vazirmatn}
 .an-market-root .am-support-pending{padding:10px;border-radius:10px;background:#fff8e8;color:#8a6822;font-size:11px;line-height:1.8}
+
+.an-market-root .am-history-chart{height:190px;display:flex;align-items:flex-end;gap:5px;padding:12px 8px 28px;border:1px solid var(--am-border);border-radius:13px;background:linear-gradient(180deg,#f4faf8,#fff);overflow-x:auto}
+.an-market-root .am-history-point{height:100%;min-width:22px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px}
+.an-market-root .am-history-point>span{display:block;width:min(100%,18px);min-height:4px;border-radius:5px 5px 2px 2px;background:var(--am-accent);opacity:.82}
+.an-market-root .am-history-point small{font-size:8px;color:var(--am-muted);white-space:nowrap;transform:rotate(-35deg);transform-origin:top center}
+.an-market-root .am-history-records{display:grid;gap:0;margin-top:12px}
+.an-market-root .am-history-records>div{display:flex;justify-content:space-between;gap:10px;padding:10px 2px;border-bottom:1px solid var(--am-border);font-size:11px}
