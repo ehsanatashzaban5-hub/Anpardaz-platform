@@ -31,7 +31,7 @@ function ProductCard({p,fav,onFav,onOpen,selected,onCompare}:{p:Product;fav:bool
  </div>
 }
 
-function ProductDetail({p,onBack,fav,onFav}:{p:Product;onBack:()=>void;fav:boolean;onFav:()=>void}){
+function ProductDetail({p,onBack,fav,onFav,onAlert}:{p:Product;onBack:()=>void;fav:boolean;onFav:()=>void;onAlert:()=>void}){
  const [offers,setOffers]=useState<any[]>(p.offers||[]),[priceHistory,setPriceHistory]=useState(p.priceHistory||[]),[reviews,setReviews]=useState<any[]>([]),[reviewBody,setReviewBody]=useState(""),[reviewRating,setReviewRating]=useState(5),[frame,setFrame]=useState(""),[ai,setAi]=useState(""),[aiAnswer,setAiAnswer]=useState(""),[aiError,setAiError]=useState(""),[busy,setBusy]=useState(false),[tab,setTab]=useState<"sellers"|"specs"|"history"|"reviews">("sellers"),[activeImage,setActiveImage]=useState(0);
  useEffect(()=>{fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(!d)return;if(Array.isArray(d.offers))setOffers(d.offers);if(Array.isArray(d.priceHistory))setPriceHistory(d.priceHistory.map((h:any)=>({price:Number(h.price??h.p??0),capturedAt:String(h.capturedAt??h.captured_at??"")})).filter((h:any)=>h.price>0));}).catch(()=>{})},[p.id]);
  useEffect(()=>{fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id)+"/reviews").then(r=>r.ok?r.json():null).then(d=>d&&setReviews(d.reviews||[])).catch(()=>{})},[p.id]);
@@ -44,7 +44,7 @@ function ProductDetail({p,onBack,fav,onFav}:{p:Product;onBack:()=>void;fav:boole
   <Card style={{overflow:"hidden",marginTop:14}}><div className="am-detail-layout">
    <div className="am-detail-gallery"><div className="am-detail-main-image">{p.images[activeImage]?<img src={p.images[activeImage]} alt={p.title+" - تصویر "+(activeImage+1)} />:<span style={{color:"var(--am-muted)"}}>تصویر واقعی موجود نیست</span>}</div>{p.images.length>1&&<div className="am-detail-thumbnails" aria-label="تصاویر محصول">{p.images.map((src,i)=><button type="button" key={src+"-"+i} className={activeImage===i?"active":""} onClick={()=>setActiveImage(i)} aria-label={"نمایش تصویر "+(i+1)}><img src={src} alt="" loading="lazy"/></button>)}</div>}</div>
    <div style={{padding:28}}><div style={{color:"var(--am-accent)",fontWeight:800,fontSize:13}}>{p.brand||p.categoryName}</div><h1 style={{fontSize:24,lineHeight:1.6,margin:"8px 0"}}>{p.title}</h1><p style={{fontSize:13,lineHeight:2,color:"var(--am-muted)"}}>{p.description||"توضیحات واقعی برای این محصول ثبت نشده است."}</p>
-    <div className="am-stat-grid" style={{margin:"18px 0"}}>{[["پایین‌ترین قیمت",money(p.priceMin)],["بالاترین قیمت",money(p.priceMax)],["فروشگاه‌ها",fa(p.storeCount)]].map(([a,b])=><div className="am-stat-tile" key={a}><div className="label">{a}</div><div className="value" style={{fontSize:12}}>{b}</div></div>)}</div>
+    <div className="am-stat-grid" style={{margin:"18px 0"}}>{[["پایین‌ترین قیمت",money(p.priceMin)],["بالاترین قیمت",money(p.priceMax)],["فروشگاه‌ها",fa(p.storeCount)]].map(([a,b])=><div className="am-stat-tile" key={a}><div className="label">{a}</div><div className="value" style={{fontSize:12}}>{b}</div></div>)}</div><div style={{display:"flex",justifyContent:"flex-start",marginBottom:14}}><Btn onClick={onAlert}>＋ ثبت هشدار قیمت برای این محصول</Btn></div>
     <div style={{display:"grid",gap:8}}><div style={{display:"flex",gap:8}}><input value={ai} onChange={e=>{setAi(e.target.value);setAiError("");}} onKeyDown={e=>e.key==="Enter"&&void ask()} placeholder="از دستیار درباره این محصول بپرس…" style={{flex:1,minWidth:0,padding:12,borderRadius:12,border:"1px solid var(--am-border)",fontFamily:"Vazirmatn"}}/><Btn primary disabled={busy||!ai.trim()} onClick={()=>void ask()}>{busy?"در حال بررسی…":"از دستیار بپرس"}</Btn></div>{aiError&&<div role="alert" style={{fontSize:12,color:"var(--am-red)"}}>{aiError}</div>}{aiAnswer&&<div role="status" aria-live="polite" style={{padding:13,borderRadius:12,background:"var(--am-accent-light)",border:"1px solid var(--am-accent-border)",fontSize:13,lineHeight:2,whiteSpace:"pre-wrap"}}>{aiAnswer}</div>}</div>
    </div></div>
    <div className="am-detail-tab-bar">{[["sellers","فروشگاه‌ها"],["specs","مشخصات"],["history","تاریخچه قیمت"],["reviews","نظرات کاربران"]].map(([id,l])=><button key={id} className={"am-detail-tab"+(tab===id?" active":"")} onClick={()=>setTab(id as any)}>{l}</button>)}</div>
@@ -178,7 +178,7 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
   }catch{setAiAnswer("ارتباط با دستیار برقرار نشد.");}
   finally{setAiBusy(false);}
  };
- if(selected)return <ProductDetail p={selected} onBack={()=>setSelected(null)} fav={favorites.has(selected.id)} onFav={()=>void toggleFav(selected.id)}/>;
+ if(selected)return <ProductDetail p={selected} onBack={()=>setSelected(null)} fav={favorites.has(selected.id)} onFav={()=>void toggleFav(selected.id)} onAlert={()=>{setAlertProduct(selected);setAlertPrice(selected.priceMin>0?String(selected.priceMin):"");}}/>;
  return <div className="an-market-root" dir="rtl" style={vars}>
   <div className="am-header">
    <div className="am-header-inner" style={{padding:"18px 16px 14px",maxWidth:1280,margin:"auto"}}>
