@@ -19,8 +19,11 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     const lim=params.length+1, off=params.length+2; params.push(l,o);
     const r=await pool.query(`SELECT p.id,p.title,p.description,p.brand,p.condition,p.specs,p.source_url,
       c.slug category_slug,c.name category_name,c.name_fa category_name_fa,
-      COALESCE(MIN(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text price_min,
-      COALESCE(MAX(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text price_max,
+      CASE WHEN COUNT(DISTINCT o.currency) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock')=1
+        THEN COALESCE(MIN(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text ELSE '0' END price_min,
+      CASE WHEN COUNT(DISTINCT o.currency) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock')=1
+        THEN COALESCE(MAX(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text ELSE '0' END price_max,
+      COALESCE(pr.ranges,'[]'::json) price_ranges,
       COUNT(DISTINCT os.id)::int store_count,
       COUNT(o.id) FILTER(WHERE os.id IS NOT NULL)::int offer_count,
       COALESCE(rv.rating,0)::numeric rating,
@@ -28,6 +31,17 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
       FROM market_products p
       LEFT JOIN market_categories c ON c.id=p.category_id
       LEFT JOIN market_offers o ON o.product_id=p.id LEFT JOIN market_stores os ON os.id=o.store_id AND os.active=true
+      LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object('currency',r.currency,'min',r.min_price,'max',r.max_price) ORDER BY r.currency) AS ranges
+        FROM (
+          SELECT o2.currency,MIN(o2.price)::text AS min_price,MAX(o2.price)::text AS max_price
+          FROM market_offers o2
+          LEFT JOIN market_stores s2 ON s2.id=o2.store_id
+          WHERE o2.product_id=p.id AND o2.availability<>'out_of_stock'
+            AND (s2.active IS TRUE OR s2.id IS NULL)
+          GROUP BY o2.currency
+        ) r
+      ) pr ON TRUE
       LEFT JOIN LATERAL (
         SELECT ROUND(AVG(r.rating),2) AS rating, COUNT(*)::int AS reviews
         FROM market_reviews r
