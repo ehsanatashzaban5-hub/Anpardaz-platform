@@ -62,9 +62,9 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
     if(!isLoggedIn){setTickets([]);setNotifications([]);setPostchiEvents([]);setProfile(null);setConversations([]);setMyListings([]);setRecentViews([]);setFavoriteListings([]);setFavorites(new Set());return;}
     setLoading(true);setError("");
     try{
-      const [f,t,n,p,m,ml,rv]=await Promise.all([
+      const [f,t,n,p,m,ml,rv,pc]=await Promise.all([
         api("/api/v1/banner/me/favorites"),api("/api/v1/banner/me/tickets"),api("/api/v1/banner/me/notifications"),
-        api("/api/v1/banner/me"),api("/api/v1/banner/me/conversations"),api("/api/v1/banner/me/listings"),api("/api/v1/banner/me/recent-views")
+        api("/api/v1/banner/me"),api("/api/v1/banner/me/conversations"),api("/api/v1/banner/me/listings"),api("/api/v1/banner/me/recent-views"),api("/api/v1/banner/me/postchi")
       ]);
       setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));setFavoriteListings(f.listings??[]);setTickets(t.tickets??[]);setNotifications(n.notifications??[]);setPostchiEvents(pc.events??[]);setProfile(p.profile??null);setConversations(m.conversations??[]);setMyListings(ml.listings??[]);setRecentViews(rv.listings??[]);
     }catch(e){setError(e instanceof Error?e.message:"خطا در دریافت اطلاعات حساب")}finally{setLoading(false)}
