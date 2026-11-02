@@ -20,7 +20,7 @@ type Listing=any; type Ticket=any; type Conversation=any;
 interface Props{onNavigate:(p:WebPage)=>void;isLoggedIn:boolean;onAuthRequired:()=>void;}
 
 export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
-  const [section,setSection]=useState<"home"|"favorites"|"messages"|"notifications"|"my-listings"|"account"|"tickets"|"post">("home");
+  const [section,setSection]=useState<"home"|"favorites"|"recent"|"messages"|"notifications"|"my-listings"|"account"|"tickets"|"post"|"search"|"support"|"terms"|"postchi">("home");
   const [listings,setListings]=useState<Listing[]>([]);
   const [categories,setCategories]=useState<any[]>([]);
   const [favorites,setFavorites]=useState<Set<string>>(new Set());
@@ -28,6 +28,12 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
   const [query,setQuery]=useState("");
   const [city,setCity]=useState("");
   const [category,setCategory]=useState("");
+  const [sort,setSort]=useState("newest");
+  const [minPrice,setMinPrice]=useState("");
+  const [maxPrice,setMaxPrice]=useState("");
+  const [page,setPage]=useState(1);
+  const [total,setTotal]=useState(0);
+  const [searchHistory,setSearchHistory]=useState<string[]>(()=>{try{return JSON.parse(localStorage.getItem("anpardaz:banner:web-search-history")||"[]").slice(0,12)}catch{return []}});
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [tickets,setTickets]=useState<Ticket[]>([]);
@@ -41,9 +47,9 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
   const loadHome=async()=>{
     setLoading(true);setError("");
     try{
-      const q=new URLSearchParams();if(query.trim())q.set("q",query.trim());if(city.trim())q.set("city",city.trim());if(category)q.set("categoryId",category);q.set("limit","100");
+      const q=new URLSearchParams();if(query.trim())q.set("q",query.trim());if(city.trim())q.set("city",city.trim());if(category)q.set("categoryId",category);if(minPrice)q.set("minPrice",minPrice);if(maxPrice)q.set("maxPrice",maxPrice);q.set("sort",sort==="price-asc"?"price_asc":sort==="price-desc"?"price_desc":"newest");q.set("page",String(page));q.set("limit","24");
       const [l,c]=await Promise.all([api("/api/v1/banner/listings?"+q.toString()),api("/api/v1/banner/categories")]);
-      setListings(l.listings??[]);setCategories(c.categories??[]);
+      setListings(l.listings??[]);setTotal(Number(l.total??0));setCategories(c.categories??[]);
       if(isLoggedIn){const f=await api("/api/v1/banner/me/favorites");setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));}
     }catch(e){setError(e instanceof Error?e.message:"خطا در دریافت آگهی‌ها")}finally{setLoading(false)}
   };
@@ -58,10 +64,11 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
       setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));setTickets(t.tickets??[]);setNotifications(n.notifications??[]);setProfile(p.profile??null);setConversations(m.conversations??[]);setMyListings(ml.listings??[]);setRecentViews(rv.listings??[]);
     }catch(e){setError(e instanceof Error?e.message:"خطا در دریافت اطلاعات حساب")}finally{setLoading(false)}
   };
-  useEffect(()=>{void loadHome()},[query,city,category,isLoggedIn]);
+  useEffect(()=>{void loadHome()},[query,city,category,minPrice,maxPrice,sort,page,isLoggedIn]);
   useEffect(()=>{if(isLoggedIn)void loadPrivate()},[isLoggedIn]);
 
   const filtered=useMemo(()=>listings,[listings]);
+  const rememberSearch=()=>{const value=query.trim();if(!value)return;setSearchHistory(old=>{const next=[value,...old.filter(x=>x!==value)].slice(0,12);try{localStorage.setItem("anpardaz:banner:web-search-history",JSON.stringify(next))}catch{}return next});setPage(1)};
   const protectedNav=(s:typeof section)=>{if(!isLoggedIn){onAuthRequired();return;}setSection(s);setSelected(null);};
 
   const toggleFavorite=async(id:string)=>{
@@ -71,20 +78,20 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
   const openListing=async(x:Listing)=>{try{if(isLoggedIn)await api("/api/v1/banner/me/recent-views/"+x.id,{method:"POST",body:"{}"});const d=await api("/api/v1/banner/listings/"+x.id);setSelected({...x,...d.listing,media:d.media??[]});}catch(e){setError(e instanceof Error?e.message:"listing_failed")}};
 
   const nav=[
-    ["home","خانه"],["favorites","علاقه‌مندی‌ها"],["recent","آخرین مشاهده‌ها"],["messages","پیام‌ها"],["notifications","اعلان‌ها"],
-    ["my-listings","آگهی‌های من"],["account","حساب کاربری"],["tickets","پشتیبانی"]
+    ["home","آگهی‌ها"],["search","جستجو"],["favorites","نشان‌شده‌ها"],["recent","آخرین مشاهده‌ها"],["postchi","پستچی و اعلان‌ها"],["messages","چت و تماس"],["notifications","اعلان‌ها"],
+    ["my-listings","آگهی‌های من"],["account","حساب کاربری"],["tickets","تیکت‌های پشتیبانی"],["support","راهنما"],["terms","قوانین"]
   ] as const;
 
   return <div className="w-fade" dir="rtl" style={{minHeight:"calc(100vh - var(--w-header))"}}>
     <div style={{background:"var(--w-surface)",borderBottom:"1px solid var(--w-border)"}}>
       <div style={{maxWidth:1480,margin:"0 auto",padding:"10px 20px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
         <button onClick={()=>{setSection("home");setSelected(null)}} style={{display:"flex",alignItems:"center",gap:8,border:0,background:"transparent",cursor:"pointer",fontWeight:900,fontSize:16}}><span style={{width:30,height:30,borderRadius:8,background:"rgba(232,53,78,.12)",display:"grid",placeItems:"center",color:"#e8354e"}}><WI n="banner" s={16}/></span>آن بنر</button>
-        <div style={{display:"flex",gap:8,flex:1,minWidth:260}}>
-          <input value={query} onChange={e=>setQuery(e.target.value)} onFocus={()=>{setSection("home");setSelected(null)}} className="w-input" placeholder="جستجو در آگهی‌ها..."/>
-          <input value={city} onChange={e=>setCity(e.target.value)} className="w-input" style={{maxWidth:160}} placeholder="شهر"/>
-          <select value={category} onChange={e=>setCategory(e.target.value)} className="w-input" style={{maxWidth:190}}><option value="">همه دسته‌ها</option>{categoryOptions(categories).map(c=><option key={c.id} value={c.id}>{"— ".repeat(c._depth)}{c.name}</option>)}</select>
+        <div className="ab-web-toolbar" style={{display:"flex",gap:8,flex:1,minWidth:260}}>
+          <input value={query} onChange={e=>{setQuery(e.target.value);setPage(1)}} onKeyDown={e=>{if(e.key==="Enter"){rememberSearch();setSection("home");setSelected(null)}}} onFocus={()=>{setSection("home");setSelected(null)}} className="w-input" placeholder="جستجو در همه آگهی‌ها..."/>
+          <input value={city} onChange={e=>{setCity(e.target.value);setPage(1)}} className="w-input" style={{maxWidth:160}} placeholder="شهر"/>
+          <select value={category} onChange={e=>{setCategory(e.target.value);setPage(1)}} className="w-input" style={{maxWidth:190}}><option value="">همه دسته‌ها</option>{categoryOptions(categories).map(c=><option key={c.id} value={c.id}>{"— ".repeat(c._depth)}{c.name}</option>)}</select>
         </div>
-        <button className="w-btn w-btn-primary" onClick={()=>protectedNav("post")}><WI n="plus" s={14}/> ثبت آگهی</button>
+        <button className="w-btn w-btn-primary" onClick={()=>{rememberSearch();protectedNav("post")}}><WI n="plus" s={14}/> ثبت آگهی</button>
         <button className="w-btn w-btn-ghost" onClick={()=>onNavigate("home")}><WI n="arrow-right" s={14}/> آن پرداز</button>
       </div>
     </div>
@@ -104,6 +111,10 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
         {section==="messages"&&<Messages conversations={conversations} conversation={conversation} setConversation={setConversation} onRefresh={loadPrivate}/>}
         {section==="tickets"&&<Tickets tickets={tickets} ticket={ticket} setTicket={setTicket} onRefresh={loadPrivate}/>}
         {section==="post"&&<Post categories={categories} onDone={()=>{setSection("my-listings");void loadPrivate()}}/>}
+        {section==="search"&&<SearchPanel history={searchHistory} query={query} setQuery={setQuery} onSearch={()=>{rememberSearch();setSection("home");setPage(1)}} onClear={()=>{setSearchHistory([]);localStorage.removeItem("anpardaz:banner:web-search-history")}}/>}
+        {section==="postchi"&&<Notifications items={notifications} onRefresh={loadPrivate}/>}
+        {section==="support"&&<SupportInfo/>}
+        {section==="terms"&&<TermsInfo/>}
       </main>
     </div>
   </div>;
