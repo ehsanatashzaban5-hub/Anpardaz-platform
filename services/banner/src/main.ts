@@ -214,6 +214,28 @@ async function registerPrivate(app:FastifyInstance){
     const a=auth(req);const r=await pool.query('SELECT id,type,title,description,read_at,created_at FROM banner_notifications WHERE identity_id=$1 ORDER BY created_at DESC LIMIT 200',[a.sub]);
     return{notifications:r.rows.map(x=>({...x,read:Boolean(x.read_at)}))};
   });
+  app.get('/api/v1/banner/me/postchi',{preHandler:requireAuth},async(req)=>{
+    const a=auth(req);
+    const r=await pool.query(`SELECT 'notification'::text source,id::text event_id,type,title,description,read_at IS NOT NULL read,created_at,NULL::text resource_type,NULL::text resource_id FROM banner_notifications WHERE identity_id=$1
+      UNION ALL
+      SELECT 'activity'::text source,id::text event_id,event_type type,event_type title,COALESCE(metadata::text,'') description,read_at IS NOT NULL read,occurred_at created_at,resource_type,resource_id FROM banner_activity_events WHERE identity_id=$1
+      ORDER BY created_at DESC LIMIT 150`,[a.sub]);
+    return{events:r.rows};
+  });
+  app.patch('/api/v1/banner/postchi/:source/:id/read',{preHandler:requireAuth},async(req,reply)=>{
+    const a=auth(req),source=String((req.params as any).source),id=idParam((req.params as any).id);
+    if(!id||!['notification','activity'].includes(source))return reply.code(400).send({error:'invalid_event'});
+    const table=source==='notification'?'banner_notifications':'banner_activity_events',dateCol=source==='notification'?'read_at':'read_at';
+    const r=await pool.query(`UPDATE ${table} SET ${dateCol}=COALESCE(${dateCol},NOW()) WHERE id=$1 AND identity_id=$2 RETURNING id`,[id,a.sub]);
+    if(!r.rows[0])return reply.code(404).send({error:'event_not_found'});
+    return{ok:true};
+  });
+  app.post('/api/v1/banner/postchi/read-all',{preHandler:requireAuth},async(req)=>{
+    const a=auth(req);
+    await pool.query('UPDATE banner_notifications SET read_at=COALESCE(read_at,NOW()) WHERE identity_id=$1',[a.sub]);
+    await pool.query('UPDATE banner_activity_events SET read_at=COALESCE(read_at,NOW()) WHERE identity_id=$1',[a.sub]);
+    return{ok:true};
+  });
   app.patch('/api/v1/banner/notifications/:id/read',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
     const r=await pool.query('UPDATE banner_notifications SET read_at=COALESCE(read_at,NOW()) WHERE id=$1 AND identity_id=$2 RETURNING id,read_at',[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'notification_not_found'});return{ok:true};
