@@ -6,13 +6,14 @@ import sharp from 'sharp';
 import {requireAuth,requireAdminInternal,type AuthClaims} from './auth.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
-const app=Fastify({logger:true,trustProxy:process.env.TRUST_PROXY==='true',bodyLimit:12*1024*1024});
+const app=Fastify({logger:true,trustProxy:process.env.TRUST_PROXY==='true',bodyLimit:24*1024*1024});
 
 app.addHook('onSend',async(_request,reply)=>{reply.header('X-Content-Type-Options','nosniff');reply.header('X-Frame-Options','DENY');reply.header('Referrer-Policy','no-referrer');reply.header('Permissions-Policy','camera=(),microphone=(),geolocation=()');if(process.env.NODE_ENV==='production')reply.header('Strict-Transport-Security','max-age=31536000; includeSubDomains');});const isProduction=process.env.NODE_ENV==='production';
 if(isProduction){for(const name of ['DATABASE_URL','CORS_ORIGIN','IDENTITY_SERVICE_URL','IDENTITY_ISSUER','IDENTITY_PUBLIC_KEY_B64','BANNER_INTERNAL_TOKEN']){const value=process.env[name];if(!value||((name==='BANNER_INTERNAL_TOKEN')&&value.length<32)||value.includes('CHANGE_ME')||value.includes('your-web-domain.example')||value.includes('BASE64-DER-ED25519-PUBLIC-KEY'))throw new Error('Production environment variable '+name+' must be configured with a real value');}}
 const pool=new Pool({connectionString:process.env.DATABASE_URL,max:10,connectionTimeoutMillis:5000,idleTimeoutMillis:30000});
 await app.register(rateLimit,{global:false});
 const MAX_MEDIA_BYTES=8*1024*1024;
+const MAX_LISTING_MEDIA_BYTES=15*1024*1024;
 const allowedMime=new Set(['image/jpeg','image/png','image/webp']);
 function validateVoice(data:Buffer,mime:string):string|null{
   if(!data.length||data.length>MAX_MEDIA_BYTES)return null;
@@ -21,8 +22,8 @@ function validateVoice(data:Buffer,mime:string):string|null{
   if(normalized==="audio/ogg"&&data.length>=4&&data.subarray(0,4).toString("ascii")==="OggS")return "audio/ogg";
   return null;
 }
-async function sanitizeImage(data:Buffer,mime:string):Promise<Buffer>{
-  if(!allowedMime.has(mime)||data.length===0||data.length>MAX_MEDIA_BYTES) throw new Error('invalid_image_content');
+async function sanitizeImage(data:Buffer,mime:string,maxInputBytes=MAX_MEDIA_BYTES):Promise<Buffer>{
+  if(!allowedMime.has(mime)||data.length===0||data.length>maxInputBytes) throw new Error('invalid_image_content');
   const image=sharp(data,{limitInputPixels:40_000_000,limitInputChannels:5,failOn:'warning',sequentialRead:true});
   const meta=await image.metadata();
   if(!meta.width||!meta.height||meta.width>10000||meta.height>10000) throw new Error('invalid_image_dimensions');
@@ -139,7 +140,7 @@ async function registerPrivate(app:FastifyInstance){
   app.get('/api/v1/banner/me',{preHandler:requireAuth},async(req)=>{const a=auth(req);if(a.phone)await pool.query(`INSERT INTO banner_profiles(identity_id,phone) VALUES($1,$2) ON CONFLICT(identity_id) DO UPDATE SET phone=COALESCE(NULLIF(banner_profiles.phone,''),EXCLUDED.phone),updated_at=NOW()`,[a.sub,a.phone]);const r=await pool.query(`SELECT identity_id,display_name,phone,city,account_status,violation_count,restriction_flags,restriction_reason,restricted_until,created_at,updated_at,CASE WHEN avatar_data IS NOT NULL THEN 'data:'||COALESCE(avatar_mime,'image/jpeg')||';base64,'||encode(avatar_data,'base64') END avatar_data_url FROM banner_profiles WHERE identity_id=$1`,[a.sub]);return{profile:r.rows[0]??{identity_id:a.sub,display_name:null,phone:null,city:null}};});
   app.patch('/api/v1/banner/me',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),b=(req.body??{}) as any;const display=clean(b.displayName,120),phone=clean(a.phone,30),city=clean(b.city,80);const avatarMime=allowedMime.has(b.avatarMime)?b.avatarMime:null;let avatarData:Buffer|null=null;if(typeof b.avatarBase64==='string'&&avatarMime){const rawAvatar=Buffer.from(b.avatarBase64,'base64');if(rawAvatar.length>MAX_MEDIA_BYTES)return reply.code(413).send({error:'avatar_too_large'});try{avatarData=await sanitizeImage(rawAvatar,avatarMime);}catch(e:any){return reply.code(String(e?.message)==='normalized_image_too_large'?413:400).send({error:String(e?.message??'invalid_avatar')});}}if(!display&&!phone&&!city&&!avatarData)return reply.code(400).send({error:'nothing_to_update'});const r=await pool.query(`INSERT INTO banner_profiles(identity_id,display_name,phone,city,avatar_data,avatar_mime) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(identity_id) DO UPDATE SET display_name=COALESCE(NULLIF($2,''),banner_profiles.display_name),phone=COALESCE(NULLIF($3,''),banner_profiles.phone),city=COALESCE(NULLIF($4,''),banner_profiles.city),avatar_data=COALESCE($5,banner_profiles.avatar_data),avatar_mime=COALESCE($6,banner_profiles.avatar_mime),updated_at=NOW() RETURNING identity_id,display_name,phone,city,created_at,updated_at,CASE WHEN avatar_data IS NOT NULL THEN 'data:'||COALESCE(avatar_mime,'image/jpeg')||';base64,'||encode(avatar_data,'base64') END avatar_data_url`,[a.sub,display,phone,city,avatarData,avatarMime]);await activity(a.sub,'profile_update','profile',a.sub,{fields:['displayName','phone','city']});return{profile:r.rows[0]};});
   app.get('/api/v1/banner/me/listings',{config:{rateLimit:{max:60,timeWindow:'1 minute'}},preHandler:requireAuth},async(req)=>{const a=auth(req);const r=await pool.query(`SELECT l.id,l.title,l.description,l.category_id,l.status,l.moderation_reason,l.price,l.price_mode,l.currency,l.condition,l.city,l.contact_enabled,l.chat_enabled,l.views,l.created_at,l.updated_at,c.name category_name,COALESCE((SELECT json_agg(m.id ORDER BY m.sort_order,m.id) FROM banner_media m WHERE m.listing_id=l.id),'[]'::json) media_ids FROM banner_listings l LEFT JOIN banner_categories c ON c.id=l.category_id WHERE l.identity_id=$1 ORDER BY l.created_at DESC`,[a.sub]);return{listings:r.rows};});
-  app.post('/api/v1/banner/ai/suggest',{preHandler:requireAuth},async(req,reply)=>{
+  app.post('/api/v1/banner/ai/suggest',{config:{rateLimit:{max:10,timeWindow:'1 minute'}},preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),b=(req.body??{}) as any,title=clean(b.title,160),description=clean(b.description,200);
     if(!title||!description)return reply.code(400).send({error:'title_and_description_required'});
     if(description.length>200)return reply.code(400).send({error:'description_too_long',max:200});
@@ -150,7 +151,7 @@ async function registerPrivate(app:FastifyInstance){
       return{suggestion:{...suggestion,id:r.rows[0].id}};
     }catch(e:any){const code=String(e?.message??'banner_ai_failed');return reply.code(code==='banner_ai_not_configured'?503:502).send({error:code});}
   });
-  app.post('/api/v1/banner/listings',{preHandler:requireAuth},async(req,reply)=>{
+  app.post('/api/v1/banner/listings',{config:{rateLimit:{max:10,timeWindow:'1 minute'}},preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),b=(req.body??{}) as any,title=clean(b.title,160),description=clean(b.description,200),city=clean(b.city,80),currency=clean(b.currency,3)||'IRR';
     if(!(await requireAllowed(a.sub,'listing')))return reply.code(403).send({error:'listing_restricted'});
     if(!title||!description||description.length>200||!city)return reply.code(400).send({error:description.length>200?'description_too_long':'invalid_listing',max:200});
@@ -180,10 +181,10 @@ async function registerPrivate(app:FastifyInstance){
     await activity(a.sub,'listing_updated','listing',String(id),{fields:fields.map(x=>x.sql.split('=')[0])});return{listing:r.rows[0]};
   });
   app.delete('/api/v1/banner/listings/:id',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});const r=await pool.query(`UPDATE banner_listings SET status='deleted',updated_at=NOW() WHERE id=$1 AND identity_id=$2 AND status<>'deleted' RETURNING id`,[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'listing_not_found'});await activity(a.sub,'listing_deleted','listing',String(id));return{deleted:true};});
-  app.post('/api/v1/banner/listings/:id/media',{preHandler:requireAuth},async(req,reply)=>{
+  app.post('/api/v1/banner/listings/:id/media',{config:{rateLimit:{max:20,timeWindow:'1 minute'}},preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id);if(!id)return reply.code(400).send({error:'invalid_id'});
     const b=(req.body??{}) as {mimeType?:string;filename?:string;dataBase64?:string};if(!allowedMime.has(b.mimeType??'')||typeof b.dataBase64!=='string')return reply.code(400).send({error:'invalid_media'});
-    const raw=Buffer.from(b.dataBase64,'base64');if(!raw.length||raw.length>MAX_MEDIA_BYTES)return reply.code(413).send({error:'media_too_large'});let data:Buffer;try{data=await sanitizeImage(raw,b.mimeType??'');}catch(e:any){return reply.code(String(e?.message)==='normalized_image_too_large'?413:400).send({error:String(e?.message??'invalid_image_content')});}
+    const raw=Buffer.from(b.dataBase64,'base64');if(!raw.length||raw.length>MAX_LISTING_MEDIA_BYTES)return reply.code(413).send({error:'media_too_large'});let data:Buffer;try{data=await sanitizeImage(raw,b.mimeType??'',MAX_LISTING_MEDIA_BYTES);}catch(e:any){return reply.code(String(e?.message)==='normalized_image_too_large'?413:400).send({error:String(e?.message??'invalid_image_content')});}
     const owner=await pool.query('SELECT id FROM banner_listings WHERE id=$1 AND identity_id=$2',[id,a.sub]);if(!owner.rows[0])return reply.code(404).send({error:'listing_not_found'});
     const count=await pool.query('SELECT COUNT(*)::int count FROM banner_media WHERE listing_id=$1',[id]);if(count.rows[0].count>=8)return reply.code(400).send({error:'media_limit_reached'});
     const r=await pool.query('INSERT INTO banner_media(listing_id,identity_id,mime_type,filename,data,sort_order) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,mime_type,filename,sort_order',[id,a.sub,b.mimeType,clean(String(b.filename??'image').replace(/[\\/\r\n\0]/g,'_'),120)||'image',data,count.rows[0].count]);
@@ -285,7 +286,7 @@ async function registerPrivate(app:FastifyInstance){
     if(body){await pool.query('INSERT INTO banner_inquiry_messages(inquiry_id,sender_identity_id,body) VALUES($1,$2,$3)',[r.rows[0].id,a.sub,body]);await notify(l.rows[0].identity_id,'message','پیام جدید','برای آگهی شما پیام جدیدی ارسال شده است');}
     await activity(a.sub,'conversation_created','inquiry',String(r.rows[0].id),{listingId:id});return reply.code(201).send({conversationId:String(r.rows[0].id),inquiry:r.rows[0]});
   });
-  app.post('/api/v1/banner/conversations/:id/messages',{preHandler:requireAuth},async(req,reply)=>{
+  app.post('/api/v1/banner/conversations/:id/messages',{config:{rateLimit:{max:60,timeWindow:'1 minute'}},preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id),b=(req.body??{}) as any,body=clean(b.message,2000),type=['text','image','offer','sticker','voice'].includes(b.type)?b.type:'text';if(!id||(type==='text'&&!body))return reply.code(400).send({error:'invalid_message'});if(!(await requireAllowed(a.sub,'message')))return reply.code(403).send({error:'message_restricted'});
     const r=await pool.query('SELECT buyer_identity_id,seller_identity_id,l.chat_enabled FROM banner_inquiries i JOIN banner_listings l ON l.id=i.listing_id WHERE i.id=$1 AND (buyer_identity_id=$2 OR seller_identity_id=$2)',[id,a.sub]);if(!r.rows[0])return reply.code(404).send({error:'conversation_not_found'});
     if(r.rows[0].chat_enabled!==true)return reply.code(403).send({error:'chat_disabled'});const recipient=r.rows[0].buyer_identity_id===a.sub?r.rows[0].seller_identity_id:r.rows[0].buyer_identity_id;
@@ -295,7 +296,7 @@ async function registerPrivate(app:FastifyInstance){
     await activity(a.sub,'message_sent','inquiry',String(id));return reply.code(201).send({message:m.rows[0]});
   });
   app.get('/api/v1/banner/me/tickets',{preHandler:requireAuth},async(req)=>{const a=auth(req);const r=await pool.query('SELECT id,subject,category,priority,status,created_at,updated_at FROM banner_tickets WHERE identity_id=$1 ORDER BY updated_at DESC',[a.sub]);return{tickets:r.rows};});
-  app.post('/api/v1/banner/tickets',{preHandler:requireAuth},async(req,reply)=>{const a=auth(req),b=(req.body??{}) as any,subject=clean(b.subject,160),message=clean(b.message,4000),category=clean(b.category,60)||'general';if(!subject||!message)return reply.code(400).send({error:'subject_and_message_required'});const r=await pool.query('INSERT INTO banner_tickets(identity_id,subject,category) VALUES($1,$2,$3) RETURNING *',[a.sub,subject,category]);await pool.query('INSERT INTO banner_ticket_messages(ticket_id,sender_identity_id,sender_type,body) VALUES($1,$2,\'user\',$3)',[r.rows[0].id,a.sub,message]);await activity(a.sub,'ticket_created','ticket',String(r.rows[0].id),{category});await notify(a.sub,'system','تیکت ثبت شد','تیکت پشتیبانی شما در آن بنر ثبت شد');await pool.query('INSERT INTO banner_admin_alerts(alert_type,identity_id,title,description,threshold) VALUES($1,$2,$3,$4,$5)',['ticket',a.sub,'تیکت جدید آن بنر','یک تیکت جدید برای بررسی مدیریت ثبت شد.',null]);return reply.code(201).send({ticket:r.rows[0]});});
+  app.post('/api/v1/banner/tickets',{config:{rateLimit:{max:5,timeWindow:'1 minute'}},preHandler:requireAuth},async(req,reply)=>{const a=auth(req),b=(req.body??{}) as any,subject=clean(b.subject,160),message=clean(b.message,4000),category=clean(b.category,60)||'general';if(!subject||!message)return reply.code(400).send({error:'subject_and_message_required'});const r=await pool.query('INSERT INTO banner_tickets(identity_id,subject,category) VALUES($1,$2,$3) RETURNING *',[a.sub,subject,category]);await pool.query('INSERT INTO banner_ticket_messages(ticket_id,sender_identity_id,sender_type,body) VALUES($1,$2,\'user\',$3)',[r.rows[0].id,a.sub,message]);await activity(a.sub,'ticket_created','ticket',String(r.rows[0].id),{category});await notify(a.sub,'system','تیکت ثبت شد','تیکت پشتیبانی شما در آن بنر ثبت شد');await pool.query('INSERT INTO banner_admin_alerts(alert_type,identity_id,title,description,threshold) VALUES($1,$2,$3,$4,$5)',['ticket',a.sub,'تیکت جدید آن بنر','یک تیکت جدید برای بررسی مدیریت ثبت شد.',null]);return reply.code(201).send({ticket:r.rows[0]});});
   app.post('/api/v1/banner/tickets/:id/reply',{preHandler:requireAuth},async(req,reply)=>{
     const a=auth(req),id=idParam((req.params as any).id),body=clean((req.body as any)?.message,4000);if(!id||!body)return reply.code(400).send({error:'invalid_reply'});
     const owner=await pool.query('SELECT identity_id FROM banner_tickets WHERE id=$1 AND identity_id=$2',[id,a.sub]);if(!owner.rows[0])return reply.code(404).send({error:'ticket_not_found'});
