@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { WebPage } from "./types";
 
 interface Props { onNavigate: (p: WebPage) => void; }
@@ -67,6 +67,8 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
  const [aiInput,setAiInput]=useState("");
  const [aiAnswer,setAiAnswer]=useState("");
  const [aiBusy,setAiBusy]=useState(false);
+ const [meView,setMeView]=useState("menu"); const [meRows,setMeRows]=useState<any[]>([]); const [meLoading,setMeLoading]=useState(false); const [meError,setMeError]=useState("");
+ const [alertProduct,setAlertProduct]=useState<Product|null>(null); const [alertPrice,setAlertPrice]=useState("");
  const load=async()=>{
   setLoading(true);
   try{
@@ -94,6 +96,16 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
   }).catch(()=>{});
  },[selected]);
  const roots=cats.filter(c=>!c.parent_id);
+ const loadMe=async(view:string)=>{
+  setMeView(view);setMeLoading(true);setMeError("");
+  const paths:Record<string,string>={favorites:"/api/v1/market/me/favorites",recent:"/api/v1/market/me/recent",alerts:"/api/v1/market/me/alerts",clickouts:"/api/v1/market/me/clickouts",comparisons:"/api/v1/market/me/comparisons",searches:"/api/v1/market/me/search-history"};
+  try{if(!token())throw new Error("برای مشاهده اطلاعات حساب، ابتدا وارد حساب آن پرداز شوید.");const r=await fetch(API+paths[view],{headers:auth(),cache:"no-store"});const d=await r.json();if(!r.ok)throw new Error("دریافت اطلاعات حساب ناموفق بود.");const key=view==="favorites"||view==="recent"?"products":view;setMeRows(Array.isArray(d[key])?d[key]:[]);}catch(e){setMeRows([]);setMeError(e instanceof Error?e.message:"خطا در دریافت اطلاعات.");}finally{setMeLoading(false);}
+ };
+ const submitPriceAlert=async()=>{
+  if(!alertProduct||!token())return;const target=Number(alertPrice);if(!Number.isFinite(target)||target<=0)return;
+  try{const r=await fetch(API+"/api/v1/market/me/alerts",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({productId:Number(alertProduct.id),targetPrice:target})});if(!r.ok)throw new Error();setAlertProduct(null);setAlertPrice("");void loadMe("alerts");setTab("me");}catch{setMeError("ثبت هشدار قیمت انجام نشد.");}
+ };
+
  const toggleFav=async(id:string)=>{
   if(!token())return;
   const r=await fetch(API+"/api/v1/market/products/"+encodeURIComponent(id)+"/favorite",{method:"POST",headers:auth()});
@@ -149,11 +161,15 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
    </div>
    <div className="am-content" style={{padding:"0 16px 14px"}}>
     {(home?.sections||[]).filter((s:any)=>s.section_type==="products").slice(0,3).map((s:any)=><Card key={s.key} style={{padding:14,marginBottom:12}}><b>{s.title}</b><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:8,marginTop:10}}>{(home?.products||[]).slice(0,4).map((p:any)=><button key={p.id} onClick={()=>setSelected(mapProduct(p))} style={{border:"1px solid var(--am-border)",background:"var(--am-card)",borderRadius:12,padding:10,textAlign:"right",fontFamily:"Vazirmatn"}}><div style={{fontSize:11,fontWeight:800}}>{p.title}</div><div style={{fontSize:10,color:"var(--am-accent)",marginTop:5}}>{p.price_min>0?money(Number(p.price_min)):"قیمت اعلام نشده"}</div></button>)}</div></Card>)}
-    {loading?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت محصولات واقعی…</Card>:error?<Card style={{padding:60,textAlign:"center",color:"#DC2626"}}>{error}</Card>:products.length===0?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>هنوز محصول واقعی در دیتابیس ثبت نشده است؛ بعد از اتصال فید فروشگاه‌ها این بخش خودکار پر می‌شود.</Card>:<div className="am-product-grid">{products.map(p=><ProductCard key={p.id} p={p} fav={favorites.has(p.id)} onFav={()=>void toggleFav(p.id)} onOpen={()=>setSelected(p)} selected={compare.includes(p.id)} onCompare={()=>compareToggle(p.id)}/>)}</div>}
+    {loading?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت محصولات واقعی…</Card>:error?<Card style={{padding:60,textAlign:"center",color:"#DC2626"}}>{error}</Card>:products.length===0?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>هنوز محصول واقعی در دیتابیس ثبت نشده است؛ بعد از اتصال فید فروشگاه‌ها این بخش خودکار پر می‌شود.</Card>:<div className="am-product-grid">{products.map(p=><div key={p.id} className="am-product-grid-item"><ProductCard p={p} fav={favorites.has(p.id)} onFav={()=>void toggleFav(p.id)} onOpen={()=>setSelected(p)} selected={compare.includes(p.id)} onCompare={()=>compareToggle(p.id)}/><button className="am-alert-link" onClick={()=>{setAlertProduct(p);setAlertPrice(p.priceMin>0?String(p.priceMin):"");}}>＋ هشدار قیمت</button></div>)}</div>}
    </div>
   </div>}
   {tab==="assistant"&&<div style={{padding:16,maxWidth:980,margin:"auto"}}><Card><div className="am-search-head"><div className="am-ai-avatar">✦</div><div><b>دستیار هوشمند آن مارکت</b><div style={{fontSize:11,color:"var(--am-muted)"}}>بر پایه داده‌های واقعی آن مارکت</div></div></div><div style={{padding:18}}>{compare.length>1&&<div style={{color:"var(--am-accent)",fontSize:12,fontWeight:800,marginBottom:10}}>{fa(compare.length)} محصول برای مقایسه انتخاب شده است.</div>}<textarea value={aiInput} onChange={e=>setAiInput(e.target.value)} placeholder={compare.length>1?"تفاوت این محصولات را بر اساس داده‌های واقعی مقایسه کن…":"درباره محصولات آن مارکت سؤال بپرس…"} style={{width:"100%",boxSizing:"border-box",minHeight:150,padding:14,borderRadius:14,border:"1.5px solid var(--am-border)",fontFamily:"Vazirmatn"}}/><Btn primary disabled={aiBusy||!token()} onClick={()=>void runAi()} style={{marginTop:10}}>{aiBusy?"در حال بررسی…":"ارسال به دستیار"}</Btn>{aiAnswer&&<div className="am-bubble-ai" style={{marginTop:16}}>{aiAnswer}</div>}</div></Card></div>}
   {tab==="categories"&&<div style={{padding:16,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:10}}>{roots.map(c=><button key={c.id} className="am-cat-row" onClick={()=>setCat(c.slug)}><span className="am-cat-row-icon">⌂</span><span style={{flex:1}}><b>{c.name_fa}</b><small style={{display:"block",color:"var(--am-muted)",marginTop:5}}>مشاهده محصولات واقعی این دسته</small></span><span>‹</span></button>)}</div>}
-  {tab==="me"&&<div style={{padding:16,maxWidth:980,margin:"auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10}}><Card style={{padding:18}}><b>آن مارکت من</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>حساب کاربری از احراز هویت آن پرداز استفاده می‌کند.</div></Card><Card style={{padding:18}}><b>نشان‌گذاری‌ها</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>{fa(favorites.size)} محصول</div></Card><Card style={{padding:18}}><b>مقایسه فعلی</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>{fa(compare.length)} محصول</div></Card><Card style={{padding:18}}><b>تاریخچه</b><div style={{fontSize:12,color:"var(--am-muted)",marginTop:8}}>بازدیدها، جستجوها و اجرای AI در سرور ثبت می‌شوند.</div></Card></div>}
+  {tab==="me"&&<div style={{padding:16,maxWidth:980,margin:"auto"}}>
+ <div className="am-sh"><div className="am-sh-title">آن مارکت من</div>{meView!=="menu"&&<button className="am-sh-action" onClick={()=>setMeView("menu")}>بازگشت</button>}</div>
+ {meView==="menu"?<div className="am-account-grid">{([["favorites","علاقه‌مندی‌ها"],["recent","اخیراً مشاهده‌شده"],["alerts","هشدارهای قیمت"],["clickouts","فعالیت خرید"],["comparisons","مقایسه‌های من"],["searches","تاریخچه جستجو"]] as const).map(([v,t])=><button key={v} className="am-me-btn" onClick={()=>void loadMe(v)}><span className="am-me-icon">◈</span><b>{t}</b><span style={{marginRight:"auto"}}>‹</span></button>)}</div>:meLoading?<Card style={{padding:32,textAlign:"center"}}>در حال دریافت اطلاعات واقعی…</Card>:meError?<Card style={{padding:20,color:"#B4534B"}}>{meError}</Card>:meRows.length===0?<Card style={{padding:32,textAlign:"center",color:"var(--am-muted)"}}>هنوز داده‌ای برای این بخش ثبت نشده است.</Card>:meRows.map((it:any,i:number)=><Card key={it.id??i} style={{padding:14,marginBottom:9}}><b>{it.title??it.product_title??it.query_text??it.query??it.store_name??it.subject??"فعالیت ثبت‌شده"}</b><div style={{fontSize:11,color:"var(--am-muted)",marginTop:6}}>{it.created_at??it.updated_at??it.last_searched??it.status??""}</div>{meView==="alerts"&&<div style={{fontSize:12,marginTop:6}}>قیمت هدف: {money(Number(it.target_price??it.targetPrice??0))}</div>}</Card>)}
+ </div>}
+ {alertProduct&&<div className="am-alert-overlay" onClick={()=>setAlertProduct(null)}><div className="am-alert-dialog" onClick={e=>e.stopPropagation()}><b>هشدار قیمت</b><p>{alertProduct.title}</p><label>مبلغ هدف (تومان)</label><input type="number" min="1" value={alertPrice} onChange={e=>setAlertPrice(e.target.value)}/><div style={{display:"flex",gap:8,marginTop:14}}><Btn primary disabled={!token()||!Number(alertPrice)} onClick={()=>void submitPriceAlert()}>ثبت هشدار</Btn><Btn onClick={()=>setAlertProduct(null)}>انصراف</Btn></div>{!token()&&<small>برای ثبت هشدار وارد حساب شوید.</small>}</div></div>}
  </div>;
 }
