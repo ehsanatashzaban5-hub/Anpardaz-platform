@@ -36,7 +36,7 @@ function ProductDetail({p,onBack,fav,onFav,onAlert}:{p:Product;onBack:()=>void;f
  useEffect(()=>{fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(!d)return;if(Array.isArray(d.offers))setOffers(d.offers);if(Array.isArray(d.priceHistory))setPriceHistory(d.priceHistory.map((h:any)=>({price:Number(h.price??h.p??0),capturedAt:String(h.capturedAt??h.captured_at??"")})).filter((h:any)=>h.price>0));}).catch(()=>{})},[p.id]);
  useEffect(()=>{fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id)+"/reviews").then(r=>r.ok?r.json():null).then(d=>d&&setReviews(d.reviews||[])).catch(()=>{})},[p.id]);
  useEffect(()=>{if(token())void fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id)+"/view",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({surface:"web"})})},[p.id]);
- const click=async(o:any)=>{if(!token())return;try{const r=await fetch(API+"/api/v1/market/clickout",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({offerId:Number(o.id),surface:"web"})});const d=await r.json();if(!r.ok)throw 0;if(d.mode==="iframe")setFrame(d.url);else window.open(d.url,"_blank","noopener,noreferrer")}catch{}};
+ const click=async(o:any)=>{if(!token())return;let popup:Window|null=null;try{popup=window.open("about:blank","_blank");if(popup)popup.opener=null;const r=await fetch(API+"/api/v1/market/clickout",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({offerId:Number(o.id),surface:"web"})});const d=await r.json();if(!r.ok||typeof d.url!=="string")throw new Error("clickout_failed");if(d.mode==="iframe"){popup?.close();setFrame(d.url);}else if(popup){popup.location.href=d.url;}else{window.location.assign(d.url);}}catch{popup?.close();}};
  const submitReview=async()=>{if(!token()||reviewBody.trim().length<3)return;setBusy(true);try{const r=await fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id)+"/reviews",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({rating:reviewRating,body:reviewBody.trim()})});if(r.ok){setReviewBody("");const d=await fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id)+"/reviews");if(d.ok)setReviews((await d.json()).reviews||[])}}finally{setBusy(false)}};
  const ask=async()=>{if(!ai.trim())return;if(!token()){setAiError("برای استفاده از دستیار هوشمند ابتدا وارد حساب آن پرداز شوید.");return;}setBusy(true);setAiError("");setAiAnswer("");try{const r=await fetch(API+"/api/v1/market/ai/assist",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({workflowCode:"market.assist",input:ai.trim(),productId:p.id})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error==="market_ai_unavailable"?"دستیار هوشمند موقتاً در دسترس نیست.":"دریافت پاسخ از دستیار ناموفق بود.");const raw=d.result?.text??d.output?.text??d.output??d.text??"";const answer=typeof raw==="string"?raw:JSON.stringify(raw);if(!answer.trim())throw new Error("پاسخی از دستیار دریافت نشد.");setAiAnswer(answer);}catch(e){setAiError(e instanceof Error?e.message:"خطا در ارتباط با دستیار هوشمند.");}finally{setBusy(false)}};
  return <div className="an-market-root am-product-detail-page" dir="rtl" style={{...vars,minHeight:"100vh",fontFamily:"Vazirmatn,sans-serif",background:"var(--am-bg)",color:"var(--am-text)"}}><div style={{maxWidth:1180,margin:"auto",padding:"0 16px 70px"}}>
@@ -173,9 +173,11 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
   setAiBusy(true);
   try{
    const r=await fetch(API+"/api/v1/market/ai/assist",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({workflowCode:compare.length>1?"market.compare":"market.assist",input:aiInput.trim(),compareIds:compare})});
-   const d=await r.json();
-   setAiAnswer(d.output?.text||d.output||"پاسخی دریافت نشد.");
-  }catch{setAiAnswer("ارتباط با دستیار برقرار نشد.");}
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(d.error==="market_ai_unavailable"?"دستیار هوشمند موقتاً در دسترس نیست.":"دریافت پاسخ از دستیار ناموفق بود.");
+   const raw=d.result?.text??d.output?.text??d.output??d.text??"";
+   setAiAnswer(typeof raw==="string"&&raw.trim()?raw:"پاسخی از دستیار دریافت نشد.");
+  }catch(e){setAiAnswer(e instanceof Error?e.message:"ارتباط با دستیار برقرار نشد.");}
   finally{setAiBusy(false);}
  };
  if(selected)return <ProductDetail p={selected} onBack={()=>setSelected(null)} fav={favorites.has(selected.id)} onFav={()=>void toggleFav(selected.id)} onAlert={()=>{setAlertProduct(selected);setAlertPrice(selected.priceMin>0?String(selected.priceMin):"");}}/>;
