@@ -9323,4 +9323,4 @@ button { font-weight: 700; }
 .sarraf-recent-orders>div:not(:first-child){min-height:64px;padding:12px 16px!important;transition:background .15s}
 .sarraf-recent-orders>div:not(:first-child):hover{background:var(--w-card2)}
 .sarraf-recent-orders>button{display:block;margin:12px!important;width:calc(100% - 24px);border:1px solid var(--w-border);border-radius:11px}
-@media(max-width:760px){.sarraf-recent-orders>div:not(:first-child){gap:8px!important;align-items:flex-start!important}.sarraf-recent-orders>div:not(:first-child)>span{white-space:nowrap}}
+@media(max-width:760px){.sarraf-overview-grid{grid-template-columns:minmax(0,1fr)!important}.sarraf-recent-orders>div:not(:first-child){gap:8px!important;align-items:flex-start!important}.sarraf-recent-orders>div:not(:first-child)>span{white-space:nowrap}}
