@@ -64,7 +64,6 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
  const [selected,setSelected]=useState<Product|null>(null);
  const [favorites,setFavorites]=useState<Set<string>>(new Set());
  const [compare,setCompare]=useState<string[]>([]);
- const [home,setHome]=useState<any>(null);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [aiInput,setAiInput]=useState("");
@@ -92,7 +91,6 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
   finally{setLoading(false);}
  };
  useEffect(()=>{void load();},[search,cat]);
- useEffect(()=>{fetch(API+"/api/v1/market/home?limit=12",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(setHome).catch(()=>{});},[]);
  useEffect(()=>{
   void fetch(API+"/api/v1/market/categories",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(d)setCats(d.categories||[]);}).catch(()=>{});
   if(token()){
@@ -100,10 +98,8 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
   }
  },[]);
  useEffect(()=>{
-  if(selected)fetch(API+"/api/v1/market/seo?type=product&id="+encodeURIComponent(selected.id)).then(r=>r.ok?r.json():null).then(d=>{
-   if(!d?.seo)return;
-   document.title=d.seo.title||"آن مارکت";
-  }).catch(()=>{});
+  document.title=selected?(`${selected.title} | آن مارکت`):"آن مارکت";
+  return ()=>{document.title="آن مارکت";};
  },[selected]);
  const roots=cats.filter(c=>!c.parent_id);
  const activeCategory=cats.find(c=>c.slug===cat)||null;
@@ -181,7 +177,6 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
     <button className={"am-compare-btn"+(compare.length>0?" active":"")} onClick={()=>setCompareOpen(true)}><span>▦</span>{compare.length>1?"مشاهده مقایسه":"انتخاب محصولات برای مقایسه"}{compare.length>0&&<span>{fa(compare.length)} محصول</span>}</button>
    </div>
    <div className="am-content" style={{padding:"0 16px 14px"}}>
-    {(home?.sections||[]).filter((s:any)=>s.section_type==="products").slice(0,3).map((s:any)=><Card key={s.key} style={{padding:14,marginBottom:12}}><b>{s.title}</b><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:8,marginTop:10}}>{(home?.products||[]).filter((p:any)=>!s.product_ids?.length||s.product_ids.map(String).includes(String(p.id))).slice(0,4).map((p:any)=><button key={p.id} onClick={()=>setSelected(mapProduct(p))} style={{border:"1px solid var(--am-border)",background:"var(--am-card)",borderRadius:12,padding:10,textAlign:"right",fontFamily:"Vazirmatn"}}><div style={{fontSize:11,fontWeight:800}}>{p.title}</div><div style={{fontSize:10,color:"var(--am-accent)",marginTop:5}}>{p.price_min>0?money(Number(p.price_min)):"قیمت اعلام نشده"}</div></button>)}</div></Card>)}
     {activeCategory&&<section className="am-subcategory-block"><div className="am-subcategory-heading"><b>{parentCategory?`زیر‌دسته‌های ${parentCategory.name_fa}`:`زیر‌دسته‌های ${activeCategory.name_fa}`}</b><button onClick={()=>setCat(parentCategory?.slug||"all")}>بازگشت به {parentCategory?.name_fa||"همه دسته‌ها"}</button></div><div className="am-subcategory-list">{(parentCategory?siblingCategories:childCategories).map(c=><button key={c.id} className={"am-cat-chip"+(cat===c.slug?" active":"")} onClick={()=>setCat(c.slug)}>{c.name_fa}</button>)}</div></section>}
     {loading?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت محصولات واقعی…</Card>:error?<Card style={{padding:60,textAlign:"center",color:"#DC2626"}}>{error}</Card>:products.length===0?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>هنوز محصول واقعی در دیتابیس ثبت نشده است؛ بعد از اتصال فید فروشگاه‌ها این بخش خودکار پر می‌شود.</Card>:<div className="am-product-grid">{products.map(p=><div key={p.id} className="am-product-grid-item"><ProductCard p={p} fav={favorites.has(p.id)} onFav={()=>void toggleFav(p.id)} onOpen={()=>setSelected(p)} selected={compare.includes(p.id)} onCompare={()=>compareToggle(p.id)}/><button className="am-alert-link" onClick={()=>{setAlertProduct(p);setAlertPrice(p.priceMin>0?String(p.priceMin):"");}}>＋ هشدار قیمت</button></div>)}</div>}
    </div>
