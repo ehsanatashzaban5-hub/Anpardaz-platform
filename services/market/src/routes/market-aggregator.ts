@@ -48,7 +48,7 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
         WHERE r.product_id=p.id AND r.status='published'
       ) rv ON TRUE
       WHERE ${where.join(' AND ')}
-      GROUP BY p.id,c.id ORDER BY p.updated_at DESC,p.id DESC LIMIT $${lim} OFFSET $${off}`,params);
+      GROUP BY p.id,c.id,pr.ranges ORDER BY p.updated_at DESC,p.id DESC LIMIT $${lim} OFFSET $${off}`,params);
     const ids=r.rows.map((x:any)=>Number(x.id));
     let media:any[]=[]; let offers:any[]=[]; let priceHistory:any[]=[];
     if(ids.length){
