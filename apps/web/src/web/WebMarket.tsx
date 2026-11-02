@@ -29,7 +29,7 @@ function ProductCard({p,fav,onFav,onOpen,selected,onCompare}:{p:Product;fav:bool
 }
 
 function ProductDetail({p,onBack,fav,onFav}:{p:Product;onBack:()=>void;fav:boolean;onFav:()=>void}){
- const [offers,setOffers]=useState<any[]>(p.offers||[]),[reviews,setReviews]=useState<any[]>([]),[reviewBody,setReviewBody]=useState(""),[reviewRating,setReviewRating]=useState(5),[frame,setFrame]=useState(""),[ai,setAi]=useState(""),[busy,setBusy]=useState(false),[tab,setTab]=useState<"sellers"|"specs"|"reviews">("sellers");
+ const [offers,setOffers]=useState<any[]>(p.offers||[]),[reviews,setReviews]=useState<any[]>([]),[reviewBody,setReviewBody]=useState(""),[reviewRating,setReviewRating]=useState(5),[frame,setFrame]=useState(""),[ai,setAi]=useState(""),[busy,setBusy]=useState(false),[tab,setTab]=useState<"sellers"|"specs"|"history"|"reviews">("sellers");
  useEffect(()=>{if(offers.length)return;fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id)).then(r=>r.ok?r.json():null).then(d=>d&&setOffers(d.offers||[])).catch(()=>{})},[p.id,offers.length]);
  useEffect(()=>{fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id)+"/reviews").then(r=>r.ok?r.json():null).then(d=>d&&setReviews(d.reviews||[])).catch(()=>{})},[p.id]);
  useEffect(()=>{if(token())void fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id)+"/view",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({surface:"web"})})},[p.id]);
@@ -145,6 +145,7 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
     </div>
     <div className="am-search-hero">
      <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <button type="button" className="am-image-search" onClick={()=>setImageSearchNotice(true)} aria-label="جستجوی تصویری" title="جستجوی تصویری">▧</button>
       <span style={{fontSize:20,color:"var(--am-muted)"}}>⌕</span>
       <input className="am-home-search" value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&setSearch(q.trim())} placeholder="جستجو در محصولات واقعی…"/>
       <Btn primary onClick={()=>setSearch(q.trim())}>جستجو</Btn>
