@@ -65,6 +65,8 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
  const [favorites,setFavorites]=useState<Set<string>>(new Set());
  const [compare,setCompare]=useState<string[]>([]);
  const [loading,setLoading]=useState(true);
+ const [page,setPage]=useState(1);
+ const [hasMore,setHasMore]=useState(false);
  const [error,setError]=useState("");
  const [aiInput,setAiInput]=useState("");
  const [aiAnswer,setAiAnswer]=useState("");
@@ -79,15 +81,24 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
  const [supportBody,setSupportBody]=useState(""); const [supportBusy,setSupportBusy]=useState(false); const [supportError,setSupportError]=useState("");
  const [selectedTicket,setSelectedTicket]=useState<any|null>(null); const [ticketMessages,setTicketMessages]=useState<any[]>([]); const [ticketReply,setTicketReply]=useState(""); const [ticketBusy,setTicketBusy]=useState(false);
  const load=async()=>{
-  setLoading(true);
+  setLoading(true);setPage(1);setHasMore(false);setProducts([]);
   try{
-   const url=API+"/api/v1/market/catalog?limit=100"+(search?"&q="+encodeURIComponent(search):"")+(cat!=="all"?"&category="+encodeURIComponent(cat):"");
+   const url=API+"/api/v1/market/catalog?limit=100&page=1"+(search?"&q="+encodeURIComponent(search):"")+(cat!=="all"?"&category="+encodeURIComponent(cat):"");
    const r=await fetch(url,{cache:"no-store"});
    if(!r.ok)throw new Error("catalog");
-   const d=await r.json();
-   setProducts((d.products||[]).map(mapProduct));
-   setError("");
-  }catch{setProducts([]);setError("اطلاعات واقعی آن مارکت در دسترس نیست.");}
+   const d=await r.json();const rows=Array.isArray(d.products)?d.products:[];
+   setProducts(rows.map(mapProduct));setHasMore(rows.length===100);setError("");
+  }catch{setProducts([]);setHasMore(false);setError("اطلاعات واقعی آن مارکت در دسترس نیست.");}
+  finally{setLoading(false);}
+ };
+ const loadMore=async()=>{
+  if(loading||!hasMore)return;setLoading(true);
+  try{
+   const next=page+1,url=API+"/api/v1/market/catalog?limit=100&page="+next+(search?"&q="+encodeURIComponent(search):"")+(cat!=="all"?"&category="+encodeURIComponent(cat):"");
+   const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw new Error("catalog");
+   const d=await r.json();const rows=Array.isArray(d.products)?d.products:[];
+   setProducts(current=>[...current,...rows.map(mapProduct)]);setPage(next);setHasMore(rows.length===100);setError("");
+  }catch{setError("دریافت ادامه فهرست محصولات ناموفق بود.");setHasMore(false);}
   finally{setLoading(false);}
  };
  useEffect(()=>{void load();},[search,cat]);
@@ -193,7 +204,7 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
    {compareError&&<div role="alert" style={{maxWidth:1240,margin:"0 auto 10px",padding:"8px 14px",color:"var(--am-red)",fontSize:12,fontWeight:700}}>{compareError}</div>}
    <div className="am-content" style={{padding:"0 16px 14px"}}>
     {activeCategory&&<section className="am-subcategory-block"><div className="am-subcategory-heading"><b>{parentCategory?`زیر‌دسته‌های ${parentCategory.name_fa}`:`زیر‌دسته‌های ${activeCategory.name_fa}`}</b><button onClick={()=>setCat(parentCategory?.slug||"all")}>بازگشت به {parentCategory?.name_fa||"همه دسته‌ها"}</button></div><div className="am-subcategory-list">{(parentCategory?siblingCategories:childCategories).map(c=><button key={c.id} className={"am-cat-chip"+(cat===c.slug?" active":"")} onClick={()=>setCat(c.slug)}>{c.name_fa}</button>)}</div></section>}
-    {loading?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت محصولات واقعی…</Card>:error?<Card style={{padding:60,textAlign:"center",color:"#DC2626"}}>{error}</Card>:products.length===0?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>هنوز محصول واقعی در دیتابیس ثبت نشده است؛ بعد از اتصال فید فروشگاه‌ها این بخش خودکار پر می‌شود.</Card>:<div className="am-product-grid">{products.map(p=><div key={p.id} className="am-product-grid-item"><ProductCard p={p} fav={favorites.has(p.id)} onFav={()=>void toggleFav(p.id)} onOpen={()=>setSelected(p)} selected={compare.includes(p.id)} onCompare={()=>compareToggle(p.id)}/><button className="am-alert-link" onClick={()=>{setAlertProduct(p);setAlertPrice(p.priceMin>0?String(p.priceMin):"");}}>＋ هشدار قیمت</button></div>)}</div>}
+    {loading?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>در حال دریافت محصولات واقعی…</Card>:error?<Card style={{padding:60,textAlign:"center",color:"#DC2626"}}>{error}</Card>:products.length===0?<Card style={{padding:60,textAlign:"center",color:"var(--am-muted)"}}>هنوز محصول واقعی در دیتابیس ثبت نشده است؛ بعد از اتصال فید فروشگاه‌ها این بخش خودکار پر می‌شود.</Card>:<><div className="am-product-grid">{products.map(p=><div key={p.id} className="am-product-grid-item"><ProductCard p={p} fav={favorites.has(p.id)} onFav={()=>void toggleFav(p.id)} onOpen={()=>setSelected(p)} selected={compare.includes(p.id)} onCompare={()=>compareToggle(p.id)}/><button className="am-alert-link" onClick={()=>{setAlertProduct(p);setAlertPrice(p.priceMin>0?String(p.priceMin):"");}}>＋ هشدار قیمت</button></div>)}</div>{hasMore&&<div style={{display:"flex",justifyContent:"center",padding:"18px 0 28px"}}><Btn primary disabled={loading} onClick={()=>void loadMore()}>{loading?"در حال دریافت…":"نمایش محصولات بیشتر"}</Btn></div>}</>}
    </div>
   </div>}
   {tab==="assistant"&&<div style={{padding:16,maxWidth:980,margin:"auto"}}><Card><div className="am-search-head"><div className="am-ai-avatar">✦</div><div><b>دستیار هوشمند آن مارکت</b><div style={{fontSize:11,color:"var(--am-muted)"}}>بر پایه داده‌های واقعی آن مارکت</div></div></div><div style={{padding:18}}>{compare.length>1&&<div style={{color:"var(--am-accent)",fontSize:12,fontWeight:800,marginBottom:10}}>{fa(compare.length)} محصول برای مقایسه انتخاب شده است.</div>}<textarea value={aiInput} onChange={e=>setAiInput(e.target.value)} placeholder={compare.length>1?"تفاوت این محصولات را بر اساس داده‌های واقعی مقایسه کن…":"درباره محصولات آن مارکت سؤال بپرس…"} style={{width:"100%",boxSizing:"border-box",minHeight:150,padding:14,borderRadius:14,border:"1.5px solid var(--am-border)",fontFamily:"Vazirmatn"}}/><Btn primary disabled={aiBusy||!token()} onClick={()=>void runAi()} style={{marginTop:10}}>{aiBusy?"در حال بررسی…":"ارسال به دستیار"}</Btn>{aiAnswer&&<div className="am-bubble-ai" style={{marginTop:16}}>{aiAnswer}</div>}</div></Card></div>}
