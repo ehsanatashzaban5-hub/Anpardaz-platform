@@ -52,11 +52,11 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
       const q=new URLSearchParams();if(query.trim())q.set("q",query.trim());if(city.trim())q.set("city",city.trim());if(category)q.set("categoryId",category);if(minPrice)q.set("minPrice",minPrice);if(maxPrice)q.set("maxPrice",maxPrice);q.set("sort",sort==="price-asc"?"price_asc":sort==="price-desc"?"price_desc":"newest");q.set("page",String(page));q.set("limit","24");
       const [l,c]=await Promise.all([api("/api/v1/banner/listings?"+q.toString()),api("/api/v1/banner/categories")]);
       setListings(l.listings??[]);setTotal(Number(l.total??0));setCategories(c.categories??[]);
-      if(isLoggedIn){const f=await api("/api/v1/banner/me/favorites");setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));setFavoriteListings(f.listings??[])}
+      if(isLoggedIn){const f=await api("/api/v1/banner/me/favorites");setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));setFavoriteListings(f.listings??[])}else{setFavorites(new Set());setFavoriteListings([])}
     }catch(e){setError(e instanceof Error?e.message:"خطا در دریافت آگهی‌ها")}finally{setLoading(false)}
   };
   const loadPrivate=async()=>{
-    if(!isLoggedIn)return;
+    if(!isLoggedIn){setTickets([]);setNotifications([]);setProfile(null);setConversations([]);setMyListings([]);setRecentViews([]);setFavoriteListings([]);setFavorites(new Set());return;}
     setLoading(true);setError("");
     try{
       const [f,t,n,p,m,ml,rv]=await Promise.all([
@@ -77,7 +77,7 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
     if(!isLoggedIn){onAuthRequired();return;}
     try{const r=await api("/api/v1/banner/listings/"+encodeURIComponent(id)+"/favorite",{method:"POST"});setFavorites(p=>{const n=new Set(p);r.favorite?n.add(id):n.delete(id);return n;});setFavoriteListings(p=>r.favorite?(p.some(x=>String(x.id)===id)?p:[...p,...listings.filter(x=>String(x.id)===id)]):p.filter(x=>String(x.id)!==id));}catch(e){setError(e instanceof Error?e.message:"favorite_failed")}
   };
-  const openListing=async(x:Listing)=>{try{if(isLoggedIn)await api("/api/v1/banner/me/recent-views/"+x.id,{method:"POST",body:"{}"});const d=await api("/api/v1/banner/listings/"+x.id);setSelected({...x,...d.listing,media:d.media??[]});}catch(e){setError(e instanceof Error?e.message:"listing_failed")}};
+  const openListing=async(x:Listing)=>{try{if(isLoggedIn)void api("/api/v1/banner/me/recent-views/"+x.id,{method:"POST",body:"{}"}).catch(()=>{});const d=await api("/api/v1/banner/listings/"+x.id);setSelected({...x,...d.listing,media:d.media??[]});}catch(e){setError(e instanceof Error?e.message:"listing_failed")}};
 
   const nav=[
     ["home","آگهی‌ها"],["search","جستجو"],["favorites","نشان‌شده‌ها"],["recent","آخرین مشاهده‌ها"],["postchi","پستچی و اعلان‌ها"],["messages","چت و تماس"],["notifications","اعلان‌ها"],
