@@ -120,7 +120,7 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return{conversations:(await pool.query(`SELECT c.*,u.email,COUNT(m.id)::int message_count FROM market_ai_conversations c LEFT JOIN market_users u ON u.id=c.user_id LEFT JOIN market_ai_messages m ON m.conversation_id=c.id GROUP BY c.id,u.email ORDER BY c.updated_at DESC LIMIT $1`,[limit])).rows};
   });
 
-  app.post('/internal/v1/admin/market/categories',{preHandler:requireAuth},async(req,reply)=>{
+  app.post('/internal/v1/admin/market/categories',{preHandler:[requireAdminInternal,requireAuth]},async(req,reply)=>{
     if(!(await admin(pool,req,'approvals.write')))return reply.code(403).send({error:'forbidden'});
     const b=(req.body??{}) as any; const name=String(b.name??'').trim(),nameFa=String(b.nameFa??'').trim(),slug=String(b.slug??'').trim();
     if(!name||!nameFa||!slug)return reply.code(400).send({error:'invalid_category'});
@@ -129,7 +129,7 @@ export function registerMarketCompletionRoutes(app:FastifyInstance,pool:Pool){
     return reply.code(201).send({category:q.rows[0]});
   });
 
-  app.patch('/internal/v1/admin/market/categories/:id',{preHandler:requireAuth},async(req,reply)=>{
+  app.patch('/internal/v1/admin/market/categories/:id',{preHandler:[requireAdminInternal,requireAuth]},async(req,reply)=>{
     if(!(await admin(pool,req,'approvals.write')))return reply.code(403).send({error:'forbidden'});
     const id=Number((req.params as any).id),b=(req.body??{}) as any;
     if(!Number.isSafeInteger(id)||id<=0)return reply.code(400).send({error:'invalid_category'});
