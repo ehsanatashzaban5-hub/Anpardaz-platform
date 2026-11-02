@@ -227,7 +227,7 @@ async function registerPrivate(app:FastifyInstance){
     const a=auth(req);
     const r=await pool.query(`SELECT 'notification'::text source,id::text event_id,type,title,description,read_at IS NOT NULL read,created_at,NULL::text resource_type,NULL::text resource_id FROM banner_notifications WHERE identity_id=$1
       UNION ALL
-      SELECT 'activity'::text source,id::text event_id,event_type type,event_type title,COALESCE(metadata::text,'') description,read_at IS NOT NULL read,occurred_at created_at,resource_type,resource_id FROM banner_activity_events WHERE identity_id=$1
+      SELECT 'activity'::text source,id::text event_id,event_type type,event_type title,CASE event_type WHEN 'listing_created' THEN 'آگهی برای بررسی ارسال شد' WHEN 'listing_updated' THEN 'اطلاعات آگهی به‌روزرسانی شد' WHEN 'message_sent' THEN 'پیام جدیدی از حساب شما ارسال شد' WHEN 'conversation_created' THEN 'گفت‌وگوی جدید ایجاد شد' WHEN 'inquiry_created' THEN 'درخواست گفت‌وگو ثبت شد' WHEN 'inquiry_reply' THEN 'پاسخ گفت‌وگو ارسال شد' WHEN 'profile_update' THEN 'پروفایل شما به‌روزرسانی شد' WHEN 'favorite_added' THEN 'آگهی به علاقه‌مندی‌ها افزوده شد' WHEN 'favorite_removed' THEN 'آگهی از علاقه‌مندی‌ها حذف شد' WHEN 'listing_viewed' THEN 'یک آگهی مشاهده شد' WHEN 'media_uploaded' THEN 'تصویر آگهی بارگذاری شد' WHEN 'media_deleted' THEN 'تصویر آگهی حذف شد' ELSE 'فعالیت جدیدی در حساب شما ثبت شد' END description,read_at IS NOT NULL read,occurred_at created_at,resource_type,resource_id FROM banner_activity_events WHERE identity_id=$1
       ORDER BY created_at DESC LIMIT 150`,[a.sub]);
     return{events:r.rows};
   });
