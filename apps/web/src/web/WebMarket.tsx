@@ -34,8 +34,10 @@ function ProductCard({p,fav,onFav,onOpen,selected,onCompare}:{p:Product;fav:bool
 }
 
 function ProductDetail({p,onBack,fav,onFav,onAlert}:{p:Product;onBack:()=>void;fav:boolean;onFav:()=>void;onAlert:()=>void}){
- const [offers,setOffers]=useState<any[]>(p.offers||[]),[priceHistory,setPriceHistory]=useState(p.priceHistory||[]),[reviews,setReviews]=useState<any[]>([]),[reviewBody,setReviewBody]=useState(""),[reviewRating,setReviewRating]=useState(5),[frame,setFrame]=useState(""),[ai,setAi]=useState(""),[aiAnswer,setAiAnswer]=useState(""),[aiError,setAiError]=useState(""),[busy,setBusy]=useState(false),[tab,setTab]=useState<"sellers"|"specs"|"history"|"reviews">("sellers"),[activeImage,setActiveImage]=useState(0);
- useEffect(()=>{fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(!d)return;if(Array.isArray(d.offers))setOffers(d.offers);if(Array.isArray(d.priceHistory))setPriceHistory(d.priceHistory.map((h:any)=>({price:Number(h.price??h.p??0),capturedAt:String(h.capturedAt??h.captured_at??"")})).filter((h:any)=>h.price>0));}).catch(()=>{})},[p.id]);
+ const [offers,setOffers]=useState<any[]>(p.offers||[]),[priceHistory,setPriceHistory]=useState(p.priceHistory||[]),[historyCurrency,setHistoryCurrency]=useState(p.priceCurrency||"IRR"),[reviews,setReviews]=useState<any[]>([]),[reviewBody,setReviewBody]=useState(""),[reviewRating,setReviewRating]=useState(5),[frame,setFrame]=useState(""),[ai,setAi]=useState(""),[aiAnswer,setAiAnswer]=useState(""),[aiError,setAiError]=useState(""),[busy,setBusy]=useState(false),[tab,setTab]=useState<"sellers"|"specs"|"history"|"reviews">("sellers"),[activeImage,setActiveImage]=useState(0);
+ useEffect(()=>{fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(!d)return;if(Array.isArray(d.offers))setOffers(d.offers);if(Array.isArray(d.priceHistory))setPriceHistory(d.priceHistory.map((h:any)=>({price:Number(h.price??h.p??0),currency:String(h.currency||"IRR").trim(),capturedAt:String(h.capturedAt??h.captured_at??"")})).filter((h:any)=>h.price>0));}).catch(()=>{})},[p.id]);
+ const historyCurrencies=[...new Set(priceHistory.map(h=>h.currency))];
+ const visiblePriceHistory=priceHistory.filter(h=>h.currency===historyCurrency);
  useEffect(()=>{fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id)+"/reviews").then(r=>r.ok?r.json():null).then(d=>d&&setReviews(d.reviews||[])).catch(()=>{})},[p.id]);
  useEffect(()=>{if(token())void fetch(API+"/api/v1/market/products/"+encodeURIComponent(p.id)+"/view",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({surface:"web"})})},[p.id]);
  const click=async(o:any)=>{if(!token())return;let popup:Window|null=null;try{popup=window.open("about:blank","_blank");if(popup)popup.opener=null;const r=await fetch(API+"/api/v1/market/clickout",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({offerId:Number(o.id),surface:"web"})});const d=await r.json();if(!r.ok||typeof d.url!=="string")throw new Error("clickout_failed");if(d.mode==="iframe"){popup?.close();setFrame(d.url);}else if(popup){popup.location.href=d.url;}else{window.location.assign(d.url);}}catch{popup?.close();}};
@@ -182,7 +184,7 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
   }catch(e){setAiAnswer(e instanceof Error?e.message:"ارتباط با دستیار برقرار نشد.");}
   finally{setAiBusy(false);}
  };
- if(selected)return <ProductDetail p={selected} onBack={()=>setSelected(null)} fav={favorites.has(selected.id)} onFav={()=>void toggleFav(selected.id)} onAlert={()=>{setAlertProduct(selected);setAlertPrice(selected.priceMin>0?String(selected.priceMin):"");}}/>;
+ if(selected)return <ProductDetail p={selected} onBack={()=>setSelected(null)} fav={favorites.has(selected.id)} onFav={()=>void toggleFav(selected.id)} onAlert={()=>{setAlertProduct(selected);setAlertCurrency(selected.priceCurrency||"IRR");setAlertPrice(selected.priceMin>0?String(selected.priceMin):"");}}/>;
  return <div className="an-market-root" dir="rtl" style={vars}>
   <div className="am-header">
    <div className="am-header-inner" style={{padding:"18px 16px 14px",maxWidth:1280,margin:"auto"}}>
