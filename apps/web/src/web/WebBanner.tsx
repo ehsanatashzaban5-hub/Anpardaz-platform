@@ -195,11 +195,47 @@ function Tickets({tickets,ticket,setTicket,onRefresh}:{tickets:Ticket[];ticket:a
  const send=async()=>{if(!ticket?.ticket?.id||!reply.trim())return;setBusy(true);setError("");try{await api("/api/v1/banner/tickets/"+ticket.ticket.id+"/reply",{method:"POST",body:JSON.stringify({message:reply.trim()})});setReply("");await open(Number(ticket.ticket.id));onRefresh()}catch(e){setError(e instanceof Error?e.message:"ارسال پاسخ ناموفق بود")}finally{setBusy(false)}};
  return <div><h2>پشتیبانی آن بنر</h2><div className="w-card" style={{padding:16,marginBottom:14}}><b style={{fontSize:13}}>موضوع تیکت</b><div style={{display:"flex",gap:7,flexWrap:"wrap",margin:"10px 0"}}>{subjects.map(x=><button key={x} className={subject===x?"w-btn w-btn-primary":"w-btn w-btn-ghost"} onClick={()=>setSubject(x)} style={{fontSize:11}}>{x}</button>)}</div><textarea className="w-input" value={message} onChange={e=>setMessage(e.target.value)} placeholder="مشکل یا سوال خود را شرح دهید…" rows={4}/><button className="w-btn w-btn-primary" onClick={()=>void create()} disabled={busy||!subject||!message.trim()} style={{marginTop:8}}>{busy?"در حال ثبت…":"ارسال تیکت"}</button></div>{error&&<div className="w-card" style={{padding:10,color:"#dc2626",marginBottom:10}}>{error}</div>}{ticket?<div className="w-card" style={{padding:16,marginBottom:12}}><button className="w-btn w-btn-ghost" onClick={()=>setTicket(null)}>بازگشت به فهرست تیکت‌ها</button><h3>{ticket.ticket.subject}</h3><div style={{fontSize:11,color:"var(--w-muted)"}}>وضعیت: {ticket.ticket.status}</div><div style={{display:"grid",gap:8,marginTop:12}}>{(ticket.messages??[]).map((m:any)=><div key={m.id} style={{padding:10,borderRadius:10,background:m.sender_type==="user"?"var(--w-card2)":"var(--w-surface)",border:"1px solid var(--w-border)",maxWidth:"90%",justifySelf:m.sender_type==="user"?"end":"start"}}><div style={{fontSize:10,color:"var(--w-muted)",marginBottom:4}}>{m.sender_type==="admin"?"پشتیبانی":m.sender_type==="system"?"سامانه":"شما"}</div><div style={{whiteSpace:"pre-wrap",lineHeight:1.8}}>{m.body}</div><small style={{display:"block",textAlign:"left",fontSize:9,color:"var(--w-muted)",marginTop:5}}>{m.created_at?new Date(m.created_at).toLocaleString("fa-IR"):""}</small></div>)}</div><textarea className="w-input" value={reply} onChange={e=>setReply(e.target.value)} placeholder="پاسخ خود را بنویسید…" rows={3} style={{marginTop:12}}/><button className="w-btn w-btn-primary" onClick={()=>void send()} disabled={busy||!reply.trim()||ticket.ticket.status==="closed"} style={{marginTop:7}}>ارسال پاسخ</button></div>:null}<h3 style={{fontSize:14,marginTop:20}}>تیکت‌های ثبت‌شده</h3>{!tickets.length?<div className="w-card" style={{padding:24}}>تیکتی ثبت نشده است.</div>:tickets.map(t=><button key={t.id} className="w-btn w-btn-ghost" onClick={()=>void open(t.id)} style={{width:"100%",justifyContent:"space-between",marginBottom:7}}><span>#{FA(t.id)} · {t.subject}</span><span>{t.status==="open"?"باز":t.status==="pending"?"در انتظار پاسخ":t.status==="resolved"?"پاسخ داده شده":"بسته"}</span></button>)}</div>;
 }
-function LocalImagePreview({file}:{file:File}){
- const canvas=useRef<HTMLCanvasElement|null>(null);
- useEffect(()=>{let active=true;let bitmap:ImageBitmap|null=null;createImageBitmap(file).then(image=>{if(!active){image.close();return;}bitmap=image;const target=canvas.current;if(!target)return;const ctx=target.getContext("2d");if(!ctx)return;const scale=Math.max(target.width/image.width,target.height/image.height);const sw=target.width/scale,sh=target.height/scale,sx=(image.width-sw)/2,sy=(image.height-sh)/2;ctx.clearRect(0,0,target.width,target.height);ctx.drawImage(image,sx,sy,sw,sh,0,0,target.width,target.height)}).catch(()=>{});return()=>{active=false;bitmap?.close();};},[file]);
- return <canvas ref={canvas} width={188} height={140} aria-label="پیش‌نمایش تصویر" style={{width:94,height:74,objectFit:"cover",borderRadius:8,background:"var(--w-card2)"}}/>;
-}
+function LocalImagePreview({file}:{file:File}) {
+  const canvas = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    let active = true;
+    let bitmap: ImageBitmap | null = null;
+    const drawPreview = async (): Promise<void> => {
+      try {
+        const image = await createImageBitmap(file);
+        if (!active) {
+          image.close();
+          return;
+        }
+        bitmap = image;
+        const target = canvas.current;
+        if (!target) {
+          return;
+        }
+        const context = target.getContext("2d");
+        if (!context) {
+          return;
+        }
+        const scale = Math.max(target.width / image.width, target.height / image.height);
+        const sourceWidth = target.width / scale;
+        const sourceHeight = target.height / scale;
+        const sourceX = (image.width - sourceWidth) / 2;
+        const sourceY = (image.height - sourceHeight) / 2;
+        context.clearRect(0, 0, target.width, target.height);
+        context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, target.width, target.height);
+      } catch {
+        // Invalid or unsupported image files are rejected during selection and upload.
+      }
+    };
+    void drawPreview();
+    return () => {
+      active = false;
+      bitmap?.close();
+    };
+  }, [file]);
+  return <canvas ref={canvas} width={188} height={140} aria-label="پیش‌نمایش تصویر" style={{width:94,height:74,objectFit:"cover",borderRadius:8,background:"var(--w-card2)"}} />;
+};
+
 function Post({categories,onDone}:{categories:any[];onDone:()=>void}){
  const [step,setStep]=useState(0);const [categoryId,setCategoryId]=useState("");const [title,setTitle]=useState("");const [contactEnabled,setContactEnabled]=useState(true);const [chatEnabled,setChatEnabled]=useState(true);const [description,setDescription]=useState("");const [price,setPrice]=useState("");const [priceMode,setPriceMode]=useState<"fixed"|"negotiable"|"free"|"swap">("fixed");const [condition,setCondition]=useState("used");const [provinceId,setProvinceId]=useState("tehran");const [cityId,setCityId]=useState("tehran");const [files,setFiles]=useState<File[]>([]);const [cropPosition,setCropPosition]=useState(50);const [attributes,setAttributes]=useState<Record<string,string>>({});const [busy,setBusy]=useState(false);const [err,setErr]=useState("");const [aiSuggestionId,setAiSuggestionId]=useState<number|null>(null);const [aiInfo,setAiInfo]=useState("");
  const options=categoryOptions(categories);const selectedCategory=options.find(x=>String(x.id)===categoryId);const province=IRAN_PROVINCES.find(x=>x.id===provinceId)??IRAN_PROVINCES[0];const cities=province?.cities??[];const selectedCity=cities.find(x=>x.id===cityId)??cities[0];
