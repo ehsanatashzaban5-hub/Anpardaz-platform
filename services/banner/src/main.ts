@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import {requireAuth,requireAdminInternal,type AuthClaims} from './auth.js';
 
 type R=FastifyRequest&{auth:AuthClaims};
-const app=Fastify({logger:true,trustProxy:process.env.TRUST_PROXY==='true'});
+const app=Fastify({logger:true,trustProxy:process.env.TRUST_PROXY==='true',bodyLimit:12*1024*1024});
 
 app.addHook('onSend',async(_request,reply)=>{reply.header('X-Content-Type-Options','nosniff');reply.header('X-Frame-Options','DENY');reply.header('Referrer-Policy','no-referrer');reply.header('Permissions-Policy','camera=(),microphone=(),geolocation=()');if(process.env.NODE_ENV==='production')reply.header('Strict-Transport-Security','max-age=31536000; includeSubDomains');});const isProduction=process.env.NODE_ENV==='production';
 if(isProduction){for(const name of ['DATABASE_URL','CORS_ORIGIN','IDENTITY_SERVICE_URL','IDENTITY_ISSUER','IDENTITY_PUBLIC_KEY_B64','BANNER_INTERNAL_TOKEN']){const value=process.env[name];if(!value||((name==='BANNER_INTERNAL_TOKEN')&&value.length<32)||value.includes('CHANGE_ME')||value.includes('your-web-domain.example')||value.includes('BASE64-DER-ED25519-PUBLIC-KEY'))throw new Error('Production environment variable '+name+' must be configured with a real value');}}
