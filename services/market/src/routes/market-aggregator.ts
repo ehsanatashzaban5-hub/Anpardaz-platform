@@ -286,9 +286,14 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
   });
 
   app.post('/api/v1/market/me/alerts',{preHandler:requireAuth},async(req,reply)=>{
-    const a=auth(req),uid=await ensureMarketUser(pool,a.auth),b=(req.body??{}) as any,id=Number(b.productId),target=Number(b.targetPrice);
-    if(!Number.isSafeInteger(id)||id<=0||!Number.isFinite(target)||target<=0)return reply.code(400).send({error:'invalid_alert'});
-    const q=await pool.query("INSERT INTO market_price_alerts(identity_id,user_id,product_id,target_price,currency) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,product_id) DO UPDATE SET target_price=EXCLUDED.target_price,enabled=true,updated_at=NOW() RETURNING *",[a.auth.sub,uid,id,target,String(b.currency??'IRR').slice(0,3)]);
+    const a=auth(req),uid=await ensureMarketUser(pool,a.auth),b=(req.body??{}) as any,id=Number(b.productId),target=Number(b.targetPrice),currency=String(b.currency??'IRR').trim().toUpperCase();
+    if(!Number.isSafeInteger(id)||id<=0||!Number.isFinite(target)||target<=0||!/^[A-Z]{3}$/.test(currency))return reply.code(400).send({error:'invalid_alert'});
+    const supported=await pool.query(`SELECT 1 FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id
+      JOIN market_products p ON p.id=o.product_id
+      WHERE o.product_id=$1 AND p.status='published' AND o.currency=$2 AND o.availability<>'out_of_stock'
+        AND (s.active IS TRUE OR s.id IS NULL) LIMIT 1`,[id,currency]);
+    if(!supported.rowCount)return reply.code(400).send({error:'unsupported_alert_currency'});
+    const q=await pool.query("INSERT INTO market_price_alerts(identity_id,user_id,product_id,target_price,currency) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,product_id) DO UPDATE SET target_price=EXCLUDED.target_price,currency=EXCLUDED.currency,enabled=true,updated_at=NOW() RETURNING *",[a.auth.sub,uid,id,target,currency]);
     return{alert:q.rows[0]};
   });
 
