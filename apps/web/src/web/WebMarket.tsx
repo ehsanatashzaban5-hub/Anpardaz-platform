@@ -81,6 +81,11 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
  const [supportSubject,setSupportSubject]=useState("");
  const [supportBody,setSupportBody]=useState(""); const [supportBusy,setSupportBusy]=useState(false); const [supportError,setSupportError]=useState("");
  const [selectedTicket,setSelectedTicket]=useState<any|null>(null); const [ticketMessages,setTicketMessages]=useState<any[]>([]); const [ticketReply,setTicketReply]=useState(""); const [ticketBusy,setTicketBusy]=useState(false);
+ const recordSearch=async(value:string)=>{
+  if(!value||!token())return;
+  try{await fetch(API+"/api/v1/market/search",{method:"POST",headers:{"content-type":"application/json",...auth()},body:JSON.stringify({query:value,surface:"web"})});}catch{}
+ };
+ const submitSearch=()=>{const value=q.trim();setPage(1);setSearch(value);void recordSearch(value);};
  const load=async()=>{
   setLoading(true);setPage(1);setHasMore(false);setProducts([]);
   try{
@@ -186,8 +191,8 @@ export default function WebMarket({onNavigate:_onNavigate}:Props){
      <div style={{display:"flex",alignItems:"center",gap:8}}>
       <button type="button" className="am-image-search" onClick={()=>setImageSearchNotice(true)} aria-label="جستجوی تصویری" title="جستجوی تصویری">▧</button>
       <span style={{fontSize:20,color:"var(--am-muted)"}}>⌕</span>
-      <input className="am-home-search" value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&setSearch(q.trim())} placeholder="جستجو در محصولات واقعی…"/>
-      <Btn primary onClick={()=>setSearch(q.trim())}>جستجو</Btn>
+      <input className="am-home-search" value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submitSearch()} placeholder="جستجو در محصولات واقعی…"/>
+      <Btn primary onClick={submitSearch}>جستجو</Btn>
      </div>
     </div>
    </div>
