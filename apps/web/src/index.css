@@ -9547,3 +9547,8 @@ button { font-weight: 700; }
 .an-market-root .am-history-placeholder p{font-size:12px;line-height:2;color:var(--am-muted)}
 .an-market-root .am-history-empty{padding:28px;text-align:center;border:1px dashed var(--am-border);border-radius:14px;background:#f8fbfa;color:var(--am-muted);font-size:12px}
 @media(max-width:620px){.an-market-root .am-subcategory-block{padding:0 12px}.an-market-root .am-compare-dialog{padding:14px}.an-market-root .am-dialog-actions>*{flex:1}}
+
+.an-market-root .am-support-dialog{display:grid;gap:9px}
+.an-market-root .am-support-dialog label{font-size:11px;font-weight:800;color:var(--am-muted)}
+.an-market-root .am-support-dialog input,.an-market-root .am-support-dialog select,.an-market-root .am-support-dialog textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid var(--am-border);border-radius:10px;background:#fff;color:var(--am-text);font:12px Vazirmatn}
+.an-market-root .am-support-pending{padding:10px;border-radius:10px;background:#fff8e8;color:#8a6822;font-size:11px;line-height:1.8}
