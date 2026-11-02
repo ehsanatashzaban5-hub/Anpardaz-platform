@@ -24,6 +24,7 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
   const [listings,setListings]=useState<Listing[]>([]);
   const [categories,setCategories]=useState<any[]>([]);
   const [favorites,setFavorites]=useState<Set<string>>(new Set());
+  const [favoriteListings,setFavoriteListings]=useState<Listing[]>([]);
   const [selected,setSelected]=useState<Listing|null>(null);
   const [editingListing,setEditingListing]=useState<Listing|null>(null);
   const [query,setQuery]=useState("");
@@ -51,7 +52,7 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
       const q=new URLSearchParams();if(query.trim())q.set("q",query.trim());if(city.trim())q.set("city",city.trim());if(category)q.set("categoryId",category);if(minPrice)q.set("minPrice",minPrice);if(maxPrice)q.set("maxPrice",maxPrice);q.set("sort",sort==="price-asc"?"price_asc":sort==="price-desc"?"price_desc":"newest");q.set("page",String(page));q.set("limit","24");
       const [l,c]=await Promise.all([api("/api/v1/banner/listings?"+q.toString()),api("/api/v1/banner/categories")]);
       setListings(l.listings??[]);setTotal(Number(l.total??0));setCategories(c.categories??[]);
-      if(isLoggedIn){const f=await api("/api/v1/banner/me/favorites");setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));}
+      if(isLoggedIn){const f=await api("/api/v1/banner/me/favorites");setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));setFavoriteListings(f.listings??[])}
     }catch(e){setError(e instanceof Error?e.message:"خطا در دریافت آگهی‌ها")}finally{setLoading(false)}
   };
   const loadPrivate=async()=>{
@@ -62,7 +63,7 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
         api("/api/v1/banner/me/favorites"),api("/api/v1/banner/me/tickets"),api("/api/v1/banner/me/notifications"),
         api("/api/v1/banner/me"),api("/api/v1/banner/me/conversations"),api("/api/v1/banner/me/listings"),api("/api/v1/banner/me/recent-views")
       ]);
-      setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));setTickets(t.tickets??[]);setNotifications(n.notifications??[]);setProfile(p.profile??null);setConversations(m.conversations??[]);setMyListings(ml.listings??[]);setRecentViews(rv.listings??[]);
+      setFavorites(new Set((f.listings??[]).map((x:any)=>String(x.id))));setFavoriteListings(f.listings??[]);setTickets(t.tickets??[]);setNotifications(n.notifications??[]);setProfile(p.profile??null);setConversations(m.conversations??[]);setMyListings(ml.listings??[]);setRecentViews(rv.listings??[]);
     }catch(e){setError(e instanceof Error?e.message:"خطا در دریافت اطلاعات حساب")}finally{setLoading(false)}
   };
   useEffect(()=>{void loadHome()},[query,city,category,minPrice,maxPrice,sort,page,isLoggedIn]);
@@ -74,7 +75,7 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
 
   const toggleFavorite=async(id:string)=>{
     if(!isLoggedIn){onAuthRequired();return;}
-    try{const r=await api("/api/v1/banner/listings/"+encodeURIComponent(id)+"/favorite",{method:"POST"});setFavorites(p=>{const n=new Set(p);r.favorite?n.add(id):n.delete(id);return n;});}catch(e){setError(e instanceof Error?e.message:"favorite_failed")}
+    try{const r=await api("/api/v1/banner/listings/"+encodeURIComponent(id)+"/favorite",{method:"POST"});setFavorites(p=>{const n=new Set(p);r.favorite?n.add(id):n.delete(id);return n;});setFavoriteListings(p=>r.favorite?(p.some(x=>String(x.id)===id)?p:[...p,...listings.filter(x=>String(x.id)===id)]):p.filter(x=>String(x.id)!==id));}catch(e){setError(e instanceof Error?e.message:"favorite_failed")}
   };
   const openListing=async(x:Listing)=>{try{if(isLoggedIn)await api("/api/v1/banner/me/recent-views/"+x.id,{method:"POST",body:"{}"});const d=await api("/api/v1/banner/listings/"+x.id);setSelected({...x,...d.listing,media:d.media??[]});}catch(e){setError(e instanceof Error?e.message:"listing_failed")}};
 
@@ -105,8 +106,8 @@ export default function WebBanner({onNavigate,isLoggedIn,onAuthRequired}:Props){
         {selected&&<Detail listing={selected} favorite={favorites.has(String(selected.id))} onBack={()=>setSelected(null)} onFavorite={()=>void toggleFavorite(String(selected.id))} isLoggedIn={isLoggedIn} onAuthRequired={onAuthRequired}/>}
         {!selected&&section==="home"&&<><div className="ab-web-filters"><input className="w-input" inputMode="numeric" value={minPrice} onChange={e=>{setMinPrice(e.target.value.replace(/[^0-9]/g,""));setPage(1)}} placeholder="حداقل قیمت (ریال)"/><input className="w-input" inputMode="numeric" value={maxPrice} onChange={e=>{setMaxPrice(e.target.value.replace(/[^0-9]/g,""));setPage(1)}} placeholder="حداکثر قیمت (ریال)"/><select className="w-input" value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">جدیدترین</option><option value="price-asc">ارزان‌ترین</option><option value="price-desc">گران‌ترین</option></select><button className="w-btn w-btn-ghost" onClick={()=>{setMinPrice("");setMaxPrice("");setSort("newest");setCity("");setCategory("");setQuery("");setPage(1)}}>پاک‌کردن فیلترها</button></div><Home listings={filtered} loading={loading} favorites={favorites} onOpen={openListing} onFavorite={toggleFavorite}/><div className="ab-web-pagination"><span>{FA(total)} آگهی</span><button className="w-btn w-btn-ghost" disabled={page<=1||loading} onClick={()=>setPage(p=>Math.max(1,p-1))}>قبلی</button><span>صفحه {FA(page)} از {FA(Math.max(1,Math.ceil(total/24)))}</span><button className="w-btn w-btn-ghost" disabled={page>=Math.ceil(total/24)||loading} onClick={()=>setPage(p=>p+1)}>بعدی</button></div></>}
         {section==="recent"&&<Home listings={recentViews} loading={loading} favorites={favorites} onOpen={openListing} onFavorite={toggleFavorite} title="آخرین مشاهده‌ها"/>}
-        {section==="favorites"&&<Home listings={listings.filter(x=>favorites.has(String(x.id)))} loading={loading} favorites={favorites} onOpen={openListing} onFavorite={toggleFavorite} title="علاقه‌مندی‌های من"/>}
-        {section==="my-listings"&&<MyListings listings={myListings} onOpen={openListing} onEdit={x=>{setEditingListing(x);setSection("edit")}} onRefresh={loadPrivate}/>}
+        {section==="favorites"&&<Home listings={favoriteListings} loading={loading} favorites={favorites} onOpen={openListing} onFavorite={toggleFavorite} title="علاقه‌مندی‌های من"/>}
+        {section==="my-listings"&&<MyListings listings={myListings} onOpen={x=>setSelected({...x,media:(x.media_ids??[]).map((id:number)=>({id}))})} onEdit={x=>{setEditingListing(x);setSection("edit")}} onRefresh={loadPrivate}/>}
         {section==="edit"&&editingListing&&<EditListing listing={editingListing} onCancel={()=>setSection("my-listings")} onDone={()=>{setEditingListing(null);setSection("my-listings");void loadPrivate()}}/>}
         {section==="account"&&<Account profile={profile} onRefresh={loadPrivate}/>}
         {section==="notifications"&&<Notifications items={notifications} onRefresh={loadPrivate}/>}
