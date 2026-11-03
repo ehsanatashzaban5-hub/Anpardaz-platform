@@ -710,7 +710,7 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [showModels, showNewProj]);
+  }, [showModels, showNewProj, onNavigate]);
 
   const model = AI_MODELS.find(m=>m.id===modelId) ?? {
     id:"",name:"مدل پیکربندی نشده",provider:"",desc:"مدل فعال توسط سرور آن هوش ارائه می‌شود.",
@@ -844,8 +844,13 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
         .ah-bnav-btn.active{color:#a78bfa}
         .ah-root button:focus-visible,.ah-root input:focus-visible,.ah-root textarea:focus-visible,.ah-root select:focus-visible{outline:2px solid rgba(167,139,250,.8);outline-offset:2px}
         .ah-root .ah-scroll{overscroll-behavior:contain}
-        @media(min-width:900px){.ah-root{min-height:620px!important}.ah-root header{padding-left:clamp(18px,3vw,42px)!important;padding-right:clamp(18px,3vw,42px)!important}.ah-root .ah-bnav-btn{padding:9px 20px!important;font-size:11px!important}}
-        @media(max-width:600px){.ah-root{height:calc(100dvh - var(--w-header))!important;min-height:480px!important}}
+        @media(min-width:900px){
+          .ah-root{min-height:620px!important;padding-right:88px!important}
+          .ah-root>nav{position:absolute!important;right:0;top:0;bottom:0;width:88px;flex-direction:column!important;justify-content:center;border-top:0!important;border-left:1px solid var(--ah-border);z-index:30;padding:16px 6px;box-sizing:border-box}
+          .ah-root>nav .ah-bnav-btn{flex:0 0 70px!important;width:100%;padding:9px 6px!important;font-size:11px!important}
+          .ah-root header{padding-left:clamp(18px,3vw,42px)!important;padding-right:clamp(18px,3vw,42px)!important}
+        }
+        @media(max-width:600px){.ah-root{height:calc(100dvh - var(--w-header))!important;min-height:0!important;padding-right:0!important}.ah-root>nav{position:relative!important;inset:auto;width:100%;flex-direction:row!important}}
       `}</style>
 
       <div className="ah-root" dir="rtl" style={{ display:"flex", flexDirection:"column", height:"calc(100dvh - var(--w-header))", minHeight:560, width:"100%", background:"var(--ah-bg)", fontFamily:"Vazirmatn,sans-serif", position:"relative", overflow:"hidden" }}>
