@@ -150,6 +150,7 @@ const CATEGORIES = [
 // ══════════════════════════════════════════════════════════════════
 const FA = (s: string) => s.replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 const ftime = (d: Date) => FA(`${d.getHours()}:${String(d.getMinutes()).padStart(2,"0")}`);
+function historyGroup(value:string|Date){const d=new Date(value);if(Number.isNaN(d.getTime()))return "older";const now=new Date();const start=(x:Date)=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();const days=Math.floor((start(now)-start(d))/86400000);return days<=0?"today":days===1?"yesterday":days<7?"week":"older";}
 
 // ══════════════════════════════════════════════════════════════════
 // PROVIDER MARK
@@ -737,10 +738,10 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
       }
       AI_MODELS=mapped;
       PROVIDERS=[...new Set(mapped.map(m=>m.provider))];
-      CONVERSATIONS_CACHE=(convs.conversations??[]).map((x:any)=>({
+      CONVERSATIONS_CACHE=(convs.conversations??[]).filter((x:any)=>x.status!=="archived").map((x:any)=>({
         id:String(x.id),title:x.title??"مکالمه جدید",preview:"",messages:[],
         modelId:x.model??mapped[0]?.id??"",modeId:x.mode??"assistant",
-        createdAt:x.created_at,updatedAt:x.updated_at,group:"week"
+        createdAt:x.created_at,updatedAt:x.updated_at,group:historyGroup(x.updated_at??x.created_at)
       }));
       PROJECTS_CACHE=(projects.projects??[]).map((x:any)=>({
         id:String(x.id),title:x.title,description:x.description??"",modelId:x.model??mapped[0]?.id??"",
@@ -824,7 +825,7 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
     setProjectBusy(true); setRuntimeError("");
     try{
       const d=await hooshApi(`/v1/hoosh/projects/${p.id}`);
-      const conversations=(d.conversations??[]).map((x:any)=>({id:String(x.id),title:x.title??"مکالمه جدید",preview:"",messages:[],modelId:x.model??p.modelId,modeId:x.mode??p.modeId??"assistant",createdAt:x.created_at,updatedAt:x.updated_at,group:"week"} as Conversation));
+      const conversations=(d.conversations??[]).filter((x:any)=>x.status!=="archived").map((x:any)=>({id:String(x.id),title:x.title??"مکالمه جدید",preview:"",messages:[],modelId:x.model??p.modelId,modeId:x.mode??p.modeId??"assistant",createdAt:x.created_at,updatedAt:x.updated_at,group:historyGroup(x.updated_at??x.created_at)} as Conversation));
       PROJECTS_CACHE=PROJECTS_CACHE.map(x=>x.id===p.id?{...x,conversationIds:conversations.map(c=>c.id)}:x);
       setActiveProjectId(p.id);
       if(conversations.length){ await openConversation(conversations[0],true); }
