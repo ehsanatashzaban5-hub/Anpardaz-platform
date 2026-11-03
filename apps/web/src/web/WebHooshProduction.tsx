@@ -1,3 +1,4 @@
+/* CI refresh: rerun full validation against the patched main branch. */
 // آن هوش — responsive web workspace aligned with the mobile feature set · An Pardaz Ecosystem
 import type { WebPage } from "./types";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
