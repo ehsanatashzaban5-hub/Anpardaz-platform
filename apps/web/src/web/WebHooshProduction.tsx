@@ -518,7 +518,7 @@ function HistoryView({ onOpenConv, onNewChat, onDeleteConv }: { onOpenConv:(c:Co
 // ══════════════════════════════════════════════════════════════════
 // PROJECTS VIEW
 // ══════════════════════════════════════════════════════════════════
-function ProjectsView({ onOpenProject, onNewProject, busy=false }: { onOpenProject:(p:Project)=>void; onNewProject:()=>void; busy?:boolean }) {
+function ProjectsView({ onOpenProject, onNewProject, onDeleteProject, busy=false }: { onOpenProject:(p:Project)=>void; onNewProject:()=>void; onDeleteProject:(p:Project)=>void; busy?:boolean }) {
   const [q, setQ] = useState("");
   const filtered = PROJECTS_CACHE.filter(p=>q===""||p.title.includes(q)||p.description.includes(q));
   return (
@@ -540,7 +540,8 @@ function ProjectsView({ onOpenProject, onNewProject, busy=false }: { onOpenProje
           const model = AI_MODELS.find(m=>m.id===p.modelId);
           const modeInfo = CREATION_MODES.find(m=>m.id===p.modeId);
           return (
-            <button key={p.id} onClick={()=>onOpenProject(p)} className="ah-proj-card" style={{
+            <div key={p.id} style={{position:"relative"}}>
+            <button onClick={()=>onOpenProject(p)} className="ah-proj-card" style={{
               width:"100%",display:"block",marginBottom:10,padding:"16px",borderRadius:16,cursor:"pointer",
               background:"var(--ah-card)",border:`1px solid ${p.accentColor}22`,textAlign:"right",transition:"all 0.15s",
             }}>
@@ -565,6 +566,8 @@ function ProjectsView({ onOpenProject, onNewProject, busy=false }: { onOpenProje
                 </div>
               </div>
             </button>
+            <button type="button" aria-label="حذف پروژه" title="حذف پروژه" onClick={e=>{e.stopPropagation();onDeleteProject(p);}} style={{position:"absolute",left:10,top:10,width:32,height:32,borderRadius:9,border:"1px solid rgba(248,113,113,.22)",background:"rgba(248,113,113,.08)",color:"#f87171",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}><Ic n="trash" s={14}/></button>
+            </div>
           );
         })}
         {filtered.length===0&&{busy&&<div style={{textAlign:"center",padding:"14px",color:"var(--ah-muted)",fontSize:12}}>در حال باز کردن پروژه…</div>}
@@ -805,6 +808,12 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
     catch(e){setRuntimeError(e instanceof Error?e.message:"حذف مکالمه ناموفق بود.");}
   },[activeConversationId]);
 
+  const deleteProject = useCallback(async(p:Project)=>{
+    if(!window.confirm(`پروژه «${p.title}» بایگانی شود؟`))return;
+    try{await hooshApi(`/v1/hoosh/projects/${p.id}`,{method:"DELETE"});PROJECTS_CACHE=PROJECTS_CACHE.filter(x=>x.id!==p.id);if(activeProjectId===p.id){setActiveProjectId(null);setActiveConversationId(null);setMessages([]);}setRefresh(v=>v+1);}
+    catch(e){setRuntimeError(e instanceof Error?e.message:"حذف پروژه ناموفق بود.");}
+  },[activeProjectId]);
+
   const openProject = useCallback(async(p:Project)=>{
     setProjectBusy(true); setRuntimeError("");
     try{
@@ -927,7 +936,7 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
             : <HomeView activeMode={activeMode} onSelectMode={handleSelectMode} onSend={send} input={input} onInputChange={setInput} deepThinking={deepThink} onToggleDeep={()=>setDeepThink(v=>!v)} filterCat={filterCat} onFilterCat={setFilterCat}/>
         )}
         {tab==="history" && <HistoryView onOpenConv={openConversation} onNewChat={newChat} onDeleteConv={deleteConversation}/> }
-                {tab==="projects" && <ProjectsView onOpenProject={openProject} onNewProject={()=>setShowNewProj(true)} busy={projectBusy}/> }
+                {tab==="projects" && <ProjectsView onOpenProject={openProject} onNewProject={()=>setShowNewProj(true)} onDeleteProject={deleteProject} busy={projectBusy}/> }
         {tab==="explore"  && <ExploreView currentModelId={modelId} onSelectModel={id=>{setModelId(id);setTab("home");}}/>}
         {tab==="account" && <AccountView/>}
 
