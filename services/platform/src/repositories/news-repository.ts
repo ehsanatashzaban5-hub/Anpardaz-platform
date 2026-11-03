@@ -7,6 +7,8 @@ export type NewsListItem = {
   summary: string | null;
   published_at: string | null;
   category_slug: string | null;
+  source_name: string | null;
+  source_url: string | null;
   meta_title: string | null;
   meta_description: string | null;
   keywords: string[];
@@ -19,7 +21,7 @@ export class NewsRepository {
   async listPublished(limit: number, offset: number, category?: string | null) {
     const [items, count] = await Promise.all([
       this.pool.query<NewsListItem>(
-        `SELECT id,title,slug,summary,published_at,category_slug,meta_title,meta_description,keywords,hashtags FROM news_articles
+        `SELECT id,title,slug,summary,published_at,category_slug,source_name,source_url,meta_title,meta_description,keywords,hashtags FROM news_articles
          WHERE status='published' AND ($3::text IS NULL OR category_slug=$3) ORDER BY published_at DESC NULLS LAST,id DESC LIMIT $1 OFFSET $2`,
         [limit, offset, category ?? null],
       ),
