@@ -752,7 +752,7 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
     }catch(e){ setRuntimeError(e instanceof Error ? e.message : "بارگذاری اطلاعات آن هوش ناموفق بود."); }
   },[modelId]);
 
-  useEffect(()=>{ if(authToken()) void loadRuntime(); },[loadRuntime]);
+  useEffect(()=>{ if(loggedIn) void loadRuntime(); },[loadRuntime,loggedIn]);
 
   const send = useCallback(async()=>{
     const text=input.trim(); if(!text||!modelId)return;
@@ -816,7 +816,8 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
     }catch(e){setRuntimeError(e instanceof Error?e.message:"باز کردن پروژه ناموفق بود.");}
     finally{setProjectBusy(false);}
   },[openConversation,modelId]);
-  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setActiveConversationId(null); setActiveProjectId(null); setTab("home"); },[]);
+  const newChatInProject = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setActiveConversationId(null); setTab("home"); },[]);
+  const newChat = useCallback(()=>{ newChatInProject(); setActiveProjectId(null); },[newChatInProject]);
   const handleSelectMode = (mode: CreationMode) => {
     if(mode.id==="__clear__"){ setActiveMode(null); return; }
     setActiveMode(prev => prev?.id===mode.id ? null : mode);
@@ -894,16 +895,17 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
 
           {/* New chat (when in chat) */}
           {inChat && (
-            <button onClick={newChat} style={{ background:"var(--ah-card)",border:"1px solid var(--ah-border)",borderRadius:11,width:36,height:36,cursor:"pointer",color:"var(--ah-muted)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+            <button onClick={activeProjectId?newChatInProject:newChat} style={{ background:"var(--ah-card)",border:"1px solid var(--ah-border)",borderRadius:11,width:36,height:36,cursor:"pointer",color:"var(--ah-muted)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
               <Ic n="plus" s={16}/>
             </button>
           )}
         </header>
 
+        {runtimeError && <div role="alert" style={{margin:"10px 14px",padding:"10px 12px",borderRadius:12,border:"1px solid rgba(248,113,113,.28)",background:"rgba(248,113,113,.08)",color:"#fca5a5",fontSize:12,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}><span>{runtimeError}</span><button onClick={()=>void loadRuntime()} style={{border:0,borderRadius:8,padding:"6px 10px",background:"rgba(248,113,113,.14)",color:"inherit",fontFamily:"Vazirmatn",cursor:"pointer"}}>تلاش مجدد</button></div>}
         {/* ── Chat mode breadcrumb ── */}
         {tab==="home" && (inChat || activeProjectId) && (
           <div style={{ display:"flex",alignItems:"center",gap:8,padding:"7px 14px",background:"var(--ah-surface)",borderBottom:"1px solid var(--ah-border)",flexShrink:0 }}>
-            <button onClick={newChat} style={{ display:"flex",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",color:"var(--ah-muted)",fontSize:11,fontWeight:700,fontFamily:"Vazirmatn",padding:0 }}>
+            <button onClick={activeProjectId?newChatInProject:newChat} style={{ display:"flex",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",color:"var(--ah-muted)",fontSize:11,fontWeight:700,fontFamily:"Vazirmatn",padding:0 }}>
               <Ic n="plus" s={12}/> چت جدید
             </button>
             {activeProjectId && <span style={{fontSize:10,color:"#a78bfa",fontWeight:700}}>پروژه: {PROJECTS_CACHE.find(p=>p.id===activeProjectId)?.title??""}</span>}
