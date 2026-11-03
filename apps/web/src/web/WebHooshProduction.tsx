@@ -150,7 +150,7 @@ const CATEGORIES = [
 // ══════════════════════════════════════════════════════════════════
 const FA = (s: string) => s.replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[+d]);
 const ftime = (d: Date) => FA(`${d.getHours()}:${String(d.getMinutes()).padStart(2,"0")}`);
-function historyGroup(value:string|Date){const d=new Date(value);if(Number.isNaN(d.getTime()))return "older";const now=new Date();const start=(x:Date)=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();const days=Math.floor((start(now)-start(d))/86400000);return days<=0?"today":days===1?"yesterday":days<7?"week":"older";}
+function historyGroup(value:string){const d=new Date(value);if(Number.isNaN(d.getTime()))return "older";const now=new Date();const start=(x:Date)=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();const days=Math.floor((start(now)-start(d))/86400000);return days<=0?"today":days===1?"yesterday":days<7?"week":"older";}
 
 // ══════════════════════════════════════════════════════════════════
 // PROVIDER MARK
