@@ -9,7 +9,7 @@ const EN=(v:unknown)=>String(v??"").replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶
 const fmt=(v:number|null,cur="IRR",mode?:string)=>mode==="free"?"رایگان":mode==="swap"?"معاوضه":mode==="negotiable"||v==null?"توافقی":`${FA(Number(v).toLocaleString())} ${cur==="IRR"?"تومان":cur}`;
 
 async function api(path:string,init:RequestInit={}) {
-  const token=localStorage.getItem("anpardaz:accessToken")??"";
+  const token=localStorage.getItem("anpardaz:accessToken")??localStorage.getItem("accessToken")??"";
   const r=await fetch(BASE+path,{...init,headers:{...(init.body?{"content-type":"application/json"}:{}),...(init.headers??{}),...(token?{authorization:"Bearer "+token}:{})},cache:"no-store"});
   const body=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(String(body?.error??"banner_request_failed"));
