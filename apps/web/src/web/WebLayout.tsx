@@ -1,3 +1,4 @@
+/* CI refresh: rerun full validation against the patched main branch. */
 // ─────────────────────────────────────────────────
 // An Pardaz Web Portal — Layout (Header + Footer)
 // ─────────────────────────────────────────────────
