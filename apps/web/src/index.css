@@ -82,7 +82,12 @@ input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }
 
-button, input, select { font-family: 'Vazirmatn', sans-serif; }
+button, input, select, textarea { font-family: 'Vazirmatn', 'system-ui', -apple-system, sans-serif; }
+
+/* One Persian typeface across every web route and embedded platform. */
+html, body, #root, #root * {
+  font-family: 'Vazirmatn', 'system-ui', -apple-system, sans-serif !important;
+}
 
 /* ─── App Root ──────────────────────────────────────────────────────────────── */
 .app {
