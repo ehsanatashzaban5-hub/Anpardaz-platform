@@ -522,7 +522,7 @@ function HistoryView({ onOpenConv, onNewChat }: { onOpenConv:(c:Conversation)=>v
 // ══════════════════════════════════════════════════════════════════
 // PROJECTS VIEW
 // ══════════════════════════════════════════════════════════════════
-function ProjectsView({ onOpenProject, onNewProject }: { onOpenProject:(p:Project)=>void; onNewProject:()=>void }) {
+function ProjectsView({ onOpenProject, onNewProject, busy=false }: { onOpenProject:(p:Project)=>void; onNewProject:()=>void; busy?:boolean }) {
   const [q, setQ] = useState("");
   const filtered = PROJECTS_CACHE.filter(p=>q===""||p.title.includes(q)||p.description.includes(q));
   return (
@@ -571,7 +571,8 @@ function ProjectsView({ onOpenProject, onNewProject }: { onOpenProject:(p:Projec
             </button>
           );
         })}
-        {filtered.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"var(--ah-muted)",fontSize:13}}>پروژه‌ای یافت نشد</div>}
+        {filtered.length===0&&{busy&&<div style={{textAlign:"center",padding:"14px",color:"var(--ah-muted)",fontSize:12}}>در حال باز کردن پروژه…</div>}
+        <div style={{textAlign:"center",padding:"40px 0",color:"var(--ah-muted)",fontSize:13}}>پروژه‌ای یافت نشد</div>}
         {/* New project CTA */}
         <button onClick={onNewProject} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,padding:"24px",borderRadius:16,cursor:"pointer",background:"transparent",border:"1.5px dashed var(--ah-border)",color:"var(--ah-muted)",marginTop:4}}>
           <Ic n="plus" s={22}/>
@@ -699,6 +700,9 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
   const [filterCat, setFilterCat]   = useState("all");
   const [showNewProj, setShowNewProj] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string|null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string|null>(null);
+  const [runtimeError, setRuntimeError] = useState("");
+  const [projectBusy, setProjectBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
@@ -743,8 +747,9 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
       }));
       if(!modelId&&mapped[0]) setModelId(mapped[0].id);
       else if(modelId&&!mapped.some(m=>m.id===modelId)&&mapped[0]) setModelId(mapped[0].id);
+      setRuntimeError("");
       setRefresh(v=>v+1);
-    }catch{}
+    }catch(e){ setRuntimeError(e instanceof Error ? e.message : "بارگذاری اطلاعات آن هوش ناموفق بود."); }
   },[modelId]);
 
   useEffect(()=>{ if(authToken()) void loadRuntime(); },[loadRuntime]);
@@ -762,6 +767,11 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
         const d=await hooshApi("/v1/hoosh/conversations",{method:"POST",body:JSON.stringify({title:"مکالمه جدید",model:modelId,mode:modeId})});
         conversationId=String(d.conversation.id); setActiveConversationId(conversationId);
         CONVERSATIONS_CACHE.unshift({id:conversationId,title:"مکالمه جدید",preview:"",messages:[],modelId,modeId,createdAt:d.conversation.created_at,updatedAt:d.conversation.updated_at,group:"today"});
+        if(activeProjectId){
+          await hooshApi(`/v1/hoosh/projects/${activeProjectId}/conversations/${conversationId}`,{method:"POST"});
+          PROJECTS_CACHE=PROJECTS_CACHE.map(p=>p.id===activeProjectId?{...p,conversationIds:[...new Set([...p.conversationIds,conversationId])]}:p);
+          setRefresh(v=>v+1);
+        }
       }
       const u:Message={id:"u-"+Date.now(),role:"user",text,ts:new Date()};
       const t:Message={id:"t-"+Date.now(),role:"ai",text:isMedia?"در حال تولید…":"",thinking:true,modelId,ts:new Date()};
@@ -790,10 +800,23 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
         }
       }
     }catch(e:any){ setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:"err-"+Date.now(),role:"ai",text:"خطا در اجرای آن هوش: "+(e?.message??"AI_EXECUTION_FAILED"),modelId,ts:new Date()}]); }
-  },[input,modelId,activeMode,activeConversationId]);
+  },[input,modelId,activeMode,activeConversationId,activeProjectId]);
 
-  const openConversation = useCallback(async(c:Conversation)=>{ try{ setActiveConversationId(c.id); const d=await hooshApi("/v1/hoosh/conversations/"+c.id); const rows=await Promise.all((d.messages??[]).map(async(m:any)=>{const jobId=m.metadata?.mediaJobId; let media:any=undefined; if(jobId){try{const j=await hooshApi("/v1/hoosh/media/"+jobId); if(j.job?.status==="completed"){const url=await hooshMediaBlob(String(jobId)); media={url,type:j.job.mime_type??"application/octet-stream",name:j.job.file_name,jobId:String(jobId)};}}catch{}} return {id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at),media};})); setMessages(rows); setTab("home"); }catch{} },[]);
-  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setActiveConversationId(null); setTab("home"); },[]);
+  const openConversation = useCallback(async(c:Conversation)=>{ try{ setActiveConversationId(c.id); const d=await hooshApi("/v1/hoosh/conversations/"+c.id); const rows=await Promise.all((d.messages??[]).map(async(m:any)=>{const jobId=m.metadata?.mediaJobId; let media:any=undefined; if(jobId){try{const j=await hooshApi("/v1/hoosh/media/"+jobId); if(j.job?.status==="completed"){const url=await hooshMediaBlob(String(jobId)); media={url,type:j.job.mime_type??"application/octet-stream",name:j.job.file_name,jobId:String(jobId)};}}catch{}} return {id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at),media};})); setMessages(rows); setTab("home"); }catch(e){setRuntimeError(e instanceof Error?e.message:"بازیابی مکالمه ناموفق بود.");} },[]);
+  const openProject = useCallback(async(p:Project)=>{
+    setProjectBusy(true); setRuntimeError("");
+    try{
+      const d=await hooshApi(`/v1/hoosh/projects/${p.id}`);
+      const conversations=(d.conversations??[]).map((x:any)=>({id:String(x.id),title:x.title??"مکالمه جدید",preview:"",messages:[],modelId:x.model??p.modelId,modeId:x.mode??p.modeId??"assistant",createdAt:x.created_at,updatedAt:x.updated_at,group:"week"} as Conversation));
+      PROJECTS_CACHE=PROJECTS_CACHE.map(x=>x.id===p.id?{...x,conversationIds:conversations.map(c=>c.id)}:x);
+      setActiveProjectId(p.id);
+      if(conversations.length){ await openConversation(conversations[0]); }
+      else { setMessages([]);setInput("");setActiveConversationId(null);setModelId(p.modelId||modelId);setActiveMode(CREATION_MODES.find(m=>m.id===p.modeId)??null);setTab("home"); }
+      setRefresh(v=>v+1);
+    }catch(e){setRuntimeError(e instanceof Error?e.message:"باز کردن پروژه ناموفق بود.");}
+    finally{setProjectBusy(false);}
+  },[openConversation,modelId]);
+  const newChat = useCallback(()=>{ setMessages([]); setInput(""); setActiveMode(null); setActiveConversationId(null); setActiveProjectId(null); setTab("home"); },[]);
   const handleSelectMode = (mode: CreationMode) => {
     if(mode.id==="__clear__"){ setActiveMode(null); return; }
     setActiveMode(prev => prev?.id===mode.id ? null : mode);
@@ -878,11 +901,12 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
         </header>
 
         {/* ── Chat mode breadcrumb ── */}
-        {inChat && tab==="home" && (
+        {tab==="home" && (inChat || activeProjectId) && (
           <div style={{ display:"flex",alignItems:"center",gap:8,padding:"7px 14px",background:"var(--ah-surface)",borderBottom:"1px solid var(--ah-border)",flexShrink:0 }}>
             <button onClick={newChat} style={{ display:"flex",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",color:"var(--ah-muted)",fontSize:11,fontWeight:700,fontFamily:"Vazirmatn",padding:0 }}>
               <Ic n="plus" s={12}/> چت جدید
             </button>
+            {activeProjectId && <span style={{fontSize:10,color:"#a78bfa",fontWeight:700}}>پروژه: {PROJECTS_CACHE.find(p=>p.id===activeProjectId)?.title??""}</span>}
             {activeMode && <>
               <div style={{flex:1,height:1,background:"var(--ah-border)"}}/>
               <span style={{display:"flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,background:"rgba(139,92,246,0.1)",border:"1px solid rgba(139,92,246,0.22)",color:"#a78bfa",fontSize:11,fontWeight:700}}>
@@ -899,7 +923,7 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
             : <HomeView activeMode={activeMode} onSelectMode={handleSelectMode} onSend={send} input={input} onInputChange={setInput} deepThinking={deepThink} onToggleDeep={()=>setDeepThink(v=>!v)} filterCat={filterCat} onFilterCat={setFilterCat}/>
         )}
         {tab==="history" && <HistoryView onOpenConv={openConversation} onNewChat={newChat}/>}
-                {tab==="projects" && <ProjectsView onOpenProject={()=>setTab("home")} onNewProject={()=>setShowNewProj(true)}/>}
+                {tab==="projects" && <ProjectsView onOpenProject={openProject} onNewProject={()=>setShowNewProj(true)} busy={projectBusy}/> }
         {tab==="explore"  && <ExploreView currentModelId={modelId} onSelectModel={id=>{setModelId(id);setTab("home");}}/>}
         {tab==="account" && <AccountView/>}
 
