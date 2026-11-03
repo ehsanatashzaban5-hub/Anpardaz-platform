@@ -403,7 +403,7 @@ export default function WebPortal() {
           />
         )}
         {page === "hoosh" && (
-          <WebHoosh onNavigate={handleNavigate}/>
+          <WebHoosh onNavigate={handleNavigate} onAuthRequired={handleAuthRequired}/>
         )}
         {(page === "news" || page === "news-article" || page === "education" ||
           page === "education-article" || page === "video" || page === "video-detail") && (
