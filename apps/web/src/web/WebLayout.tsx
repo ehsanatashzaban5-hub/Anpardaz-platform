@@ -23,7 +23,7 @@ export const CSS_VARS = `
     --w-shadow:0 1px 3px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04);
     --w-shadow-md:0 4px 12px rgba(0,0,0,0.08),0 12px 32px rgba(0,0,0,0.06);
     --w-shadow-lg:0 8px 24px rgba(0,0,0,0.12),0 24px 64px rgba(0,0,0,0.08);
-    --w-font:"Vazirmatn",system-ui,sans-serif;
+    --w-font:'Vazirmatn',system-ui,-apple-system,sans-serif;
     --w-header:64px;
   }
   .dark-theme{
@@ -38,7 +38,13 @@ export const CSS_VARS = `
   }
   *,*::before,*::after{box-sizing:border-box;}
   html{scroll-behavior:smooth;}
-  body{margin:0;background:var(--w-bg);color:var(--w-text);font-family:var(--w-font);direction:rtl;}
+  body{margin:0;background:var(--w-bg);color:var(--w-text);font-family:'Vazirmatn',system-ui,-apple-system,sans-serif;direction:rtl;-webkit-font-smoothing:antialiased;}
+  /* Match the mobile app's Vazirmatn typography across every web route and nested component. */
+  .w-portal,.w-portal *,.w-portal *::before,.w-portal *::after{
+    font-family:'Vazirmatn',system-ui,-apple-system,sans-serif !important;
+    font-synthesis:none;
+  }
+  .w-portal{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
   .w-portal{min-height:100vh;display:flex;flex-direction:column;background:var(--w-bg);color:var(--w-text);}
   .w-main{flex:1;padding-top:var(--w-header);}
   input,textarea,select,button{font-family:var(--w-font);}
