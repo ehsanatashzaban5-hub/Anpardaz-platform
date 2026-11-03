@@ -156,14 +156,16 @@ const ftime = (d: Date) => FA(`${d.getHours()}:${String(d.getMinutes()).padStart
 // ══════════════════════════════════════════════════════════════════
 function AccountView(){
   const [profile,setProfile]=useState<any>(null); const [tickets,setTickets]=useState<any[]>([]);
-  const [subject,setSubject]=useState(""); const [content,setContent]=useState(""); const [busy,setBusy]=useState(false);
-  const load=useCallback(async()=>{try{const r=await Promise.all([hooshApi("/v1/hoosh/profile"),hooshApi("/v1/hoosh/tickets")]);setProfile(r[0].profile);setTickets(r[1].tickets??[]);}catch{}},[]);
+  const [subject,setSubject]=useState(""); const [content,setContent]=useState(""); const [busy,setBusy]=useState(false); const [loading,setLoading]=useState(true); const [error,setError]=useState("");
+  const load=useCallback(async()=>{setLoading(true);setError("");try{const r=await Promise.all([hooshApi("/v1/hoosh/profile"),hooshApi("/v1/hoosh/tickets")]);setProfile(r[0].profile);setTickets(r[1].tickets??[]);}catch(e){setError(e instanceof Error?e.message:"بارگذاری حساب کاربری ناموفق بود.");}finally{setLoading(false);}},[]);
   useEffect(()=>{void load()},[load]);
-  const save=async()=>{setBusy(true);try{const r=await hooshApi("/v1/hoosh/profile",{method:"PUT",body:JSON.stringify({displayName:profile?.display_name??""})});setProfile(r.profile);}finally{setBusy(false)}};
-  const ticket=async()=>{if(!subject.trim()||!content.trim())return;setBusy(true);try{await hooshApi("/v1/hoosh/tickets",{method:"POST",body:JSON.stringify({subject,content})});setSubject("");setContent("");await load();}finally{setBusy(false)}};
+  const save=async()=>{setBusy(true);setError("");try{const r=await hooshApi("/v1/hoosh/profile",{method:"PUT",body:JSON.stringify({displayName:profile?.display_name??""})});setProfile(r.profile);}catch(e){setError(e instanceof Error?e.message:"ذخیره پروفایل ناموفق بود.");}finally{setBusy(false)}};
+  const ticket=async()=>{if(!subject.trim()||!content.trim())return;setBusy(true);setError("");try{await hooshApi("/v1/hoosh/tickets",{method:"POST",body:JSON.stringify({subject,content})});setSubject("");setContent("");await load();}catch(e){setError(e instanceof Error?e.message:"ثبت تیکت ناموفق بود.");}finally{setBusy(false)}};
   const box={background:"var(--ah-card)",border:"1px solid var(--ah-border)",borderRadius:18,padding:18};
   const input={width:"100%",boxSizing:"border-box" as const,padding:11,borderRadius:12,border:"1px solid var(--ah-border)",background:"var(--ah-input)",color:"var(--ah-text)",fontFamily:"Vazirmatn"};
   return <div style={{flex:1,overflowY:"auto",padding:20}} className="ah-scroll"><div style={{maxWidth:760,margin:"0 auto",display:"grid",gap:14}}>
+    {error&&<div role="alert" style={{padding:12,borderRadius:12,background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.24)",color:"#fca5a5",fontSize:12}}>{error}<button onClick={()=>void load()} style={{marginRight:10,border:0,background:"transparent",color:"inherit",textDecoration:"underline",cursor:"pointer",fontFamily:"Vazirmatn"}}>تلاش مجدد</button></div>}
+    {loading&&<div style={{padding:16,textAlign:"center",color:"var(--ah-muted)",fontSize:12}}>در حال بارگذاری حساب کاربری…</div>}
     <div style={box}><div style={{fontWeight:900,fontSize:18}}>حساب کاربری</div><div style={{color:"var(--ah-muted)",fontSize:12,margin:"6px 0 14px"}}>{profile?.email??"—"}</div><input value={profile?.display_name??""} onChange={e=>setProfile((p:any)=>({...p,display_name:e.target.value}))} placeholder="نام نمایشی" style={input}/><button onClick={save} disabled={busy} className="ah-send-btn" style={{marginTop:10,width:"100%",background:"#7c3aed",color:"#fff"}}>ذخیره پروفایل</button></div>
     <div style={box}><div style={{fontWeight:900,fontSize:16,marginBottom:10}}>پشتیبانی و تیکت</div><input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="موضوع تیکت" style={{...input,marginBottom:8}}/><textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="شرح درخواست" rows={4} style={input}/><button onClick={ticket} disabled={busy||!subject.trim()||!content.trim()} className="ah-send-btn" style={{marginTop:10,width:"100%",background:"#7c3aed",color:"#fff"}}>ثبت تیکت</button></div>
     <div style={box}><div style={{fontWeight:900,fontSize:16,marginBottom:10}}>تیکت‌های من</div>{tickets.length?tickets.map(t=><div key={t.id} style={{padding:"10px 0",borderBottom:"1px solid var(--ah-border)"}}><b>{t.subject}</b><div style={{fontSize:11,color:"var(--ah-muted)",marginTop:4}}>{t.status} · {t.priority}</div></div>):<div style={{fontSize:12,color:"var(--ah-muted)"}}>هنوز تیکتی ثبت نشده است.</div>}</div>
@@ -776,7 +778,7 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
       const t:Message={id:"t-"+Date.now(),role:"ai",text:isMedia?"در حال تولید…":"",thinking:true,modelId,ts:new Date()};
       setMessages(prev=>[...prev,u,t]); setInput("");
       if(isMedia){
-        const d=await hooshApi("/v1/hoosh/media",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({conversationId,mode:modeId,model:modelId,prompt:text})});
+        const d=await hooshApi("/v1/hoosh/media",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({conversationId,projectId:activeProjectId??undefined,mode:modeId,model:modelId,prompt:text})});
         const jobId=String(d.job.id);
         let mediaCompleted=false;
         for(let i=0;i<180;i++){
