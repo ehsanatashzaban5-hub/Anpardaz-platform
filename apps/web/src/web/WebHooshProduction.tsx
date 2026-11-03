@@ -440,7 +440,7 @@ function ChatView({ messages, input, onInputChange, onSend, deepThinking, onTogg
 // ══════════════════════════════════════════════════════════════════
 // HISTORY VIEW
 // ══════════════════════════════════════════════════════════════════
-function HistoryView({ onOpenConv, onNewChat }: { onOpenConv:(c:Conversation)=>void; onNewChat:()=>void }) {
+function HistoryView({ onOpenConv, onNewChat, onDeleteConv }: { onOpenConv:(c:Conversation)=>void; onNewChat:()=>void; onDeleteConv:(c:Conversation)=>void }) {
   const [q, setQ] = useState("");
   const [menuId, setMenuId] = useState<string|null>(null);
   const groups = ["today","yesterday","week","older"] as const;
@@ -500,11 +500,7 @@ function HistoryView({ onOpenConv, onNewChat }: { onOpenConv:(c:Conversation)=>v
                     </div>
                     {menuId===c.id&&(
                       <div style={{position:"absolute",left:0,top:"100%",zIndex:20,background:"var(--ah-surface)",border:"1px solid var(--ah-border)",borderRadius:12,padding:"4px",boxShadow:"0 8px 24px rgba(0,0,0,0.4)",minWidth:140,marginTop:4}}>
-                        {[{n:"edit",label:"تغییر نام"},{n:"trash",label:"حذف"}].map(item=>(
-                          <button key={item.n} onClick={()=>setMenuId(null)} style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:9,cursor:"pointer",background:"transparent",border:"none",color:item.n==="trash"?"#f87171":"var(--ah-text)",fontSize:12,fontWeight:600,fontFamily:"Vazirmatn",textAlign:"right"}}>
-                            <Ic n={item.n} s={14}/>{item.label}
-                          </button>
-                        ))}
+                        {<button onClick={()=>{setMenuId(null);onDeleteConv(c);}} style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:9,cursor:"pointer",background:"transparent",border:"none",color:"#f87171",fontSize:12,fontWeight:600,fontFamily:"Vazirmatn",textAlign:"right"}}><Ic n="trash" s={14}/>حذف مکالمه</button>}
                       </div>
                     )}
                   </div>
@@ -803,6 +799,12 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
   },[input,modelId,activeMode,activeConversationId,activeProjectId]);
 
   const openConversation = useCallback(async(c:Conversation)=>{ try{ setActiveConversationId(c.id); const d=await hooshApi("/v1/hoosh/conversations/"+c.id); const rows=await Promise.all((d.messages??[]).map(async(m:any)=>{const jobId=m.metadata?.mediaJobId; let media:any=undefined; if(jobId){try{const j=await hooshApi("/v1/hoosh/media/"+jobId); if(j.job?.status==="completed"){const url=await hooshMediaBlob(String(jobId)); media={url,type:j.job.mime_type??"application/octet-stream",name:j.job.file_name,jobId:String(jobId)};}}catch{}} return {id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at),media};})); setMessages(rows); setTab("home"); }catch(e){setRuntimeError(e instanceof Error?e.message:"بازیابی مکالمه ناموفق بود.");} },[]);
+  const deleteConversation = useCallback(async(c:Conversation)=>{
+    if(!window.confirm(`مکالمه «${c.title}» بایگانی شود؟`))return;
+    try{await hooshApi(`/v1/hoosh/conversations/${c.id}`,{method:"DELETE"});CONVERSATIONS_CACHE=CONVERSATIONS_CACHE.filter(x=>x.id!==c.id);if(activeConversationId===c.id){setMessages([]);setActiveConversationId(null);}setRefresh(v=>v+1);}
+    catch(e){setRuntimeError(e instanceof Error?e.message:"حذف مکالمه ناموفق بود.");}
+  },[activeConversationId]);
+
   const openProject = useCallback(async(p:Project)=>{
     setProjectBusy(true); setRuntimeError("");
     try{
@@ -924,7 +926,7 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
             ? <ChatView messages={messages} input={input} onInputChange={setInput} onSend={send} deepThinking={deepThink} onToggleDeep={()=>setDeepThink(v=>!v)} mode={activeMode}/>
             : <HomeView activeMode={activeMode} onSelectMode={handleSelectMode} onSend={send} input={input} onInputChange={setInput} deepThinking={deepThink} onToggleDeep={()=>setDeepThink(v=>!v)} filterCat={filterCat} onFilterCat={setFilterCat}/>
         )}
-        {tab==="history" && <HistoryView onOpenConv={openConversation} onNewChat={newChat}/>}
+        {tab==="history" && <HistoryView onOpenConv={openConversation} onNewChat={newChat} onDeleteConv={deleteConversation}/> }
                 {tab==="projects" && <ProjectsView onOpenProject={openProject} onNewProject={()=>setShowNewProj(true)} busy={projectBusy}/> }
         {tab==="explore"  && <ExploreView currentModelId={modelId} onSelectModel={id=>{setModelId(id);setTab("home");}}/>}
         {tab==="account" && <AccountView/>}
