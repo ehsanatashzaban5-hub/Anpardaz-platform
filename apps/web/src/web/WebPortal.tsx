@@ -256,8 +256,8 @@ export default function WebPortal() {
 
   // Which section for WebContent
   const contentSection: ContentSection =
-    page === "education" ? "education" :
-    page === "video"     ? "video"     : "news";
+    page === "education" || page === "education-article" ? "education" :
+    page === "video" || page === "video-detail" ? "video" : "news";
 
   return (
     <div
