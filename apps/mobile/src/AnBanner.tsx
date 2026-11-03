@@ -1278,7 +1278,7 @@ function mapApiListing(x: any): ABListing {
     listingId: String(x.id), token: "", ownerId: String(x.identity_id),
     categoryId: category?.categoryId ?? String(x.category_id), parentCategoryId: category?.parentId ?? "",
     title: x.title, description: x.description ?? "", images: Array.isArray(x.media_ids) ? x.media_ids.map((id:number)=>bannerMediaUrl(id)) : [],
-    price: Number(x.price ?? 0), priceMode: x.price === null ? "negotiable" : "fixed",
+    price: Number(x.price ?? 0), priceMode: (["fixed","negotiable","free","swap"].includes(x.price_mode) ? x.price_mode : x.price === null ? "negotiable" : "fixed") as ABListing["priceMode"],
     condition: (["new","like-new","good","used","for-parts"].includes(x.condition) ? x.condition : "used") as ABListing["condition"],
     cityId: x.city ?? "", provinceId: "", attributes: x.attributes && typeof x.attributes === "object" ? x.attributes : {}, status: x.status === "published" ? "active" : x.status,
     createdAt: x.created_at, updatedAt: x.updated_at, expiresAt: x.expires_at ?? "",
