@@ -778,30 +778,34 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
       if(isMedia){
         const d=await hooshApi("/v1/hoosh/media",{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({conversationId,mode:modeId,model:modelId,prompt:text})});
         const jobId=String(d.job.id);
+        let mediaCompleted=false;
         for(let i=0;i<180;i++){
           await new Promise(r=>setTimeout(r,1000)); const j=await hooshApi("/v1/hoosh/media/"+jobId);
           if(j.job.status==="completed"){
             const url=await hooshMediaBlob(jobId); const label=modeId==="video"?"ویدیو":modeId==="music"?"موسیقی":modeId==="voice"?"صدا":"تصویر";
-            setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:"m-"+jobId,role:"ai",text:label+" آماده شد.",modelId,ts:new Date(j.job.completed_at??Date.now()),media:{url,type:j.job.mime_type??"application/octet-stream",name:j.job.file_name,jobId}}]); break;
+            setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:"m-"+jobId,role:"ai",text:label+" آماده شد.",modelId,ts:new Date(j.job.completed_at??Date.now()),media:{url,type:j.job.mime_type??"application/octet-stream",name:j.job.file_name,jobId}}]); mediaCompleted=true; break;
           }
           if(j.job.status==="failed"||j.job.status==="cancelled") throw new Error(j.job.error??"MEDIA_GENERATION_FAILED");
         }
+        if(!mediaCompleted)throw new Error("MEDIA_GENERATION_TIMEOUT");
         return;
       }
       const idem="hoosh-ui-"+conversationId+"-"+Date.now();
       await hooshApi("/v1/hoosh/conversations/"+conversationId+"/messages",{method:"POST",headers:{"Idempotency-Key":idem},body:JSON.stringify({content:text,model:modelId,mode:modeId})});
+      let assistantReceived=false;
       for(let i=0;i<30;i++){
         await new Promise(r=>setTimeout(r,1000)); const d=await hooshApi("/v1/hoosh/conversations/"+conversationId);
         const assistant=(d.messages??[]).filter((m:any)=>m.role==="assistant").at(-1);
         if(assistant){
           setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:String(assistant.id),role:"ai",text:assistant.content,modelId:assistant.metadata?.model??modelId,ts:new Date(assistant.created_at)}]);
-          CONVERSATIONS_CACHE=CONVERSATIONS_CACHE.map(c=>c.id===conversationId?{...c,preview:assistant.content,updatedAt:d.conversation.updated_at}:c); setRefresh(v=>v+1); break;
+          CONVERSATIONS_CACHE=CONVERSATIONS_CACHE.map(c=>c.id===conversationId?{...c,title:d.conversation.title??c.title,preview:assistant.content,updatedAt:d.conversation.updated_at}:c); setRefresh(v=>v+1); assistantReceived=true; break;
         }
       }
+      if(!assistantReceived)throw new Error("AI_RESPONSE_TIMEOUT");
     }catch(e:any){ setMessages(prev=>[...prev.filter(m=>!m.thinking),{id:"err-"+Date.now(),role:"ai",text:"خطا در اجرای آن هوش: "+(e?.message??"AI_EXECUTION_FAILED"),modelId,ts:new Date()}]); }
   },[input,modelId,activeMode,activeConversationId,activeProjectId]);
 
-  const openConversation = useCallback(async(c:Conversation)=>{ try{ setActiveConversationId(c.id); const d=await hooshApi("/v1/hoosh/conversations/"+c.id); const rows=await Promise.all((d.messages??[]).map(async(m:any)=>{const jobId=m.metadata?.mediaJobId; let media:any=undefined; if(jobId){try{const j=await hooshApi("/v1/hoosh/media/"+jobId); if(j.job?.status==="completed"){const url=await hooshMediaBlob(String(jobId)); media={url,type:j.job.mime_type??"application/octet-stream",name:j.job.file_name,jobId:String(jobId)};}}catch{}} return {id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at),media};})); setMessages(rows); setTab("home"); }catch(e){setRuntimeError(e instanceof Error?e.message:"بازیابی مکالمه ناموفق بود.");} },[]);
+  const openConversation = useCallback(async(c:Conversation, keepProject=false)=>{ try{ if(!keepProject)setActiveProjectId(null);setActiveConversationId(c.id);if(c.modelId)setModelId(c.modelId);setActiveMode(CREATION_MODES.find(m=>m.id===c.modeId)??null); const d=await hooshApi("/v1/hoosh/conversations/"+c.id); const rows=await Promise.all((d.messages??[]).map(async(m:any)=>{const jobId=m.metadata?.mediaJobId; let media:any=undefined; if(jobId){try{const j=await hooshApi("/v1/hoosh/media/"+jobId); if(j.job?.status==="completed"){const url=await hooshMediaBlob(String(jobId)); media={url,type:j.job.mime_type??"application/octet-stream",name:j.job.file_name,jobId:String(jobId)};}}catch{}} return {id:String(m.id),role:m.role==="assistant"?"ai":"user",text:m.content,modelId:m.metadata?.model??c.modelId,ts:new Date(m.created_at),media};})); setMessages(rows); setTab("home"); }catch(e){setRuntimeError(e instanceof Error?e.message:"بازیابی مکالمه ناموفق بود.");} },[]);
   const deleteConversation = useCallback(async(c:Conversation)=>{
     if(!window.confirm(`مکالمه «${c.title}» بایگانی شود؟`))return;
     try{await hooshApi(`/v1/hoosh/conversations/${c.id}`,{method:"DELETE"});CONVERSATIONS_CACHE=CONVERSATIONS_CACHE.filter(x=>x.id!==c.id);if(activeConversationId===c.id){setMessages([]);setActiveConversationId(null);}setRefresh(v=>v+1);}
@@ -821,7 +825,7 @@ export default function WebHooshProduction({ onNavigate, onAuthRequired }: { onN
       const conversations=(d.conversations??[]).map((x:any)=>({id:String(x.id),title:x.title??"مکالمه جدید",preview:"",messages:[],modelId:x.model??p.modelId,modeId:x.mode??p.modeId??"assistant",createdAt:x.created_at,updatedAt:x.updated_at,group:"week"} as Conversation));
       PROJECTS_CACHE=PROJECTS_CACHE.map(x=>x.id===p.id?{...x,conversationIds:conversations.map(c=>c.id)}:x);
       setActiveProjectId(p.id);
-      if(conversations.length){ await openConversation(conversations[0]); }
+      if(conversations.length){ await openConversation(conversations[0],true); }
       else { setMessages([]);setInput("");setActiveConversationId(null);setModelId(p.modelId||modelId);setActiveMode(CREATION_MODES.find(m=>m.id===p.modeId)??null);setTab("home"); }
       setRefresh(v=>v+1);
     }catch(e){setRuntimeError(e instanceof Error?e.message:"باز کردن پروژه ناموفق بود.");}
