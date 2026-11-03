@@ -1,3 +1,4 @@
+/* CI refresh: rerun full validation against the patched main branch. */
 import {useEffect,useMemo,useState} from "react";
 import WI from "./WebIcons";
 import type {WebPage} from "./types";
