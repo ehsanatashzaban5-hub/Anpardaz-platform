@@ -570,8 +570,8 @@ function ProjectsView({ onOpenProject, onNewProject, onDeleteProject, busy=false
             </div>
           );
         })}
-        {filtered.length===0&&{busy&&<div style={{textAlign:"center",padding:"14px",color:"var(--ah-muted)",fontSize:12}}>در حال باز کردن پروژه…</div>}
-        <div style={{textAlign:"center",padding:"40px 0",color:"var(--ah-muted)",fontSize:13}}>پروژه‌ای یافت نشد</div>}
+        {busy&&<div style={{textAlign:"center",padding:"14px",color:"var(--ah-muted)",fontSize:12}}>در حال باز کردن پروژه…</div>}
+        {filtered.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"var(--ah-muted)",fontSize:13}}>پروژه‌ای یافت نشد</div>}
         {/* New project CTA */}
         <button onClick={onNewProject} style={{width:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,padding:"24px",borderRadius:16,cursor:"pointer",background:"transparent",border:"1.5px dashed var(--ah-border)",color:"var(--ah-muted)",marginTop:4}}>
           <Ic n="plus" s={22}/>
