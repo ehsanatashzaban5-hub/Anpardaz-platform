@@ -283,7 +283,7 @@ export default function WebHome({ onNavigate }: HomeProps) {
       {/* ── APP DOWNLOAD ─────────────────────────────── */}
       <section style={{ maxWidth:1280, margin:"0 auto", padding:"72px 24px" }}>
         <div style={{ background:"var(--w-card)", border:"1px solid var(--w-border)", borderRadius:24, padding:"48px", textAlign:"center", position:"relative", overflow:"hidden" }}>
-          <div style={{ position:"absolute", inset:0, backgroundImage:"linear-gradient(var(--w-border) 1px,transparent 1px),linear-gradient(90deg,var(--w-border) 1px,transparent 1px)", backgroundSize:"40px 40px", opacity:0.4 }}/>
+          
           <div style={{ position:"relative" }}>
             <div style={{ fontSize:"clamp(20px,3vw,32px)", fontWeight:900, marginBottom:12 }}>اپلیکیشن آن پرداز را دانلود کنید</div>
             <div style={{ fontSize:14, color:"var(--w-muted)", marginBottom:36, maxWidth:500, margin:"0 auto 36px" }}>

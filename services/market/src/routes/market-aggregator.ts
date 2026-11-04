@@ -19,8 +19,11 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
     const lim=params.length+1, off=params.length+2; params.push(l,o);
     const r=await pool.query(`SELECT p.id,p.title,p.description,p.brand,p.condition,p.specs,p.source_url,
       c.slug category_slug,c.name category_name,c.name_fa category_name_fa,
-      COALESCE(MIN(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text price_min,
-      COALESCE(MAX(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text price_max,
+      CASE WHEN COUNT(DISTINCT o.currency) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock')=1
+        THEN COALESCE(MIN(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text ELSE '0' END price_min,
+      CASE WHEN COUNT(DISTINCT o.currency) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock')=1
+        THEN COALESCE(MAX(o.price) FILTER(WHERE os.id IS NOT NULL AND o.availability<>'out_of_stock'),0)::text ELSE '0' END price_max,
+      COALESCE(pr.ranges,'[]'::json) price_ranges,
       COUNT(DISTINCT os.id)::int store_count,
       COUNT(o.id) FILTER(WHERE os.id IS NOT NULL)::int offer_count,
       COALESCE(rv.rating,0)::numeric rating,
@@ -29,12 +32,23 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
       LEFT JOIN market_categories c ON c.id=p.category_id
       LEFT JOIN market_offers o ON o.product_id=p.id LEFT JOIN market_stores os ON os.id=o.store_id AND os.active=true
       LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object('currency',r.currency,'min',r.min_price,'max',r.max_price) ORDER BY r.currency) AS ranges
+        FROM (
+          SELECT o2.currency,MIN(o2.price)::text AS min_price,MAX(o2.price)::text AS max_price
+          FROM market_offers o2
+          LEFT JOIN market_stores s2 ON s2.id=o2.store_id
+          WHERE o2.product_id=p.id AND o2.availability<>'out_of_stock'
+            AND (s2.active IS TRUE OR s2.id IS NULL)
+          GROUP BY o2.currency
+        ) r
+      ) pr ON TRUE
+      LEFT JOIN LATERAL (
         SELECT ROUND(AVG(r.rating),2) AS rating, COUNT(*)::int AS reviews
         FROM market_reviews r
         WHERE r.product_id=p.id AND r.status='published'
       ) rv ON TRUE
       WHERE ${where.join(' AND ')}
-      GROUP BY p.id,c.id ORDER BY p.updated_at DESC,p.id DESC LIMIT $${lim} OFFSET $${off}`,params);
+      GROUP BY p.id,c.id,pr.ranges ORDER BY p.updated_at DESC,p.id DESC LIMIT $${lim} OFFSET $${off}`,params);
     const ids=r.rows.map((x:any)=>Number(x.id));
     let media:any[]=[]; let offers:any[]=[]; let priceHistory:any[]=[];
     if(ids.length){
@@ -181,15 +195,18 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
       FROM market_products p LEFT JOIN market_categories c ON c.id=p.category_id
       WHERE p.id=$1 AND p.status='published' LIMIT 1`,[id]);
     if(!p.rows[0])return reply.code(404).send({error:'product_not_found'});
-    const [media,offers]=await Promise.all([
+    const [media,offers,history]=await Promise.all([
       pool.query(`SELECT id,url,sort_order FROM market_media WHERE product_id=$1 ORDER BY sort_order,id`,[id]),
       pool.query(`SELECT o.id,o.store_id,o.price,o.currency,o.availability,o.shipping_cost,o.product_url,o.image_url,o.updated_at,
         s.name store_name,s.domain store_domain,s.iframe_mode,s.homepage_url
         FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id
         WHERE o.product_id=$1 AND (s.active IS TRUE OR s.id IS NULL)
-        ORDER BY o.price,o.id`,[id])
+        ORDER BY o.price,o.id`,[id]),
+      pool.query(`SELECT price AS p,currency,"captured_at" AS "capturedAt"
+        FROM market_offer_snapshots WHERE product_id=$1
+        ORDER BY captured_at DESC,id DESC LIMIT 30`,[id])
     ]);
-    return{product:p.rows[0],media:media.rows,offers:offers.rows};
+    return{product:p.rows[0],media:media.rows,offers:offers.rows,priceHistory:history.rows.reverse()};
   });
 
   app.get('/api/v1/market/me/favorites',{preHandler:requireAuth},async(req)=>{
@@ -269,9 +286,14 @@ export function registerMarketAggregatorRoutes(app:FastifyInstance,pool:Pool){
   });
 
   app.post('/api/v1/market/me/alerts',{preHandler:requireAuth},async(req,reply)=>{
-    const a=auth(req),uid=await ensureMarketUser(pool,a.auth),b=(req.body??{}) as any,id=Number(b.productId),target=Number(b.targetPrice);
-    if(!Number.isSafeInteger(id)||id<=0||!Number.isFinite(target)||target<=0)return reply.code(400).send({error:'invalid_alert'});
-    const q=await pool.query("INSERT INTO market_price_alerts(identity_id,user_id,product_id,target_price,currency) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,product_id) DO UPDATE SET target_price=EXCLUDED.target_price,enabled=true,updated_at=NOW() RETURNING *",[a.auth.sub,uid,id,target,String(b.currency??'IRR').slice(0,3)]);
+    const a=auth(req),uid=await ensureMarketUser(pool,a.auth),b=(req.body??{}) as any,id=Number(b.productId),target=Number(b.targetPrice),currency=String(b.currency??'IRR').trim().toUpperCase();
+    if(!Number.isSafeInteger(id)||id<=0||!Number.isFinite(target)||target<=0||!/^[A-Z]{3}$/.test(currency))return reply.code(400).send({error:'invalid_alert'});
+    const supported=await pool.query(`SELECT 1 FROM market_offers o LEFT JOIN market_stores s ON s.id=o.store_id
+      JOIN market_products p ON p.id=o.product_id
+      WHERE o.product_id=$1 AND p.status='published' AND o.currency=$2 AND o.availability<>'out_of_stock'
+        AND (s.active IS TRUE OR s.id IS NULL) LIMIT 1`,[id,currency]);
+    if(!supported.rowCount)return reply.code(400).send({error:'unsupported_alert_currency'});
+    const q=await pool.query("INSERT INTO market_price_alerts(identity_id,user_id,product_id,target_price,currency) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,product_id) DO UPDATE SET target_price=EXCLUDED.target_price,currency=EXCLUDED.currency,enabled=true,updated_at=NOW() RETURNING *",[a.auth.sub,uid,id,target,currency]);
     return{alert:q.rows[0]};
   });
 
