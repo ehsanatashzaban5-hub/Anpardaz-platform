@@ -9297,7 +9297,7 @@ button { font-weight: 700; }
 
 /* Unified Persian typography for all web routes, including form controls. */
 button, input, select, textarea { font-family: "Vazirmatn", system-ui, -apple-system, sans-serif; }
-html, body, #root, #root * { font-family: "Vazirmatn", system-ui, -apple-system, sans-serif !important; }
+html, body, #root { font-family: "Vazirmatn", system-ui, -apple-system, sans-serif; }
 
 
 /* 2026-11-02: An Market responsive polish — web only */
