@@ -1,5 +1,7 @@
 {
-  "description": "Manage Iranian currency transfers, pay bills, access vehicle services, and handle insurance with a user-friendly interface supporting multiple payment methods.",
+  "title": "آن پرداز | همه خدمات در یک اپلیکیشن",
+  "description": "آن پرداز؛ دسترسی یکپارچه به خدمات مالی، پرداخت، بازار، هوش مصنوعی و محتوای کاربردی در یک بستر امن و حرفه‌ای.",
+  "language": "fa",
   "robots": {
     "index": false
   },
