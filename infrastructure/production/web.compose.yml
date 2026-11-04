@@ -20,6 +20,10 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
     cap_drop:
       - ALL
     healthcheck:
