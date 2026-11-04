@@ -4,31 +4,24 @@
     <!-- figma:head-start -->
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https:; media-src 'self' data: blob: https:; worker-src 'self' blob:" />
-    <!-- The web portal is desktop-only. On phones the complete 1280px desktop
-         canvas is scaled to fit the device; it must never become a mobile UI
-         or require horizontal panning. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       html,
-      body {
+      body,
+      #root {
         width: 100%;
         min-width: 0;
+        max-width: 100%;
         margin: 0;
-        overflow-x: hidden;
       }
-
+      html {
+        overflow-x: clip;
+      }
+      body {
+        overflow-x: clip;
+      }
       #root {
-        width: 1280px;
-        min-width: 1280px;
-      }
-
-      /* Scale the unchanged desktop canvas on narrow devices. This is visual
-         scaling, not responsive/mobile re-layout: the desktop proportions,
-         columns and navigation remain exactly the same. */
-      @media (max-width: 1279px) {
-        #root {
-          zoom: calc(100vw / 1280);
-        }
+        min-height: 100vh;
       }
     </style>
     <title><!-- figma:title --></title>
