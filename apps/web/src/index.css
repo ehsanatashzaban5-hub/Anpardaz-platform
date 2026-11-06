@@ -84,9 +84,12 @@ input[type="number"] { -moz-appearance: textfield; }
 
 button, input, select, textarea { font-family: 'Vazirmatn', 'system-ui', -apple-system, sans-serif; }
 
-/* One Persian typeface across every web route and embedded platform. */
-html, body, #root, #root * {
-  font-family: 'Vazirmatn', 'system-ui', -apple-system, sans-serif !important;
+/* Keep typography global without overriding icon-font glyphs in child components. */
+html, body, #root {
+  font-family: 'Vazirmatn', 'system-ui', -apple-system, sans-serif;
+}
+button, input, select, textarea {
+  font-family: 'Vazirmatn', 'system-ui', -apple-system, sans-serif;
 }
 
 /* ─── App Root ──────────────────────────────────────────────────────────────── */
