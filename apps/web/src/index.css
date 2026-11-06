@@ -82,7 +82,15 @@ input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; }
 
-button, input, select { font-family: 'Vazirmatn', sans-serif; }
+button, input, select, textarea { font-family: 'Vazirmatn', 'system-ui', -apple-system, sans-serif; }
+
+/* Keep typography global without overriding icon-font glyphs in child components. */
+html, body, #root {
+  font-family: 'Vazirmatn', 'system-ui', -apple-system, sans-serif;
+}
+button, input, select, textarea {
+  font-family: 'Vazirmatn', 'system-ui', -apple-system, sans-serif;
+}
 
 /* ─── App Root ──────────────────────────────────────────────────────────────── */
 .app {
