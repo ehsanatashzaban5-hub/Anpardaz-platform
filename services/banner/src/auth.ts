@@ -21,7 +21,7 @@ export function verifyIdentityToken(token:string):AuthClaims|null {
     const c=JSON.parse(Buffer.from(p,'base64url').toString()) as AuthClaims;
     const now=Math.floor(Date.now()/1000);
     if(typeof c.sub!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.sub)) return null;
-    if(typeof c.email!=='string'||!/^([^\\s@]+)@([^\\s@]+)\\.([^\\s@]+)$/.test(c.email)) return null;
+    if(typeof c.email!=='string'||!/^([^\s@]+)@([^\s@]+)\.([^\s@]+)$/.test(c.email)) return null;
     if(typeof c.role!=='string'||!['user','admin','super_admin','operator','editor','moderator','support'].includes(c.role)) return null;
     if(c.aud!=='anpardaz-ecosystem'||c.iss!==(process.env.IDENTITY_ISSUER??'anpardaz-platform')||
       !Number.isSafeInteger(c.iat)||!Number.isSafeInteger(c.exp)||c.iat>now+60||c.exp<=now||c.exp>c.iat+3600) return null;
